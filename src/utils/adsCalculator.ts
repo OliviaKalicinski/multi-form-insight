@@ -2,8 +2,36 @@ import { AdsData, AdsMetrics } from "@/types/marketing";
 
 export const parseAdsValue = (value: string): number => {
   if (!value || value === "" || value === "N/A" || value === "-") return 0;
-  // Remove pontos de milhar e substitui vírgula por ponto
-  const cleaned = value.replace(/\./g, "").replace(",", ".");
+  
+  const stringValue = String(value).trim();
+  
+  // Detectar formato baseado na presença de vírgula e ponto
+  const hasComma = stringValue.includes(',');
+  const hasDot = stringValue.includes('.');
+  
+  let cleaned = stringValue;
+  
+  if (hasComma && hasDot) {
+    // Determinar qual é o separador de milhar e qual é o decimal
+    const lastCommaPos = stringValue.lastIndexOf(',');
+    const lastDotPos = stringValue.lastIndexOf('.');
+    
+    if (lastDotPos > lastCommaPos) {
+      // Formato americano: 1,234.56
+      cleaned = stringValue.replace(/,/g, '');
+    } else {
+      // Formato brasileiro: 1.234,56
+      cleaned = stringValue.replace(/\./g, '').replace(',', '.');
+    }
+  } else if (hasComma) {
+    // Apenas vírgula - formato brasileiro: 1234,56
+    cleaned = stringValue.replace(',', '.');
+  } else if (hasDot) {
+    // Apenas ponto - formato americano: 1234.56 ou 1.56
+    // Já está no formato correto
+    cleaned = stringValue;
+  }
+  
   return parseFloat(cleaned) || 0;
 };
 
