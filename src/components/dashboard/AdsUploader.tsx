@@ -18,7 +18,7 @@ const adsDataSchema = z.object({
   "Impressões": z.string(),
   "Início dos relatórios": z.string(),
   "Término dos relatórios": z.string(),
-});
+}).passthrough();
 
 export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
   const [isDragging, setIsDragging] = useState(false);
