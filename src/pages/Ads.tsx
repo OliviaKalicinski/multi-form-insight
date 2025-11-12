@@ -23,28 +23,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
+import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { calculateAdsMetrics, filterAdsByMonth } from "@/utils/adsCalculator";
+import { filterAdsByMonth } from "@/utils/adsParserV2";
 
 const Ads = () => {
   const navigate = useNavigate();
-  const { adsData, selectedMonth, availableMonths, setSelectedMonth } = useDashboard();
-
-  // DEBUG: Ver estado atual
-  console.log('=== ADS PAGE DEBUG ===');
-  console.log('selectedMonth:', selectedMonth);
-  console.log('availableMonths:', availableMonths);
-  console.log('adsData length:', adsData.length);
-  if (adsData.length > 0) {
-    console.log('adsData sample:', adsData[0]);
-    console.log('First ad date:', adsData[0]["Início dos relatórios"]);
-  }
+  const { adsData, monthlySummaries, hasHierarchicalFormat, selectedMonth, availableMonths, setSelectedMonth } = useDashboard();
 
   const currentMonthAdsData = useMemo(() => {
     if (!selectedMonth) return [];
-    const filtered = filterAdsByMonth(adsData, selectedMonth);
-    console.log('Filtered ads for month', selectedMonth, ':', filtered.length);
-    return filtered;
+    return filterAdsByMonth(adsData, selectedMonth);
   }, [adsData, selectedMonth]);
 
   // Validar se o mês selecionado está disponível
@@ -55,9 +44,18 @@ const Ads = () => {
     }
   }, [selectedMonth, availableMonths, setSelectedMonth]);
 
+  // Usar resumo mensal pré-calculado se disponível, senão calcular dos individuais
   const metrics = useMemo(() => {
+    if (hasHierarchicalFormat && monthlySummaries.length > 0) {
+      const summary = monthlySummaries.find(s => s.month === selectedMonth);
+      if (summary) {
+        return summary.data;
+      }
+    }
+    // Fallback: calcular dos dados individuais (formato antigo ou se resumo não encontrado)
+    const { calculateAdsMetrics } = require("@/utils/adsCalculator");
     return calculateAdsMetrics(currentMonthAdsData);
-  }, [currentMonthAdsData]);
+  }, [hasHierarchicalFormat, monthlySummaries, selectedMonth, currentMonthAdsData]);
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -254,7 +252,12 @@ const Ads = () => {
                 />
               </div>
             </div>
-        </div>
+
+            {/* Breakdown de Anúncios Individuais */}
+            {currentMonthAdsData.length > 0 && (
+              <AdsBreakdown ads={currentMonthAdsData} selectedMonth={selectedMonth} />
+            )}
+          </div>
       )}
     </div>
   );

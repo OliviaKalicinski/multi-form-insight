@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { AdsData } from "@/types/marketing";
+import { parseHierarchicalAds, validateAdsConsistency } from "@/utils/adsParserV2";
 
 interface AdsUploaderProps {
-  onDataLoaded: (data: AdsData[], fileName: string) => void;
+  onDataLoaded: (data: AdsData[], fileName: string, summaries?: any[], isHierarchical?: boolean) => void;
 }
 
 const adsDataSchema = z.object({
@@ -25,28 +26,71 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const validateAndProcessData = (data: any[]): AdsData[] => {
-    const validData: AdsData[] = [];
+  const validateAndProcessData = (
+    parsedData: any[],
+    fileName: string
+  ): AdsData[] | null => {
+    if (!parsedData || parsedData.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Arquivo vazio",
+        description: "O arquivo não contém dados válidos.",
+      });
+      return null;
+    }
+
+    const validatedData: AdsData[] = [];
     const errors: string[] = [];
 
-    data.forEach((row, index) => {
-      try {
-        adsDataSchema.parse(row);
-        validData.push(row as AdsData);
-      } catch (error) {
-        errors.push(`Linha ${index + 1}: dados inválidos`);
+    parsedData.forEach((row, index) => {
+      const result = adsDataSchema.safeParse(row);
+      if (result.success) {
+        validatedData.push(row as AdsData);
+      } else {
+        errors.push(`Linha ${index + 2}: ${result.error.message}`);
       }
     });
 
-    if (errors.length > 0 && errors.length < data.length) {
+    if (validatedData.length === 0) {
       toast({
-        title: "Aviso",
-        description: `${errors.length} linha(s) com formato inválido foram ignoradas. ${validData.length} linha(s) foram importadas com sucesso.`,
-        variant: "default",
+        variant: "destructive",
+        title: "Nenhum dado válido encontrado",
+        description: "Por favor, verifique o formato do arquivo.",
+      });
+      return null;
+    }
+
+    // Parser hierárquico para detectar formato novo
+    const { monthlySummaries, individualAds, hasHierarchicalFormat } = parseHierarchicalAds(validatedData);
+
+    // Validar consistência se for formato hierárquico
+    if (hasHierarchicalFormat && monthlySummaries.length > 0) {
+      const { warnings } = validateAdsConsistency(monthlySummaries, individualAds);
+      
+      if (warnings.length > 0) {
+        console.warn("Avisos de consistência:", warnings);
+      }
+
+      toast({
+        title: hasHierarchicalFormat ? "🟢 Formato Hierárquico Detectado" : "🔵 Formato Individual Detectado",
+        description: hasHierarchicalFormat 
+          ? `${monthlySummaries.length} resumos mensais e ${individualAds.length} anúncios individuais carregados.`
+          : `${validatedData.length} anúncios carregados.`,
+      });
+
+      onDataLoaded(individualAds, fileName, monthlySummaries, hasHierarchicalFormat);
+      return individualAds;
+    }
+
+    if (errors.length > 0 && errors.length < parsedData.length) {
+      toast({
+        title: "Dados carregados com avisos",
+        description: `${validatedData.length} anúncios válidos. ${errors.length} linha(s) com problemas foram ignoradas.`,
       });
     }
 
-    return validData;
+    onDataLoaded(validatedData, fileName, [], false);
+    return validatedData;
   };
 
   const processFile = (file: File) => {
@@ -82,9 +126,9 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
           return;
         }
 
-        const validData = validateAndProcessData(results.data);
+        const validData = validateAndProcessData(results.data, file.name);
 
-        if (validData.length === 0) {
+        if (!validData || validData.length === 0) {
           toast({
             title: "Nenhum dado válido encontrado",
             description: "Certifique-se de que o arquivo contém as colunas corretas do Meta Ads Manager.",
@@ -93,12 +137,7 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
           return;
         }
 
-        onDataLoaded(validData, file.name);
         setUploadedFile(file.name);
-        toast({
-          title: "Sucesso!",
-          description: `${validData.length} anúncio(s) importado(s) com sucesso.`,
-        });
       },
       error: (error) => {
         toast({
@@ -129,7 +168,7 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
 
   const clearFile = () => {
     setUploadedFile(null);
-    onDataLoaded([], "");
+    onDataLoaded([], "", [], false);
     toast({
       title: "Arquivo removido",
       description: "Dados resetados para os valores padrão.",

@@ -36,6 +36,7 @@ export interface FollowersMetrics {
 }
 
 export interface AdsData {
+  "Mês"?: string; // Novo campo para o formato hierárquico
   "Nome do anúncio": string;
   "Nome do conjunto de anúncios": string;
   "Valor usado (BRL)": string;
@@ -67,6 +68,12 @@ export interface AdsData {
   "Veiculação da campanha": string;
   "Início dos relatórios": string;
   "Término dos relatórios": string;
+}
+
+export interface AdsMonthSummary {
+  month: string; // "2025-10"
+  data: AdsMetrics;
+  rawData: AdsData; // Dados originais da linha "All"
 }
 
 export interface AdsMetrics {

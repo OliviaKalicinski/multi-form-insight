@@ -1,18 +1,21 @@
 import { createContext, useContext, useState, useMemo, ReactNode } from "react";
-import { MarketingData, FollowersData, AdsData } from "@/types/marketing";
+import { MarketingData, FollowersData, AdsData, AdsMonthSummary } from "@/types/marketing";
 import { marketingData as defaultMarketingData } from "@/data/marketingData";
 import { followersData as defaultFollowersData } from "@/data/followersData";
 import { defaultAdsData } from "@/data/adsData";
+import { extractAvailableMonths } from "@/utils/adsParserV2";
 
 interface DashboardContextType {
   marketingData: MarketingData[];
   followersData: FollowersData[];
   adsData: AdsData[];
+  monthlySummaries: AdsMonthSummary[];
+  hasHierarchicalFormat: boolean;
   selectedMonth: string;
   availableMonths: string[];
   setMarketingData: (data: MarketingData[]) => void;
   setFollowersData: (data: FollowersData[]) => void;
-  setAdsData: (data: AdsData[]) => void;
+  setAdsData: (data: AdsData[], summaries?: AdsMonthSummary[], isHierarchical?: boolean) => void;
   setSelectedMonth: (month: string) => void;
 }
 
@@ -22,6 +25,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [marketingData, setMarketingDataState] = useState<MarketingData[]>(defaultMarketingData);
   const [followersData, setFollowersDataState] = useState<FollowersData[]>(defaultFollowersData);
   const [adsData, setAdsDataState] = useState<AdsData[]>(defaultAdsData);
+  const [monthlySummaries, setMonthlySummaries] = useState<AdsMonthSummary[]>([]);
+  const [hasHierarchicalFormat, setHasHierarchicalFormat] = useState<boolean>(false);
   const [selectedMonth, setSelectedMonthState] = useState<string>("");
 
   // Calculate available months from all data sources
@@ -38,11 +43,9 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       months.add(month);
     });
     
-    adsData.forEach((item) => {
-      const month = item["Início dos relatórios"].substring(0, 7);
-      console.log('📅 Ad month extracted:', month, 'from', item["Início dos relatórios"]);
-      months.add(month);
-    });
+    // Use parser otimizado para extrair meses dos anúncios
+    const adsMonths = extractAvailableMonths(adsData);
+    adsMonths.forEach(month => months.add(month));
     
     const result = Array.from(months).sort();
     console.log('📊 Available months calculated:', result);
@@ -67,8 +70,10 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setSelectedMonthState("");
   };
 
-  const setAdsData = (data: AdsData[]) => {
+  const setAdsData = (data: AdsData[], summaries: AdsMonthSummary[] = [], isHierarchical: boolean = false) => {
     setAdsDataState(data.length > 0 ? data : defaultAdsData);
+    setMonthlySummaries(summaries);
+    setHasHierarchicalFormat(isHierarchical);
     setSelectedMonthState("");
   };
 
@@ -76,6 +81,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     marketingData,
     followersData,
     adsData,
+    monthlySummaries,
+    hasHierarchicalFormat,
     selectedMonth,
     availableMonths,
     setMarketingData,

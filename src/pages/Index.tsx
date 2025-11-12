@@ -14,6 +14,7 @@ import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNum
 import { calculateAdsMetrics, filterAdsByMonth } from "@/utils/adsCalculator";
 import { MarketingData, FollowersData, AdsData } from "@/types/marketing";
 import { useDashboard } from "@/contexts/DashboardContext";
+import { defaultAdsData } from "@/data/adsData";
 
 const Index = () => {
   const {
@@ -106,8 +107,12 @@ const Index = () => {
     setFollowersData(data);
   };
 
-  const handleAdsDataLoaded = (data: AdsData[]) => {
-    setAdsData(data);
+  const handleAdsDataLoaded = (data: AdsData[], fileName: string, summaries?: any[], isHierarchical?: boolean) => {
+    if (data.length === 0) {
+      setAdsData(defaultAdsData, [], false);
+    } else {
+      setAdsData(data, summaries, isHierarchical);
+    }
   };
 
   return (
