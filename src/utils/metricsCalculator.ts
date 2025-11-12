@@ -1,6 +1,7 @@
 import { MarketingData, MonthlyMetrics, GrowthMetrics } from "@/types/marketing";
 
 export const calculateMonthlyMetrics = (data: MarketingData[]): MonthlyMetrics => {
+  const visualizacoesTotal = data.reduce((sum, item) => sum + parseInt(item.Visualizações), 0);
   const alcanceTotal = data.reduce((sum, item) => sum + parseInt(item.Alcance), 0);
   const visitasTotal = data.reduce((sum, item) => sum + parseInt(item.Visitas), 0);
   const interacoesTotal = data.reduce((sum, item) => sum + parseInt(item.Interações), 0);
@@ -10,6 +11,7 @@ export const calculateMonthlyMetrics = (data: MarketingData[]): MonthlyMetrics =
   const taxaEngajamento = alcanceTotal > 0 ? (interacoesTotal / alcanceTotal) * 100 : 0;
 
   return {
+    visualizacoesTotal,
     alcanceTotal,
     visitasTotal,
     interacoesTotal,
@@ -26,6 +28,11 @@ export const calculateGrowthMetrics = (
   const currentMetrics = calculateMonthlyMetrics(currentMonth);
   const previousMetrics = calculateMonthlyMetrics(previousMonth);
 
+  const crescimentoVisualizacoes =
+    previousMetrics.visualizacoesTotal > 0
+      ? ((currentMetrics.visualizacoesTotal - previousMetrics.visualizacoesTotal) / previousMetrics.visualizacoesTotal) * 100
+      : 0;
+
   const crescimentoAlcance =
     previousMetrics.alcanceTotal > 0
       ? ((currentMetrics.alcanceTotal - previousMetrics.alcanceTotal) / previousMetrics.alcanceTotal) * 100
@@ -37,6 +44,7 @@ export const calculateGrowthMetrics = (
       : 0;
 
   return {
+    crescimentoVisualizacoes,
     crescimentoAlcance,
     crescimentoVisitas,
   };

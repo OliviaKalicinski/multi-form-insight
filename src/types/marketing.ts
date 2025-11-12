@@ -8,6 +8,7 @@ export interface MarketingData {
 }
 
 export interface MonthlyMetrics {
+  visualizacoesTotal: number;
   alcanceTotal: number;
   visitasTotal: number;
   interacoesTotal: number;
@@ -17,6 +18,7 @@ export interface MonthlyMetrics {
 }
 
 export interface GrowthMetrics {
+  crescimentoVisualizacoes: number;
   crescimentoAlcance: number;
   crescimentoVisitas: number;
 }

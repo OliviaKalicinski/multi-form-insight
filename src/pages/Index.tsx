@@ -5,7 +5,7 @@ import { TrendChart } from "@/components/dashboard/TrendChart";
 import { CSVUploader } from "@/components/dashboard/CSVUploader";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { marketingData as defaultData } from "@/data/marketingData";
-import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber } from "@/utils/metricsCalculator";
+import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage } from "@/utils/metricsCalculator";
 import { MarketingData } from "@/types/marketing";
 
 const Index = () => {
@@ -51,7 +51,7 @@ const Index = () => {
 
   const growthMetrics = useMemo(() => {
     if (previousMonthData.length === 0) {
-      return { crescimentoAlcance: 0, crescimentoVisitas: 0 };
+      return { crescimentoVisualizacoes: 0, crescimentoAlcance: 0, crescimentoVisitas: 0 };
     }
     return calculateGrowthMetrics(currentMonthData, previousMonthData);
   }, [currentMonthData, previousMonthData]);
@@ -90,24 +90,30 @@ const Index = () => {
               <h2 className="text-2xl font-semibold mb-4 text-foreground">📊 Volume (Totais do Mês)</h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <MetricCard
-                  title="Alcance Total"
+                  title="👁️ Visualizações Totais"
+                  value={formatNumber(currentMetrics.visualizacoesTotal)}
+                  icon={Eye}
+                  trend={previousMonthData.length > 0 ? growthMetrics.crescimentoVisualizacoes : undefined}
+                />
+                <MetricCard
+                  title="📊 Alcance Total"
                   value={formatNumber(currentMetrics.alcanceTotal)}
-                  icon={TrendingUp}
+                  icon={Users}
                   trend={previousMonthData.length > 0 ? growthMetrics.crescimentoAlcance : undefined}
                 />
                 <MetricCard
-                  title="Visitas ao Perfil"
+                  title="👤 Visitas ao Perfil"
                   value={formatNumber(currentMetrics.visitasTotal)}
                   icon={Users}
                   trend={previousMonthData.length > 0 ? growthMetrics.crescimentoVisitas : undefined}
                 />
                 <MetricCard
-                  title="Interações Totais"
+                  title="💬 Interações Totais"
                   value={formatNumber(currentMetrics.interacoesTotal)}
-                  icon={Eye}
+                  icon={Target}
                 />
                 <MetricCard
-                  title="Cliques no Link"
+                  title="🔗 Cliques no Link"
                   value={formatNumber(currentMetrics.clicksTotal)}
                   icon={MousePointerClick}
                 />
@@ -139,16 +145,22 @@ const Index = () => {
             {previousMonthData.length > 0 && (
               <div>
                 <h2 className="text-2xl font-semibold mb-4 text-foreground">📈 Crescimento (vs Mês Anterior)</h2>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <MetricCard
-                    title="Crescimento de Alcance"
-                    value={`${growthMetrics.crescimentoAlcance >= 0 ? "+" : ""}${growthMetrics.crescimentoAlcance.toFixed(1)}%`}
+                    title="👁️ Crescimento de Visualizações"
+                    value={formatPercentage(growthMetrics.crescimentoVisualizacoes)}
+                    icon={growthMetrics.crescimentoVisualizacoes >= 0 ? TrendingUp : TrendingDown}
+                    variant={growthMetrics.crescimentoVisualizacoes >= 0 ? "success" : undefined}
+                  />
+                  <MetricCard
+                    title="📊 Crescimento de Alcance"
+                    value={formatPercentage(growthMetrics.crescimentoAlcance)}
                     icon={growthMetrics.crescimentoAlcance >= 0 ? TrendingUp : TrendingDown}
                     variant={growthMetrics.crescimentoAlcance >= 0 ? "success" : undefined}
                   />
                   <MetricCard
-                    title="Crescimento de Visitas"
-                    value={`${growthMetrics.crescimentoVisitas >= 0 ? "+" : ""}${growthMetrics.crescimentoVisitas.toFixed(1)}%`}
+                    title="👤 Crescimento de Visitas"
+                    value={formatPercentage(growthMetrics.crescimentoVisitas)}
                     icon={growthMetrics.crescimentoVisitas >= 0 ? TrendingUp : TrendingDown}
                     variant={growthMetrics.crescimentoVisitas >= 0 ? "success" : undefined}
                   />
