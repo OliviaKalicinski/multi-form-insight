@@ -72,10 +72,12 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
       }
 
       toast({
-        title: hasHierarchicalFormat ? "🟢 Formato Hierárquico Detectado" : "🔵 Formato Individual Detectado",
+        title: hasHierarchicalFormat 
+          ? "🟢 Formato Hierárquico Detectado" 
+          : "🟡 Formato Individual - Resumos Calculados",
         description: hasHierarchicalFormat 
           ? `${monthlySummaries.length} resumos mensais e ${individualAds.length} anúncios individuais carregados.`
-          : `${validatedData.length} anúncios carregados.`,
+          : `${individualAds.length} anúncios processados. Resumos calculados para ${monthlySummaries.length} meses.`,
       });
 
       onDataLoaded(individualAds, fileName, monthlySummaries, hasHierarchicalFormat);

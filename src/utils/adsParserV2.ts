@@ -39,6 +39,7 @@ export const isMonthSummaryRow = (row: AdsData): boolean => {
 /**
  * Parser para o novo formato hierárquico de ads
  * Detecta linhas "All" como resumos mensais e agrupa anúncios individuais
+ * Se não houver linhas "All", calcula resumos automaticamente
  */
 export const parseHierarchicalAds = (data: AdsData[]): {
   monthlySummaries: AdsMonthSummary[];
@@ -48,14 +49,15 @@ export const parseHierarchicalAds = (data: AdsData[]): {
   const monthlySummaries: AdsMonthSummary[] = [];
   const individualAds: AdsData[] = [];
   let currentMonth = "";
-  let hasHierarchicalFormat = false;
+  let hasAllLines = false;
 
+  // Primeira passagem: separar linhas "All" de anúncios individuais
   for (const row of data) {
     const month = extractMonth(row);
     
     if (isMonthSummaryRow(row)) {
       // Esta é uma linha de resumo mensal
-      hasHierarchicalFormat = true;
+      hasAllLines = true;
       currentMonth = month;
       
       const metrics = calculateAdsMetrics([row]);
@@ -66,11 +68,8 @@ export const parseHierarchicalAds = (data: AdsData[]): {
       });
     } else {
       // Esta é uma linha de anúncio individual
-      // Se estamos no novo formato, usar o último mês visto
-      // Se não, extrair o mês da própria linha
-      const adMonth = hasHierarchicalFormat && currentMonth ? currentMonth : month;
+      const adMonth = hasAllLines && currentMonth ? currentMonth : month;
       
-      // Adicionar o mês extraído ao objeto do anúncio
       const adWithMonth: AdsData = {
         ...row,
         "Mês": adMonth || row["Mês"],
@@ -80,10 +79,39 @@ export const parseHierarchicalAds = (data: AdsData[]): {
     }
   }
 
+  // Se não houver linhas "All", calcular resumos a partir dos anúncios individuais
+  if (!hasAllLines && individualAds.length > 0) {
+    const monthGroups = new Map<string, AdsData[]>();
+    
+    // Agrupar anúncios por mês
+    for (const ad of individualAds) {
+      const month = extractMonth(ad);
+      if (month) {
+        if (!monthGroups.has(month)) {
+          monthGroups.set(month, []);
+        }
+        monthGroups.get(month)!.push(ad);
+      }
+    }
+
+    // Calcular resumos mensais a partir dos anúncios agrupados
+    for (const [month, ads] of monthGroups.entries()) {
+      const metrics = calculateAdsMetrics(ads);
+      monthlySummaries.push({
+        month,
+        data: metrics,
+        rawData: ads[0], // Usar primeiro anúncio como referência para dados brutos
+      });
+    }
+    
+    // Ordenar resumos por mês
+    monthlySummaries.sort((a, b) => a.month.localeCompare(b.month));
+  }
+
   return {
     monthlySummaries,
     individualAds,
-    hasHierarchicalFormat,
+    hasHierarchicalFormat: hasAllLines,
   };
 };
 
