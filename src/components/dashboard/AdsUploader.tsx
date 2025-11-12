@@ -129,9 +129,10 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
 
   const clearFile = () => {
     setUploadedFile(null);
+    onDataLoaded([], "");
     toast({
       title: "Arquivo removido",
-      description: "Você pode fazer upload de um novo arquivo.",
+      description: "Dados resetados para os valores padrão.",
     });
   };
 

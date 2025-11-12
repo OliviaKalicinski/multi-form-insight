@@ -68,7 +68,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const setAdsData = (data: AdsData[]) => {
-    setAdsDataState(data);
+    setAdsDataState(data.length > 0 ? data : defaultAdsData);
     setSelectedMonthState("");
   };
 
