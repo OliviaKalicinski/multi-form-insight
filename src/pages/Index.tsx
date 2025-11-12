@@ -1,23 +1,27 @@
 import { useState, useMemo } from "react";
-import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPlus } from "lucide-react";
+import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPlus, DollarSign, ShoppingCart, ShoppingBag, Coins, Heart, ExternalLink as ExternalLinkIcon } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { FollowersChart } from "@/components/dashboard/FollowersChart";
 import { CSVUploader } from "@/components/dashboard/CSVUploader";
 import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
+import { AdsUploader } from "@/components/dashboard/AdsUploader";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { marketingData as defaultData } from "@/data/marketingData";
 import { followersData as defaultFollowersData } from "@/data/followersData";
+import { defaultAdsData } from "@/data/adsData";
 import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage } from "@/utils/metricsCalculator";
 import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNumber, formatFollowersGrowth } from "@/utils/followersCalculator";
-import { MarketingData, FollowersData } from "@/types/marketing";
+import { calculateAdsMetrics, filterAdsByMonth } from "@/utils/adsCalculator";
+import { MarketingData, FollowersData, AdsData } from "@/types/marketing";
 
 const Index = () => {
   const [marketingData, setMarketingData] = useState<MarketingData[]>(defaultData);
   const [followersData, setFollowersData] = useState<FollowersData[]>(defaultFollowersData);
+  const [adsData, setAdsData] = useState<AdsData[]>(defaultAdsData);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
 
-  // Extract available months from both marketing and followers data
+  // Extract available months from marketing, followers, and ads data
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
     marketingData.forEach((item) => {
@@ -28,8 +32,12 @@ const Index = () => {
       const month = item.Data.substring(0, 7); // YYYY-MM
       months.add(month);
     });
+    adsData.forEach((item) => {
+      const month = item["Início dos relatórios"].substring(0, 7); // YYYY-MM
+      months.add(month);
+    });
     return Array.from(months).sort();
-  }, [marketingData, followersData]);
+  }, [marketingData, followersData, adsData]);
 
   // Set initial selected month
   useMemo(() => {
@@ -96,6 +104,18 @@ const Index = () => {
     return metrics;
   }, [currentMonthFollowersData, previousMonthFollowersData]);
 
+  // Filter ads data by selected month
+  const currentMonthAdsData = useMemo(() => {
+    if (!selectedMonth) return [];
+    return filterAdsByMonth(adsData, selectedMonth);
+  }, [adsData, selectedMonth]);
+
+  // Calculate ads metrics
+  const currentAdsMetrics = useMemo(() => {
+    if (currentMonthAdsData.length === 0) return null;
+    return calculateAdsMetrics(currentMonthAdsData);
+  }, [currentMonthAdsData]);
+
   const handleDataLoaded = (data: MarketingData[], fileName: string) => {
     setMarketingData(data);
     setSelectedMonth(""); // Reset selection to trigger auto-select of latest month
@@ -103,6 +123,11 @@ const Index = () => {
 
   const handleFollowersDataLoaded = (data: FollowersData[], fileName: string) => {
     setFollowersData(data);
+    setSelectedMonth(""); // Reset selection to trigger auto-select of latest month
+  };
+
+  const handleAdsDataLoaded = (data: AdsData[], fileName: string) => {
+    setAdsData(data);
     setSelectedMonth(""); // Reset selection to trigger auto-select of latest month
   };
 
@@ -116,10 +141,11 @@ const Index = () => {
         </div>
 
         {/* CSV Uploaders */}
-        <div className="grid gap-6 md:grid-cols-2">
-          <CSVUploader onDataLoaded={handleDataLoaded} />
-          <FollowersUploader onDataLoaded={handleFollowersDataLoaded} />
-        </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            <CSVUploader onDataLoaded={handleDataLoaded} />
+            <FollowersUploader onDataLoaded={handleFollowersDataLoaded} />
+            <AdsUploader onDataLoaded={handleAdsDataLoaded} />
+          </div>
 
         {/* Month Filter */}
         {availableMonths.length > 0 && (
@@ -288,6 +314,129 @@ const Index = () => {
                 title="Evolução de Seguidores"
                 description="Acompanhe o crescimento da sua base de seguidores"
               />
+            )}
+
+            {/* Ads Section */}
+            {currentAdsMetrics && (
+              <>
+                <div>
+                  <h2 className="text-2xl font-semibold mb-4 text-foreground">💰 Anúncios (Meta Ads)</h2>
+                </div>
+
+                {/* Investimento e Performance */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 text-foreground">💵 Investimento e Performance</h3>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <MetricCard
+                      title="Investimento Total"
+                      value={`R$ ${currentAdsMetrics.investimentoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                      icon={DollarSign}
+                      variant="default"
+                    />
+                    <MetricCard
+                      title="Impressões"
+                      value={formatNumber(currentAdsMetrics.impressoesTotal)}
+                      icon={Eye}
+                      subtitle={`CPM médio: R$ ${currentAdsMetrics.cpmMedio.toFixed(2)}`}
+                    />
+                    <MetricCard
+                      title="Alcance Total"
+                      value={formatNumber(currentAdsMetrics.alcanceTotal)}
+                      icon={Users}
+                      subtitle={`Frequência: ${currentAdsMetrics.frequenciaMedia.toFixed(2)}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Cliques e Engajamento */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 text-foreground">🖱️ Cliques e Engajamento</h3>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <MetricCard
+                      title="Cliques Totais"
+                      value={formatNumber(currentAdsMetrics.cliquesTotal)}
+                      icon={MousePointerClick}
+                      subtitle={`CTR: ${currentAdsMetrics.ctrMedio.toFixed(2)}%`}
+                    />
+                    <MetricCard
+                      title="CPC Médio"
+                      value={`R$ ${currentAdsMetrics.cpcMedio.toFixed(2)}`}
+                      icon={TrendingDown}
+                      subtitle={`${formatNumber(currentAdsMetrics.cliquesLinkTotal)} cliques no link`}
+                    />
+                    <MetricCard
+                      title="Engajamentos"
+                      value={formatNumber(currentAdsMetrics.engajamentosTotal)}
+                      icon={Heart}
+                    />
+                  </div>
+                </div>
+
+                {/* Funil de Conversão */}
+                {(currentAdsMetrics.visualizacoesPaginaTotal > 0 || currentAdsMetrics.adicoesCarrinhoTotal > 0 || currentAdsMetrics.comprasTotal > 0) && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 text-foreground">🛒 Funil de Conversão</h3>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {currentAdsMetrics.visualizacoesPaginaTotal > 0 && (
+                        <MetricCard
+                          title="Visualizações de Página"
+                          value={formatNumber(currentAdsMetrics.visualizacoesPaginaTotal)}
+                          icon={ExternalLinkIcon}
+                        />
+                      )}
+                      {currentAdsMetrics.adicoesCarrinhoTotal > 0 && (
+                        <MetricCard
+                          title="Adições ao Carrinho"
+                          value={formatNumber(currentAdsMetrics.adicoesCarrinhoTotal)}
+                          icon={ShoppingCart}
+                        />
+                      )}
+                      {currentAdsMetrics.comprasTotal > 0 && (
+                        <MetricCard
+                          title="Compras"
+                          value={formatNumber(currentAdsMetrics.comprasTotal)}
+                          icon={ShoppingBag}
+                          subtitle={currentAdsMetrics.adicoesCarrinhoTotal > 0 ? `Taxa de conversão: ${currentAdsMetrics.taxaConversaoCarrinho.toFixed(1)}%` : undefined}
+                          variant="success"
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ROI e Conversão */}
+                {(currentAdsMetrics.valorConversaoTotal > 0 || currentAdsMetrics.roas > 0 || currentAdsMetrics.custoPorCompra > 0) && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 text-foreground">💎 ROI e Conversão</h3>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {currentAdsMetrics.valorConversaoTotal > 0 && (
+                        <MetricCard
+                          title="Valor de Conversão"
+                          value={`R$ ${currentAdsMetrics.valorConversaoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                          icon={Coins}
+                          variant="success"
+                        />
+                      )}
+                      {currentAdsMetrics.roas > 0 && (
+                        <MetricCard
+                          title="ROAS"
+                          value={`${currentAdsMetrics.roas.toFixed(2)}x`}
+                          icon={TrendingUp}
+                          subtitle={`Para cada R$ 1 investido: R$ ${currentAdsMetrics.roas.toFixed(2)}`}
+                          variant={currentAdsMetrics.roas >= 2 ? "success" : currentAdsMetrics.roas >= 1 ? "default" : "warning"}
+                        />
+                      )}
+                      {currentAdsMetrics.custoPorCompra > 0 && (
+                        <MetricCard
+                          title="Custo por Compra"
+                          value={`R$ ${currentAdsMetrics.custoPorCompra.toFixed(2)}`}
+                          icon={Target}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         ) : (
