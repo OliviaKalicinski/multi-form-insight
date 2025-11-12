@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPlus, DollarSign, ShoppingCart, ShoppingBag, Coins, Heart, ExternalLink as ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,44 +9,24 @@ import { CSVUploader } from "@/components/dashboard/CSVUploader";
 import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
 import { AdsUploader } from "@/components/dashboard/AdsUploader";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
-import { marketingData as defaultData } from "@/data/marketingData";
-import { followersData as defaultFollowersData } from "@/data/followersData";
-import { defaultAdsData } from "@/data/adsData";
 import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage } from "@/utils/metricsCalculator";
 import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNumber, formatFollowersGrowth } from "@/utils/followersCalculator";
 import { calculateAdsMetrics, filterAdsByMonth } from "@/utils/adsCalculator";
 import { MarketingData, FollowersData, AdsData } from "@/types/marketing";
+import { useDashboard } from "@/contexts/DashboardContext";
 
 const Index = () => {
-  const [marketingData, setMarketingData] = useState<MarketingData[]>(defaultData);
-  const [followersData, setFollowersData] = useState<FollowersData[]>(defaultFollowersData);
-  const [adsData, setAdsData] = useState<AdsData[]>(defaultAdsData);
-  const [selectedMonth, setSelectedMonth] = useState<string>("");
-
-  // Extract available months from marketing, followers, and ads data
-  const availableMonths = useMemo(() => {
-    const months = new Set<string>();
-    marketingData.forEach((item) => {
-      const month = item.Data.substring(0, 7); // YYYY-MM
-      months.add(month);
-    });
-    followersData.forEach((item) => {
-      const month = item.Data.substring(0, 7); // YYYY-MM
-      months.add(month);
-    });
-    adsData.forEach((item) => {
-      const month = item["Início dos relatórios"].substring(0, 7); // YYYY-MM
-      months.add(month);
-    });
-    return Array.from(months).sort();
-  }, [marketingData, followersData, adsData]);
-
-  // Set initial selected month
-  useMemo(() => {
-    if (availableMonths.length > 0 && !selectedMonth) {
-      setSelectedMonth(availableMonths[availableMonths.length - 1]);
-    }
-  }, [availableMonths, selectedMonth]);
+  const {
+    marketingData,
+    followersData,
+    adsData,
+    selectedMonth,
+    availableMonths,
+    setMarketingData,
+    setFollowersData,
+    setAdsData,
+    setSelectedMonth,
+  } = useDashboard();
 
   // Filter marketing data by selected month
   const currentMonthData = useMemo(() => {
@@ -118,36 +98,26 @@ const Index = () => {
     return calculateAdsMetrics(currentMonthAdsData);
   }, [currentMonthAdsData]);
 
-  const handleDataLoaded = (data: MarketingData[], fileName: string) => {
+  const handleDataLoaded = (data: MarketingData[]) => {
     setMarketingData(data);
-    setSelectedMonth(""); // Reset selection to trigger auto-select of latest month
   };
 
-  const handleFollowersDataLoaded = (data: FollowersData[], fileName: string) => {
+  const handleFollowersDataLoaded = (data: FollowersData[]) => {
     setFollowersData(data);
-    setSelectedMonth(""); // Reset selection to trigger auto-select of latest month
   };
 
-  const handleAdsDataLoaded = (data: AdsData[], fileName: string) => {
+  const handleAdsDataLoaded = (data: AdsData[]) => {
     setAdsData(data);
-    setSelectedMonth(""); // Reset selection to trigger auto-select of latest month
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6 space-y-8">
-        {/* Header */}
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">Dashboard de Marketing</h1>
-          <p className="text-muted-foreground">Visualize e analise suas principais métricas de desempenho</p>
-        </div>
-
-        {/* CSV Uploaders */}
-          <div className="grid gap-6 md:grid-cols-3">
-            <CSVUploader onDataLoaded={handleDataLoaded} />
-            <FollowersUploader onDataLoaded={handleFollowersDataLoaded} />
-            <AdsUploader onDataLoaded={handleAdsDataLoaded} />
-          </div>
+    <div className="container mx-auto p-6 space-y-8">
+      {/* CSV Uploaders */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <CSVUploader onDataLoaded={handleDataLoaded} />
+        <FollowersUploader onDataLoaded={handleFollowersDataLoaded} />
+        <AdsUploader onDataLoaded={handleAdsDataLoaded} />
+      </div>
 
         {/* Month Filter */}
         {availableMonths.length > 0 && (
@@ -456,7 +426,6 @@ const Index = () => {
             </p>
           </div>
         )}
-      </div>
     </div>
   );
 };
