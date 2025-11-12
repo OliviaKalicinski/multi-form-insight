@@ -26,6 +26,7 @@ import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { filterAdsByMonth } from "@/utils/adsParserV2";
+import { calculateAdsMetrics } from "@/utils/adsCalculator";
 
 const Ads = () => {
   const navigate = useNavigate();
@@ -53,7 +54,6 @@ const Ads = () => {
       }
     }
     // Fallback: calcular dos dados individuais (formato antigo ou se resumo não encontrado)
-    const { calculateAdsMetrics } = require("@/utils/adsCalculator");
     return calculateAdsMetrics(currentMonthAdsData);
   }, [hasHierarchicalFormat, monthlySummaries, selectedMonth, currentMonthAdsData]);
 
