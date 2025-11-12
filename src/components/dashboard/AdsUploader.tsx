@@ -70,7 +70,7 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
 
     Papa.parse(file, {
       header: true,
-      delimiter: "\t",
+      delimiter: "",
       skipEmptyLines: true,
       complete: (results) => {
         if (results.errors.length > 0) {
@@ -143,7 +143,7 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
           Dados de Anúncios (Meta Ads)
         </CardTitle>
         <CardDescription>
-          Importe os dados de anúncios do Facebook/Instagram Ads Manager em formato TSV
+          Importe os dados de anúncios do Facebook/Instagram Ads Manager em formato CSV ou TSV
         </CardDescription>
       </CardHeader>
       <CardContent>
