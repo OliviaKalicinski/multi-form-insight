@@ -4,15 +4,23 @@ import { MarketingData } from "@/types/marketing";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+interface MetricConfig {
+  dataKey: string;
+  name: string;
+  color: string;
+}
+
 interface TrendChartProps {
   data: MarketingData[];
   title: string;
   description: string;
+  metrics: MetricConfig[];
 }
 
-export const TrendChart = ({ data, title, description }: TrendChartProps) => {
+export const TrendChart = ({ data, title, description, metrics }: TrendChartProps) => {
   const chartData = data.map((item) => ({
     data: format(new Date(item.Data), "dd/MM", { locale: ptBR }),
+    visualizacoes: parseInt(item.Visualizações),
     alcance: parseInt(item.Alcance),
     visitas: parseInt(item.Visitas),
     interacoes: parseInt(item.Interações),
@@ -45,30 +53,17 @@ export const TrendChart = ({ data, title, description }: TrendChartProps) => {
               }}
             />
             <Legend />
-            <Line 
-              type="monotone" 
-              dataKey="alcance" 
-              stroke="hsl(var(--chart-1))" 
-              strokeWidth={2}
-              name="Alcance"
-              dot={{ fill: "hsl(var(--chart-1))" }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="visitas" 
-              stroke="hsl(var(--chart-2))" 
-              strokeWidth={2}
-              name="Visitas"
-              dot={{ fill: "hsl(var(--chart-2))" }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="interacoes" 
-              stroke="hsl(var(--chart-3))" 
-              strokeWidth={2}
-              name="Interações"
-              dot={{ fill: "hsl(var(--chart-3))" }}
-            />
+            {metrics.map((metric) => (
+              <Line
+                key={metric.dataKey}
+                type="monotone"
+                dataKey={metric.dataKey}
+                stroke={metric.color}
+                strokeWidth={2}
+                name={metric.name}
+                dot={{ fill: metric.color }}
+              />
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </CardContent>

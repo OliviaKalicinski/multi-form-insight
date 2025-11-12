@@ -248,8 +248,38 @@ const Index = () => {
             {/* Charts */}
             <TrendChart
               data={currentMonthData}
-              title="Tendência de Desempenho - Marketing"
-              description="Visualize a evolução das métricas de marketing ao longo do período"
+              title="📊 Visualizações × Alcance"
+              description="Compare o volume de visualizações com o alcance total"
+              metrics={[
+                {
+                  dataKey: "visualizacoes",
+                  name: "Visualizações",
+                  color: "hsl(var(--chart-4))",
+                },
+                {
+                  dataKey: "alcance",
+                  name: "Alcance",
+                  color: "hsl(var(--chart-1))",
+                },
+              ]}
+            />
+
+            <TrendChart
+              data={currentMonthData}
+              title="👥 Visitas × Interações"
+              description="Acompanhe as visitas ao perfil e o nível de engajamento"
+              metrics={[
+                {
+                  dataKey: "visitas",
+                  name: "Visitas",
+                  color: "hsl(var(--chart-2))",
+                },
+                {
+                  dataKey: "interacoes",
+                  name: "Interações",
+                  color: "hsl(var(--chart-3))",
+                },
+              ]}
             />
 
             {currentMonthFollowersData.length > 0 && (
