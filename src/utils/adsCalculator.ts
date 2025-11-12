@@ -1,5 +1,4 @@
 import { AdsData, AdsMetrics } from "@/types/marketing";
-import { format } from "date-fns";
 
 export const parseAdsValue = (value: string): number => {
   if (!value || value === "" || value === "N/A" || value === "-") return 0;
@@ -11,8 +10,7 @@ export const parseAdsValue = (value: string): number => {
 export const filterAdsByMonth = (data: AdsData[], month: string): AdsData[] => {
   return data.filter((item) => {
     try {
-      const startDate = new Date(item["Início dos relatórios"]);
-      const itemMonth = format(startDate, "yyyy-MM");
+      const itemMonth = item["Início dos relatórios"].substring(0, 7);
       return itemMonth === month;
     } catch {
       return false;
