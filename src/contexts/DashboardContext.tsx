@@ -40,10 +40,13 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     
     adsData.forEach((item) => {
       const month = item["Início dos relatórios"].substring(0, 7);
+      console.log('📅 Ad month extracted:', month, 'from', item["Início dos relatórios"]);
       months.add(month);
     });
     
-    return Array.from(months).sort();
+    const result = Array.from(months).sort();
+    console.log('📊 Available months calculated:', result);
+    return result;
   }, [marketingData, followersData, adsData]);
 
   // Auto-select latest month when data changes or month is not selected

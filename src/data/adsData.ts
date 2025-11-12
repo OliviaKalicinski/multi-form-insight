@@ -32,7 +32,7 @@ export const defaultAdsData: AdsData[] = [
     "ROAS de resultados": "",
     "Veiculação da campanha": "inactive",
     "Início dos relatórios": "2025-01-01",
-    "Término dos relatórios": "2025-10-31",
+    "Término dos relatórios": "2025-01-31",
   },
   {
     "Nome do anúncio": "TP01 - POST/CS - Deixa o nojinho 27/07 — Cópia",
@@ -65,7 +65,7 @@ export const defaultAdsData: AdsData[] = [
     "ROAS de resultados": "",
     "Veiculação da campanha": "active",
     "Início dos relatórios": "2025-01-01",
-    "Término dos relatórios": "2025-10-31",
+    "Término dos relatórios": "2025-01-31",
   },
   {
     "Nome do anúncio": "TP06 - POST/VV    tira duvidas   - 05/08",
@@ -97,8 +97,8 @@ export const defaultAdsData: AdsData[] = [
     "Tipo de valor de resultado": "",
     "ROAS de resultados": "",
     "Veiculação da campanha": "inactive",
-    "Início dos relatórios": "2025-01-01",
-    "Término dos relatórios": "2025-10-31",
+    "Início dos relatórios": "2025-02-01",
+    "Término dos relatórios": "2025-02-28",
   },
   {
     "Nome do anúncio": "TP07 - POST/VV - revolução vai acontecendo - 05/08",
@@ -130,8 +130,8 @@ export const defaultAdsData: AdsData[] = [
     "Tipo de valor de resultado": "",
     "ROAS de resultados": "",
     "Veiculação da campanha": "inactive",
-    "Início dos relatórios": "2025-01-01",
-    "Término dos relatórios": "2025-10-31",
+    "Início dos relatórios": "2025-02-01",
+    "Término dos relatórios": "2025-02-28",
   },
   {
     "Nome do anúncio": "TP02 - VV - Descubra a Comida de Dragão - 05/08",
@@ -163,7 +163,7 @@ export const defaultAdsData: AdsData[] = [
     "Tipo de valor de resultado": "",
     "ROAS de resultados": "",
     "Veiculação da campanha": "active",
-    "Início dos relatórios": "2025-01-01",
+    "Início dos relatórios": "2025-10-01",
     "Término dos relatórios": "2025-10-31",
   },
   {
@@ -196,7 +196,7 @@ export const defaultAdsData: AdsData[] = [
     "Tipo de valor de resultado": "Valor de conversão da compra no site",
     "ROAS de resultados": "1,43856996",
     "Veiculação da campanha": "active",
-    "Início dos relatórios": "2025-01-01",
+    "Início dos relatórios": "2025-10-01",
     "Término dos relatórios": "2025-10-31",
   },
 ];

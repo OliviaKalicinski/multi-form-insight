@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DollarSign,
@@ -30,10 +30,30 @@ const Ads = () => {
   const navigate = useNavigate();
   const { adsData, selectedMonth, availableMonths, setSelectedMonth } = useDashboard();
 
+  // DEBUG: Ver estado atual
+  console.log('=== ADS PAGE DEBUG ===');
+  console.log('selectedMonth:', selectedMonth);
+  console.log('availableMonths:', availableMonths);
+  console.log('adsData length:', adsData.length);
+  if (adsData.length > 0) {
+    console.log('adsData sample:', adsData[0]);
+    console.log('First ad date:', adsData[0]["Início dos relatórios"]);
+  }
+
   const currentMonthAdsData = useMemo(() => {
     if (!selectedMonth) return [];
-    return filterAdsByMonth(adsData, selectedMonth);
+    const filtered = filterAdsByMonth(adsData, selectedMonth);
+    console.log('Filtered ads for month', selectedMonth, ':', filtered.length);
+    return filtered;
   }, [adsData, selectedMonth]);
+
+  // Validar se o mês selecionado está disponível
+  useEffect(() => {
+    if (selectedMonth && availableMonths.length > 0 && !availableMonths.includes(selectedMonth)) {
+      console.warn('⚠️ Selected month not available, resetting to latest');
+      setSelectedMonth(availableMonths[availableMonths.length - 1]);
+    }
+  }, [selectedMonth, availableMonths, setSelectedMonth]);
 
   const metrics = useMemo(() => {
     return calculateAdsMetrics(currentMonthAdsData);

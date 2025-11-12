@@ -17,8 +17,12 @@ interface MonthFilterProps {
 export const MonthFilter = ({ availableMonths, selectedMonth, onMonthChange }: MonthFilterProps) => {
   const formatMonthLabel = (month: string) => {
     const [year, monthNum] = month.split("-");
-    const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-    return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    const monthNames = [
+      "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+      "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+    ];
+    const monthIndex = parseInt(monthNum) - 1;
+    return `${monthNames[monthIndex]} de ${year}`;
   };
 
   return (
