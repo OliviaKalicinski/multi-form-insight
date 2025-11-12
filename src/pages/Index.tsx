@@ -1,26 +1,35 @@
 import { useState, useMemo } from "react";
-import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown } from "lucide-react";
+import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPlus } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
+import { FollowersChart } from "@/components/dashboard/FollowersChart";
 import { CSVUploader } from "@/components/dashboard/CSVUploader";
+import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { marketingData as defaultData } from "@/data/marketingData";
+import { followersData as defaultFollowersData } from "@/data/followersData";
 import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage } from "@/utils/metricsCalculator";
-import { MarketingData } from "@/types/marketing";
+import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNumber, formatFollowersGrowth } from "@/utils/followersCalculator";
+import { MarketingData, FollowersData } from "@/types/marketing";
 
 const Index = () => {
   const [marketingData, setMarketingData] = useState<MarketingData[]>(defaultData);
+  const [followersData, setFollowersData] = useState<FollowersData[]>(defaultFollowersData);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
 
-  // Extract available months from data
+  // Extract available months from both marketing and followers data
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
     marketingData.forEach((item) => {
       const month = item.Data.substring(0, 7); // YYYY-MM
       months.add(month);
     });
+    followersData.forEach((item) => {
+      const month = item.Data.substring(0, 7); // YYYY-MM
+      months.add(month);
+    });
     return Array.from(months).sort();
-  }, [marketingData]);
+  }, [marketingData, followersData]);
 
   // Set initial selected month
   useMemo(() => {
@@ -29,13 +38,13 @@ const Index = () => {
     }
   }, [availableMonths, selectedMonth]);
 
-  // Filter data by selected month
+  // Filter marketing data by selected month
   const currentMonthData = useMemo(() => {
     if (!selectedMonth) return [];
     return marketingData.filter((item) => item.Data.startsWith(selectedMonth));
   }, [marketingData, selectedMonth]);
 
-  // Get previous month data for comparison
+  // Get previous month marketing data for comparison
   const previousMonthData = useMemo(() => {
     if (!selectedMonth || availableMonths.length < 2) return [];
     const currentIndex = availableMonths.indexOf(selectedMonth);
@@ -43,6 +52,21 @@ const Index = () => {
     const previousMonth = availableMonths[currentIndex - 1];
     return marketingData.filter((item) => item.Data.startsWith(previousMonth));
   }, [marketingData, selectedMonth, availableMonths]);
+
+  // Filter followers data by selected month
+  const currentMonthFollowersData = useMemo(() => {
+    if (!selectedMonth) return [];
+    return followersData.filter((item) => item.Data.startsWith(selectedMonth));
+  }, [followersData, selectedMonth]);
+
+  // Get previous month followers data for comparison
+  const previousMonthFollowersData = useMemo(() => {
+    if (!selectedMonth || availableMonths.length < 2) return [];
+    const currentIndex = availableMonths.indexOf(selectedMonth);
+    if (currentIndex <= 0) return [];
+    const previousMonth = availableMonths[currentIndex - 1];
+    return followersData.filter((item) => item.Data.startsWith(previousMonth));
+  }, [followersData, selectedMonth, availableMonths]);
 
   const currentMetrics = useMemo(
     () => calculateMonthlyMetrics(currentMonthData),
@@ -56,8 +80,29 @@ const Index = () => {
     return calculateGrowthMetrics(currentMonthData, previousMonthData);
   }, [currentMonthData, previousMonthData]);
 
+  // Calculate followers metrics
+  const currentFollowersMetrics = useMemo(() => {
+    const metrics = calculateFollowersMetrics(currentMonthFollowersData);
+    
+    if (previousMonthFollowersData.length > 0) {
+      const growth = calculateFollowersGrowth(currentMonthFollowersData, previousMonthFollowersData);
+      return {
+        ...metrics,
+        crescimentoAbsoluto: growth.crescimentoAbsoluto,
+        crescimentoPercentual: growth.crescimentoPercentual,
+      };
+    }
+    
+    return metrics;
+  }, [currentMonthFollowersData, previousMonthFollowersData]);
+
   const handleDataLoaded = (data: MarketingData[], fileName: string) => {
     setMarketingData(data);
+    setSelectedMonth(""); // Reset selection to trigger auto-select of latest month
+  };
+
+  const handleFollowersDataLoaded = (data: FollowersData[], fileName: string) => {
+    setFollowersData(data);
     setSelectedMonth(""); // Reset selection to trigger auto-select of latest month
   };
 
@@ -70,8 +115,11 @@ const Index = () => {
           <p className="text-muted-foreground">Visualize e analise suas principais métricas de desempenho</p>
         </div>
 
-        {/* CSV Uploader */}
-        <CSVUploader onDataLoaded={handleDataLoaded} />
+        {/* CSV Uploaders */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <CSVUploader onDataLoaded={handleDataLoaded} />
+          <FollowersUploader onDataLoaded={handleFollowersDataLoaded} />
+        </div>
 
         {/* Month Filter */}
         {availableMonths.length > 0 && (
@@ -119,6 +167,35 @@ const Index = () => {
                 />
               </div>
             </div>
+
+            {/* Followers Metrics */}
+            {currentMonthFollowersData.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-semibold mb-4 text-foreground">👥 Seguidores</h2>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <MetricCard
+                    title="Total de Seguidores (Mês)"
+                    value={formatFollowersNumber(currentFollowersMetrics.totalSeguidores)}
+                    icon={Users}
+                    trend={previousMonthFollowersData.length > 0 ? currentFollowersMetrics.crescimentoPercentual : undefined}
+                    variant="success"
+                  />
+                  <MetricCard
+                    title="Novos Seguidores"
+                    value={formatFollowersNumber(currentFollowersMetrics.novosSeguidoresMes)}
+                    icon={UserPlus}
+                    subtitle="Total no mês"
+                  />
+                  <MetricCard
+                    title="Crescimento"
+                    value={formatFollowersGrowth(currentFollowersMetrics.crescimentoAbsoluto)}
+                    icon={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? TrendingUp : TrendingDown}
+                    subtitle={previousMonthFollowersData.length > 0 ? `${currentFollowersMetrics.crescimentoPercentual >= 0 ? '+' : ''}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}%` : undefined}
+                    variant={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? "success" : undefined}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Efficiency Metrics */}
             <div>
@@ -171,9 +248,17 @@ const Index = () => {
             {/* Charts */}
             <TrendChart
               data={currentMonthData}
-              title="Tendência de Desempenho"
-              description="Visualize a evolução das métricas ao longo do período"
+              title="Tendência de Desempenho - Marketing"
+              description="Visualize a evolução das métricas de marketing ao longo do período"
             />
+
+            {currentMonthFollowersData.length > 0 && (
+              <FollowersChart
+                data={currentMonthFollowersData}
+                title="Evolução de Seguidores"
+                description="Acompanhe o crescimento da sua base de seguidores"
+              />
+            )}
           </>
         ) : (
           <div className="text-center py-12">

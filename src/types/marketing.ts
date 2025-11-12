@@ -22,3 +22,15 @@ export interface GrowthMetrics {
   crescimentoAlcance: number;
   crescimentoVisitas: number;
 }
+
+export interface FollowersData {
+  Data: string;
+  Seguidores: string;
+}
+
+export interface FollowersMetrics {
+  totalSeguidores: number;
+  novosSeguidoresMes: number;
+  crescimentoAbsoluto: number;
+  crescimentoPercentual: number;
+}
