@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPlus, DollarSign, ShoppingCart, ShoppingBag, Coins, Heart, ExternalLink as ExternalLinkIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { FollowersChart } from "@/components/dashboard/FollowersChart";
@@ -319,8 +321,14 @@ const Index = () => {
             {/* Ads Section */}
             {currentAdsMetrics && (
               <>
-                <div>
-                  <h2 className="text-2xl font-semibold mb-4 text-foreground">💰 Anúncios (Meta Ads)</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-semibold text-foreground">💰 Anúncios (Meta Ads)</h2>
+                  <Link to="/ads">
+                    <Button variant="outline" className="gap-2">
+                      Ver Análise Completa
+                      <ExternalLinkIcon className="h-4 w-4" />
+                    </Button>
+                  </Link>
                 </div>
 
                 {/* Investimento e Performance */}

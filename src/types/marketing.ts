@@ -88,4 +88,11 @@ export interface AdsMetrics {
   taxaConversaoCarrinho: number;
   engajamentosTotal: number;
   visualizacoesTotal: number;
+  roi: number;
+  ticketMedio: number;
+  taxaEngajamento: number;
+  cliquesDesaida: number;
+  taxaConversao: number;
+  taxaAddCarrinho: number;
+  taxaAbandonoCarrinho: number;
 }

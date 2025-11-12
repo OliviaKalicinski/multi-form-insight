@@ -41,6 +41,13 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
       taxaConversaoCarrinho: 0,
       engajamentosTotal: 0,
       visualizacoesTotal: 0,
+      roi: 0,
+      ticketMedio: 0,
+      taxaEngajamento: 0,
+      cliquesDesaida: 0,
+      taxaConversao: 0,
+      taxaAddCarrinho: 0,
+      taxaAbandonoCarrinho: 0,
     };
   }
 
@@ -56,6 +63,7 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
   const visualizacoesPaginaTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Visualizações da página de destino do site"]), 0);
   const engajamentosTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Engajamentos com o post"]), 0);
   const visualizacoesTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Visualizações"]), 0);
+  const cliquesDesaida = data.reduce((sum, item) => sum + parseAdsValue(item["Cliques de saída"]), 0);
 
   // Calcular médias
   const frequenciaMedia = data.reduce((sum, item) => sum + parseAdsValue(item["Frequência"]), 0) / data.length;
@@ -68,6 +76,14 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
   const roas = investimentoTotal > 0 ? valorConversaoTotal / investimentoTotal : 0;
   const custoPorCompra = comprasTotal > 0 ? investimentoTotal / comprasTotal : 0;
   const taxaConversaoCarrinho = adicoesCarrinhoTotal > 0 ? (comprasTotal / adicoesCarrinhoTotal) * 100 : 0;
+  
+  // Novos KPIs
+  const roi = investimentoTotal > 0 ? ((valorConversaoTotal - investimentoTotal) / investimentoTotal) * 100 : 0;
+  const ticketMedio = comprasTotal > 0 ? valorConversaoTotal / comprasTotal : 0;
+  const taxaEngajamento = alcanceTotal > 0 ? (engajamentosTotal / alcanceTotal) * 100 : 0;
+  const taxaConversao = cliquesDesaida > 0 ? (comprasTotal / cliquesDesaida) * 100 : 0;
+  const taxaAddCarrinho = visualizacoesPaginaTotal > 0 ? (adicoesCarrinhoTotal / visualizacoesPaginaTotal) * 100 : 0;
+  const taxaAbandonoCarrinho = adicoesCarrinhoTotal > 0 ? 100 - ((comprasTotal / adicoesCarrinhoTotal) * 100) : 0;
 
   return {
     investimentoTotal,
@@ -88,5 +104,12 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
     taxaConversaoCarrinho,
     engajamentosTotal,
     visualizacoesTotal,
+    roi,
+    ticketMedio,
+    taxaEngajamento,
+    cliquesDesaida,
+    taxaConversao,
+    taxaAddCarrinho,
+    taxaAbandonoCarrinho,
   };
 };
