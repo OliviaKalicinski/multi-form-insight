@@ -14,11 +14,8 @@ interface AdsUploaderProps {
 
 const adsDataSchema = z.object({
   "Nome do anúncio": z.string(),
-  "Nome do conjunto de anúncios": z.string(),
   "Valor usado (BRL)": z.string(),
   "Impressões": z.string(),
-  "Início dos relatórios": z.string(),
-  "Término dos relatórios": z.string(),
 }).passthrough();
 
 export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
