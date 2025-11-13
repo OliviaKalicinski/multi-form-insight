@@ -16,6 +16,7 @@ export const Navigation = () => {
         <Tabs value={currentPath} onValueChange={(path) => navigate(path)}>
           <TabsList>
             <TabsTrigger value="/">📊 Visão Geral</TabsTrigger>
+            <TabsTrigger value="/seguidores">👥 Seguidores</TabsTrigger>
             <TabsTrigger value="/volume">📊 Volume</TabsTrigger>
             <TabsTrigger value="/ads">💰 Ads</TabsTrigger>
           </TabsList>

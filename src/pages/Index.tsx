@@ -243,34 +243,6 @@ const Index = () => {
       {/* Show metrics only if month is selected and data exists */}
       {selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
           <>
-            {/* Followers Metrics */}
-            {hasFollowersData && currentMonthFollowersData.length > 0 && (
-              <div>
-                <h2 className="text-2xl font-semibold mb-4 text-foreground">👥 Seguidores</h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <MetricCard
-                    title="Total de Seguidores (Mês)"
-                    value={formatFollowersNumber(currentFollowersMetrics.totalSeguidores)}
-                    icon={Users}
-                    trend={previousMonthFollowersData.length > 0 ? currentFollowersMetrics.crescimentoPercentual : undefined}
-                    variant="success"
-                  />
-                  <MetricCard
-                    title="Novos Seguidores"
-                    value={formatFollowersNumber(currentFollowersMetrics.novosSeguidoresMes)}
-                    icon={UserPlus}
-                    subtitle="Total no mês"
-                  />
-                  <MetricCard
-                    title="Crescimento"
-                    value={formatFollowersGrowth(currentFollowersMetrics.crescimentoAbsoluto)}
-                    icon={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? TrendingUp : TrendingDown}
-                    subtitle={previousMonthFollowersData.length > 0 ? `${currentFollowersMetrics.crescimentoPercentual >= 0 ? '+' : ''}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}%` : undefined}
-                    variant={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? "success" : undefined}
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Efficiency Metrics */}
             <div>
@@ -414,11 +386,11 @@ const Index = () => {
               </div>
             )}
 
-            {/* Ads Section */}
-            {hasAdsData && currentAdsMetrics && (
+            {/* Ads Section - Simplified */}
+            {hasAdsData && currentAdsMetrics && (currentAdsMetrics.investimentoTotal > 0 || currentAdsMetrics.valorConversaoTotal > 0 || currentAdsMetrics.roas > 0 || currentAdsMetrics.custoPorCompra > 0) && (
               <>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-semibold text-foreground">💰 Anúncios (Meta Ads)</h2>
+                  <h2 className="text-2xl font-semibold text-foreground">💰 Anúncios (Meta Ads) - Principais Métricas</h2>
                   <Link to="/ads">
                     <Button variant="outline" className="gap-2">
                       Ver Análise Completa
@@ -427,119 +399,42 @@ const Index = () => {
                   </Link>
                 </div>
 
-                {/* Investimento e Performance */}
+                {/* ROI e Performance - Only 4 essential cards */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4 text-foreground">💵 Investimento e Performance</h3>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <h3 className="text-lg font-semibold mb-4 text-foreground">💎 ROI e Performance</h3>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <MetricCard
                       title="Investimento Total"
                       value={`R$ ${currentAdsMetrics.investimentoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
                       icon={DollarSign}
                       variant="default"
                     />
-                    <MetricCard
-                      title="Impressões"
-                      value={formatNumber(currentAdsMetrics.impressoesTotal)}
-                      icon={Eye}
-                      subtitle={`CPM médio: R$ ${currentAdsMetrics.cpmMedio.toFixed(2)}`}
-                    />
-                    <MetricCard
-                      title="Alcance Total"
-                      value={formatNumber(currentAdsMetrics.alcanceTotal)}
-                      icon={Users}
-                      subtitle={`Frequência: ${currentAdsMetrics.frequenciaMedia.toFixed(2)}`}
-                    />
+                    {currentAdsMetrics.valorConversaoTotal > 0 && (
+                      <MetricCard
+                        title="Valor de Conversão"
+                        value={`R$ ${currentAdsMetrics.valorConversaoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                        icon={Coins}
+                        variant="success"
+                      />
+                    )}
+                    {currentAdsMetrics.roas > 0 && (
+                      <MetricCard
+                        title="ROAS"
+                        value={`${currentAdsMetrics.roas.toFixed(2)}x`}
+                        icon={TrendingUp}
+                        subtitle={`Para cada R$ 1 investido: R$ ${currentAdsMetrics.roas.toFixed(2)}`}
+                        variant={currentAdsMetrics.roas >= 2 ? "success" : currentAdsMetrics.roas >= 1 ? "default" : "warning"}
+                      />
+                    )}
+                    {currentAdsMetrics.custoPorCompra > 0 && (
+                      <MetricCard
+                        title="Custo por Compra"
+                        value={`R$ ${currentAdsMetrics.custoPorCompra.toFixed(2)}`}
+                        icon={Target}
+                      />
+                    )}
                   </div>
                 </div>
-
-                {/* Cliques e Engajamento */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4 text-foreground">🖱️ Cliques e Engajamento</h3>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    <MetricCard
-                      title="Cliques Totais"
-                      value={formatNumber(currentAdsMetrics.cliquesTotal)}
-                      icon={MousePointerClick}
-                      subtitle={`CTR: ${currentAdsMetrics.ctrMedio.toFixed(2)}%`}
-                    />
-                    <MetricCard
-                      title="CPC Médio"
-                      value={`R$ ${currentAdsMetrics.cpcMedio.toFixed(2)}`}
-                      icon={TrendingDown}
-                      subtitle={`${formatNumber(currentAdsMetrics.cliquesLinkTotal)} cliques no link`}
-                    />
-                    <MetricCard
-                      title="Engajamentos"
-                      value={formatNumber(currentAdsMetrics.engajamentosTotal)}
-                      icon={Heart}
-                    />
-                  </div>
-                </div>
-
-                {/* Funil de Conversão */}
-                {(currentAdsMetrics.visualizacoesPaginaTotal > 0 || currentAdsMetrics.adicoesCarrinhoTotal > 0 || currentAdsMetrics.comprasTotal > 0) && (
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4 text-foreground">🛒 Funil de Conversão</h3>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {currentAdsMetrics.visualizacoesPaginaTotal > 0 && (
-                        <MetricCard
-                          title="Visualizações de Página"
-                          value={formatNumber(currentAdsMetrics.visualizacoesPaginaTotal)}
-                          icon={ExternalLinkIcon}
-                        />
-                      )}
-                      {currentAdsMetrics.adicoesCarrinhoTotal > 0 && (
-                        <MetricCard
-                          title="Adições ao Carrinho"
-                          value={formatNumber(currentAdsMetrics.adicoesCarrinhoTotal)}
-                          icon={ShoppingCart}
-                        />
-                      )}
-                      {currentAdsMetrics.comprasTotal > 0 && (
-                        <MetricCard
-                          title="Compras"
-                          value={formatNumber(currentAdsMetrics.comprasTotal)}
-                          icon={ShoppingBag}
-                          subtitle={currentAdsMetrics.adicoesCarrinhoTotal > 0 ? `Taxa de conversão: ${currentAdsMetrics.taxaConversaoCarrinho.toFixed(1)}%` : undefined}
-                          variant="success"
-                        />
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* ROI e Conversão */}
-                {(currentAdsMetrics.valorConversaoTotal > 0 || currentAdsMetrics.roas > 0 || currentAdsMetrics.custoPorCompra > 0) && (
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4 text-foreground">💎 ROI e Conversão</h3>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {currentAdsMetrics.valorConversaoTotal > 0 && (
-                        <MetricCard
-                          title="Valor de Conversão"
-                          value={`R$ ${currentAdsMetrics.valorConversaoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
-                          icon={Coins}
-                          variant="success"
-                        />
-                      )}
-                      {currentAdsMetrics.roas > 0 && (
-                        <MetricCard
-                          title="ROAS"
-                          value={`${currentAdsMetrics.roas.toFixed(2)}x`}
-                          icon={TrendingUp}
-                          subtitle={`Para cada R$ 1 investido: R$ ${currentAdsMetrics.roas.toFixed(2)}`}
-                          variant={currentAdsMetrics.roas >= 2 ? "success" : currentAdsMetrics.roas >= 1 ? "default" : "warning"}
-                        />
-                      )}
-                      {currentAdsMetrics.custoPorCompra > 0 && (
-                        <MetricCard
-                          title="Custo por Compra"
-                          value={`R$ ${currentAdsMetrics.custoPorCompra.toFixed(2)}`}
-                          icon={Target}
-                        />
-                      )}
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </>

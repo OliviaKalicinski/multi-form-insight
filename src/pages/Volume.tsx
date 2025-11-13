@@ -3,7 +3,6 @@ import { Eye, Users, MousePointerClick, Target } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
-import { CSVUploader } from "@/components/dashboard/CSVUploader";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber } from "@/utils/metricsCalculator";
 import { useDashboard } from "@/contexts/DashboardContext";
@@ -15,7 +14,6 @@ const Volume = () => {
     marketingData,
     selectedMonth,
     availableMonths,
-    setMarketingData,
     setSelectedMonth,
   } = useDashboard();
 
@@ -100,9 +98,6 @@ const Volume = () => {
           selectedMonth={selectedMonth}
           onMonthChange={setSelectedMonth}
         />
-
-        {/* CSV Uploader */}
-        <CSVUploader onDataLoaded={setMarketingData} />
 
         {/* Show metrics only if month is selected and data exists */}
         {selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
