@@ -60,13 +60,49 @@ const Seguidores = () => {
 
   // Calculate followers metrics
   const currentFollowersMetrics = useMemo(() => {
-    const metrics = calculateFollowersMetrics(currentMonthFollowersData);
+    if (!selectedMonth) {
+      return { 
+        totalSeguidores: 0, 
+        novosSeguidoresMes: 0, 
+        crescimentoAbsoluto: 0, 
+        crescimentoPercentual: 0 
+      };
+    }
+    
+    // For 12-month view, use the last month as reference
+    const referenceMonth = isLast12MonthsView && last12Months.length > 0
+      ? last12Months[last12Months.length - 1].slice(0, 7)
+      : selectedMonth.slice(0, 7);
+    
+    const metrics = calculateFollowersMetrics(
+      currentMonthFollowersData,
+      followersData,
+      referenceMonth
+    );
+    
     if (previousMonthFollowersData.length > 0) {
-      const growth = calculateFollowersGrowth(currentMonthFollowersData, previousMonthFollowersData);
-      return { ...metrics, ...growth };
+      const currentIndex = availableMonths.indexOf(selectedMonth);
+      const previousMonth = isLast12MonthsView && last12Months.length > 0
+        ? getLast12Months(availableMonths.slice(0, availableMonths.indexOf(last12Months[0])))[0]
+        : availableMonths[currentIndex - 1];
+      
+      if (previousMonth) {
+        const previousMonthStr = isLast12MonthsView 
+          ? previousMonth.slice(0, 7)
+          : previousMonth.slice(0, 7);
+        
+        const growth = calculateFollowersGrowth(
+          currentMonthFollowersData,
+          previousMonthFollowersData,
+          followersData,
+          referenceMonth,
+          previousMonthStr
+        );
+        return { ...metrics, ...growth };
+      }
     }
     return metrics;
-  }, [currentMonthFollowersData, previousMonthFollowersData]);
+  }, [currentMonthFollowersData, previousMonthFollowersData, followersData, selectedMonth, availableMonths, isLast12MonthsView, last12Months]);
 
   // Aggregate data for 12-month view
   const monthlyFollowersData = useMemo(() => {

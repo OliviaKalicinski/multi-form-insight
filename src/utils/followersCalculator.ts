@@ -1,6 +1,10 @@
 import { FollowersData, FollowersMetrics } from "@/types/marketing";
 
-export const calculateFollowersMetrics = (data: FollowersData[]): FollowersMetrics => {
+export const calculateFollowersMetrics = (
+  data: FollowersData[],
+  allData: FollowersData[],
+  selectedMonth: string
+): FollowersMetrics => {
   if (data.length === 0) {
     return {
       totalSeguidores: 0,
@@ -10,14 +14,13 @@ export const calculateFollowersMetrics = (data: FollowersData[]): FollowersMetri
     };
   }
 
-  // Sort by date to get the last value
-  const sortedData = [...data].sort((a, b) => new Date(a.Data).getTime() - new Date(b.Data).getTime());
+  // Novos seguidores = soma do mês atual
+  const novosSeguidoresMes = data.reduce((sum, item) => sum + parseInt(item.Seguidores), 0);
   
-  // Total followers is the accumulated value (sum of all new followers in the month)
-  const novosSeguidoresMes = sortedData.reduce((sum, item) => sum + parseInt(item.Seguidores), 0);
-  
-  // Last value represents the total accumulated (using the sum as total for the month)
-  const totalSeguidores = novosSeguidoresMes;
+  // Total acumulado = soma de TODOS os dados até o mês selecionado
+  const monthEnd = `${selectedMonth}-31 23:59:59`;
+  const allDataUntilMonth = allData.filter(item => item.Data <= monthEnd);
+  const totalSeguidores = allDataUntilMonth.reduce((sum, item) => sum + parseInt(item.Seguidores), 0);
 
   return {
     totalSeguidores,
@@ -29,14 +32,18 @@ export const calculateFollowersMetrics = (data: FollowersData[]): FollowersMetri
 
 export const calculateFollowersGrowth = (
   currentMonth: FollowersData[], 
-  previousMonth: FollowersData[]
+  previousMonth: FollowersData[],
+  allData: FollowersData[],
+  currentMonthStr: string,
+  previousMonthStr: string
 ): { crescimentoAbsoluto: number; crescimentoPercentual: number } => {
-  const currentMetrics = calculateFollowersMetrics(currentMonth);
-  const previousMetrics = calculateFollowersMetrics(previousMonth);
+  const currentMetrics = calculateFollowersMetrics(currentMonth, allData, currentMonthStr);
+  const previousMetrics = calculateFollowersMetrics(previousMonth, allData, previousMonthStr);
 
-  const crescimentoAbsoluto = currentMetrics.totalSeguidores - previousMetrics.totalSeguidores;
-  const crescimentoPercentual = previousMetrics.totalSeguidores > 0
-    ? (crescimentoAbsoluto / previousMetrics.totalSeguidores) * 100
+  // Crescimento = diferença entre NOVOS seguidores (não total acumulado)
+  const crescimentoAbsoluto = currentMetrics.novosSeguidoresMes - previousMetrics.novosSeguidoresMes;
+  const crescimentoPercentual = previousMetrics.novosSeguidoresMes > 0
+    ? (crescimentoAbsoluto / previousMetrics.novosSeguidoresMes) * 100
     : 0;
 
   return {
