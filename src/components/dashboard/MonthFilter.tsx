@@ -16,6 +16,20 @@ interface MonthFilterProps {
 
 export const MonthFilter = ({ availableMonths, selectedMonth, onMonthChange }: MonthFilterProps) => {
   const formatMonthLabel = (month: string) => {
+    if (month === "last-12-months") {
+      const last12 = availableMonths.slice(-12);
+      const count = last12.length;
+      if (count === 0) return "Últimos 12 Meses";
+      
+      const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      const firstMonth = last12[0];
+      const lastMonth = last12[last12.length - 1];
+      const [firstYear, firstMonthNum] = firstMonth.split("-");
+      const [lastYear, lastMonthNum] = lastMonth.split("-");
+      
+      return `📅 Últimos ${count} Meses (${monthNames[parseInt(firstMonthNum) - 1]}/${firstYear.slice(2)} - ${monthNames[parseInt(lastMonthNum) - 1]}/${lastYear.slice(2)})`;
+    }
+    
     const [year, monthNum] = month.split("-");
     const monthNames = [
       "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -39,6 +53,11 @@ export const MonthFilter = ({ availableMonths, selectedMonth, onMonthChange }: M
                 <SelectValue placeholder="Selecione o mês" />
               </SelectTrigger>
               <SelectContent>
+                {availableMonths.length >= 2 && (
+                  <SelectItem value="last-12-months">
+                    📅 Últimos {Math.min(12, availableMonths.length)} Meses
+                  </SelectItem>
+                )}
                 {availableMonths.map((month) => (
                   <SelectItem key={month} value={month}>
                     {formatMonthLabel(month)}

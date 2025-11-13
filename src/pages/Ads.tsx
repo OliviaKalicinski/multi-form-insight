@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   PackageCheck,
   PackageX,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,15 +28,29 @@ import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { filterAdsByMonth } from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
+import { getLast12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
+import { aggregateAdsByMonth } from "@/utils/monthlyAggregator";
 
 const Ads = () => {
   const navigate = useNavigate();
   const { adsData, monthlySummaries, hasHierarchicalFormat, selectedMonth, availableMonths, setSelectedMonth } = useDashboard();
 
+  // Detect 12-month view
+  const isLast12MonthsView = selectedMonth === "last-12-months";
+  
+  // Get last 12 months
+  const last12Months = useMemo(() => {
+    if (!isLast12MonthsView) return [];
+    return getLast12Months(availableMonths);
+  }, [isLast12MonthsView, availableMonths]);
+
   const currentMonthAdsData = useMemo(() => {
     if (!selectedMonth) return [];
+    if (isLast12MonthsView) {
+      return aggregateAdsByMonth(adsData, last12Months);
+    }
     return filterAdsByMonth(adsData, selectedMonth);
-  }, [adsData, selectedMonth]);
+  }, [adsData, selectedMonth, isLast12MonthsView, last12Months]);
 
   // Validar se o mês selecionado está disponível
   useEffect(() => {
@@ -47,6 +62,11 @@ const Ads = () => {
 
   // Usar resumo mensal pré-calculado se disponível, senão calcular dos individuais
   const metrics = useMemo(() => {
+    if (isLast12MonthsView) {
+      // Para visão de 12 meses, sempre calcular dos dados agregados
+      return calculateAdsMetrics(currentMonthAdsData);
+    }
+    
     if (hasHierarchicalFormat && monthlySummaries.length > 0) {
       const summary = monthlySummaries.find(s => s.month === selectedMonth);
       if (summary) {
@@ -55,7 +75,7 @@ const Ads = () => {
     }
     // Fallback: calcular dos dados individuais (formato antigo ou se resumo não encontrado)
     return calculateAdsMetrics(currentMonthAdsData);
-  }, [hasHierarchicalFormat, monthlySummaries, selectedMonth, currentMonthAdsData]);
+  }, [hasHierarchicalFormat, monthlySummaries, selectedMonth, currentMonthAdsData, isLast12MonthsView]);
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -77,11 +97,32 @@ const Ads = () => {
     <div className="container mx-auto p-6 space-y-8">
       {/* Month Filter */}
       {availableMonths.length > 0 && (
-        <MonthFilter
-          availableMonths={availableMonths}
-          selectedMonth={selectedMonth}
-          onMonthChange={setSelectedMonth}
-        />
+        <>
+          <MonthFilter
+            availableMonths={availableMonths}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+          />
+          
+          {/* Period indicator badge for 12-month view */}
+          {isLast12MonthsView && last12Months.length > 0 && (
+            <Card className="border-primary/50 bg-primary/5">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      📅 Visão Anual - Análise dos Últimos {last12Months.length} Meses
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Período: {formatMonthRange(last12Months)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* KPIs */}

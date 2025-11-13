@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPlus, DollarSign, ShoppingCart, ShoppingBag, Coins, Heart, ExternalLink as ExternalLinkIcon } from "lucide-react";
+import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPlus, DollarSign, ShoppingCart, ShoppingBag, Coins, Heart, ExternalLink as ExternalLinkIcon, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
+import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
 import { FollowersChart } from "@/components/dashboard/FollowersChart";
 import { CSVUploader } from "@/components/dashboard/CSVUploader";
 import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
@@ -15,6 +17,8 @@ import { calculateAdsMetrics, filterAdsByMonth } from "@/utils/adsCalculator";
 import { MarketingData, FollowersData, AdsData } from "@/types/marketing";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getLast12Months, getPrevious12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
+import { aggregateMarketingByMonth, aggregateFollowersByMonth, aggregateAdsByMonth } from "@/utils/monthlyAggregator";
 
 const Index = () => {
   const {
@@ -29,35 +33,72 @@ const Index = () => {
     setSelectedMonth,
   } = useDashboard();
 
-  // Filter marketing data by selected month
+  // Detect 12-month view
+  const isLast12MonthsView = selectedMonth === "last-12-months";
+  
+  // Get last 12 months
+  const last12Months = useMemo(() => {
+    if (!isLast12MonthsView) return [];
+    return getLast12Months(availableMonths);
+  }, [isLast12MonthsView, availableMonths]);
+
+  // Filter marketing data by selected month or last 12 months
   const currentMonthData = useMemo(() => {
     if (!selectedMonth) return [];
+    if (isLast12MonthsView) {
+      return marketingData.filter((item) => 
+        last12Months.some(month => item.Data.startsWith(month))
+      );
+    }
     return marketingData.filter((item) => item.Data.startsWith(selectedMonth));
-  }, [marketingData, selectedMonth]);
+  }, [marketingData, selectedMonth, isLast12MonthsView, last12Months]);
 
-  // Get previous month marketing data for comparison
+  // Get previous month/period marketing data for comparison
   const previousMonthData = useMemo(() => {
     if (!selectedMonth || availableMonths.length < 2) return [];
+    
+    if (isLast12MonthsView) {
+      const previous12 = getPrevious12Months(availableMonths, last12Months);
+      if (previous12.length === 0) return [];
+      return marketingData.filter((item) => 
+        previous12.some(month => item.Data.startsWith(month))
+      );
+    }
+    
     const currentIndex = availableMonths.indexOf(selectedMonth);
     if (currentIndex <= 0) return [];
     const previousMonth = availableMonths[currentIndex - 1];
     return marketingData.filter((item) => item.Data.startsWith(previousMonth));
-  }, [marketingData, selectedMonth, availableMonths]);
+  }, [marketingData, selectedMonth, availableMonths, isLast12MonthsView, last12Months]);
 
-  // Filter followers data by selected month
+  // Filter followers data by selected month or last 12 months
   const currentMonthFollowersData = useMemo(() => {
     if (!selectedMonth) return [];
+    if (isLast12MonthsView) {
+      return followersData.filter((item) => 
+        last12Months.some(month => item.Data.startsWith(month))
+      );
+    }
     return followersData.filter((item) => item.Data.startsWith(selectedMonth));
-  }, [followersData, selectedMonth]);
+  }, [followersData, selectedMonth, isLast12MonthsView, last12Months]);
 
-  // Get previous month followers data for comparison
+  // Get previous month/period followers data for comparison
   const previousMonthFollowersData = useMemo(() => {
     if (!selectedMonth || availableMonths.length < 2) return [];
+    
+    if (isLast12MonthsView) {
+      const previous12 = getPrevious12Months(availableMonths, last12Months);
+      if (previous12.length === 0) return [];
+      return followersData.filter((item) => 
+        previous12.some(month => item.Data.startsWith(month))
+      );
+    }
+    
     const currentIndex = availableMonths.indexOf(selectedMonth);
     if (currentIndex <= 0) return [];
     const previousMonth = availableMonths[currentIndex - 1];
     return followersData.filter((item) => item.Data.startsWith(previousMonth));
-  }, [followersData, selectedMonth, availableMonths]);
+  }, [followersData, selectedMonth, availableMonths, isLast12MonthsView, last12Months]);
 
   const currentMetrics = useMemo(
     () => calculateMonthlyMetrics(currentMonthData),
@@ -87,11 +128,14 @@ const Index = () => {
     return metrics;
   }, [currentMonthFollowersData, previousMonthFollowersData]);
 
-  // Filter ads data by selected month
+  // Filter ads data by selected month or last 12 months
   const currentMonthAdsData = useMemo(() => {
     if (!selectedMonth) return [];
+    if (isLast12MonthsView) {
+      return aggregateAdsByMonth(adsData, last12Months);
+    }
     return filterAdsByMonth(adsData, selectedMonth);
-  }, [adsData, selectedMonth]);
+  }, [adsData, selectedMonth, isLast12MonthsView, last12Months]);
 
   // Calculate ads metrics
   const currentAdsMetrics = useMemo(() => {
@@ -110,6 +154,17 @@ const Index = () => {
   const handleAdsDataLoaded = (data: AdsData[], fileName: string, summaries?: any[], isHierarchical?: boolean) => {
     setAdsData(data, summaries, isHierarchical);
   };
+
+  // Aggregate data by month for 12-month view
+  const monthlyMarketingData = useMemo(() => {
+    if (!isLast12MonthsView) return [];
+    return aggregateMarketingByMonth(marketingData, last12Months);
+  }, [isLast12MonthsView, marketingData, last12Months]);
+
+  const monthlyFollowersData = useMemo(() => {
+    if (!isLast12MonthsView) return [];
+    return aggregateFollowersByMonth(followersData, last12Months);
+  }, [isLast12MonthsView, followersData, last12Months]);
 
   // Check if we have any data
   const hasMarketingData = marketingData.length > 0;
@@ -145,11 +200,32 @@ const Index = () => {
 
       {/* Month Filter - only show when we have data */}
       {availableMonths.length > 0 && (
-        <MonthFilter
-          availableMonths={availableMonths}
-          selectedMonth={selectedMonth}
-          onMonthChange={setSelectedMonth}
-        />
+        <>
+          <MonthFilter
+            availableMonths={availableMonths}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+          />
+          
+          {/* Period indicator badge for 12-month view */}
+          {isLast12MonthsView && last12Months.length > 0 && (
+            <Card className="border-primary/50 bg-primary/5">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      📅 Visão Anual - Análise dos Últimos {last12Months.length} Meses
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Período: {formatMonthRange(last12Months)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* Show metrics only if month is selected and data exists */}
@@ -268,41 +344,83 @@ const Index = () => {
             )}
 
             {/* Charts */}
-            <TrendChart
-              data={currentMonthData}
-              title="📊 Visualizações × Alcance"
-              description="Compare o volume de visualizações com o alcance total"
-              metrics={[
-                {
-                  dataKey: "visualizacoes",
-                  name: "Visualizações",
-                  color: "hsl(var(--chart-4))",
-                },
-                {
-                  dataKey: "alcance",
-                  name: "Alcance",
-                  color: "hsl(var(--chart-1))",
-                },
-              ]}
-            />
+            {isLast12MonthsView ? (
+              <>
+                <MonthlyAggregateChart
+                  data={monthlyMarketingData}
+                  title="📊 Visualizações × Alcance (Evolução Mensal)"
+                  description="Compare o volume mensal de visualizações com o alcance total"
+                  metrics={[
+                    {
+                      dataKey: "Visualizações",
+                      name: "Visualizações",
+                      color: "hsl(var(--chart-4))",
+                    },
+                    {
+                      dataKey: "Alcance",
+                      name: "Alcance",
+                      color: "hsl(var(--chart-1))",
+                    },
+                  ]}
+                />
 
-            <TrendChart
-              data={currentMonthData}
-              title="👥 Visitas × Interações"
-              description="Acompanhe as visitas ao perfil e o nível de engajamento"
-              metrics={[
-                {
-                  dataKey: "visitas",
-                  name: "Visitas",
-                  color: "hsl(var(--chart-2))",
-                },
-                {
-                  dataKey: "interacoes",
-                  name: "Interações",
-                  color: "hsl(var(--chart-3))",
-                },
-              ]}
-            />
+                <MonthlyAggregateChart
+                  data={monthlyMarketingData}
+                  title="👥 Visitas × Interações (Evolução Mensal)"
+                  description="Acompanhe a evolução mensal das visitas ao perfil e o nível de engajamento"
+                  metrics={[
+                    {
+                      dataKey: "Visitas",
+                      name: "Visitas",
+                      color: "hsl(var(--chart-2))",
+                    },
+                    {
+                      dataKey: "Interações",
+                      name: "Interações",
+                      color: "hsl(var(--chart-3))",
+                    },
+                  ]}
+                />
+              </>
+            ) : (
+              <>
+                <TrendChart
+                  data={currentMonthData}
+                  title="📊 Visualizações × Alcance"
+                  description="Compare o volume de visualizações com o alcance total"
+                  metrics={[
+                    {
+                      dataKey: "visualizacoes",
+                      name: "Visualizações",
+                      color: "hsl(var(--chart-4))",
+                    },
+                    {
+                      dataKey: "alcance",
+                      name: "Alcance",
+                      color: "hsl(var(--chart-1))",
+                    },
+                  ]}
+                />
+
+                <TrendChart
+                  data={currentMonthData}
+                  title="👥 Visitas × Interações"
+                  description="Acompanhe as visitas ao perfil e o nível de engajamento"
+                  metrics={[
+                    {
+                      dataKey: "visitas",
+                      name: "Visitas",
+                      color: "hsl(var(--chart-2))",
+                    },
+                    {
+                      dataKey: "interacoes",
+                      name: "Interações",
+                      color: "hsl(var(--chart-3))",
+                    },
+                  ]}
+                />
+              </>
+            )}
 
             {hasFollowersData && currentMonthFollowersData.length > 0 && (
               <FollowersChart
