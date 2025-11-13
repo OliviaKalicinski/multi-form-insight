@@ -244,6 +244,58 @@ const Index = () => {
       {selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
           <>
 
+            {/* Ads Section - Simplified - MOVED TO TOP */}
+            {hasAdsData && currentAdsMetrics && (currentAdsMetrics.investimentoTotal > 0 || currentAdsMetrics.valorConversaoTotal > 0 || currentAdsMetrics.roas > 0 || currentAdsMetrics.custoPorCompra > 0) && (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-semibold text-foreground">💰 Anúncios (Meta Ads) - Principais Métricas</h2>
+                  <Link to="/ads">
+                    <Button variant="outline" className="gap-2">
+                      Ver Análise Completa
+                      <ExternalLinkIcon className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+
+                {/* ROI e Performance - Only 4 essential cards */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 text-foreground">💎 ROI e Performance</h3>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <MetricCard
+                      title="Investimento Total"
+                      value={`R$ ${currentAdsMetrics.investimentoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                      icon={DollarSign}
+                      variant="default"
+                    />
+                    {currentAdsMetrics.valorConversaoTotal > 0 && (
+                      <MetricCard
+                        title="Valor de Conversão"
+                        value={`R$ ${currentAdsMetrics.valorConversaoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                        icon={Coins}
+                        variant="success"
+                      />
+                    )}
+                    {currentAdsMetrics.roas > 0 && (
+                      <MetricCard
+                        title="ROAS"
+                        value={`${currentAdsMetrics.roas.toFixed(2)}x`}
+                        icon={TrendingUp}
+                        subtitle={`Para cada R$ 1 investido: R$ ${currentAdsMetrics.roas.toFixed(2)}`}
+                        variant={currentAdsMetrics.roas >= 2 ? "success" : currentAdsMetrics.roas >= 1 ? "default" : "warning"}
+                      />
+                    )}
+                    {currentAdsMetrics.custoPorCompra > 0 && (
+                      <MetricCard
+                        title="Custo por Compra"
+                        value={`R$ ${currentAdsMetrics.custoPorCompra.toFixed(2)}`}
+                        icon={Target}
+                      />
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* Efficiency Metrics */}
             <div>
               <h2 className="text-2xl font-semibold mb-4 text-foreground">🎯 Eficiência (Taxas)</h2>
@@ -384,58 +436,6 @@ const Index = () => {
                   description="Crescimento mensal da base de seguidores"
                 />
               </div>
-            )}
-
-            {/* Ads Section - Simplified */}
-            {hasAdsData && currentAdsMetrics && (currentAdsMetrics.investimentoTotal > 0 || currentAdsMetrics.valorConversaoTotal > 0 || currentAdsMetrics.roas > 0 || currentAdsMetrics.custoPorCompra > 0) && (
-              <>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-semibold text-foreground">💰 Anúncios (Meta Ads) - Principais Métricas</h2>
-                  <Link to="/ads">
-                    <Button variant="outline" className="gap-2">
-                      Ver Análise Completa
-                      <ExternalLinkIcon className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                </div>
-
-                {/* ROI e Performance - Only 4 essential cards */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4 text-foreground">💎 ROI e Performance</h3>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <MetricCard
-                      title="Investimento Total"
-                      value={`R$ ${currentAdsMetrics.investimentoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
-                      icon={DollarSign}
-                      variant="default"
-                    />
-                    {currentAdsMetrics.valorConversaoTotal > 0 && (
-                      <MetricCard
-                        title="Valor de Conversão"
-                        value={`R$ ${currentAdsMetrics.valorConversaoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
-                        icon={Coins}
-                        variant="success"
-                      />
-                    )}
-                    {currentAdsMetrics.roas > 0 && (
-                      <MetricCard
-                        title="ROAS"
-                        value={`${currentAdsMetrics.roas.toFixed(2)}x`}
-                        icon={TrendingUp}
-                        subtitle={`Para cada R$ 1 investido: R$ ${currentAdsMetrics.roas.toFixed(2)}`}
-                        variant={currentAdsMetrics.roas >= 2 ? "success" : currentAdsMetrics.roas >= 1 ? "default" : "warning"}
-                      />
-                    )}
-                    {currentAdsMetrics.custoPorCompra > 0 && (
-                      <MetricCard
-                        title="Custo por Compra"
-                        value={`R$ ${currentAdsMetrics.custoPorCompra.toFixed(2)}`}
-                        icon={Target}
-                      />
-                    )}
-                  </div>
-                </div>
-              </>
             )}
           </>
         ) : null}

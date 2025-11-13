@@ -3,7 +3,7 @@ import { Users, UserPlus, TrendingUp, TrendingDown, Calendar } from "lucide-reac
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
 import { NewFollowersChart } from "@/components/dashboard/NewFollowersChart";
-import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
+
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/contexts/DashboardContext";
@@ -17,7 +17,6 @@ const Seguidores = () => {
     followersData,
     selectedMonth,
     availableMonths,
-    setFollowersData,
     setSelectedMonth,
   } = useDashboard();
 
@@ -88,10 +87,6 @@ const Seguidores = () => {
           </p>
         </div>
 
-        {/* Followers Uploader */}
-        <FollowersUploader 
-          onDataLoaded={(data: FollowersData[]) => setFollowersData(data)}
-        />
 
         {/* Show welcome message if no data */}
         {!hasFollowersData && (

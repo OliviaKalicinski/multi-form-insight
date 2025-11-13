@@ -143,20 +143,37 @@ const Volume = () => {
                 <>
                   <MonthlyAggregateChart
                     data={aggregatedMarketingData}
-                    title="Visualizações × Alcance (Últimos 12 Meses)"
-                    description="Evolução mensal de visualizações e alcance"
+                    title="📊 Visualizações × Alcance (Evolução Mensal)"
+                    description="Compare o volume mensal de visualizações com o alcance total"
                     metrics={[
-                      { dataKey: "Visualizacoes", name: "Visualizações", color: "hsl(var(--chart-1))" },
-                      { dataKey: "Alcance", name: "Alcance", color: "hsl(var(--chart-2))" },
+                      {
+                        dataKey: "Visualizações",
+                        name: "Visualizações",
+                        color: "hsl(var(--chart-4))",
+                      },
+                      {
+                        dataKey: "Alcance",
+                        name: "Alcance",
+                        color: "hsl(var(--chart-1))",
+                      },
                     ]}
                   />
+
                   <MonthlyAggregateChart
                     data={aggregatedMarketingData}
-                    title="Visitas × Interações (Últimos 12 Meses)"
-                    description="Evolução mensal de visitas ao perfil e interações"
+                    title="👥 Visitas × Interações (Evolução Mensal)"
+                    description="Acompanhe a evolução mensal das visitas ao perfil e o nível de engajamento"
                     metrics={[
-                      { dataKey: "Visitas", name: "Visitas ao Perfil", color: "hsl(var(--chart-3))" },
-                      { dataKey: "Interacoes", name: "Interações", color: "hsl(var(--chart-4))" },
+                      {
+                        dataKey: "Visitas",
+                        name: "Visitas",
+                        color: "hsl(var(--chart-2))",
+                      },
+                      {
+                        dataKey: "Interações",
+                        name: "Interações",
+                        color: "hsl(var(--chart-3))",
+                      },
                     ]}
                   />
                 </>
@@ -164,20 +181,37 @@ const Volume = () => {
                 <>
                   <TrendChart
                     data={currentMonthData}
-                    title="Visualizações × Alcance"
-                    description="Tendência diária de visualizações e alcance"
+                    title="📊 Visualizações × Alcance"
+                    description="Compare o volume de visualizações com o alcance total"
                     metrics={[
-                      { dataKey: "Visualizacoes", name: "Visualizações", color: "hsl(var(--chart-1))" },
-                      { dataKey: "Alcance", name: "Alcance", color: "hsl(var(--chart-2))" },
+                      {
+                        dataKey: "visualizacoes",
+                        name: "Visualizações",
+                        color: "hsl(var(--chart-4))",
+                      },
+                      {
+                        dataKey: "alcance",
+                        name: "Alcance",
+                        color: "hsl(var(--chart-1))",
+                      },
                     ]}
                   />
+
                   <TrendChart
                     data={currentMonthData}
-                    title="Visitas × Interações"
-                    description="Tendência diária de visitas ao perfil e interações"
+                    title="👥 Visitas × Interações"
+                    description="Acompanhe as visitas ao perfil e o nível de engajamento"
                     metrics={[
-                      { dataKey: "VisitasPerfil", name: "Visitas ao Perfil", color: "hsl(var(--chart-3))" },
-                      { dataKey: "Interacoes", name: "Interações", color: "hsl(var(--chart-4))" },
+                      {
+                        dataKey: "visitas",
+                        name: "Visitas",
+                        color: "hsl(var(--chart-2))",
+                      },
+                      {
+                        dataKey: "interacoes",
+                        name: "Interações",
+                        color: "hsl(var(--chart-3))",
+                      },
                     ]}
                   />
                 </>
