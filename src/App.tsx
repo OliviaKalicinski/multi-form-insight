@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { Navigation } from "@/components/Navigation";
 import Index from "./pages/Index";
+import Volume from "./pages/Volume";
 import Ads from "./pages/Ads";
 import NotFound from "./pages/NotFound";
 
@@ -22,6 +23,7 @@ const App = () => (
             <Navigation />
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/volume" element={<Volume />} />
               <Route path="/ads" element={<Ads />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

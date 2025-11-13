@@ -243,41 +243,6 @@ const Index = () => {
       {/* Show metrics only if month is selected and data exists */}
       {selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
           <>
-            {/* Volume Metrics */}
-            <div>
-              <h2 className="text-2xl font-semibold mb-4 text-foreground">📊 Volume (Totais do Mês)</h2>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <MetricCard
-                  title="👁️ Visualizações Totais"
-                  value={formatNumber(currentMetrics.visualizacoesTotal)}
-                  icon={Eye}
-                  trend={previousMonthData.length > 0 ? growthMetrics.crescimentoVisualizacoes : undefined}
-                />
-                <MetricCard
-                  title="📊 Alcance Total"
-                  value={formatNumber(currentMetrics.alcanceTotal)}
-                  icon={Users}
-                  trend={previousMonthData.length > 0 ? growthMetrics.crescimentoAlcance : undefined}
-                />
-                <MetricCard
-                  title="👤 Visitas ao Perfil"
-                  value={formatNumber(currentMetrics.visitasTotal)}
-                  icon={Users}
-                  trend={previousMonthData.length > 0 ? growthMetrics.crescimentoVisitas : undefined}
-                />
-                <MetricCard
-                  title="💬 Interações Totais"
-                  value={formatNumber(currentMetrics.interacoesTotal)}
-                  icon={Target}
-                />
-                <MetricCard
-                  title="🔗 Cliques no Link"
-                  value={formatNumber(currentMetrics.clicksTotal)}
-                  icon={MousePointerClick}
-                />
-              </div>
-            </div>
-
             {/* Followers Metrics */}
             {hasFollowersData && currentMonthFollowersData.length > 0 && (
               <div>
