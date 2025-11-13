@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
-import { FollowersChart } from "@/components/dashboard/FollowersChart";
+import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
+import { NewFollowersChart } from "@/components/dashboard/NewFollowersChart";
 import { CSVUploader } from "@/components/dashboard/CSVUploader";
 import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
 import { AdsUploader } from "@/components/dashboard/AdsUploader";
@@ -162,9 +163,20 @@ const Index = () => {
   }, [isLast12MonthsView, marketingData, last12Months]);
 
   const monthlyFollowersData = useMemo(() => {
-    if (!isLast12MonthsView) return [];
-    return aggregateFollowersByMonth(followersData, last12Months);
-  }, [isLast12MonthsView, followersData, last12Months]);
+    if (followersData.length === 0) return [];
+    
+    if (isLast12MonthsView) {
+      return aggregateFollowersByMonth(followersData, last12Months);
+    } else if (selectedMonth) {
+      // Para mês único, pegar contexto de até 6 meses atrás para melhor visualização
+      const monthIndex = availableMonths.indexOf(selectedMonth);
+      const startIndex = Math.max(0, monthIndex - 5);
+      const relevantMonths = availableMonths.slice(startIndex, monthIndex + 1);
+      return aggregateFollowersByMonth(followersData, relevantMonths);
+    }
+    
+    return [];
+  }, [followersData, isLast12MonthsView, selectedMonth, last12Months, availableMonths]);
 
   // Check if we have any data
   const hasMarketingData = marketingData.length > 0;
@@ -422,12 +434,19 @@ const Index = () => {
               </>
             )}
 
-            {hasFollowersData && currentMonthFollowersData.length > 0 && (
-              <FollowersChart
-                data={currentMonthFollowersData}
-                title="Evolução de Seguidores"
-                description="Acompanhe o crescimento da sua base de seguidores"
-              />
+            {hasFollowersData && monthlyFollowersData.length > 0 && (
+              <div className="col-span-full grid gap-4 md:grid-cols-2">
+                <AccumulatedFollowersChart
+                  data={monthlyFollowersData}
+                  title="Seguidores Acumulados"
+                  description="Total de seguidores ao longo do tempo"
+                />
+                <NewFollowersChart
+                  data={monthlyFollowersData}
+                  title="Novos Seguidores"
+                  description="Crescimento mensal da base de seguidores"
+                />
+              </div>
             )}
 
             {/* Ads Section */}
