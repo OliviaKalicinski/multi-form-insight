@@ -438,8 +438,8 @@ const Index = () => {
               <div className="col-span-full grid gap-4 md:grid-cols-2">
                 <AccumulatedFollowersChart
                   data={monthlyFollowersData}
-                  title="Seguidores Acumulados"
-                  description="Total de seguidores ao longo do tempo"
+                  title="Crescimento Acumulado"
+                  description="Soma dos novos seguidores ao longo do período"
                 />
                 <NewFollowersChart
                   data={monthlyFollowersData}

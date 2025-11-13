@@ -42,6 +42,8 @@ export const aggregateFollowersByMonth = (
     "Jul", "Ago", "Set", "Out", "Nov", "Dez"
   ];
 
+  let cumulativeGrowth = 0;
+
   return months.map((month, index) => {
     const monthData = data.filter((item) => item.Data.startsWith(month));
     
@@ -63,13 +65,20 @@ export const aggregateFollowersByMonth = (
         ? parseInt(prevMonthData[prevMonthData.length - 1].Seguidores || "0")
         : 0;
       newFollowers = lastDayFollowers - prevLastDay;
+    } else if (index === 0) {
+      // Para o primeiro mês, considerar todo o valor como novos seguidores
+      newFollowers = lastDayFollowers;
     }
+
+    // Acumular o crescimento
+    cumulativeGrowth += newFollowers;
 
     return {
       month,
       monthLabel,
       Seguidores: lastDayFollowers,
       NovosSeguidores: newFollowers,
+      CrescimentoAcumulado: cumulativeGrowth,
     };
   });
 };

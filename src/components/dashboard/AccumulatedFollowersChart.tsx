@@ -41,8 +41,8 @@ export const AccumulatedFollowersChart = ({
             />
             <Line
               type="monotone"
-              dataKey="Seguidores"
-              name="Seguidores Acumulados"
+              dataKey="CrescimentoAcumulado"
+              name="Crescimento Acumulado"
               stroke="hsl(var(--chart-4))"
               strokeWidth={2}
               dot={{ fill: 'hsl(var(--chart-4))', r: 4 }}
