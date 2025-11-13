@@ -14,7 +14,7 @@ import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNum
 import { calculateAdsMetrics, filterAdsByMonth } from "@/utils/adsCalculator";
 import { MarketingData, FollowersData, AdsData } from "@/types/marketing";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { defaultAdsData } from "@/data/adsData";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Index = () => {
   const {
@@ -108,12 +108,14 @@ const Index = () => {
   };
 
   const handleAdsDataLoaded = (data: AdsData[], fileName: string, summaries?: any[], isHierarchical?: boolean) => {
-    if (data.length === 0) {
-      setAdsData(defaultAdsData, [], false);
-    } else {
-      setAdsData(data, summaries, isHierarchical);
-    }
+    setAdsData(data, summaries, isHierarchical);
   };
+
+  // Check if we have any data
+  const hasMarketingData = marketingData.length > 0;
+  const hasFollowersData = followersData.length > 0;
+  const hasAdsData = adsData.length > 0;
+  const hasAnyData = hasMarketingData || hasFollowersData || hasAdsData;
 
   return (
     <div className="container mx-auto p-6 space-y-8">
@@ -124,17 +126,34 @@ const Index = () => {
         <AdsUploader onDataLoaded={handleAdsDataLoaded} />
       </div>
 
-        {/* Month Filter */}
-        {availableMonths.length > 0 && (
-          <MonthFilter
-            availableMonths={availableMonths}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
-        )}
+      {/* Welcome message when no data */}
+      {!hasAnyData && (
+        <Card className="col-span-full">
+          <CardHeader>
+            <CardTitle>👋 Bem-vindo ao Dashboard de Marketing</CardTitle>
+            <CardDescription>
+              Para começar, faça upload das suas planilhas acima
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              📊 CSV de Marketing • 👥 CSV de Seguidores • 📢 CSV de Anúncios Meta
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Show metrics only if month is selected and data exists */}
-        {selectedMonth && currentMonthData.length > 0 ? (
+      {/* Month Filter - only show when we have data */}
+      {availableMonths.length > 0 && (
+        <MonthFilter
+          availableMonths={availableMonths}
+          selectedMonth={selectedMonth}
+          onMonthChange={setSelectedMonth}
+        />
+      )}
+
+      {/* Show metrics only if month is selected and data exists */}
+      {selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
           <>
             {/* Volume Metrics */}
             <div>
@@ -172,7 +191,7 @@ const Index = () => {
             </div>
 
             {/* Followers Metrics */}
-            {currentMonthFollowersData.length > 0 && (
+            {hasFollowersData && currentMonthFollowersData.length > 0 && (
               <div>
                 <h2 className="text-2xl font-semibold mb-4 text-foreground">👥 Seguidores</h2>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -222,7 +241,7 @@ const Index = () => {
             </div>
 
             {/* Growth Metrics */}
-            {previousMonthData.length > 0 && (
+            {hasMarketingData && previousMonthData.length > 0 && (
               <div>
                 <h2 className="text-2xl font-semibold mb-4 text-foreground">📈 Crescimento (vs Mês Anterior)</h2>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -285,7 +304,7 @@ const Index = () => {
               ]}
             />
 
-            {currentMonthFollowersData.length > 0 && (
+            {hasFollowersData && currentMonthFollowersData.length > 0 && (
               <FollowersChart
                 data={currentMonthFollowersData}
                 title="Evolução de Seguidores"
@@ -294,7 +313,7 @@ const Index = () => {
             )}
 
             {/* Ads Section */}
-            {currentAdsMetrics && (
+            {hasAdsData && currentAdsMetrics && (
               <>
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-semibold text-foreground">💰 Anúncios (Meta Ads)</h2>
@@ -422,15 +441,7 @@ const Index = () => {
               </>
             )}
           </>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">
-              {availableMonths.length === 0
-                ? "Faça upload de um arquivo CSV para começar"
-                : "Selecione um mês para visualizar os dados"}
-            </p>
-          </div>
-        )}
+        ) : null}
     </div>
   );
 };

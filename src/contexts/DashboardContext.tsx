@@ -1,8 +1,5 @@
 import { createContext, useContext, useState, useMemo, ReactNode } from "react";
 import { MarketingData, FollowersData, AdsData, AdsMonthSummary } from "@/types/marketing";
-import { marketingData as defaultMarketingData } from "@/data/marketingData";
-import { followersData as defaultFollowersData } from "@/data/followersData";
-import { defaultAdsData } from "@/data/adsData";
 import { extractAvailableMonths } from "@/utils/adsParserV2";
 
 interface DashboardContextType {
@@ -22,9 +19,9 @@ interface DashboardContextType {
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
 export const DashboardProvider = ({ children }: { children: ReactNode }) => {
-  const [marketingData, setMarketingDataState] = useState<MarketingData[]>(defaultMarketingData);
-  const [followersData, setFollowersDataState] = useState<FollowersData[]>(defaultFollowersData);
-  const [adsData, setAdsDataState] = useState<AdsData[]>(defaultAdsData);
+  const [marketingData, setMarketingDataState] = useState<MarketingData[]>([]);
+  const [followersData, setFollowersDataState] = useState<FollowersData[]>([]);
+  const [adsData, setAdsDataState] = useState<AdsData[]>([]);
   const [monthlySummaries, setMonthlySummaries] = useState<AdsMonthSummary[]>([]);
   const [hasHierarchicalFormat, setHasHierarchicalFormat] = useState<boolean>(false);
   const [selectedMonth, setSelectedMonthState] = useState<string>("");
@@ -71,7 +68,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const setAdsData = (data: AdsData[], summaries: AdsMonthSummary[] = [], isHierarchical: boolean = false) => {
-    setAdsDataState(data.length > 0 ? data : defaultAdsData);
+    setAdsDataState(data);
     setMonthlySummaries(summaries);
     setHasHierarchicalFormat(isHierarchical);
     setSelectedMonthState("");
