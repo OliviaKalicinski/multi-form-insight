@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { AdsData } from "@/types/marketing";
 import {
   Table,
@@ -9,7 +10,15 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, DollarSign, MousePointer, ShoppingCart, Package } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { TrendingUp, TrendingDown, DollarSign, MousePointer, ShoppingCart, Package, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface AdsBreakdownProps {
   ads: AdsData[];
@@ -28,28 +37,142 @@ const parseValue = (value: string): number => {
   return parseFloat(cleaned) || 0;
 };
 
+type SortColumn = 'investment' | 'impressions' | 'clicks' | 'ctr' | 'purchases' | 'roas' | null;
+type SortDirection = 'asc' | 'desc' | null;
+
 export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
+  const [sortColumn, setSortColumn] = useState<SortColumn>('investment');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [filterResultType, setFilterResultType] = useState<string>("all");
+
   if (ads.length === 0) {
     return null;
   }
 
-  // Ordenar por investimento (maior primeiro)
-  const sortedAds = [...ads].sort((a, b) => {
-    const investA = parseValue(a["Valor usado (BRL)"]);
-    const investB = parseValue(b["Valor usado (BRL)"]);
-    return investB - investA;
-  });
+  // Extrair tipos únicos de resultado
+  const uniqueResultTypes = useMemo(() => {
+    const types = new Set(ads.map(ad => ad["Tipo de resultado"]).filter(Boolean));
+    return Array.from(types).sort();
+  }, [ads]);
+
+  // Função de ordenação
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Ciclar: desc -> asc -> null (padrão)
+      if (sortDirection === 'desc') {
+        setSortDirection('asc');
+      } else if (sortDirection === 'asc') {
+        setSortDirection(null);
+        setSortColumn(null);
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  // Filtrar e ordenar anúncios
+  const processedAds = useMemo(() => {
+    let filtered = [...ads];
+
+    // Aplicar filtro de tipo de resultado
+    if (filterResultType !== "all") {
+      filtered = filtered.filter(ad => ad["Tipo de resultado"] === filterResultType);
+    }
+
+    // Aplicar ordenação
+    if (sortColumn && sortDirection) {
+      filtered.sort((a, b) => {
+        let valueA = 0;
+        let valueB = 0;
+
+        switch (sortColumn) {
+          case 'investment':
+            valueA = parseValue(a["Valor usado (BRL)"]);
+            valueB = parseValue(b["Valor usado (BRL)"]);
+            break;
+          case 'impressions':
+            valueA = parseValue(a["Impressões"]);
+            valueB = parseValue(b["Impressões"]);
+            break;
+          case 'clicks':
+            valueA = parseValue(a["Cliques (todos)"]);
+            valueB = parseValue(b["Cliques (todos)"]);
+            break;
+          case 'ctr':
+            valueA = parseValue(a["CTR (todos)"]);
+            valueB = parseValue(b["CTR (todos)"]);
+            break;
+          case 'purchases':
+            valueA = parseValue(a["Compras"]);
+            valueB = parseValue(b["Compras"]);
+            break;
+          case 'roas':
+            valueA = parseValue(a["ROAS de resultados"]);
+            valueB = parseValue(b["ROAS de resultados"]);
+            break;
+        }
+
+        return sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
+      });
+    } else {
+      // Ordenação padrão por investimento
+      filtered.sort((a, b) => {
+        const investA = parseValue(a["Valor usado (BRL)"]);
+        const investB = parseValue(b["Valor usado (BRL)"]);
+        return investB - investA;
+      });
+    }
+
+    return filtered;
+  }, [ads, sortColumn, sortDirection, filterResultType]);
+
+  const getSortIcon = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-3 w-3 ml-1" />
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
 
   return (
     <Card className="mt-6">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          Detalhamento por Anúncio
-        </CardTitle>
-        <CardDescription>
-          {ads.length} anúncios ativos no mês selecionado
-        </CardDescription>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Detalhamento por Anúncio
+            </CardTitle>
+            <CardDescription className="flex items-center gap-2 mt-2">
+              <span>
+                {processedAds.length} {processedAds.length !== ads.length && `de ${ads.length}`} anúncios
+              </span>
+              {filterResultType !== "all" && (
+                <Badge variant="secondary" className="ml-2">
+                  Filtrado
+                </Badge>
+              )}
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={filterResultType} onValueChange={setFilterResultType}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Tipo de resultado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                {uniqueResultTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
@@ -58,31 +181,92 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
               <TableRow>
                 <TableHead>Anúncio</TableHead>
                 <TableHead className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <DollarSign className="h-4 w-4" />
-                    Investimento
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent"
+                    onClick={() => handleSort('investment')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <DollarSign className="h-4 w-4" />
+                      Investimento
+                      {getSortIcon('investment')}
+                    </div>
+                  </Button>
                 </TableHead>
-                <TableHead className="text-right">Impressões</TableHead>
                 <TableHead className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <MousePointer className="h-4 w-4" />
-                    Cliques
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent"
+                    onClick={() => handleSort('impressions')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Impressões
+                      {getSortIcon('impressions')}
+                    </div>
+                  </Button>
                 </TableHead>
-                <TableHead className="text-right">CTR</TableHead>
                 <TableHead className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <ShoppingCart className="h-4 w-4" />
-                    Compras
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent"
+                    onClick={() => handleSort('clicks')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <MousePointer className="h-4 w-4" />
+                      Cliques
+                      {getSortIcon('clicks')}
+                    </div>
+                  </Button>
                 </TableHead>
-                <TableHead className="text-right">ROAS</TableHead>
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent"
+                    onClick={() => handleSort('ctr')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      CTR
+                      {getSortIcon('ctr')}
+                    </div>
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent"
+                    onClick={() => handleSort('purchases')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <ShoppingCart className="h-4 w-4" />
+                      Compras
+                      {getSortIcon('purchases')}
+                    </div>
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent"
+                    onClick={() => handleSort('roas')}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      ROAS
+                      {getSortIcon('roas')}
+                    </div>
+                  </Button>
+                </TableHead>
+                <TableHead>Tipo de Resultado</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedAds.map((ad, index) => {
+              {processedAds.map((ad, index) => {
                 const investment = parseValue(ad["Valor usado (BRL)"]);
                 const impressions = parseValue(ad["Impressões"]);
                 const clicks = parseValue(ad["Cliques (todos)"]);
@@ -128,6 +312,11 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">
+                        {ad["Tipo de resultado"] || "-"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Badge variant={status === "active" ? "default" : "secondary"}>
