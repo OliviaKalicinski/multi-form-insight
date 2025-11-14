@@ -4,6 +4,9 @@ import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPl
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
+import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
+import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
@@ -20,6 +23,15 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLast12Months, getPrevious12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
 import { aggregateMarketingByMonth, aggregateFollowersByMonth, aggregateAdsByMonth } from "@/utils/monthlyAggregator";
+import { 
+  calculateMultiMonthMetrics, 
+  calculateFollowersMultiMonthMetrics, 
+  calculateAdsMultiMonthMetrics,
+  prepareMarketingComparisonChartData,
+  prepareFollowersComparisonChartData,
+  getMonthColor,
+  formatMonthLabel 
+} from "@/utils/comparisonCalculator";
 
 const Index = () => {
   const {
@@ -32,6 +44,10 @@ const Index = () => {
     setFollowersData,
     setAdsData,
     setSelectedMonth,
+    comparisonMode,
+    selectedMonths,
+    setComparisonMode,
+    toggleMonth,
   } = useDashboard();
 
   // Detect 12-month view
@@ -42,6 +58,39 @@ const Index = () => {
     if (!isLast12MonthsView) return [];
     return getLast12Months(availableMonths);
   }, [isLast12MonthsView, availableMonths]);
+
+  // Comparison mode calculations
+  const multiMonthMetrics = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length < 2) return null;
+    return calculateMultiMonthMetrics(marketingData, selectedMonths);
+  }, [comparisonMode, selectedMonths, marketingData]);
+
+  const followersMultiMonthMetrics = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length < 2) return null;
+    return calculateFollowersMultiMonthMetrics(followersData, selectedMonths);
+  }, [comparisonMode, selectedMonths, followersData]);
+
+  const adsMultiMonthMetrics = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length < 2) return null;
+    return calculateAdsMultiMonthMetrics(
+      adsData,
+      selectedMonths,
+      (data, month) => filterAdsByMonth(data, month)
+    );
+  }, [comparisonMode, selectedMonths, adsData]);
+
+  const comparisonChartData = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length < 2) return [];
+    return prepareMarketingComparisonChartData(marketingData, selectedMonths, "visualizacoes");
+  }, [comparisonMode, selectedMonths, marketingData]);
+
+  const monthColors = useMemo(() => {
+    const colors: Record<string, string> = {};
+    selectedMonths.forEach((month) => {
+      colors[formatMonthLabel(month)] = getMonthColor(month, selectedMonths);
+    });
+    return colors;
+  }, [selectedMonths]);
 
   // Filter marketing data by selected month or last 12 months
   const currentMonthData = useMemo(() => {
@@ -245,14 +294,30 @@ const Index = () => {
         </Card>
       )}
 
-      {/* Month Filter - only show when we have data */}
+      {/* Comparison Toggle */}
+      {availableMonths.length > 1 && (
+        <ComparisonToggle
+          enabled={comparisonMode}
+          onToggle={setComparisonMode}
+        />
+      )}
+
+      {/* Month Selector */}
       {availableMonths.length > 0 && (
         <>
-          <MonthFilter
-            availableMonths={availableMonths}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
+          {comparisonMode ? (
+            <MonthComparisonSelector
+              availableMonths={availableMonths}
+              selectedMonths={selectedMonths}
+              onToggleMonth={toggleMonth}
+            />
+          ) : (
+            <MonthFilter
+              availableMonths={availableMonths}
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+            />
+          )}
           
           {/* Period indicator badge for 12-month view */}
           {isLast12MonthsView && last12Months.length > 0 && (
@@ -276,7 +341,119 @@ const Index = () => {
       )}
 
       {/* Show metrics only if month is selected and data exists */}
-      {selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
+      {comparisonMode && multiMonthMetrics ? (
+        <>
+          {/* Comparison View */}
+          <div>
+            <h2 className="text-2xl font-semibold mb-4 text-foreground">📊 Marketing - Comparação de Métricas</h2>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+              <ComparisonMetricCard
+                title="Visualizações"
+                icon={Eye}
+                metrics={multiMonthMetrics.visualizacoes}
+                formatValue={formatNumber}
+              />
+              <ComparisonMetricCard
+                title="Alcance"
+                icon={Users}
+                metrics={multiMonthMetrics.alcance}
+                formatValue={formatNumber}
+              />
+              <ComparisonMetricCard
+                title="Visitas ao Perfil"
+                icon={MousePointerClick}
+                metrics={multiMonthMetrics.visitas}
+                formatValue={formatNumber}
+              />
+              <ComparisonMetricCard
+                title="Interações"
+                icon={Heart}
+                metrics={multiMonthMetrics.interacoes}
+                formatValue={formatNumber}
+              />
+              <ComparisonMetricCard
+                title="Clicks no Link"
+                icon={Target}
+                metrics={multiMonthMetrics.clicks}
+                formatValue={formatNumber}
+              />
+            </div>
+          </div>
+
+          {/* Followers Comparison */}
+          {hasFollowersData && followersMultiMonthMetrics && (
+            <div>
+              <h2 className="text-2xl font-semibold mb-4 text-foreground">👥 Seguidores - Comparação</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <ComparisonMetricCard
+                  title="Total de Seguidores"
+                  icon={Users}
+                  metrics={followersMultiMonthMetrics.totalSeguidores}
+                  formatValue={formatFollowersNumber}
+                />
+                <ComparisonMetricCard
+                  title="Novos Seguidores"
+                  icon={UserPlus}
+                  metrics={followersMultiMonthMetrics.novosSeguidores}
+                  formatValue={formatFollowersNumber}
+                />
+                <ComparisonMetricCard
+                  title="Crescimento"
+                  icon={TrendingUp}
+                  metrics={followersMultiMonthMetrics.crescimento}
+                  formatValue={formatFollowersNumber}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Ads Comparison */}
+          {hasAdsData && adsMultiMonthMetrics && (
+            <div>
+              <h2 className="text-2xl font-semibold mb-4 text-foreground">💰 Anúncios - Comparação</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <ComparisonMetricCard
+                  title="Investimento Total"
+                  icon={DollarSign}
+                  metrics={adsMultiMonthMetrics.investimento}
+                  formatValue={(v) => `R$ ${v.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}
+                />
+                <ComparisonMetricCard
+                  title="ROAS"
+                  icon={TrendingUp}
+                  metrics={adsMultiMonthMetrics.roas}
+                  formatValue={(v) => `${v.toFixed(2)}x`}
+                />
+                <ComparisonMetricCard
+                  title="Conversões"
+                  icon={ShoppingCart}
+                  metrics={adsMultiMonthMetrics.compras}
+                  formatValue={formatNumber}
+                />
+                <ComparisonMetricCard
+                  title="CPC Médio"
+                  icon={Coins}
+                  metrics={adsMultiMonthMetrics.cpc}
+                  formatValue={(v) => `R$ ${v.toFixed(2)}`}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Comparison Charts */}
+          {comparisonChartData.length > 0 && (
+            <TrendChart
+              data={comparisonChartData}
+              title="📈 Visualizações - Comparação entre Meses"
+              description="Comparação diária de visualizações entre os meses selecionados"
+              metrics={[]}
+              comparisonMode={true}
+              selectedMonths={selectedMonths.map(formatMonthLabel)}
+              monthColors={monthColors}
+            />
+          )}
+        </>
+      ) : selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
           <>
 
             {/* Ads Section - Simplified - MOVED TO TOP */}

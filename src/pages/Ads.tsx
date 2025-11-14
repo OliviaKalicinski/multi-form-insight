@@ -23,6 +23,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
+import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
+import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
 import { useDashboard } from "@/contexts/DashboardContext";
@@ -30,10 +33,22 @@ import { filterAdsByMonth } from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { getLast12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
 import { aggregateAdsByMonth } from "@/utils/monthlyAggregator";
+import { calculateAdsMultiMonthMetrics, getMonthColor, formatMonthLabel } from "@/utils/comparisonCalculator";
 
 const Ads = () => {
   const navigate = useNavigate();
-  const { adsData, monthlySummaries, hasHierarchicalFormat, selectedMonth, availableMonths, setSelectedMonth } = useDashboard();
+  const { 
+    adsData, 
+    monthlySummaries, 
+    hasHierarchicalFormat, 
+    selectedMonth, 
+    availableMonths, 
+    setSelectedMonth,
+    comparisonMode,
+    selectedMonths,
+    setComparisonMode,
+    toggleMonth,
+  } = useDashboard();
 
   // Detect 12-month view
   const isLast12MonthsView = selectedMonth === "last-12-months";
@@ -43,6 +58,16 @@ const Ads = () => {
     if (!isLast12MonthsView) return [];
     return getLast12Months(availableMonths);
   }, [isLast12MonthsView, availableMonths]);
+
+  // Comparison mode calculations
+  const multiMonthMetrics = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length < 2) return null;
+    return calculateAdsMultiMonthMetrics(
+      adsData, 
+      selectedMonths,
+      (data, month) => isLast12MonthsView ? aggregateAdsByMonth(data, [month]) : filterAdsByMonth(data, month)
+    );
+  }, [comparisonMode, selectedMonths, adsData, isLast12MonthsView]);
 
   const currentMonthAdsData = useMemo(() => {
     if (!selectedMonth) return [];
@@ -95,14 +120,30 @@ const Ads = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-8">
-      {/* Month Filter */}
+      {/* Comparison Toggle */}
+      {availableMonths.length > 1 && (
+        <ComparisonToggle
+          enabled={comparisonMode}
+          onToggle={setComparisonMode}
+        />
+      )}
+
+      {/* Month Selector */}
       {availableMonths.length > 0 && (
         <>
-          <MonthFilter
-            availableMonths={availableMonths}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
+          {comparisonMode ? (
+            <MonthComparisonSelector
+              availableMonths={availableMonths}
+              selectedMonths={selectedMonths}
+              onToggleMonth={toggleMonth}
+            />
+          ) : (
+            <MonthFilter
+              availableMonths={availableMonths}
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+            />
+          )}
           
           {/* Period indicator badge for 12-month view */}
           {isLast12MonthsView && last12Months.length > 0 && (
@@ -149,6 +190,45 @@ const Ads = () => {
         </Card>
       ) : (
           <div className="space-y-8">
+            {/* Comparison or Regular View */}
+            {comparisonMode && multiMonthMetrics ? (
+              <>
+                <h2 className="text-2xl font-semibold text-foreground">📊 Comparação de Métricas</h2>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                  <ComparisonMetricCard
+                    title="Investimento Total"
+                    icon={DollarSign}
+                    metrics={multiMonthMetrics.investimento}
+                    formatValue={formatCurrency}
+                  />
+                  <ComparisonMetricCard
+                    title="ROAS"
+                    icon={TrendingUp}
+                    metrics={multiMonthMetrics.roas}
+                    formatValue={formatRoas}
+                  />
+                  <ComparisonMetricCard
+                    title="Conversões (Compras)"
+                    icon={ShoppingCart}
+                    metrics={multiMonthMetrics.compras}
+                    formatValue={formatNumber}
+                  />
+                  <ComparisonMetricCard
+                    title="CPC Médio"
+                    icon={Coins}
+                    metrics={multiMonthMetrics.cpc}
+                    formatValue={formatCurrency}
+                  />
+                  <ComparisonMetricCard
+                    title="Taxa de Conversão"
+                    icon={Percent}
+                    metrics={multiMonthMetrics.taxaConversao}
+                    formatValue={formatPercent}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
             {/* Seção 1: Investimento e Retorno */}
             <div className="space-y-4">
               <h2 className="text-2xl font-semibold text-foreground">💰 Investimento e Retorno</h2>
@@ -295,8 +375,10 @@ const Ads = () => {
             </div>
 
             {/* Breakdown de Anúncios Individuais */}
-            {currentMonthAdsData.length > 0 && (
+            {!comparisonMode && currentMonthAdsData.length > 0 && (
               <AdsBreakdown ads={currentMonthAdsData} selectedMonth={selectedMonth} />
+            )}
+            </>
             )}
           </div>
       )}
