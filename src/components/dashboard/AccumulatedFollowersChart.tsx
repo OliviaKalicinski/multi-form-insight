@@ -1,17 +1,24 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { MonthlyAggregate } from "@/utils/monthlyAggregator";
+import { ComparisonChartData } from "@/types/marketing";
 
 interface AccumulatedFollowersChartProps {
-  data: MonthlyAggregate[];
+  data: MonthlyAggregate[] | ComparisonChartData[];
   title: string;
   description: string;
+  comparisonMode?: boolean;
+  selectedMonths?: string[];
+  monthColors?: Record<string, string>;
 }
 
 export const AccumulatedFollowersChart = ({ 
   data, 
   title, 
-  description 
+  description,
+  comparisonMode = false,
+  selectedMonths = [],
+  monthColors = {},
 }: AccumulatedFollowersChartProps) => {
   return (
     <Card>
@@ -24,7 +31,7 @@ export const AccumulatedFollowersChart = ({
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
-              dataKey="monthLabel" 
+              dataKey={comparisonMode ? "dia" : "monthLabel"}
               className="text-xs"
               tick={{ fill: 'hsl(var(--foreground))' }}
             />
@@ -39,14 +46,31 @@ export const AccumulatedFollowersChart = ({
                 borderRadius: '6px'
               }}
             />
-            <Line
-              type="monotone"
-              dataKey="CrescimentoAcumulado"
-              name="Crescimento Acumulado"
-              stroke="hsl(var(--chart-4))"
-              strokeWidth={2}
-              dot={{ fill: 'hsl(var(--chart-4))', r: 4 }}
-            />
+            {comparisonMode ? (
+              selectedMonths.map((month) => {
+                const color = monthColors[month] || "hsl(var(--chart-4))";
+                return (
+                  <Line
+                    key={month}
+                    type="monotone"
+                    dataKey={month}
+                    name={month}
+                    stroke={color}
+                    strokeWidth={2}
+                    dot={{ fill: color, r: 3 }}
+                  />
+                );
+              })
+            ) : (
+              <Line
+                type="monotone"
+                dataKey="CrescimentoAcumulado"
+                name="Crescimento Acumulado"
+                stroke="hsl(var(--chart-4))"
+                strokeWidth={2}
+                dot={{ fill: 'hsl(var(--chart-4))', r: 4 }}
+              />
+            )}
           </LineChart>
         </ResponsiveContainer>
       </CardContent>

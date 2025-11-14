@@ -1,17 +1,24 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import { MonthlyAggregate } from "@/utils/monthlyAggregator";
+import { ComparisonChartData } from "@/types/marketing";
 
 interface NewFollowersChartProps {
-  data: MonthlyAggregate[];
+  data: MonthlyAggregate[] | ComparisonChartData[];
   title: string;
   description: string;
+  comparisonMode?: boolean;
+  selectedMonths?: string[];
+  monthColors?: Record<string, string>;
 }
 
 export const NewFollowersChart = ({ 
   data, 
   title, 
-  description 
+  description,
+  comparisonMode = false,
+  selectedMonths = [],
+  monthColors = {},
 }: NewFollowersChartProps) => {
   return (
     <Card>
@@ -24,7 +31,7 @@ export const NewFollowersChart = ({
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
-              dataKey="monthLabel" 
+              dataKey={comparisonMode ? "dia" : "monthLabel"}
               className="text-xs"
               tick={{ fill: 'hsl(var(--foreground))' }}
             />
@@ -39,12 +46,28 @@ export const NewFollowersChart = ({
                 borderRadius: '6px'
               }}
             />
-            <Bar
-              dataKey="NovosSeguidores"
-              name="Novos Seguidores"
-              fill="hsl(var(--chart-5))"
-              radius={[4, 4, 0, 0]}
-            />
+            {comparisonMode && <Legend />}
+            {comparisonMode ? (
+              selectedMonths.map((month) => {
+                const color = monthColors[month] || "hsl(var(--chart-5))";
+                return (
+                  <Bar
+                    key={month}
+                    dataKey={month}
+                    name={month}
+                    fill={color}
+                    radius={[4, 4, 0, 0]}
+                  />
+                );
+              })
+            ) : (
+              <Bar
+                dataKey="NovosSeguidores"
+                name="Novos Seguidores"
+                fill="hsl(var(--chart-5))"
+                radius={[4, 4, 0, 0]}
+              />
+            )}
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

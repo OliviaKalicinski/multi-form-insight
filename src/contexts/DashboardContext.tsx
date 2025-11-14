@@ -10,10 +10,15 @@ interface DashboardContextType {
   hasHierarchicalFormat: boolean;
   selectedMonth: string;
   availableMonths: string[];
+  comparisonMode: boolean;
+  selectedMonths: string[];
   setMarketingData: (data: MarketingData[]) => void;
   setFollowersData: (data: FollowersData[]) => void;
   setAdsData: (data: AdsData[], summaries?: AdsMonthSummary[], isHierarchical?: boolean) => void;
   setSelectedMonth: (month: string) => void;
+  setComparisonMode: (enabled: boolean) => void;
+  setSelectedMonths: (months: string[]) => void;
+  toggleMonth: (month: string) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -25,6 +30,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [monthlySummaries, setMonthlySummaries] = useState<AdsMonthSummary[]>([]);
   const [hasHierarchicalFormat, setHasHierarchicalFormat] = useState<boolean>(false);
   const [selectedMonth, setSelectedMonthState] = useState<string>("");
+  const [comparisonMode, setComparisonModeState] = useState<boolean>(false);
+  const [selectedMonths, setSelectedMonthsState] = useState<string[]>([]);
 
   // Calculate available months from all data sources
   const availableMonths = useMemo(() => {
@@ -74,6 +81,25 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setSelectedMonthState("");
   };
 
+  const setComparisonMode = (enabled: boolean) => {
+    setComparisonModeState(enabled);
+    if (!enabled) {
+      setSelectedMonthsState([]);
+    }
+  };
+
+  const toggleMonth = (month: string) => {
+    setSelectedMonthsState(prev => {
+      if (prev.includes(month)) {
+        return prev.filter(m => m !== month);
+      }
+      if (prev.length >= 5) {
+        return prev;
+      }
+      return [...prev, month].sort();
+    });
+  };
+
   const value = {
     marketingData,
     followersData,
@@ -82,10 +108,15 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     hasHierarchicalFormat,
     selectedMonth,
     availableMonths,
+    comparisonMode,
+    selectedMonths,
     setMarketingData,
     setFollowersData,
     setAdsData,
     setSelectedMonth: setSelectedMonthState,
+    setComparisonMode,
+    setSelectedMonths: setSelectedMonthsState,
+    toggleMonth,
   };
 
   return (

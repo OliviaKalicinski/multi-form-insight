@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { Eye, Users, MousePointerClick, Target } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
+import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
+import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
@@ -8,6 +11,7 @@ import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber } from "@
 import { useDashboard } from "@/contexts/DashboardContext";
 import { getLast12Months, getPrevious12Months } from "@/utils/dateRangeCalculator";
 import { aggregateMarketingByMonth } from "@/utils/monthlyAggregator";
+import { calculateMultiMonthMetrics, prepareMarketingComparisonChartData, getMonthColor, formatMonthLabel } from "@/utils/comparisonCalculator";
 
 const Volume = () => {
   const {
@@ -15,6 +19,10 @@ const Volume = () => {
     selectedMonth,
     availableMonths,
     setSelectedMonth,
+    comparisonMode,
+    setComparisonMode,
+    selectedMonths,
+    toggleMonth,
   } = useDashboard();
 
   // Detect 12-month view
@@ -79,6 +87,25 @@ const Volume = () => {
     return aggregateMarketingByMonth(marketingData, last12Months);
   }, [marketingData, isLast12MonthsView, last12Months]);
 
+  const multiMonthMetrics = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length < 2) return null;
+    return calculateMultiMonthMetrics(marketingData, selectedMonths);
+  }, [comparisonMode, selectedMonths, marketingData]);
+
+  const comparisonChartData = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length < 2) return [];
+    return prepareMarketingComparisonChartData(marketingData, selectedMonths, "visualizacoes");
+  }, [comparisonMode, selectedMonths, marketingData]);
+
+  const monthColors = useMemo(() => {
+    const colors: Record<string, string> = {};
+    selectedMonths.forEach((month) => {
+      const label = formatMonthLabel(month);
+      colors[label] = getMonthColor(month, selectedMonths);
+    });
+    return colors;
+  }, [selectedMonths]);
+
   const hasMarketingData = marketingData && marketingData.length > 0;
 
   return (
@@ -92,15 +119,33 @@ const Volume = () => {
           </p>
         </div>
 
-        {/* Month Filter */}
-        <MonthFilter
-          availableMonths={availableMonths}
-          selectedMonth={selectedMonth}
-          onMonthChange={setSelectedMonth}
-        />
+        {availableMonths.length >= 2 && (
+          <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
+        )}
 
-        {/* Show metrics only if month is selected and data exists */}
-        {selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
+        {comparisonMode ? (
+          <MonthComparisonSelector
+            availableMonths={availableMonths}
+            selectedMonths={selectedMonths}
+            onToggleMonth={toggleMonth}
+          />
+        ) : (
+          <MonthFilter
+            availableMonths={availableMonths}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+          />
+        )}
+
+        {comparisonMode && selectedMonths.length >= 2 && multiMonthMetrics ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <ComparisonMetricCard title="Visualizações" icon={Eye} metrics={multiMonthMetrics.visualizacoes} formatValue={formatNumber} />
+            <ComparisonMetricCard title="Alcance" icon={Users} metrics={multiMonthMetrics.alcance} formatValue={formatNumber} />
+            <ComparisonMetricCard title="Visitas ao Perfil" icon={Users} metrics={multiMonthMetrics.visitas} formatValue={formatNumber} />
+            <ComparisonMetricCard title="Interações" icon={Target} metrics={multiMonthMetrics.interacoes} formatValue={formatNumber} />
+            <ComparisonMetricCard title="Clicks no Link" icon={MousePointerClick} metrics={multiMonthMetrics.clicks} formatValue={formatNumber} />
+          </div>
+        ) : selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
           <>
             {/* Volume Metrics */}
             <div>
