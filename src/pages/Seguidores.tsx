@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { Users, UserPlus, TrendingUp, TrendingDown, Calendar } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
+import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
+import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
 import { NewFollowersChart } from "@/components/dashboard/NewFollowersChart";
-
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/contexts/DashboardContext";
@@ -11,6 +13,7 @@ import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNum
 import { aggregateFollowersByMonth } from "@/utils/monthlyAggregator";
 import { getLast12Months, getPrevious12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
 import { FollowersData } from "@/types/marketing";
+import { calculateFollowersMultiMonthMetrics, prepareFollowersComparisonChartData, getMonthColor, formatMonthLabel } from "@/utils/comparisonCalculator";
 
 const Seguidores = () => {
   const {
@@ -18,10 +21,33 @@ const Seguidores = () => {
     selectedMonth,
     availableMonths,
     setSelectedMonth,
+    comparisonMode,
+    selectedMonths,
+    setComparisonMode,
+    toggleMonth,
   } = useDashboard();
 
   // Detect 12-month view
   const isLast12MonthsView = selectedMonth === "last-12-months";
+
+  // Comparison mode calculations
+  const multiMonthMetrics = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length < 2) return null;
+    return calculateFollowersMultiMonthMetrics(followersData, selectedMonths);
+  }, [comparisonMode, selectedMonths, followersData]);
+
+  const comparisonChartData = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length < 2) return [];
+    return prepareFollowersComparisonChartData(followersData, selectedMonths);
+  }, [comparisonMode, selectedMonths, followersData]);
+
+  const monthColors = useMemo(() => {
+    const colors: Record<string, string> = {};
+    selectedMonths.forEach((month) => {
+      colors[formatMonthLabel(month)] = getMonthColor(month, selectedMonths);
+    });
+    return colors;
+  }, [selectedMonths]);
   
   // Get last 12 months
   const last12Months = useMemo(() => {
@@ -141,14 +167,30 @@ const Seguidores = () => {
           </Card>
         )}
 
-        {/* Month Filter - only show when we have data */}
+        {/* Comparison Toggle */}
+        {availableMonths.length > 1 && (
+          <ComparisonToggle
+            enabled={comparisonMode}
+            onToggle={setComparisonMode}
+          />
+        )}
+
+        {/* Month Selector */}
         {availableMonths.length > 0 && (
           <>
-            <MonthFilter
-              availableMonths={availableMonths}
-              selectedMonth={selectedMonth}
-              onMonthChange={setSelectedMonth}
-            />
+            {comparisonMode ? (
+              <MonthComparisonSelector
+                availableMonths={availableMonths}
+                selectedMonths={selectedMonths}
+                onToggleMonth={toggleMonth}
+              />
+            ) : (
+              <MonthFilter
+                availableMonths={availableMonths}
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+              />
+            )}
             
             {/* Period indicator badge for 12-month view */}
             {isLast12MonthsView && last12Months.length > 0 && (
@@ -172,7 +214,57 @@ const Seguidores = () => {
         )}
 
         {/* Show metrics only if month is selected and data exists */}
-        {selectedMonth && hasFollowersData && currentMonthFollowersData.length > 0 ? (
+        {comparisonMode && multiMonthMetrics ? (
+          <>
+            {/* Comparison Metrics Cards */}
+            <div>
+              <h2 className="text-2xl font-semibold mb-4 text-foreground">📊 Métricas Comparativas</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <ComparisonMetricCard
+                  title="Total de Seguidores"
+                  icon={Users}
+                  metrics={multiMonthMetrics.totalSeguidores}
+                  formatValue={formatFollowersNumber}
+                />
+                <ComparisonMetricCard
+                  title="Novos Seguidores"
+                  icon={UserPlus}
+                  metrics={multiMonthMetrics.novosSeguidores}
+                  formatValue={formatFollowersNumber}
+                />
+                <ComparisonMetricCard
+                  title="Crescimento"
+                  icon={TrendingUp}
+                  metrics={multiMonthMetrics.crescimento}
+                  formatValue={formatFollowersNumber}
+                />
+              </div>
+            </div>
+
+            {/* Comparison Charts */}
+            <div>
+              <h2 className="text-2xl font-semibold mb-4 text-foreground">📈 Gráficos Comparativos</h2>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <AccumulatedFollowersChart
+                  data={comparisonChartData}
+                  title="Seguidores Acumulados - Comparação"
+                  description="Comparação do total acumulado entre meses"
+                  comparisonMode={true}
+                  selectedMonths={selectedMonths.map(formatMonthLabel)}
+                  monthColors={monthColors}
+                />
+                <NewFollowersChart
+                  data={comparisonChartData}
+                  title="Novos Seguidores - Comparação"
+                  description="Comparação diária de novos seguidores"
+                  comparisonMode={true}
+                  selectedMonths={selectedMonths.map(formatMonthLabel)}
+                  monthColors={monthColors}
+                />
+              </div>
+            </div>
+          </>
+        ) : selectedMonth && hasFollowersData && currentMonthFollowersData.length > 0 ? (
           <>
             {/* Followers Metrics Cards */}
             <div>
