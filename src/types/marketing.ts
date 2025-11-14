@@ -103,3 +103,40 @@ export interface AdsMetrics {
   taxaAddCarrinho: number;
   taxaAbandonoCarrinho: number;
 }
+
+export interface MonthMetric {
+  month: string;
+  monthLabel: string;
+  value: number;
+  color: string;
+  percentageChange?: number;
+}
+
+export interface MultiMonthMetrics {
+  visualizacoes: MonthMetric[];
+  alcance: MonthMetric[];
+  visitas: MonthMetric[];
+  interacoes: MonthMetric[];
+  clicks: MonthMetric[];
+  best: string;
+  worst: string;
+}
+
+export interface ComparisonChartData {
+  dia: string;
+  [key: string]: string | number;
+}
+
+export interface FollowersMultiMonthMetrics {
+  totalSeguidores: MonthMetric[];
+  novosSeguidores: MonthMetric[];
+  crescimento: MonthMetric[];
+}
+
+export interface AdsMultiMonthMetrics {
+  investimento: MonthMetric[];
+  roas: MonthMetric[];
+  compras: MonthMetric[];
+  cpc: MonthMetric[];
+  taxaConversao: MonthMetric[];
+}
