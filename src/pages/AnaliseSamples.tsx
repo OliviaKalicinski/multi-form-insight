@@ -249,7 +249,7 @@ const AnaliseSamples = () => {
       ) : metrics ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <SalesMetricCard
-            title="Total de Amostras Vendidas"
+            title="Pedidos com Amostras"
             value={metrics.volume.totalSamples.toLocaleString('pt-BR')}
             icon={Package}
             subtitle={`${metrics.volume.uniqueCustomers} clientes únicos`}
