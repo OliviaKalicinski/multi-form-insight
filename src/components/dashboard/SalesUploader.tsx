@@ -41,13 +41,30 @@ export const SalesUploader = ({
 
   const validateAndProcessData = (data: any[]): ProcessedOrder[] | null => {
     try {
-      // Validar cada linha
-      const validatedData = data.map((row) => salesDataSchema.parse(row)) as SalesData[];
+      console.log(`📥 Total de linhas no CSV: ${data.length}`);
+      
+      // Validar linha por linha e capturar erros
+      const validatedData: SalesData[] = [];
+      const invalidRows: any[] = [];
+      
+      data.forEach((row, index) => {
+        try {
+          validatedData.push(salesDataSchema.parse(row) as SalesData);
+        } catch (error) {
+          invalidRows.push({ index, row, error });
+        }
+      });
+      
+      console.log(`✅ Linhas válidas: ${validatedData.length}`);
+      console.log(`❌ Linhas rejeitadas: ${invalidRows.length}`);
+      if (invalidRows.length > 0) {
+        console.log('🔍 Primeiras 5 linhas rejeitadas:', invalidRows.slice(0, 5));
+      }
       
       // Processar e agrupar por pedido
       const processedOrders = processSalesData(validatedData);
+      console.log(`🔄 Pedidos únicos após agrupamento: ${processedOrders.length}`);
       
-      console.log(`✅ ${processedOrders.length} pedidos processados`);
       return processedOrders;
     } catch (error) {
       console.error("❌ Erro na validação:", error);
