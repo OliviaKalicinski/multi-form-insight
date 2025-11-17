@@ -223,3 +223,62 @@ export interface PlatformPerformance {
   averageTicket: number;
   marketShare: number;
 }
+
+// Customer Behavior Metrics
+export interface CustomerBehaviorMetrics {
+  totalClientes: number;
+  taxaRecompra: number;
+  clientesAtivos: number;
+  clientesEmRisco: number;
+  clientesInativos: number;
+  clientesChurn: number;
+  taxaChurn: number;
+  taxaRetencao: number;
+  pedidosPorDia: { date: string; orders: number }[];
+  pedidosPorSemana: { week: string; orders: number }[];
+  pedidosPorMes: { month: string; orders: number }[];
+  picosVendas: SalesPeak[];
+  customerSegmentation: CustomerSegment[];
+  churnRiskCustomers: ChurnRiskCustomer[];
+  averageDaysBetweenPurchases: number;
+  customerLifetimeValue: number;
+}
+
+export interface CustomerSegment {
+  segment: 'Novo' | 'Ativo' | 'Frequente' | 'VIP';
+  count: number;
+  percentage: number;
+  totalRevenue: number;
+  averageTicket: number;
+  criteria: string;
+}
+
+export interface ChurnRiskCustomer {
+  nomeCliente: string;
+  cpfCnpj: string;
+  ultimaCompra: Date;
+  diasSemComprar: number;
+  totalPedidos: number;
+  valorTotal: number;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface SalesPeak {
+  date: string;
+  orders: number;
+  revenue: number;
+  isPeak: boolean;
+  deviationFromAverage: number;
+  percentageAboveAverage: number;
+}
+
+export interface OrderVolumeAnalysis {
+  daily: { date: string; orders: number; revenue: number }[];
+  weekly: { week: string; startDate: string; endDate: string; orders: number; revenue: number }[];
+  monthly: { month: string; orders: number; revenue: number }[];
+  averageDaily: number;
+  averageWeekly: number;
+  averageMonthly: number;
+  peakDay: { date: string; orders: number };
+  lowDay: { date: string; orders: number };
+}

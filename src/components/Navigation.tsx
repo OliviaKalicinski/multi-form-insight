@@ -21,8 +21,11 @@ export const Navigation = () => {
             <TabsTrigger value="/performance-financeira" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               💰 Performance Financeira
             </TabsTrigger>
+            <TabsTrigger value="/comportamento-cliente" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              👥 Comportamento do Cliente
+            </TabsTrigger>
             <TabsTrigger value="/seguidores" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              👥 Seguidores
+              📈 Seguidores
             </TabsTrigger>
             <TabsTrigger value="/volume" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               📊 Volume
