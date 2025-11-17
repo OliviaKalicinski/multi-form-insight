@@ -4,6 +4,47 @@ import { SalesData, ProcessedOrder, SalesMetrics } from "@/types/marketing";
 import { standardizeProductName } from './productNormalizer';
 
 /**
+ * Consolida múltiplos kits de amostras em um único kit por pedido
+ * Regra de negócio: 1 pedido = 1 kit de amostra (preço R$ 0,01)
+ */
+const consolidateSampleKits = (orders: ProcessedOrder[]): ProcessedOrder[] => {
+  return orders.map(order => {
+    // Encontrar todos os produtos "Kit de Amostras"
+    const sampleKits = order.produtos.filter(p => p.descricaoAjustada === 'Kit de Amostras');
+    const otherProducts = order.produtos.filter(p => p.descricaoAjustada !== 'Kit de Amostras');
+    
+    // Se tem kits de amostras, consolidar em apenas 1
+    if (sampleKits.length > 0) {
+      const totalSampleQuantity = sampleKits.reduce((sum, p) => sum + p.quantidade, 0);
+      const totalSampleValue = sampleKits.reduce((sum, p) => sum + p.preco, 0);
+      
+      // Criar um único kit consolidado
+      const consolidatedKit = {
+        sku: sampleKits[0].sku,
+        descricao: sampleKits[0].descricao,
+        descricaoAjustada: 'Kit de Amostras',
+        quantidade: 1, // SEMPRE 1
+        preco: 0.01,   // SEMPRE R$ 0,01
+      };
+      
+      // Recalcular valor total do pedido
+      const newValorTotal = order.valorTotal - totalSampleValue + 0.01;
+      const newTotalItens = order.totalItens - totalSampleQuantity + 1;
+      
+      return {
+        ...order,
+        produtos: [...otherProducts, consolidatedKit],
+        valorTotal: newValorTotal,
+        totalItens: newTotalItens
+      };
+    }
+    
+    // Se não tem kits de amostras, retornar pedido original
+    return order;
+  });
+};
+
+/**
  * Processa dados brutos do CSV e agrupa por pedido único
  */
 export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
@@ -73,7 +114,21 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
   );
   console.table(samples);
   
-  return result;
+  // Consolidar kits de amostras: 1 pedido = 1 kit (R$ 0,01)
+  const consolidatedResult = consolidateSampleKits(result);
+  
+  console.log('🎁 Consolidação de Kits de Amostras aplicada');
+  const samplesOrders = consolidatedResult.filter(o => 
+    o.produtos.some(p => p.descricaoAjustada === 'Kit de Amostras')
+  );
+  const totalSampleKits = samplesOrders.reduce((sum, o) => 
+    sum + (o.produtos.find(p => p.descricaoAjustada === 'Kit de Amostras')?.quantidade || 0), 
+    0
+  );
+  console.log(`📦 Pedidos com amostras: ${samplesOrders.length}`);
+  console.log(`🎁 Total de kits após consolidação: ${totalSampleKits}`);
+  
+  return consolidatedResult;
 };
 
 /**
