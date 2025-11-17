@@ -10,6 +10,8 @@ import { parseHierarchicalAds, validateAdsConsistency } from "@/utils/adsParserV
 
 interface AdsUploaderProps {
   onDataLoaded: (data: AdsData[], fileName: string, summaries?: any[], isHierarchical?: boolean) => void;
+  title?: string;
+  description?: string;
 }
 
 const adsDataSchema = z.object({
@@ -18,7 +20,11 @@ const adsDataSchema = z.object({
   "Impressões": z.string(),
 }).passthrough();
 
-export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
+export const AdsUploader = ({ 
+  onDataLoaded,
+  title = "Importar Dados de Anúncios",
+  description = "Faça upload dos dados de campanhas publicitárias do Meta Ads"
+}: AdsUploaderProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const { toast } = useToast();
@@ -177,12 +183,9 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5 text-primary" />
-          Dados de Anúncios (Meta Ads)
-        </CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Importe os dados de anúncios do Facebook/Instagram Ads Manager em formato CSV ou TSV
+          {description}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -194,13 +197,13 @@ export const AdsUploader = ({ onDataLoaded }: AdsUploaderProps) => {
             }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
               isDragging
                 ? "border-primary bg-primary/5"
                 : "border-border hover:border-primary/50"
             }`}
           >
-            <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground mb-4">
               Arraste e solte o arquivo TSV do Meta Ads Manager aqui, ou clique para selecionar
             </p>

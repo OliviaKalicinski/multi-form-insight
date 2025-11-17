@@ -9,6 +9,8 @@ import { z } from "zod";
 
 interface FollowersUploaderProps {
   onDataLoaded: (data: FollowersData[], fileName: string) => void;
+  title?: string;
+  description?: string;
 }
 
 const followersDataSchema = z.object({
@@ -16,7 +18,11 @@ const followersDataSchema = z.object({
   Seguidores: z.string(),
 });
 
-export const FollowersUploader = ({ onDataLoaded }: FollowersUploaderProps) => {
+export const FollowersUploader = ({ 
+  onDataLoaded,
+  title = "Importar Dados de Seguidores",
+  description = "Faça upload de um arquivo CSV com dados de crescimento de seguidores"
+}: FollowersUploaderProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const { toast } = useToast();
@@ -125,9 +131,9 @@ export const FollowersUploader = ({ onDataLoaded }: FollowersUploaderProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Importar Dados de Seguidores</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Faça upload de um arquivo CSV com dados de crescimento de seguidores
+          {description}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -139,13 +145,13 @@ export const FollowersUploader = ({ onDataLoaded }: FollowersUploaderProps) => {
             }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
               isDragging
                 ? "border-primary bg-primary/5"
                 : "border-border hover:border-primary/50"
             }`}
           >
-            <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground mb-4">
               Arraste e solte seu arquivo CSV aqui, ou
             </p>
