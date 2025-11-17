@@ -29,11 +29,11 @@ export default function Volume() {
     if (salesData.length === 0) return null;
     
     const filteredOrders = selectedMonth 
-      ? filterOrdersByMonth(salesData, selectedMonth) 
+      ? filterOrdersByMonth(salesData, selectedMonth, availableMonths) 
       : salesData;
     
     return calculateProductOperationsMetrics(filteredOrders);
-  }, [salesData, selectedMonth]);
+  }, [salesData, selectedMonth, availableMonths]);
 
   if (salesData.length === 0) {
     return (

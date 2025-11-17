@@ -338,3 +338,110 @@ export const prepareFollowersComparisonChartData = (
     parseInt(a.dia) - parseInt(b.dia)
   );
 };
+
+// Calcular métricas de comparação para vendas
+export const calculateComparisonMetrics = (
+  orders: any[], // ProcessedOrder
+  selectedMonths: string[],
+  availableMonths: string[]
+): {
+  revenue: MonthMetric[];
+  averageTicket: MonthMetric[];
+  totalOrders: MonthMetric[];
+  totalCustomers: MonthMetric[];
+} => {
+  const revenue: MonthMetric[] = [];
+  const averageTicket: MonthMetric[] = [];
+  const totalOrders: MonthMetric[] = [];
+  const totalCustomers: MonthMetric[] = [];
+
+  selectedMonths.forEach((month, index) => {
+    const { filterOrdersByMonth } = require("./salesCalculator");
+    const { calculateFinancialMetrics } = require("./financialMetrics");
+    const { format: formatDate, parse } = require("date-fns");
+    const { ptBR } = require("date-fns/locale");
+    
+    const filteredOrders = filterOrdersByMonth(orders, month, availableMonths);
+    const metrics = calculateFinancialMetrics(filteredOrders, month);
+    
+    // Calcular total de clientes únicos
+    const uniqueCustomers = new Set(filteredOrders.map((order: any) => order.cpfCnpj)).size;
+    
+    if (metrics) {
+      const monthLabel = formatDate(
+        parse(month, "yyyy-MM", new Date()), 
+        "MMM yyyy", 
+        { locale: ptBR }
+      );
+      
+      const SALES_COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
+      const color = SALES_COLORS[index % SALES_COLORS.length];
+
+      revenue.push({
+        month,
+        monthLabel,
+        value: metrics.faturamentoTotal,
+        color,
+      });
+
+      averageTicket.push({
+        month,
+        monthLabel,
+        value: metrics.ticketMedio,
+        color,
+      });
+
+      totalOrders.push({
+        month,
+        monthLabel,
+        value: metrics.totalPedidos,
+        color,
+      });
+
+      totalCustomers.push({
+        month,
+        monthLabel,
+        value: uniqueCustomers,
+        color,
+      });
+    }
+  });
+
+  // Calcular variação percentual em relação ao primeiro mês
+  if (revenue.length > 1) {
+    const baseRevenue = revenue[0].value;
+    revenue.forEach((item, idx) => {
+      if (idx > 0) {
+        item.percentageChange = ((item.value - baseRevenue) / baseRevenue) * 100;
+      }
+    });
+
+    const baseTicket = averageTicket[0].value;
+    averageTicket.forEach((item, idx) => {
+      if (idx > 0) {
+        item.percentageChange = ((item.value - baseTicket) / baseTicket) * 100;
+      }
+    });
+
+    const baseOrders = totalOrders[0].value;
+    totalOrders.forEach((item, idx) => {
+      if (idx > 0) {
+        item.percentageChange = ((item.value - baseOrders) / baseOrders) * 100;
+      }
+    });
+
+    const baseCustomers = totalCustomers[0].value;
+    totalCustomers.forEach((item, idx) => {
+      if (idx > 0) {
+        item.percentageChange = ((item.value - baseCustomers) / baseCustomers) * 100;
+      }
+    });
+  }
+
+  return {
+    revenue,
+    averageTicket,
+    totalOrders,
+    totalCustomers,
+  };
+};
