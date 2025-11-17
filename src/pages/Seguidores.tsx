@@ -1,55 +1,54 @@
 import { useMemo } from "react";
-import { Users, UserPlus, TrendingUp, TrendingDown, Calendar } from "lucide-react";
+import { TrendingUp, Users, MousePointerClick, Eye, Target, UserPlus, DollarSign, ShoppingCart, ShoppingBag, Heart } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
 import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
 import { NewFollowersChart } from "@/components/dashboard/NewFollowersChart";
+import { TrendChart } from "@/components/dashboard/TrendChart";
+import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
+import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
+import { SalesMetricCard } from "@/components/dashboard/SalesMetricCard";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useDashboard } from "@/contexts/DashboardContext";
+import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber } from "@/utils/metricsCalculator";
 import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNumber, formatFollowersGrowth } from "@/utils/followersCalculator";
-import { aggregateFollowersByMonth } from "@/utils/monthlyAggregator";
+import { calculateAdsMetrics, filterAdsByMonth } from "@/utils/adsCalculator";
+import { calculateSalesMetrics, filterOrdersByMonth, formatCurrency, formatPercentage as formatSalesPercentage, formatQuantity } from "@/utils/salesCalculator";
+import { aggregateMarketingByMonth, aggregateFollowersByMonth } from "@/utils/monthlyAggregator";
 import { getLast12Months, getPrevious12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
 import { FollowersData } from "@/types/marketing";
-import { calculateFollowersMultiMonthMetrics, prepareFollowersComparisonChartData, getMonthColor, formatMonthLabel } from "@/utils/comparisonCalculator";
+import { 
+  calculateMultiMonthMetrics, 
+  calculateFollowersMultiMonthMetrics, 
+  calculateAdsMultiMonthMetrics,
+  prepareMarketingComparisonChartData,
+  prepareFollowersComparisonChartData,
+  getMonthColor,
+  formatMonthLabel 
+} from "@/utils/comparisonCalculator";
 
 const Seguidores = () => {
   const {
+    marketingData,
     followersData,
+    adsData,
+    salesData,
     selectedMonth,
     availableMonths,
     setSelectedMonth,
+    setFollowersData,
     comparisonMode,
     selectedMonths,
     setComparisonMode,
     toggleMonth,
   } = useDashboard();
 
-  // Detect 12-month view
+  const handleFollowersDataLoaded = (data: FollowersData[]) => setFollowersData(data);
   const isLast12MonthsView = selectedMonth === "last-12-months";
-
-  // Comparison mode calculations
-  const multiMonthMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length < 2) return null;
-    return calculateFollowersMultiMonthMetrics(followersData, selectedMonths);
-  }, [comparisonMode, selectedMonths, followersData]);
-
-  const comparisonChartData = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length < 2) return [];
-    return prepareFollowersComparisonChartData(followersData, selectedMonths);
-  }, [comparisonMode, selectedMonths, followersData]);
-
-  const monthColors = useMemo(() => {
-    const colors: Record<string, string> = {};
-    selectedMonths.forEach((month) => {
-      colors[formatMonthLabel(month)] = getMonthColor(month, selectedMonths);
-    });
-    return colors;
-  }, [selectedMonths]);
   
-  // Get last 12 months
   const last12Months = useMemo(() => {
     if (!isLast12MonthsView) return [];
     return getLast12Months(availableMonths);
