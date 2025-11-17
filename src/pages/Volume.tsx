@@ -4,6 +4,8 @@ import { Package, ListTree } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
+import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
+import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
 import { TopProductsTable } from "@/components/dashboard/TopProductsTable";
 import { SKUAnalysisTable } from "@/components/dashboard/SKUAnalysisTable";
 import { ProductCombinationsTable } from "@/components/dashboard/ProductCombinationsTable";
@@ -20,6 +22,10 @@ export default function Volume() {
     selectedMonth,
     availableMonths,
     setSelectedMonth,
+    comparisonMode,
+    selectedMonths,
+    setComparisonMode,
+    toggleMonth,
   } = useDashboard();
 
   const [productSortBy, setProductSortBy] = useState<'quantity' | 'revenue'>('quantity');
@@ -58,23 +64,35 @@ export default function Volume() {
 
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Package className="w-8 h-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">📦 Produto & Operações</h1>
-            <p className="text-muted-foreground">
-              Análise de produtos, SKUs, combinações, brindes e operações logísticas
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <Package className="w-8 h-8 text-primary" />
+        <div>
+          <h1 className="text-3xl font-bold">📦 Produto & Operações</h1>
+          <p className="text-muted-foreground">
+            Análise de produtos, SKUs, combinações, brindes e operações logísticas
+          </p>
         </div>
       </div>
 
-      <MonthFilter
-        availableMonths={availableMonths}
-        selectedMonth={selectedMonth}
-        onMonthChange={setSelectedMonth}
-      />
+      {availableMonths.length > 1 && (
+        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
+      )}
+
+      {availableMonths.length > 0 && (
+        comparisonMode ? (
+          <MonthComparisonSelector
+            availableMonths={availableMonths}
+            selectedMonths={selectedMonths}
+            onToggleMonth={toggleMonth}
+          />
+        ) : (
+          <MonthFilter
+            availableMonths={availableMonths}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+          />
+        )
+      )}
 
 
       <Tabs defaultValue="ranking" className="space-y-6">

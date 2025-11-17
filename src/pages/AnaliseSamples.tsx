@@ -1,8 +1,11 @@
 import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { filterOrdersByMonth } from "@/utils/salesCalculator";
+import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
 import { calculateAllSampleMetrics } from "@/utils/samplesAnalyzer";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
+import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
+import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
+import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { SalesMetricCard } from "@/components/dashboard/SalesMetricCard";
 import { ConversionFunnelChart } from "@/components/dashboard/ConversionFunnelChart";
 import { SampleProductsTable } from "@/components/dashboard/SampleProductsTable";
@@ -13,7 +16,16 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Package, TrendingUp, DollarSign, Clock, Users, ShoppingCart, Target, Calendar } from "lucide-react";
 
 const AnaliseSamples = () => {
-  const { salesData, selectedMonth, availableMonths, setSelectedMonth } = useDashboard();
+  const { 
+    salesData, 
+    selectedMonth, 
+    availableMonths, 
+    setSelectedMonth,
+    comparisonMode,
+    selectedMonths,
+    setComparisonMode,
+    toggleMonth,
+  } = useDashboard();
 
   const filteredOrders = useMemo(() => {
     if (salesData.length === 0) return [];
@@ -28,18 +40,57 @@ const AnaliseSamples = () => {
     return calculateAllSampleMetrics(filteredOrders);
   }, [filteredOrders]);
 
+  const comparisonMetrics = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length === 0 || salesData.length === 0) {
+      return null;
+    }
+    
+    return selectedMonths.map(month => {
+      const orders = filterOrdersByMonth(salesData, month, availableMonths);
+      const monthMetrics = calculateAllSampleMetrics(orders);
+      
+      const formatMonthLabel = (m: string) => {
+        if (m === 'last-12-months') return 'Últimos 12 meses';
+        const [year, monthNum] = m.split('-');
+        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        return `${monthNames[parseInt(monthNum) - 1]} ${year}`;
+      };
+      
+      return {
+        month,
+        label: formatMonthLabel(month),
+        metrics: monthMetrics
+      };
+    });
+  }, [comparisonMode, selectedMonths, salesData, availableMonths]);
+
   if (!metrics) {
     return (
       <div className="container mx-auto p-6 space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Vendas de Amostras</h1>
-          <p className="text-muted-foreground">Análise detalhada do Kit de Amostras - Comida de Dragão</p>
-        </div>
-        <MonthFilter
-          availableMonths={availableMonths}
-          selectedMonth={selectedMonth}
-          onMonthChange={setSelectedMonth}
-        />
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Vendas de Amostras</h1>
+        <p className="text-muted-foreground">Análise detalhada do Kit de Amostras - Comida de Dragão</p>
+      </div>
+      
+      {availableMonths.length > 1 && (
+        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
+      )}
+
+      {availableMonths.length > 0 && (
+        comparisonMode ? (
+          <MonthComparisonSelector
+            availableMonths={availableMonths}
+            selectedMonths={selectedMonths}
+            onToggleMonth={toggleMonth}
+          />
+        ) : (
+          <MonthFilter
+            availableMonths={availableMonths}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+          />
+        )
+      )}
         <div className="text-center py-12">
           <p className="text-muted-foreground">
             Nenhum dado disponível. Por favor, faça upload dos dados de vendas.
@@ -89,40 +140,102 @@ const AnaliseSamples = () => {
         <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Vendas de Amostras</h1>
         <p className="text-muted-foreground">Análise detalhada do Kit de Amostras - Comida de Dragão</p>
       </div>
+      
+      {availableMonths.length > 1 && (
+        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
+      )}
 
-      <MonthFilter
-        availableMonths={availableMonths}
-        selectedMonth={selectedMonth}
-        onMonthChange={setSelectedMonth}
-      />
+      {availableMonths.length > 0 && (
+        comparisonMode ? (
+          <MonthComparisonSelector
+            availableMonths={availableMonths}
+            selectedMonths={selectedMonths}
+            onToggleMonth={toggleMonth}
+          />
+        ) : (
+          <MonthFilter
+            availableMonths={availableMonths}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+          />
+        )
+      )}
 
       {/* Cards principais */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <SalesMetricCard
-          title="Total de Amostras Vendidas"
-          value={metrics.volume.totalSamples.toLocaleString('pt-BR')}
-          icon={Package}
-          subtitle={`${metrics.volume.uniqueCustomers} clientes únicos`}
-        />
-        <SalesMetricCard
-          title="Taxa de Recompra"
-          value={`${metrics.repurchase.repurchaseRate.toFixed(1)}%`}
-          icon={TrendingUp}
-          subtitle={`${metrics.repurchase.customersWhoRepurchased} clientes recompraram`}
-        />
-        <SalesMetricCard
-          title="Ticket Médio das Recompras"
-          value={`R$ ${metrics.repurchase.avgTicketRepurchase.toFixed(2)}`}
-          icon={DollarSign}
-          subtitle="Excluindo pedido da amostra"
-        />
-        <SalesMetricCard
-          title="Tempo Médio até Recompra"
-          value={`${Math.round(metrics.repurchase.avgDaysToFirstRepurchase)} dias`}
-          icon={Clock}
-          subtitle="Primeira recompra após amostra"
-        />
-      </div>
+      {comparisonMode && comparisonMetrics ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <ComparisonMetricCard
+            title="Total de Amostras Vendidas"
+            icon={Package}
+            metrics={comparisonMetrics.map(m => ({
+              value: m.metrics.volume.totalSamples,
+              month: m.month,
+              monthLabel: m.label,
+              color: 'hsl(var(--primary))'
+            }))}
+          />
+          <ComparisonMetricCard
+            title="Taxa de Recompra"
+            icon={TrendingUp}
+            metrics={comparisonMetrics.map(m => ({
+              value: m.metrics.repurchase.repurchaseRate,
+              month: m.month,
+              monthLabel: m.label,
+              color: 'hsl(var(--primary))'
+            }))}
+            formatValue={(v) => `${v.toFixed(1)}%`}
+          />
+          <ComparisonMetricCard
+            title="Ticket Médio das Recompras"
+            icon={DollarSign}
+            metrics={comparisonMetrics.map(m => ({
+              value: m.metrics.repurchase.avgTicketRepurchase,
+              month: m.month,
+              monthLabel: m.label,
+              color: 'hsl(var(--primary))'
+            }))}
+            formatValue={(v) => formatCurrency(v)}
+          />
+          <ComparisonMetricCard
+            title="Tempo Médio até Primeira Recompra"
+            icon={Clock}
+            metrics={comparisonMetrics.map(m => ({
+              value: m.metrics.repurchase.avgDaysToFirstRepurchase,
+              month: m.month,
+              monthLabel: m.label,
+              color: 'hsl(var(--primary))'
+            }))}
+            formatValue={(v) => `${Math.round(v)} dias`}
+          />
+        </div>
+      ) : metrics ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <SalesMetricCard
+            title="Total de Amostras Vendidas"
+            value={metrics.volume.totalSamples.toLocaleString('pt-BR')}
+            icon={Package}
+            subtitle={`${metrics.volume.uniqueCustomers} clientes únicos`}
+          />
+          <SalesMetricCard
+            title="Taxa de Recompra"
+            value={`${metrics.repurchase.repurchaseRate.toFixed(1)}%`}
+            icon={TrendingUp}
+            subtitle={`${metrics.repurchase.customersWhoRepurchased} clientes recompraram`}
+          />
+          <SalesMetricCard
+            title="Ticket Médio das Recompras"
+            value={`R$ ${metrics.repurchase.avgTicketRepurchase.toFixed(2)}`}
+            icon={DollarSign}
+            subtitle="Excluindo pedido da amostra"
+          />
+          <SalesMetricCard
+            title="Tempo Médio até Recompra"
+            value={`${Math.round(metrics.repurchase.avgDaysToFirstRepurchase)} dias`}
+            icon={Clock}
+            subtitle="Primeira recompra após amostra"
+          />
+        </div>
+      ) : null}
 
       {/* Tabs com análises detalhadas */}
       <Tabs defaultValue="overview" className="space-y-6">

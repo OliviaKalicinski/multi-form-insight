@@ -74,32 +74,35 @@ export default function PerformanceFinanceira() {
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <DollarSign className="w-8 h-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">💰 Performance Financeira</h1>
-            <p className="text-muted-foreground">
-              Análise detalhada de faturamento, ticket médio e sazonalidade
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <DollarSign className="w-8 h-8 text-primary" />
+        <div>
+          <h1 className="text-3xl font-bold">💰 Performance Financeira</h1>
+          <p className="text-muted-foreground">
+            Análise detalhada de faturamento, ticket médio e sazonalidade
+          </p>
         </div>
-        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
       </div>
 
+      {/* ComparisonToggle */}
+      {availableMonths.length > 1 && (
+        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
+      )}
+
       {/* Filtro de mês */}
-      {comparisonMode ? (
-        <MonthComparisonSelector
-          availableMonths={availableMonths}
-          selectedMonths={selectedMonths}
-          onToggleMonth={toggleMonth}
-        />
-      ) : (
-        <MonthFilter
-          availableMonths={availableMonths}
-          selectedMonth={selectedMonth}
-          onMonthChange={setSelectedMonth}
-        />
+      {availableMonths.length > 0 && (comparisonMode ? (
+          <MonthComparisonSelector
+            availableMonths={availableMonths}
+            selectedMonths={selectedMonths}
+            onToggleMonth={toggleMonth}
+          />
+        ) : (
+          <MonthFilter
+            availableMonths={availableMonths}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+          />
+        )
       )}
 
       {/* Cards resumo */}

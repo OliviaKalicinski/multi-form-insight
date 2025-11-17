@@ -67,21 +67,24 @@ export default function ComportamentoCliente() {
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Users className="w-8 h-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">👥 Comportamento do Cliente</h1>
-            <p className="text-muted-foreground">
-              Análise de recompra, churn, volume de pedidos e picos de vendas
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <Users className="w-8 h-8 text-primary" />
+        <div>
+          <h1 className="text-3xl font-bold">👥 Comportamento do Cliente</h1>
+          <p className="text-muted-foreground">
+            Análise de recompra, churn, volume de pedidos e picos de vendas
+          </p>
         </div>
       </div>
 
+      {/* ComparisonToggle */}
+      {availableMonths.length > 1 && (
+        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
+      )}
+
       {/* Filtros */}
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-        {comparisonMode ? (
+      {availableMonths.length > 0 && (
+        comparisonMode ? (
           <MonthComparisonSelector
             availableMonths={availableMonths}
             selectedMonths={selectedMonths}
@@ -93,12 +96,8 @@ export default function ComportamentoCliente() {
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
           />
-        )}
-        <ComparisonToggle 
-          enabled={comparisonMode} 
-          onToggle={setComparisonMode} 
-        />
-      </div>
+        )
+      )}
 
       {/* Indicador de período */}
       <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
