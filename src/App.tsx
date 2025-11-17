@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { Navigation } from "@/components/Navigation";
 import Index from "./pages/Index";
-import Importar from "./pages/Importar";
+import Seguidores from "./pages/Seguidores";
 import Volume from "./pages/Volume";
 import Ads from "./pages/Ads";
 import PerformanceFinanceira from "./pages/PerformanceFinanceira";
@@ -26,7 +26,7 @@ const App = () => (
             <Navigation />
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/importar" element={<Importar />} />
+              <Route path="/seguidores" element={<Seguidores />} />
               <Route path="/volume" element={<Volume />} />
               <Route path="/ads" element={<Ads />} />
               <Route path="/performance-financeira" element={<PerformanceFinanceira />} />
