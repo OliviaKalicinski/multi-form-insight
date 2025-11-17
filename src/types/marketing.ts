@@ -358,7 +358,7 @@ export interface OrderVolumeAnalysis {
 // Sample Analysis Metrics
 export interface SampleMetrics {
   volume: {
-    totalSamples: number;
+    totalSamples: number; // PEDIDOS únicos com amostras (não produtos individuais)
     uniqueCustomers: number;
     percentageOfTotal: number;
   };

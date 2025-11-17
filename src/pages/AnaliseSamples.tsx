@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
-import { calculateAllSampleMetrics } from "@/utils/samplesAnalyzer";
+import { calculateAllSampleMetrics, calculateDataPeriod } from "@/utils/samplesAnalyzer";
+import { format } from "date-fns";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
@@ -40,6 +41,11 @@ const AnaliseSamples = () => {
     return calculateAllSampleMetrics(filteredOrders);
   }, [filteredOrders]);
 
+  const dataPeriod = useMemo(() => {
+    if (filteredOrders.length === 0) return null;
+    return calculateDataPeriod(filteredOrders);
+  }, [filteredOrders]);
+
   const comparisonMetrics = useMemo(() => {
     if (!comparisonMode || selectedMonths.length === 0 || salesData.length === 0) {
       return null;
@@ -69,7 +75,14 @@ const AnaliseSamples = () => {
       <div className="container mx-auto p-6 space-y-6">
       <div className="space-y-2">
         <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Vendas de Amostras</h1>
-        <p className="text-muted-foreground">Análise detalhada do Kit de Amostras - Comida de Dragão</p>
+        <p className="text-muted-foreground">
+          Análise detalhada do Kit de Amostras - Comida de Dragão
+          {dataPeriod && (
+            <span className="block text-xs mt-1">
+              Período: {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')}
+            </span>
+          )}
+        </p>
       </div>
       
       {availableMonths.length > 1 && (
@@ -138,7 +151,14 @@ const AnaliseSamples = () => {
     <div className="container mx-auto p-6 space-y-6">
       <div className="space-y-2">
         <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Vendas de Amostras</h1>
-        <p className="text-muted-foreground">Análise detalhada do Kit de Amostras - Comida de Dragão</p>
+        <p className="text-muted-foreground">
+          Análise detalhada do Kit de Amostras - Comida de Dragão
+          {dataPeriod && (
+            <span className="block text-xs mt-1">
+              Período: {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')}
+            </span>
+          )}
+        </p>
       </div>
       
       {availableMonths.length > 1 && (
@@ -161,11 +181,29 @@ const AnaliseSamples = () => {
         )
       )}
 
+      {dataPeriod && dataPeriod.isShortPeriod && (
+        <Card className="border-warning bg-warning/10">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Calendar className="h-5 w-5 text-warning mt-0.5" />
+              <div>
+                <p className="font-medium text-warning">⚠️ Período de análise curto</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Dados disponíveis: {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')} 
+                  ({dataPeriod.totalMonths} {dataPeriod.totalMonths === 1 ? 'mês' : 'meses'}).
+                  Algumas métricas de recompra podem estar subestimadas.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Cards principais */}
       {comparisonMode && comparisonMetrics ? (
         <div className="grid gap-4 md:grid-cols-2">
           <ComparisonMetricCard
-            title="Total de Amostras Vendidas"
+            title="Total de Pedidos com Amostras"
             icon={Package}
             metrics={comparisonMetrics.map(m => ({
               value: m.metrics.volume.totalSamples,
@@ -186,7 +224,7 @@ const AnaliseSamples = () => {
             formatValue={(v) => `${v.toFixed(1)}%`}
           />
           <ComparisonMetricCard
-            title="Ticket Médio das Recompras"
+            title="Ticket Médio Geral"
             icon={DollarSign}
             metrics={comparisonMetrics.map(m => ({
               value: m.metrics.repurchase.avgTicketRepurchase,
