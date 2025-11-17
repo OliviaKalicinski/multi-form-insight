@@ -2,6 +2,10 @@ import { MarketingData, FollowersData, AdsData, MonthMetric, MultiMonthMetrics, 
 import { calculateMonthlyMetrics } from "./metricsCalculator";
 import { calculateFollowersMetrics } from "./followersCalculator";
 import { calculateAdsMetrics } from "./adsCalculator";
+import { filterOrdersByMonth } from "./salesCalculator";
+import { calculateFinancialMetrics } from "./financialMetrics";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export const MONTH_COLORS = [
   "hsl(217, 91%, 60%)",  // Azul
@@ -355,12 +359,9 @@ export const calculateComparisonMetrics = (
   const totalOrders: MonthMetric[] = [];
   const totalCustomers: MonthMetric[] = [];
 
+  const SALES_COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
+
   selectedMonths.forEach((month, index) => {
-    const { filterOrdersByMonth } = require("./salesCalculator");
-    const { calculateFinancialMetrics } = require("./financialMetrics");
-    const { format: formatDate, parse } = require("date-fns");
-    const { ptBR } = require("date-fns/locale");
-    
     const filteredOrders = filterOrdersByMonth(orders, month, availableMonths);
     const metrics = calculateFinancialMetrics(filteredOrders, month);
     
@@ -368,13 +369,12 @@ export const calculateComparisonMetrics = (
     const uniqueCustomers = new Set(filteredOrders.map((order: any) => order.cpfCnpj)).size;
     
     if (metrics) {
-      const monthLabel = formatDate(
+      const monthLabel = format(
         parse(month, "yyyy-MM", new Date()), 
         "MMM yyyy", 
         { locale: ptBR }
       );
       
-      const SALES_COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
       const color = SALES_COLORS[index % SALES_COLORS.length];
 
       revenue.push({
