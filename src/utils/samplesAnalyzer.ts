@@ -515,6 +515,24 @@ export const calculateDataPeriod = (orders: ProcessedOrder[]) => {
  * Calcula todas as métricas de amostra de uma vez
  */
 export const calculateAllSampleMetrics = (orders: ProcessedOrder[]): SampleMetrics => {
+  console.log(`🎁 Analisando amostras de ${orders.length} pedidos totais`);
+  
+  const sampleOrders = orders.filter(isSampleOrder);
+  console.log(`🎁 Pedidos de amostras encontrados: ${sampleOrders.length}`);
+  
+  // Descobrir quantos pedidos foram excluídos e seus valores
+  const excludedOrders = orders.filter(o => !isSampleOrder(o));
+  console.log(`🚫 Pedidos excluídos (valor > R$ 1,00): ${excludedOrders.length}`);
+  
+  if (excludedOrders.length > 0) {
+    const excludedSamples = excludedOrders.slice(0, 10).map(o => ({
+      numero: o.numeroPedido,
+      valor: o.valorTotal.toFixed(2),
+      produtos: o.produtos.length
+    }));
+    console.log('📋 Exemplos de pedidos excluídos:', excludedSamples);
+  }
+  
   return {
     volume: calculateSampleVolume(orders),
     repurchase: calculateRepurchaseBehavior(orders),

@@ -28,6 +28,8 @@ export const adjustProductDescription = (descricao: string, preco: number): stri
  * Processa dados brutos do CSV e agrupa por pedido único
  */
 export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
+  console.log(`📊 Processando ${rawData.length} linhas de vendas`);
+  
   // Agrupar por número do pedido
   const pedidosMap = new Map<string, ProcessedOrder>();
 
@@ -78,7 +80,10 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
     }
   });
 
-  return Array.from(pedidosMap.values());
+  const result = Array.from(pedidosMap.values());
+  console.log(`📦 Total de pedidos únicos: ${result.length}`);
+  
+  return result;
 };
 
 /**
