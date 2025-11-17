@@ -201,7 +201,7 @@ const Seguidores = () => {
             <CardHeader>
               <CardTitle>👋 Bem-vindo à Análise de Seguidores</CardTitle>
               <CardDescription>
-                Para começar, faça upload da sua planilha de seguidores na página Visão Geral
+                Para começar, faça upload da sua planilha de seguidores na página Uploader
               </CardDescription>
             </CardHeader>
             <CardContent>

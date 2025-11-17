@@ -63,7 +63,7 @@ export default function PerformanceFinanceira() {
               💰 Performance Financeira
             </CardTitle>
             <CardDescription>
-              Carregue os dados de vendas na página "Visão Geral" para visualizar as análises financeiras.
+              Carregue os dados de vendas na página "Uploader" para visualizar as análises financeiras.
             </CardDescription>
           </CardHeader>
         </Card>

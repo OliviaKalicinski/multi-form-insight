@@ -56,7 +56,7 @@ export default function ComportamentoCliente() {
               👥 Comportamento do Cliente
             </CardTitle>
             <CardDescription>
-              Carregue os dados de vendas na página "Visão Geral" para visualizar as análises de comportamento.
+              Carregue os dados de vendas na página "Uploader" para visualizar as análises de comportamento.
             </CardDescription>
           </CardHeader>
         </Card>

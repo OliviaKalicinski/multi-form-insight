@@ -173,10 +173,10 @@ const Ads = () => {
             <p className="text-muted-foreground">
               Nenhum dado de anúncios disponível.
               <br />
-              Faça upload de um arquivo CSV/TSV do Meta Ads Manager na página "Visão Geral".
+              Faça upload de um arquivo CSV/TSV do Meta Ads Manager na página "Uploader".
             </p>
             <Button variant="outline" onClick={() => navigate("/")}>
-              Ir para Visão Geral
+              Ir para Uploader
             </Button>
           </CardContent>
         </Card>
