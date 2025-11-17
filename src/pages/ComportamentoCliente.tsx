@@ -41,10 +41,10 @@ export default function ComportamentoCliente() {
     
     const filteredOrders = selectedMonth === 'last-12-months' 
       ? salesData 
-      : filterOrdersByMonth(salesData, selectedMonth);
+      : filterOrdersByMonth(salesData, selectedMonth, availableMonths);
     
     return calculateCustomerBehaviorMetrics(filteredOrders);
-  }, [salesData, selectedMonth, behaviorMetrics]);
+  }, [salesData, selectedMonth, availableMonths, behaviorMetrics]);
 
   if (salesData.length === 0) {
     return (

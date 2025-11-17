@@ -71,9 +71,37 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
 };
 
 /**
- * Filtra pedidos por mês específico
+ * Filtra pedidos por mês específico ou "last-12-months"
  */
-export const filterOrdersByMonth = (orders: ProcessedOrder[], month: string): ProcessedOrder[] => {
+export const filterOrdersByMonth = (
+  orders: ProcessedOrder[], 
+  month: string,
+  availableMonths?: string[]
+): ProcessedOrder[] => {
+  // Caso especial: "last-12-months"
+  if (month === "last-12-months") {
+    if (!availableMonths || availableMonths.length === 0) {
+      // Se não tiver availableMonths, pegar os últimos 12 meses dos dados
+      const allMonths = Array.from(
+        new Set(orders.map(order => format(order.dataVenda, "yyyy-MM")))
+      ).sort();
+      const last12 = allMonths.slice(-12);
+      
+      return orders.filter((order) => {
+        const orderMonth = format(order.dataVenda, "yyyy-MM");
+        return last12.includes(orderMonth);
+      });
+    } else {
+      // Usar getLast12Months para pegar os últimos 12 meses
+      const last12 = availableMonths.slice(-12);
+      return orders.filter((order) => {
+        const orderMonth = format(order.dataVenda, "yyyy-MM");
+        return last12.includes(orderMonth);
+      });
+    }
+  }
+  
+  // Caso normal: mês específico
   return orders.filter((order) => {
     const orderMonth = format(order.dataVenda, "yyyy-MM");
     return orderMonth === month;

@@ -1,18 +1,20 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { DollarSign } from "lucide-react";
+import { DollarSign, TrendingUp, Users, ShoppingCart } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { FinancialSummaryCards } from "@/components/dashboard/FinancialSummaryCards";
+import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { RevenueEvolutionChart } from "@/components/dashboard/RevenueEvolutionChart";
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
 import { OrderDistributionChart } from "@/components/dashboard/OrderDistributionChart";
 import { PlatformComparisonChart } from "@/components/dashboard/PlatformComparisonChart";
 import { calculateFinancialMetrics, analyzeSeasonality } from "@/utils/financialMetrics";
 import { filterOrdersByMonth } from "@/utils/salesCalculator";
+import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
 
 export default function PerformanceFinanceira() {
   const {
@@ -32,9 +34,18 @@ export default function PerformanceFinanceira() {
   // Calcular métricas do mês selecionado
   const financialMetrics = useMemo(() => {
     if (salesData.length === 0 || !selectedMonth) return null;
-    const filteredOrders = filterOrdersByMonth(salesData, selectedMonth);
+    const filteredOrders = filterOrdersByMonth(salesData, selectedMonth, availableMonths);
     return calculateFinancialMetrics(filteredOrders, selectedMonth);
-  }, [salesData, selectedMonth]);
+  }, [salesData, selectedMonth, availableMonths]);
+
+  // Métricas de comparação (quando comparisonMode ativo)
+  const comparisonMetrics = useMemo(() => {
+    if (!comparisonMode || selectedMonths.length === 0 || salesData.length === 0) {
+      return null;
+    }
+    
+    return calculateComparisonMetrics(salesData, selectedMonths, availableMonths);
+  }, [comparisonMode, selectedMonths, salesData, availableMonths]);
 
   // Análise de sazonalidade (todos os dados)
   const seasonalityAnalysis = useMemo(() => {
@@ -92,8 +103,46 @@ export default function PerformanceFinanceira() {
       )}
 
       {/* Cards resumo */}
-      {financialMetrics && !comparisonMode && (
+      {!comparisonMode && financialMetrics && (
         <FinancialSummaryCards metrics={financialMetrics} />
+      )}
+
+      {/* Cards de comparação */}
+      {comparisonMode && comparisonMetrics && (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <ComparisonMetricCard
+            title="Faturamento Total"
+            icon={DollarSign}
+            metrics={comparisonMetrics.revenue}
+            formatValue={(v) =>
+              new Intl.NumberFormat("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              }).format(v)
+            }
+          />
+          <ComparisonMetricCard
+            title="Ticket Médio"
+            icon={TrendingUp}
+            metrics={comparisonMetrics.averageTicket}
+            formatValue={(v) =>
+              new Intl.NumberFormat("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              }).format(v)
+            }
+          />
+          <ComparisonMetricCard
+            title="Total de Pedidos"
+            icon={ShoppingCart}
+            metrics={comparisonMetrics.totalOrders}
+          />
+          <ComparisonMetricCard
+            title="Total de Clientes"
+            icon={Users}
+            metrics={comparisonMetrics.totalCustomers}
+          />
+        </div>
       )}
 
       {/* Tabs com análises */}
@@ -107,12 +156,55 @@ export default function PerformanceFinanceira() {
 
         {/* Tab 1: Evolução do faturamento */}
         <TabsContent value="evolution">
-          {financialMetrics && (
+          {!comparisonMode && financialMetrics && (
             <RevenueEvolutionChart
               data={financialMetrics.revenueByDay}
               title="Evolução do Faturamento ao Longo do Tempo"
               showCumulative={true}
             />
+          )}
+          
+          {comparisonMode && comparisonMetrics && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Comparação de Faturamento por Mês</CardTitle>
+                <CardDescription>
+                  Comparando {selectedMonths.length} meses selecionados
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {comparisonMetrics.revenue.map((metric) => (
+                    <div key={metric.month} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-4 h-4 rounded-full"
+                            style={{ backgroundColor: metric.color }}
+                          />
+                          <span className="font-medium">{metric.monthLabel}</span>
+                        </div>
+                        <span className="text-lg font-bold">
+                          {new Intl.NumberFormat("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          }).format(metric.value)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-3">
+                        <div
+                          className="h-3 rounded-full transition-all"
+                          style={{
+                            width: `${(metric.value / Math.max(...comparisonMetrics.revenue.map(m => m.value))) * 100}%`,
+                            backgroundColor: metric.color,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
