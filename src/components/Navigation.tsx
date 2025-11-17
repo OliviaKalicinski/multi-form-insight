@@ -28,7 +28,7 @@ export const Navigation = () => {
               📈 Seguidores
             </TabsTrigger>
             <TabsTrigger value="/volume" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              📊 Volume
+              📦 Produto & Operações
             </TabsTrigger>
             <TabsTrigger value="/ads" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               💰 Ads

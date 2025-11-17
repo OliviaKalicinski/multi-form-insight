@@ -1,278 +1,255 @@
-import { useMemo } from "react";
-import { Eye, Users, MousePointerClick, Target } from "lucide-react";
-import { MetricCard } from "@/components/dashboard/MetricCard";
-import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
-import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
-import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
-import { TrendChart } from "@/components/dashboard/TrendChart";
-import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
-import { MonthFilter } from "@/components/dashboard/MonthFilter";
-import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber } from "@/utils/metricsCalculator";
+import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { getLast12Months, getPrevious12Months } from "@/utils/dateRangeCalculator";
-import { aggregateMarketingByMonth } from "@/utils/monthlyAggregator";
-import { calculateMultiMonthMetrics, prepareMarketingComparisonChartData, getMonthColor, formatMonthLabel } from "@/utils/comparisonCalculator";
+import { Package } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MonthFilter } from "@/components/dashboard/MonthFilter";
+import { ProductOperationsSummaryCards } from "@/components/dashboard/ProductOperationsSummaryCards";
+import { TopProductsTable } from "@/components/dashboard/TopProductsTable";
+import { SKUAnalysisTable } from "@/components/dashboard/SKUAnalysisTable";
+import { ProductCombinationsTable } from "@/components/dashboard/ProductCombinationsTable";
+import { ShippingMethodsChart } from "@/components/dashboard/ShippingMethodsChart";
+import { NFIssuanceChart } from "@/components/dashboard/NFIssuanceChart";
+import { FreebieProductsList } from "@/components/dashboard/FreebieProductsList";
+import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
+import { filterOrdersByMonth } from "@/utils/salesCalculator";
+import { Button } from "@/components/ui/button";
 
-const Volume = () => {
+export default function Volume() {
   const {
-    marketingData,
+    salesData,
     selectedMonth,
     availableMonths,
     setSelectedMonth,
-    comparisonMode,
-    setComparisonMode,
-    selectedMonths,
-    toggleMonth,
   } = useDashboard();
 
-  // Detect 12-month view
-  const isLast12MonthsView = selectedMonth === "last-12-months";
-  
-  // Get last 12 months
-  const last12Months = useMemo(() => {
-    if (!isLast12MonthsView) return [];
-    return getLast12Months(availableMonths);
-  }, [isLast12MonthsView, availableMonths]);
+  const [productSortBy, setProductSortBy] = useState<'quantity' | 'revenue'>('quantity');
 
-  // Filter marketing data by selected month or last 12 months
-  const currentMonthData = useMemo(() => {
-    if (!selectedMonth) return [];
-    if (isLast12MonthsView) {
-      return marketingData.filter((item) => 
-        last12Months.some(month => item.Data.startsWith(month))
-      );
-    }
-    return marketingData.filter((item) => item.Data.startsWith(selectedMonth));
-  }, [marketingData, selectedMonth, isLast12MonthsView, last12Months]);
-
-  // Get previous month/period marketing data for comparison
-  const previousMonthData = useMemo(() => {
-    if (!selectedMonth || availableMonths.length < 2) return [];
+  const productMetrics = useMemo(() => {
+    if (salesData.length === 0) return null;
     
-    if (isLast12MonthsView) {
-      const previous12 = getPrevious12Months(availableMonths, last12Months);
-      if (previous12.length === 0) return [];
-      return marketingData.filter((item) => 
-        previous12.some(month => item.Data.startsWith(month))
-      );
-    }
+    const filteredOrders = selectedMonth 
+      ? filterOrdersByMonth(salesData, selectedMonth) 
+      : salesData;
     
-    const currentIndex = availableMonths.indexOf(selectedMonth);
-    if (currentIndex <= 0) return [];
-    const previousMonth = availableMonths[currentIndex - 1];
-    return marketingData.filter((item) => item.Data.startsWith(previousMonth));
-  }, [marketingData, selectedMonth, availableMonths, isLast12MonthsView, last12Months]);
+    return calculateProductOperationsMetrics(filteredOrders);
+  }, [salesData, selectedMonth]);
 
-  // Calculate metrics
-  const currentMetrics = useMemo(
-    () => calculateMonthlyMetrics(currentMonthData),
-    [currentMonthData]
-  );
-
-  const previousMetrics = useMemo(
-    () => calculateMonthlyMetrics(previousMonthData),
-    [previousMonthData]
-  );
-
-  const growthMetrics = useMemo(() => {
-    if (previousMonthData.length === 0) {
-      return { crescimentoVisualizacoes: 0, crescimentoAlcance: 0, crescimentoVisitas: 0 };
-    }
-    return calculateGrowthMetrics(currentMonthData, previousMonthData);
-  }, [currentMonthData, previousMonthData]);
-
-  // Aggregate data for 12-month view
-  const aggregatedMarketingData = useMemo(() => {
-    if (!isLast12MonthsView || marketingData.length === 0) return [];
-    return aggregateMarketingByMonth(marketingData, last12Months);
-  }, [marketingData, isLast12MonthsView, last12Months]);
-
-  const multiMonthMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length < 2) return null;
-    return calculateMultiMonthMetrics(marketingData, selectedMonths);
-  }, [comparisonMode, selectedMonths, marketingData]);
-
-  const comparisonChartData = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length < 2) return [];
-    return prepareMarketingComparisonChartData(marketingData, selectedMonths, "visualizacoes");
-  }, [comparisonMode, selectedMonths, marketingData]);
-
-  const monthColors = useMemo(() => {
-    const colors: Record<string, string> = {};
-    selectedMonths.forEach((month) => {
-      const label = formatMonthLabel(month);
-      colors[label] = getMonthColor(month, selectedMonths);
-    });
-    return colors;
-  }, [selectedMonths]);
-
-  const hasMarketingData = marketingData && marketingData.length > 0;
+  if (salesData.length === 0) {
+    return (
+      <div className="container mx-auto px-6 py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="w-6 h-6" />
+              📦 Produto & Operações
+            </CardTitle>
+            <CardDescription>
+              Carregue os dados de vendas na página "Visão Geral" para visualizar as análises de produtos.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto px-6 py-8">
-      <div className="space-y-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4">
-          <h1 className="text-3xl font-bold text-foreground">📊 Volume</h1>
-          <p className="text-muted-foreground">
-            Métricas de alcance, visualizações e engajamento
-          </p>
+    <div className="container mx-auto px-6 py-8 space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Package className="w-8 h-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">📦 Produto & Operações</h1>
+            <p className="text-muted-foreground">
+              Análise de produtos, SKUs, combinações, brindes e operações logísticas
+            </p>
+          </div>
         </div>
-
-        {availableMonths.length >= 2 && (
-          <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
-        )}
-
-        {comparisonMode ? (
-          <MonthComparisonSelector
-            availableMonths={availableMonths}
-            selectedMonths={selectedMonths}
-            onToggleMonth={toggleMonth}
-          />
-        ) : (
-          <MonthFilter
-            availableMonths={availableMonths}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
-        )}
-
-        {comparisonMode && selectedMonths.length >= 2 && multiMonthMetrics ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <ComparisonMetricCard title="Visualizações" icon={Eye} metrics={multiMonthMetrics.visualizacoes} formatValue={formatNumber} />
-            <ComparisonMetricCard title="Alcance" icon={Users} metrics={multiMonthMetrics.alcance} formatValue={formatNumber} />
-            <ComparisonMetricCard title="Visitas ao Perfil" icon={Users} metrics={multiMonthMetrics.visitas} formatValue={formatNumber} />
-            <ComparisonMetricCard title="Interações" icon={Target} metrics={multiMonthMetrics.interacoes} formatValue={formatNumber} />
-            <ComparisonMetricCard title="Clicks no Link" icon={MousePointerClick} metrics={multiMonthMetrics.clicks} formatValue={formatNumber} />
-          </div>
-        ) : selectedMonth && hasMarketingData && currentMonthData.length > 0 ? (
-          <>
-            {/* Volume Metrics */}
-            <div>
-              <h2 className="text-2xl font-semibold mb-4 text-foreground">📊 Volume (Totais do Mês)</h2>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <MetricCard
-                  title="👁️ Visualizações Totais"
-                  value={formatNumber(currentMetrics.visualizacoesTotal)}
-                  icon={Eye}
-                  trend={previousMonthData.length > 0 ? growthMetrics.crescimentoVisualizacoes : undefined}
-                />
-                <MetricCard
-                  title="📊 Alcance Total"
-                  value={formatNumber(currentMetrics.alcanceTotal)}
-                  icon={Users}
-                  trend={previousMonthData.length > 0 ? growthMetrics.crescimentoAlcance : undefined}
-                />
-                <MetricCard
-                  title="👤 Visitas ao Perfil"
-                  value={formatNumber(currentMetrics.visitasTotal)}
-                  icon={Users}
-                  trend={previousMonthData.length > 0 ? growthMetrics.crescimentoVisitas : undefined}
-                />
-                <MetricCard
-                  title="💬 Interações Totais"
-                  value={formatNumber(currentMetrics.interacoesTotal)}
-                  icon={Target}
-                />
-                <MetricCard
-                  title="🔗 Cliques no Link"
-                  value={formatNumber(currentMetrics.clicksTotal)}
-                  icon={MousePointerClick}
-                />
-              </div>
-            </div>
-
-            {/* Charts */}
-            <div className="grid gap-6">
-              {isLast12MonthsView ? (
-                <>
-                  <MonthlyAggregateChart
-                    data={aggregatedMarketingData}
-                    title="📊 Visualizações × Alcance (Evolução Mensal)"
-                    description="Compare o volume mensal de visualizações com o alcance total"
-                    metrics={[
-                      {
-                        dataKey: "Visualizações",
-                        name: "Visualizações",
-                        color: "hsl(var(--chart-4))",
-                      },
-                      {
-                        dataKey: "Alcance",
-                        name: "Alcance",
-                        color: "hsl(var(--chart-1))",
-                      },
-                    ]}
-                  />
-
-                  <MonthlyAggregateChart
-                    data={aggregatedMarketingData}
-                    title="👥 Visitas × Interações (Evolução Mensal)"
-                    description="Acompanhe a evolução mensal das visitas ao perfil e o nível de engajamento"
-                    metrics={[
-                      {
-                        dataKey: "Visitas",
-                        name: "Visitas",
-                        color: "hsl(var(--chart-2))",
-                      },
-                      {
-                        dataKey: "Interações",
-                        name: "Interações",
-                        color: "hsl(var(--chart-3))",
-                      },
-                    ]}
-                  />
-                </>
-              ) : (
-                <>
-                  <TrendChart
-                    data={currentMonthData}
-                    title="📊 Visualizações × Alcance"
-                    description="Compare o volume de visualizações com o alcance total"
-                    metrics={[
-                      {
-                        dataKey: "visualizacoes",
-                        name: "Visualizações",
-                        color: "hsl(var(--chart-4))",
-                      },
-                      {
-                        dataKey: "alcance",
-                        name: "Alcance",
-                        color: "hsl(var(--chart-1))",
-                      },
-                    ]}
-                  />
-
-                  <TrendChart
-                    data={currentMonthData}
-                    title="👥 Visitas × Interações"
-                    description="Acompanhe as visitas ao perfil e o nível de engajamento"
-                    metrics={[
-                      {
-                        dataKey: "visitas",
-                        name: "Visitas",
-                        color: "hsl(var(--chart-2))",
-                      },
-                      {
-                        dataKey: "interacoes",
-                        name: "Interações",
-                        color: "hsl(var(--chart-3))",
-                      },
-                    ]}
-                  />
-                </>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            {!selectedMonth 
-              ? "Selecione um mês para visualizar as métricas"
-              : "Nenhum dado disponível para o período selecionado"}
-          </div>
-        )}
       </div>
+
+      <MonthFilter
+        availableMonths={availableMonths}
+        selectedMonth={selectedMonth}
+        onMonthChange={setSelectedMonth}
+      />
+
+      {productMetrics && (
+        <ProductOperationsSummaryCards metrics={productMetrics} />
+      )}
+
+      <Tabs defaultValue="ranking" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+          <TabsTrigger value="ranking">📊 Ranking</TabsTrigger>
+          <TabsTrigger value="sku">🏷️ SKU</TabsTrigger>
+          <TabsTrigger value="combinations">🔗 Combinações</TabsTrigger>
+          <TabsTrigger value="shipping">🚚 Envio</TabsTrigger>
+          <TabsTrigger value="operations">⚙️ Operações</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ranking" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <CardTitle>Produtos Mais Vendidos</CardTitle>
+                  <CardDescription>
+                    Top 20 produtos por quantidade ou faturamento
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={productSortBy === 'quantity' ? 'default' : 'outline'}
+                    onClick={() => setProductSortBy('quantity')}
+                    size="sm"
+                  >
+                    Por Quantidade
+                  </Button>
+                  <Button
+                    variant={productSortBy === 'revenue' ? 'default' : 'outline'}
+                    onClick={() => setProductSortBy('revenue')}
+                    size="sm"
+                  >
+                    Por Faturamento
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <TopProductsTable
+                products={
+                  productSortBy === 'quantity'
+                    ? productMetrics?.topProductsByQuantity || []
+                    : productMetrics?.topProductsByRevenue || []
+                }
+                sortBy={productSortBy}
+              />
+            </CardContent>
+          </Card>
+
+          {productMetrics && productMetrics.freebieProducts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>🎁 Produtos Brinde / Promoções (R$ 0,01)</CardTitle>
+                <CardDescription>
+                  Produtos distribuídos como cortesia ou amostras
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FreebieProductsList products={productMetrics.freebieProducts} />
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="sku">
+          <Card>
+            <CardHeader>
+              <CardTitle>Análise Detalhada de SKU</CardTitle>
+              <CardDescription>
+                Desempenho individual de cada código de produto
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SKUAnalysisTable skus={productMetrics?.skuAnalysis || []} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="combinations">
+          <Card>
+            <CardHeader>
+              <CardTitle>Produtos Frequentemente Comprados Juntos</CardTitle>
+              <CardDescription>
+                Identificar oportunidades de cross-sell e bundles
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {productMetrics && productMetrics.productCombinations.length > 0 ? (
+                <ProductCombinationsTable
+                  combinations={productMetrics.productCombinations}
+                />
+              ) : (
+                <p className="text-muted-foreground text-center py-8">
+                  Não há combinações frequentes de produtos no período selecionado
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="shipping">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuição de Formas de Envio</CardTitle>
+                <CardDescription>
+                  Como os pedidos são entregues
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ShippingMethodsChart
+                  data={productMetrics?.shippingMethodStats || []}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Detalhes por Forma de Envio</CardTitle>
+                <CardDescription>
+                  Performance de cada método de entrega
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {productMetrics?.shippingMethodStats.map((stat, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{stat.formaEnvio}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {stat.percentual.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div 
+                          className="bg-primary h-2 rounded-full" 
+                          style={{ width: `${stat.percentual}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{stat.numeroPedidos} pedidos</span>
+                        <span>
+                          Ticket médio: {new Intl.NumberFormat('pt-BR', { 
+                            style: 'currency', 
+                            currency: 'BRL' 
+                          }).format(stat.ticketMedio)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="operations">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tempo de Emissão de Nota Fiscal</CardTitle>
+              <CardDescription>
+                Análise do tempo entre venda e emissão de NF
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <NFIssuanceChart
+                distribution={productMetrics?.nfIssuanceDistribution || []}
+                averageDays={productMetrics?.averageNFIssuanceTime || 0}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-};
-
-export default Volume;
+}
