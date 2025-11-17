@@ -76,41 +76,6 @@ export default function Volume() {
         onMonthChange={setSelectedMonth}
       />
 
-      {/* Toggle de visualização */}
-      <div className="flex items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg border">
-        <div className="flex-1">
-          <h3 className="font-semibold flex items-center gap-2">
-            {viewMode === 'as-sold' ? (
-              <><Package className="h-4 w-4" /> Produtos Como Vendidos</>
-            ) : (
-              <><ListTree className="h-4 w-4" /> Produtos Individuais</>
-            )}
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            {viewMode === 'as-sold' 
-              ? 'Kits contam como 1 produto (agrupados por tipo)' 
-              : 'Kits desmembrados em produtos individuais'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'as-sold' ? 'default' : 'outline'}
-            onClick={() => setViewMode('as-sold')}
-            size="sm"
-          >
-            <Package className="h-4 w-4 mr-2" />
-            Como Vendidos
-          </Button>
-          <Button
-            variant={viewMode === 'individual' ? 'default' : 'outline'}
-            onClick={() => setViewMode('individual')}
-            size="sm"
-          >
-            <ListTree className="h-4 w-4 mr-2" />
-            Individuais
-          </Button>
-        </div>
-      </div>
 
       <Tabs defaultValue="ranking" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
@@ -124,28 +89,64 @@ export default function Volume() {
         <TabsContent value="ranking" className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <CardTitle>Produtos Mais Vendidos</CardTitle>
+              <div className="space-y-4">
+                {/* Linha 1: Toggle de visualização */}
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      {viewMode === 'as-sold' ? (
+                        <><Package className="h-5 w-5" /> Produtos Como Vendidos</>
+                      ) : (
+                        <><ListTree className="h-5 w-5" /> Produtos Individuais</>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {viewMode === 'as-sold' 
+                        ? 'Kits contam como 1 produto (agrupados por tipo)' 
+                        : 'Kits desmembrados em produtos individuais'}
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={viewMode === 'as-sold' ? 'default' : 'outline'}
+                      onClick={() => setViewMode('as-sold')}
+                      size="sm"
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      Como Vendidos
+                    </Button>
+                    <Button
+                      variant={viewMode === 'individual' ? 'default' : 'outline'}
+                      onClick={() => setViewMode('individual')}
+                      size="sm"
+                    >
+                      <ListTree className="h-4 w-4 mr-2" />
+                      Individuais
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Linha 2: Ordenação */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pt-4 border-t">
                   <CardDescription>
                     Top 20 produtos por quantidade ou faturamento
                   </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant={productSortBy === 'quantity' ? 'default' : 'outline'}
-                    onClick={() => setProductSortBy('quantity')}
-                    size="sm"
-                  >
-                    Por Quantidade
-                  </Button>
-                  <Button
-                    variant={productSortBy === 'revenue' ? 'default' : 'outline'}
-                    onClick={() => setProductSortBy('revenue')}
-                    size="sm"
-                  >
-                    Por Faturamento
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={productSortBy === 'quantity' ? 'default' : 'outline'}
+                      onClick={() => setProductSortBy('quantity')}
+                      size="sm"
+                    >
+                      Por Quantidade
+                    </Button>
+                    <Button
+                      variant={productSortBy === 'revenue' ? 'default' : 'outline'}
+                      onClick={() => setProductSortBy('revenue')}
+                      size="sm"
+                    >
+                      Por Faturamento
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardHeader>
