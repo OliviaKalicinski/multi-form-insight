@@ -186,3 +186,40 @@ export interface SalesMetrics {
   totalClientes: number;
   taxaRecompra: number;
 }
+
+// Financial Metrics
+export interface FinancialMetrics {
+  faturamentoTotal: number;
+  ticketMedio: number;
+  totalPedidos: number;
+  revenueByDay: { date: string; revenue: number; cumulativeRevenue: number }[];
+  revenueByMonth: { month: string; revenue: number; orders: number }[];
+  seasonality: SeasonalityAnalysis;
+  orderDistribution: OrderValueDistribution[];
+  platformPerformance: PlatformPerformance[];
+  topPlatform: string;
+  growthRate: number;
+}
+
+export interface SeasonalityAnalysis {
+  monthly: { month: string; monthLabel: string; revenue: number; orders: number }[];
+  quarterly: { quarter: string; revenue: number; orders: number }[];
+  bestMonth: string;
+  worstMonth: string;
+  seasonalityIndex: number;
+}
+
+export interface OrderValueDistribution {
+  range: string;
+  count: number;
+  percentage: number;
+  totalRevenue: number;
+}
+
+export interface PlatformPerformance {
+  platform: string;
+  revenue: number;
+  orders: number;
+  averageTicket: number;
+  marketShare: number;
+}

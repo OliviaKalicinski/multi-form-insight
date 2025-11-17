@@ -14,11 +14,22 @@ export const Navigation = () => {
         </div>
         
         <Tabs value={currentPath} onValueChange={(path) => navigate(path)}>
-          <TabsList>
-            <TabsTrigger value="/">📊 Visão Geral</TabsTrigger>
-            <TabsTrigger value="/seguidores">👥 Seguidores</TabsTrigger>
-            <TabsTrigger value="/volume">📊 Volume</TabsTrigger>
-            <TabsTrigger value="/ads">💰 Ads</TabsTrigger>
+          <TabsList className="h-12 bg-card/50 backdrop-blur-sm border rounded-lg">
+            <TabsTrigger value="/" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              📊 Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="/performance-financeira" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              💰 Performance Financeira
+            </TabsTrigger>
+            <TabsTrigger value="/seguidores" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              👥 Seguidores
+            </TabsTrigger>
+            <TabsTrigger value="/volume" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              📊 Volume
+            </TabsTrigger>
+            <TabsTrigger value="/ads" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              💰 Ads
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

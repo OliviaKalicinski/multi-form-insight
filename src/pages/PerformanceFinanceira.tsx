@@ -1,0 +1,212 @@
+import { useMemo, useState } from "react";
+import { useDashboard } from "@/contexts/DashboardContext";
+import { DollarSign } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
+import { MonthFilter } from "@/components/dashboard/MonthFilter";
+import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
+import { FinancialSummaryCards } from "@/components/dashboard/FinancialSummaryCards";
+import { RevenueEvolutionChart } from "@/components/dashboard/RevenueEvolutionChart";
+import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
+import { OrderDistributionChart } from "@/components/dashboard/OrderDistributionChart";
+import { PlatformComparisonChart } from "@/components/dashboard/PlatformComparisonChart";
+import { calculateFinancialMetrics, analyzeSeasonality } from "@/utils/financialMetrics";
+import { filterOrdersByMonth } from "@/utils/salesCalculator";
+
+export default function PerformanceFinanceira() {
+  const {
+    salesData,
+    selectedMonth,
+    availableMonths,
+    comparisonMode,
+    selectedMonths,
+    setSelectedMonth,
+    setComparisonMode,
+    toggleMonth,
+  } = useDashboard();
+
+  const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
+  const [platformMetric, setPlatformMetric] = useState<'revenue' | 'orders' | 'averageTicket'>('revenue');
+
+  // Calcular métricas do mês selecionado
+  const financialMetrics = useMemo(() => {
+    if (salesData.length === 0 || !selectedMonth) return null;
+    const filteredOrders = filterOrdersByMonth(salesData, selectedMonth);
+    return calculateFinancialMetrics(filteredOrders, selectedMonth);
+  }, [salesData, selectedMonth]);
+
+  // Análise de sazonalidade (todos os dados)
+  const seasonalityAnalysis = useMemo(() => {
+    if (salesData.length === 0) return null;
+    return analyzeSeasonality(salesData);
+  }, [salesData]);
+
+  if (salesData.length === 0) {
+    return (
+      <div className="container mx-auto px-6 py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-6 h-6" />
+              💰 Performance Financeira
+            </CardTitle>
+            <CardDescription>
+              Carregue os dados de vendas na página "Visão Geral" para visualizar as análises financeiras.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-6 py-8 space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <DollarSign className="w-8 h-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">💰 Performance Financeira</h1>
+            <p className="text-muted-foreground">
+              Análise detalhada de faturamento, ticket médio e sazonalidade
+            </p>
+          </div>
+        </div>
+        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
+      </div>
+
+      {/* Filtro de mês */}
+      {comparisonMode ? (
+        <MonthComparisonSelector
+          availableMonths={availableMonths}
+          selectedMonths={selectedMonths}
+          onToggleMonth={toggleMonth}
+        />
+      ) : (
+        <MonthFilter
+          availableMonths={availableMonths}
+          selectedMonth={selectedMonth}
+          onMonthChange={setSelectedMonth}
+        />
+      )}
+
+      {/* Cards resumo */}
+      {financialMetrics && !comparisonMode && (
+        <FinancialSummaryCards metrics={financialMetrics} />
+      )}
+
+      {/* Tabs com análises */}
+      <Tabs defaultValue="evolution" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+          <TabsTrigger value="evolution">📈 Evolução</TabsTrigger>
+          <TabsTrigger value="seasonality">📅 Sazonalidade</TabsTrigger>
+          <TabsTrigger value="distribution">🎯 Distribuição</TabsTrigger>
+          <TabsTrigger value="platforms">🏪 Plataformas</TabsTrigger>
+        </TabsList>
+
+        {/* Tab 1: Evolução do faturamento */}
+        <TabsContent value="evolution">
+          {financialMetrics && (
+            <RevenueEvolutionChart
+              data={financialMetrics.revenueByDay}
+              title="Evolução do Faturamento ao Longo do Tempo"
+              showCumulative={true}
+            />
+          )}
+        </TabsContent>
+
+        {/* Tab 2: Sazonalidade */}
+        <TabsContent value="seasonality">
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <button
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  seasonalityView === 'monthly' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+                onClick={() => setSeasonalityView('monthly')}
+              >
+                Mensal
+              </button>
+              <button
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  seasonalityView === 'quarterly' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+                onClick={() => setSeasonalityView('quarterly')}
+              >
+                Trimestral
+              </button>
+            </div>
+            
+            {seasonalityAnalysis && (
+              <SeasonalityChart
+                monthlyData={seasonalityAnalysis.monthly}
+                quarterlyData={seasonalityAnalysis.quarterly}
+                viewMode={seasonalityView}
+              />
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Tab 3: Distribuição de valores */}
+        <TabsContent value="distribution">
+          {financialMetrics && (
+            <OrderDistributionChart
+              data={financialMetrics.orderDistribution}
+              totalOrders={financialMetrics.totalPedidos}
+            />
+          )}
+        </TabsContent>
+
+        {/* Tab 4: Performance por plataforma */}
+        <TabsContent value="platforms">
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <button
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  platformMetric === 'revenue' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+                onClick={() => setPlatformMetric('revenue')}
+              >
+                Faturamento
+              </button>
+              <button
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  platformMetric === 'orders' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+                onClick={() => setPlatformMetric('orders')}
+              >
+                Pedidos
+              </button>
+              <button
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  platformMetric === 'averageTicket' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+                onClick={() => setPlatformMetric('averageTicket')}
+              >
+                Ticket Médio
+              </button>
+            </div>
+            
+            {financialMetrics && (
+              <PlatformComparisonChart
+                data={financialMetrics.platformPerformance}
+                metric={platformMetric}
+              />
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
