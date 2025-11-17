@@ -123,7 +123,7 @@ export const calculateMultiMonthMetrics = (
   };
 };
 
-// Calcular métricas para múltiplos meses (Seguidores)
+// Calcular métricas de seguidores para múltiplos meses
 export const calculateFollowersMultiMonthMetrics = (
   data: FollowersData[],
   selectedMonths: string[]
@@ -138,13 +138,15 @@ export const calculateFollowersMultiMonthMetrics = (
     const color = getMonthColor(month, selectedMonths);
     const monthLabel = formatMonthLabel(month);
 
+    // Calcular mudança percentual em relação ao mês anterior
+    const prevIndex = index - 1;
     let percentageChange: number | undefined = undefined;
-    if (index > 0) {
-      const prevMonth = selectedMonths[index - 1];
+    if (prevIndex >= 0) {
+      const prevMonth = selectedMonths[prevIndex];
       const prevMonthData = data.filter(item => item.Data.startsWith(prevMonth));
       const prevMetrics = calculateFollowersMetrics(prevMonthData, data, prevMonth);
-      if (prevMetrics.novosSeguidoresMes > 0) {
-        percentageChange = ((metrics.novosSeguidoresMes - prevMetrics.novosSeguidoresMes) / prevMetrics.novosSeguidoresMes) * 100;
+      if (prevMetrics.totalSeguidores > 0) {
+        percentageChange = ((metrics.totalSeguidores - prevMetrics.totalSeguidores) / prevMetrics.totalSeguidores) * 100;
       }
     }
 
@@ -167,7 +169,7 @@ export const calculateFollowersMultiMonthMetrics = (
     crescimento.push({
       month,
       monthLabel,
-      value: metrics.novosSeguidoresMes,
+      value: metrics.crescimentoPercentual,
       color,
       percentageChange,
     });
@@ -180,7 +182,7 @@ export const calculateFollowersMultiMonthMetrics = (
   };
 };
 
-// Calcular métricas para múltiplos meses (Ads)
+// Calcular métricas de anúncios para múltiplos meses
 export const calculateAdsMultiMonthMetrics = (
   data: AdsData[],
   selectedMonths: string[],
@@ -198,9 +200,11 @@ export const calculateAdsMultiMonthMetrics = (
     const color = getMonthColor(month, selectedMonths);
     const monthLabel = formatMonthLabel(month);
 
+    // Calcular mudança percentual em relação ao mês anterior
+    const prevIndex = index - 1;
     let percentageChange: number | undefined = undefined;
-    if (index > 0) {
-      const prevMonth = selectedMonths[index - 1];
+    if (prevIndex >= 0) {
+      const prevMonth = selectedMonths[prevIndex];
       const prevMonthData = filterFn(data, prevMonth);
       const prevMetrics = calculateAdsMetrics(prevMonthData);
       if (prevMetrics.investimentoTotal > 0) {
@@ -258,94 +262,101 @@ export const calculateAdsMultiMonthMetrics = (
   };
 };
 
-// Preparar dados para gráficos comparativos (Marketing)
+// Preparar dados de comparação para gráficos de marketing
 export const prepareMarketingComparisonChartData = (
   data: MarketingData[],
   selectedMonths: string[],
   metric: string
 ): ComparisonChartData[] => {
-  const chartDataMap = new Map<string, any>();
+  const dataByDay = new Map<string, any>();
 
-  selectedMonths.forEach((month) => {
+  selectedMonths.forEach((month, index) => {
     const monthData = data.filter(item => item.Data.startsWith(month));
+    const color = getMonthColor(month, selectedMonths);
     const monthLabel = formatMonthLabel(month);
 
-    monthData.forEach((item) => {
-      const day = item.Data.substring(8, 10);
+    monthData.forEach(item => {
+      const date = new Date(item.Data);
+      const day = date.getDate();
+      const dayKey = `Dia ${day}`;
+
+      if (!dataByDay.has(dayKey)) {
+        dataByDay.set(dayKey, { dia: dayKey });
+      }
+
+      const dayData = dataByDay.get(dayKey);
       
-      if (!chartDataMap.has(day)) {
-        chartDataMap.set(day, { dia: day });
-      }
-
-      const entry = chartDataMap.get(day);
       let value = 0;
-
       switch (metric) {
-        case "visualizacoes":
-          value = parseInt(item.Visualizações);
+        case "Visualizações":
+          value = parseInt(item.Visualizações.replace(/\./g, ''));
           break;
-        case "alcance":
-          value = parseInt(item.Alcance);
+        case "Alcance":
+          value = parseInt(item.Alcance.replace(/\./g, ''));
           break;
-        case "visitas":
-          value = parseInt(item.Visitas);
+        case "Visitas":
+          value = parseInt(item.Visitas.replace(/\./g, ''));
           break;
-        case "interacoes":
-          value = parseInt(item.Interações);
+        case "Interações":
+          value = parseInt(item.Interações.replace(/\./g, ''));
           break;
-        case "clicks":
-          value = parseInt(item["Clicks no Link"]);
+        case "Clicks":
+          value = parseInt(item["Clicks no Link"].replace(/\./g, ''));
           break;
       }
 
-      entry[monthLabel] = value;
+      dayData[monthLabel] = value;
     });
   });
 
-  return Array.from(chartDataMap.values()).sort((a, b) => 
-    parseInt(a.dia) - parseInt(b.dia)
-  );
+  return Array.from(dataByDay.values()).sort((a, b) => {
+    const dayA = parseInt(a.dia.replace("Dia ", ""));
+    const dayB = parseInt(b.dia.replace("Dia ", ""));
+    return dayA - dayB;
+  });
 };
 
-// Preparar dados para gráficos comparativos (Seguidores)
+// Preparar dados de comparação para gráficos de seguidores
 export const prepareFollowersComparisonChartData = (
   data: FollowersData[],
   selectedMonths: string[]
 ): ComparisonChartData[] => {
-  const chartDataMap = new Map<string, any>();
+  const dataByDay = new Map<string, any>();
 
-  selectedMonths.forEach((month) => {
+  selectedMonths.forEach((month, index) => {
     const monthData = data.filter(item => item.Data.startsWith(month));
+    const color = getMonthColor(month, selectedMonths);
     const monthLabel = formatMonthLabel(month);
 
-    // Calcular acumulado para cada dia do mês
-    let accumulated = 0;
-    const allDataUpToMonth = data.filter(item => item.Data <= `${month}-31`);
-    const baseAccumulated = allDataUpToMonth
-      .filter(item => !item.Data.startsWith(month))
-      .reduce((sum, item) => sum + parseInt(item.Seguidores), 0);
+    // Calcular seguidores acumulados por dia
+    let cumulativeFollowers = 0;
+    monthData.forEach(item => {
+      const date = new Date(item.Data);
+      const day = date.getDate();
+      const dayKey = `Dia ${day}`;
 
-    monthData.forEach((item) => {
-      const day = item.Data.substring(8, 10);
-      accumulated += parseInt(item.Seguidores);
-      
-      if (!chartDataMap.has(day)) {
-        chartDataMap.set(day, { dia: day });
+      const followers = parseInt(item.Seguidores.replace(/\./g, ''));
+      cumulativeFollowers = followers;
+
+      if (!dataByDay.has(dayKey)) {
+        dataByDay.set(dayKey, { dia: dayKey });
       }
 
-      const entry = chartDataMap.get(day);
-      entry[monthLabel] = baseAccumulated + accumulated;
+      const dayData = dataByDay.get(dayKey);
+      dayData[monthLabel] = cumulativeFollowers;
     });
   });
 
-  return Array.from(chartDataMap.values()).sort((a, b) => 
-    parseInt(a.dia) - parseInt(b.dia)
-  );
+  return Array.from(dataByDay.values()).sort((a, b) => {
+    const dayA = parseInt(a.dia.replace("Dia ", ""));
+    const dayB = parseInt(b.dia.replace("Dia ", ""));
+    return dayA - dayB;
+  });
 };
 
 // Calcular métricas de comparação para vendas
 export const calculateComparisonMetrics = (
-  orders: any[], // ProcessedOrder
+  orders: any[],
   selectedMonths: string[],
   availableMonths: string[]
 ): {
@@ -353,11 +364,13 @@ export const calculateComparisonMetrics = (
   averageTicket: MonthMetric[];
   totalOrders: MonthMetric[];
   totalCustomers: MonthMetric[];
+  averageProducts: MonthMetric[];
 } => {
   const revenue: MonthMetric[] = [];
   const averageTicket: MonthMetric[] = [];
   const totalOrders: MonthMetric[] = [];
   const totalCustomers: MonthMetric[] = [];
+  const averageProducts: MonthMetric[] = [];
 
   const SALES_COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 
@@ -365,7 +378,6 @@ export const calculateComparisonMetrics = (
     const filteredOrders = filterOrdersByMonth(orders, month, availableMonths);
     const metrics = calculateFinancialMetrics(filteredOrders, month);
     
-    // Calcular total de clientes únicos
     const uniqueCustomers = new Set(filteredOrders.map((order: any) => order.cpfCnpj)).size;
     
     if (metrics) {
@@ -404,6 +416,13 @@ export const calculateComparisonMetrics = (
         value: uniqueCustomers,
         color,
       });
+
+      averageProducts.push({
+        month,
+        monthLabel,
+        value: metrics.produtoMedio,
+        color,
+      });
     }
   });
 
@@ -436,6 +455,13 @@ export const calculateComparisonMetrics = (
         item.percentageChange = ((item.value - baseCustomers) / baseCustomers) * 100;
       }
     });
+
+    const baseProducts = averageProducts[0].value;
+    averageProducts.forEach((item, idx) => {
+      if (idx > 0) {
+        item.percentageChange = ((item.value - baseProducts) / baseProducts) * 100;
+      }
+    });
   }
 
   return {
@@ -443,5 +469,6 @@ export const calculateComparisonMetrics = (
     averageTicket,
     totalOrders,
     totalCustomers,
+    averageProducts,
   };
 };

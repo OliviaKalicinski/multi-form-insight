@@ -1,4 +1,4 @@
-import { DollarSign, TrendingUp, ShoppingCart, Award, Calendar, TrendingDown } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingCart, Award, Calendar, TrendingDown, Package } from "lucide-react";
 import { SalesMetricCard } from "./SalesMetricCard";
 import { FinancialMetrics } from "@/types/marketing";
 import { formatCurrency, formatPercentage, formatQuantity } from "@/utils/salesCalculator";
@@ -31,6 +31,13 @@ export const FinancialSummaryCards = ({ metrics }: FinancialSummaryCardsProps) =
         value={formatCurrency(metrics.ticketMedio)}
         icon={TrendingUp}
         subtitle="Por pedido"
+      />
+
+      <SalesMetricCard
+        title="Produto Médio"
+        value={metrics.produtoMedio.toFixed(1)}
+        icon={Package}
+        subtitle="Itens por pedido"
       />
 
       <SalesMetricCard
