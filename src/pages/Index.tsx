@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPlus, DollarSign, ShoppingCart, ShoppingBag, Coins, Heart, ExternalLink as ExternalLinkIcon, Calendar } from "lucide-react";
+import { TrendingUp, Users, MousePointerClick, Eye, Target, TrendingDown, UserPlus, Heart, Calendar, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -11,10 +11,6 @@ import { TrendChart } from "@/components/dashboard/TrendChart";
 import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
 import { NewFollowersChart } from "@/components/dashboard/NewFollowersChart";
-import { CSVUploader } from "@/components/dashboard/CSVUploader";
-import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
-import { AdsUploader } from "@/components/dashboard/AdsUploader";
-import { SalesUploader } from "@/components/dashboard/SalesUploader";
 import { SalesMetricCard } from "@/components/dashboard/SalesMetricCard";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage } from "@/utils/metricsCalculator";
@@ -44,10 +40,6 @@ const Index = () => {
     salesData,
     selectedMonth,
     availableMonths,
-    setMarketingData,
-    setFollowersData,
-    setAdsData,
-    setSalesData,
     setSelectedMonth,
     comparisonMode,
     selectedMonths,
@@ -233,21 +225,6 @@ const Index = () => {
     return calculateAdsMetrics(currentMonthAdsData);
   }, [currentMonthAdsData]);
 
-  const handleDataLoaded = (data: MarketingData[]) => {
-    setMarketingData(data);
-  };
-
-  const handleFollowersDataLoaded = (data: FollowersData[]) => {
-    setFollowersData(data);
-  };
-
-  const handleAdsDataLoaded = (data: AdsData[], fileName: string, summaries?: any[], isHierarchical?: boolean) => {
-    setAdsData(data, summaries, isHierarchical);
-  };
-
-  const handleSalesDataLoaded = (data: ProcessedOrder[], fileName: string) => {
-    setSalesData(data);
-  };
 
   // Aggregate data by month for 12-month view
   const monthlyMarketingData = useMemo(() => {
