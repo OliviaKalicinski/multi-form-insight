@@ -140,3 +140,49 @@ export interface AdsMultiMonthMetrics {
   cpc: MonthMetric[];
   taxaConversao: MonthMetric[];
 }
+
+// Sales/E-commerce Data
+export interface SalesData {
+  "Nome do cliente": string;
+  "CPF/CNPJ": string;
+  "Número do pedido no e-commerce": string;
+  "E-commerce": string;
+  "Código (SKU)": string;
+  "Descrição do produto": string;
+  "Preço total": string;
+  "Total de itens": string;
+  "Data da venda": string;
+  "Forma de envio": string;
+  "Número (Nota Fiscal)": string;
+  "Data de Emissão": string;
+}
+
+// Processed Order (agrupado por pedido único)
+export interface ProcessedOrder {
+  numeroPedido: string;
+  nomeCliente: string;
+  cpfCnpj: string;
+  ecommerce: string;
+  valorTotal: number;
+  totalItens: number;
+  produtos: {
+    sku: string;
+    descricao: string;
+    descricaoAjustada: string;
+    preco: number;
+    quantidade: number;
+  }[];
+  dataVenda: Date;
+  formaEnvio: string;
+  numeroNF: string;
+  dataEmissao: Date;
+}
+
+// Sales Metrics
+export interface SalesMetrics {
+  faturamentoTotal: number;
+  ticketMedio: number;
+  totalPedidos: number;
+  totalClientes: number;
+  taxaRecompra: number;
+}
