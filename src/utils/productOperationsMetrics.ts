@@ -1,5 +1,6 @@
 import { ProcessedOrder, ProductOperationsMetrics, ProductRanking, SKUPerformance, ProductCombination, FreebieProduct, ShippingMethodStat, NFIssuanceDistribution } from "@/types/marketing";
 import { differenceInDays } from "date-fns";
+import { breakdownOrders } from './orderBreakdown';
 
 /**
  * KPI 12: Analisa produtos mais vendidos por quantidade
@@ -327,19 +328,25 @@ export const analyzeNFIssuanceTime = (orders: ProcessedOrder[]): {
 /**
  * Calcula métricas consolidadas de produto e operações
  */
-export const calculateProductOperationsMetrics = (orders: ProcessedOrder[]): ProductOperationsMetrics => {
-  const topByQuantity = analyzeTopProductsByQuantity(orders, 20);
-  const topByRevenue = analyzeTopProductsByRevenue(orders, 20);
-  const skuAnalysis = analyzeSKUPerformance(orders);
-  const combinations = analyzeProductCombinations(orders, 2);
-  const freebies = analyzeFreebieProducts(orders);
-  const shipping = analyzeShippingMethods(orders);
-  const nfTime = analyzeNFIssuanceTime(orders);
+export const calculateProductOperationsMetrics = (
+  orders: ProcessedOrder[], 
+  breakdownKits: boolean = false
+): ProductOperationsMetrics => {
+  // Se modo "Individual", desmembrar kits
+  const processedOrders = breakdownKits ? breakdownOrders(orders) : orders;
+  
+  const topByQuantity = analyzeTopProductsByQuantity(processedOrders, 20);
+  const topByRevenue = analyzeTopProductsByRevenue(processedOrders, 20);
+  const skuAnalysis = analyzeSKUPerformance(processedOrders);
+  const combinations = analyzeProductCombinations(processedOrders, 2);
+  const freebies = analyzeFreebieProducts(processedOrders);
+  const shipping = analyzeShippingMethods(processedOrders);
+  const nfTime = analyzeNFIssuanceTime(processedOrders);
 
   const uniqueProducts = new Set<string>();
   const uniqueSKUs = new Set<string>();
   
-  orders.forEach(order => {
+  processedOrders.forEach(order => {
     order.produtos.forEach(produto => {
       uniqueProducts.add(produto.descricaoAjustada);
       uniqueSKUs.add(produto.sku);

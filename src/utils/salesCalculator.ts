@@ -1,16 +1,27 @@
 import { format, parse } from "date-fns";
 import { SalesData, ProcessedOrder, SalesMetrics } from "@/types/marketing";
 
+import { normalizeProductName, getKitType } from './productNormalizer';
+
 /**
  * Ajusta descrição do produto duplicado "Comida de Dragão"
  * Se preço = 0.01, é o "Kit de amostras"
  */
 export const adjustProductDescription = (descricao: string, preco: number): string => {
+  // Caso especial: Kit de amostras (preço R$ 0,01)
   const isComidaDragao = descricao.includes("Comida de Dragão - Original® - 90g - Compra única");
   if (isComidaDragao && Math.abs(preco - 0.01) < 0.001) {
     return "Kit de amostras - Comida de Dragão";
   }
-  return descricao;
+  
+  // Verificar se é kit conhecido e normalizar
+  const kitType = getKitType(descricao);
+  if (kitType) {
+    return kitType;
+  }
+  
+  // Para produtos não-kit, aplicar normalização padrão
+  return normalizeProductName(descricao);
 };
 
 /**

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { Package } from "lucide-react";
+import { Package, ListTree } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
@@ -24,6 +24,7 @@ export default function Volume() {
   } = useDashboard();
 
   const [productSortBy, setProductSortBy] = useState<'quantity' | 'revenue'>('quantity');
+  const [viewMode, setViewMode] = useState<'as-sold' | 'individual'>('as-sold');
 
   const productMetrics = useMemo(() => {
     if (salesData.length === 0) return null;
@@ -32,8 +33,11 @@ export default function Volume() {
       ? filterOrdersByMonth(salesData, selectedMonth, availableMonths) 
       : salesData;
     
-    return calculateProductOperationsMetrics(filteredOrders);
-  }, [salesData, selectedMonth, availableMonths]);
+    return calculateProductOperationsMetrics(
+      filteredOrders, 
+      viewMode === 'individual'
+    );
+  }, [salesData, selectedMonth, availableMonths, viewMode]);
 
   if (salesData.length === 0) {
     return (
@@ -73,8 +77,47 @@ export default function Volume() {
         onMonthChange={setSelectedMonth}
       />
 
+      {/* Toggle de visualização */}
+      <div className="flex items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg border">
+        <div className="flex-1">
+          <h3 className="font-semibold flex items-center gap-2">
+            {viewMode === 'as-sold' ? (
+              <><Package className="h-4 w-4" /> Produtos Como Vendidos</>
+            ) : (
+              <><ListTree className="h-4 w-4" /> Produtos Individuais</>
+            )}
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            {viewMode === 'as-sold' 
+              ? 'Kits contam como 1 produto (agrupados por tipo)' 
+              : 'Kits desmembrados em produtos individuais'}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={viewMode === 'as-sold' ? 'default' : 'outline'}
+            onClick={() => setViewMode('as-sold')}
+            size="sm"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Como Vendidos
+          </Button>
+          <Button
+            variant={viewMode === 'individual' ? 'default' : 'outline'}
+            onClick={() => setViewMode('individual')}
+            size="sm"
+          >
+            <ListTree className="h-4 w-4 mr-2" />
+            Individuais
+          </Button>
+        </div>
+      </div>
+
       {productMetrics && (
-        <ProductOperationsSummaryCards metrics={productMetrics} />
+        <ProductOperationsSummaryCards 
+          metrics={productMetrics} 
+          viewMode={viewMode}
+        />
       )}
 
       <Tabs defaultValue="ranking" className="space-y-6">
