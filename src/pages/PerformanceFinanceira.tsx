@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { DollarSign, TrendingUp, Users, ShoppingCart } from "lucide-react";
+import { DollarSign, TrendingUp, Users, ShoppingCart, Package } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
@@ -141,6 +141,12 @@ export default function PerformanceFinanceira() {
             title="Total de Clientes"
             icon={Users}
             metrics={comparisonMetrics.totalCustomers}
+          />
+          <ComparisonMetricCard
+            title="Produto Médio"
+            icon={Package}
+            metrics={comparisonMetrics.averageProducts}
+            formatValue={(v) => `${v.toFixed(1)} itens`}
           />
         </div>
       )}

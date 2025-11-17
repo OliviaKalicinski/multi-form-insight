@@ -192,6 +192,7 @@ export interface FinancialMetrics {
   faturamentoTotal: number;
   ticketMedio: number;
   totalPedidos: number;
+  produtoMedio: number;
   revenueByDay: { date: string; revenue: number; cumulativeRevenue: number }[];
   revenueByMonth: { month: string; revenue: number; orders: number }[];
   seasonality: SeasonalityAnalysis;

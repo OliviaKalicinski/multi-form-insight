@@ -236,6 +236,10 @@ export const calculateFinancialMetrics = (
   const totalRevenue = orders.reduce((sum, order) => sum + order.valorTotal, 0);
   const totalOrders = orders.length;
   const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  
+  // Calcular produto médio (média de itens por pedido)
+  const totalItems = orders.reduce((sum, order) => sum + order.totalItens, 0);
+  const produtoMedio = totalOrders > 0 ? totalItems / totalOrders : 0;
 
   const revenueEvolution = calculateRevenueEvolution(orders);
   const revenueByMonth = calculateRevenueByPeriod(orders, 'month').map((item) => ({
@@ -256,6 +260,7 @@ export const calculateFinancialMetrics = (
     faturamentoTotal: totalRevenue,
     ticketMedio: averageTicket,
     totalPedidos: totalOrders,
+    produtoMedio,
     revenueByDay: revenueEvolution,
     revenueByMonth,
     seasonality,
