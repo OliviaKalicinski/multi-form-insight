@@ -354,3 +354,65 @@ export interface OrderVolumeAnalysis {
   peakDay: { date: string; orders: number };
   lowDay: { date: string; orders: number };
 }
+
+// Sample Analysis Metrics
+export interface SampleMetrics {
+  volume: {
+    totalSamples: number;
+    uniqueCustomers: number;
+    percentageOfTotal: number;
+  };
+  repurchase: {
+    repurchaseRate: number;
+    customersWhoRepurchased: number;
+    avgTicketRepurchase: number;
+    avgDaysToFirstRepurchase: number;
+    conversionToRegularProduct: number;
+  };
+  crossSell: {
+    onlySample: number;
+    samplePlusOthers: number;
+    topProductsWithSample: { product: string; count: number; avgOrderValue: number }[];
+    avgTicketSampleOnly: number;
+    avgTicketSamplePlusOthers: number;
+  };
+  conversionByTime: {
+    days30: number;
+    days60: number;
+    days90: number;
+    days180: number;
+  };
+  quality: {
+    avgRepurchasesPerCustomer: number;
+    avgLTV: number;
+    topRepurchaseProducts: { product: string; count: number }[];
+  };
+  profile: {
+    platformDistribution: { platform: string; count: number }[];
+    shippingMethods: { method: string; count: number }[];
+    avgFirstOrderValue: number;
+  };
+  basket: {
+    avgBasketSize: number;
+    topCombinations: { product: string; count: number }[];
+  };
+  segmentation: {
+    oneTime: number;
+    explorers: number;
+    loyal: number;
+  };
+  temporal: {
+    monthlyData: { month: string; count: number; growthRate: number }[];
+  };
+}
+
+export interface CustomerPurchaseHistory {
+  customer: string;
+  cpfCnpj: string;
+  orders: ProcessedOrder[];
+  sampleOrder?: ProcessedOrder;
+  totalOrders: number;
+  totalRevenue: number;
+  hasSample: boolean;
+  hasRepurchase: boolean;
+}
