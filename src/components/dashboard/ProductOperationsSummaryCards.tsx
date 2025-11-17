@@ -4,16 +4,24 @@ import { ProductOperationsMetrics } from "@/types/marketing";
 
 interface ProductOperationsSummaryCardsProps {
   metrics: ProductOperationsMetrics;
+  viewMode?: 'as-sold' | 'individual';
 }
 
-export const ProductOperationsSummaryCards = ({ metrics }: ProductOperationsSummaryCardsProps) => {
+export const ProductOperationsSummaryCards = ({ 
+  metrics, 
+  viewMode = 'as-sold' 
+}: ProductOperationsSummaryCardsProps) => {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       <SalesMetricCard
         title="Total de Produtos"
         value={metrics.totalProducts}
         icon={Package}
-        subtitle="Produtos únicos no catálogo"
+        subtitle={
+          viewMode === 'as-sold' 
+            ? 'Produtos únicos (kits agrupados)' 
+            : 'Produtos individuais (kits desmembrados)'
+        }
       />
       <SalesMetricCard
         title="Total de SKUs"
