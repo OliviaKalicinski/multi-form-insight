@@ -198,6 +198,11 @@ export const compareEcommercePlatforms = (orders: ProcessedOrder[]) => {
 const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): number => {
   if (orders.length === 0) return 0;
 
+  // Se não for um mês válido (ex: "last-12-months"), retornar 0
+  if (!selectedMonth || selectedMonth === "last-12-months" || !selectedMonth.match(/^\d{4}-\d{2}$/)) {
+    return 0;
+  }
+
   const currentMonthOrders = orders.filter(
     (order) => format(order.dataVenda, "yyyy-MM") === selectedMonth
   );
