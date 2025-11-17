@@ -244,6 +244,77 @@ export interface CustomerBehaviorMetrics {
   customerLifetimeValue: number;
 }
 
+// Product & Operations Metrics
+export interface ProductOperationsMetrics {
+  topProductsByQuantity: ProductRanking[];
+  topProductsByRevenue: ProductRanking[];
+  skuAnalysis: SKUPerformance[];
+  productCombinations: ProductCombination[];
+  freebieProducts: FreebieProduct[];
+  shippingMethodStats: ShippingMethodStat[];
+  averageNFIssuanceTime: number;
+  nfIssuanceDistribution: NFIssuanceDistribution[];
+  totalProducts: number;
+  totalSKUs: number;
+}
+
+export interface ProductRanking {
+  sku: string;
+  descricao: string;
+  descricaoAjustada: string;
+  quantidadeTotal: number;
+  faturamentoTotal: number;
+  numeroPedidos: number;
+  ticketMedio: number;
+  percentualQuantidade: number;
+  percentualFaturamento: number;
+}
+
+export interface SKUPerformance {
+  sku: string;
+  descricao: string;
+  descricaoAjustada: string;
+  faturamentoTotal: number;
+  quantidadeTotal: number;
+  numeroPedidos: number;
+  ticketMedio: number;
+  precoMedio: number;
+  primeiraVenda: Date;
+  ultimaVenda: Date;
+}
+
+export interface ProductCombination {
+  produto1: string;
+  produto2: string;
+  sku1: string;
+  sku2: string;
+  frequencia: number;
+  percentualPedidos: number;
+  faturamentoMedio: number;
+}
+
+export interface FreebieProduct {
+  sku: string;
+  descricao: string;
+  quantidadeTotal: number;
+  numeroPedidos: number;
+  percentualPedidosComBrinde: number;
+}
+
+export interface ShippingMethodStat {
+  formaEnvio: string;
+  numeroPedidos: number;
+  percentual: number;
+  faturamentoTotal: number;
+  ticketMedio: number;
+}
+
+export interface NFIssuanceDistribution {
+  faixa: string;
+  quantidade: number;
+  percentual: number;
+}
+
 export interface CustomerSegment {
   segment: 'Novo' | 'Ativo' | 'Frequente' | 'VIP';
   count: number;
