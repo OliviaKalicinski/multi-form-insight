@@ -10,6 +10,8 @@ import { SalesData, ProcessedOrder } from "@/types/marketing";
 
 interface SalesUploaderProps {
   onDataLoaded: (data: ProcessedOrder[], fileName: string) => void;
+  title?: string;
+  description?: string;
 }
 
 // Schema de validação Zod
@@ -28,7 +30,11 @@ const salesDataSchema = z.object({
   "Data de Emissão": z.string(),
 });
 
-export const SalesUploader = ({ onDataLoaded }: SalesUploaderProps) => {
+export const SalesUploader = ({ 
+  onDataLoaded,
+  title = "Dados de Vendas",
+  description = "Envie o arquivo CSV com dados de vendas do e-commerce"
+}: SalesUploaderProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const { toast } = useToast();
@@ -131,18 +137,15 @@ export const SalesUploader = ({ onDataLoaded }: SalesUploaderProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="w-5 h-5" />
-          Dados de Vendas
-        </CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Envie o arquivo CSV com dados de vendas do e-commerce
+          {description}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {!uploadedFile ? (
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
               isDragging
                 ? "border-primary bg-primary/5"
                 : "border-muted-foreground/25 hover:border-primary/50"
@@ -154,11 +157,11 @@ export const SalesUploader = ({ onDataLoaded }: SalesUploaderProps) => {
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
           >
-            <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
             <p className="text-sm text-muted-foreground mb-2">
               Arraste e solte o arquivo CSV aqui
             </p>
-            <p className="text-xs text-muted-foreground mb-4">ou</p>
+            <p className="text-xs text-muted-foreground mb-3">ou</p>
             <Button variant="outline" onClick={() => document.getElementById("sales-file-input")?.click()}>
               Selecionar arquivo
             </Button>

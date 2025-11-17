@@ -9,6 +9,8 @@ import { z } from "zod";
 
 interface CSVUploaderProps {
   onDataLoaded: (data: MarketingData[], fileName: string) => void;
+  title?: string;
+  description?: string;
 }
 
 const marketingDataSchema = z.object({
@@ -20,7 +22,11 @@ const marketingDataSchema = z.object({
   Alcance: z.string(),
 });
 
-export const CSVUploader = ({ onDataLoaded }: CSVUploaderProps) => {
+export const CSVUploader = ({ 
+  onDataLoaded,
+  title = "Importar Dados CSV",
+  description = "Faça upload de um arquivo CSV com suas métricas de marketing"
+}: CSVUploaderProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const { toast } = useToast();
@@ -129,9 +135,9 @@ export const CSVUploader = ({ onDataLoaded }: CSVUploaderProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Importar Dados CSV</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Faça upload de um arquivo CSV com suas métricas de marketing
+          {description}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -143,13 +149,13 @@ export const CSVUploader = ({ onDataLoaded }: CSVUploaderProps) => {
             }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
               isDragging
                 ? "border-primary bg-primary/5"
                 : "border-border hover:border-primary/50"
             }`}
           >
-            <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground mb-4">
               Arraste e solte seu arquivo CSV aqui, ou
             </p>

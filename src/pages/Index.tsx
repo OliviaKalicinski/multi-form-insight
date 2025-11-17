@@ -42,54 +42,30 @@ const Index = () => {
         </div>
 
         {/* Uploaders Section */}
-        <div className="grid gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>📊 Dados de Marketing</CardTitle>
-              <CardDescription>
-                Faça upload do relatório CSV do Instagram
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CSVUploader onDataLoaded={handleMarketingDataLoaded} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>👥 Dados de Seguidores</CardTitle>
-              <CardDescription>
-                Faça upload do CSV de crescimento de seguidores
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FollowersUploader onDataLoaded={handleFollowersDataLoaded} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>💰 Dados de Anúncios</CardTitle>
-              <CardDescription>
-                Faça upload dos dados de campanhas publicitárias
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AdsUploader onDataLoaded={handleAdsDataLoaded} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>🛍️ Dados de Vendas</CardTitle>
-              <CardDescription>
-                Faça upload dos dados de vendas do e-commerce
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SalesUploader onDataLoaded={handleSalesDataLoaded} />
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <CSVUploader 
+            onDataLoaded={handleMarketingDataLoaded}
+            title="📊 Dados de Marketing"
+            description="Faça upload do relatório CSV do Instagram"
+          />
+          
+          <FollowersUploader 
+            onDataLoaded={handleFollowersDataLoaded}
+            title="👥 Dados de Seguidores"
+            description="Faça upload do CSV de crescimento de seguidores"
+          />
+          
+          <AdsUploader 
+            onDataLoaded={handleAdsDataLoaded}
+            title="💰 Dados de Anúncios"
+            description="Faça upload dos dados de campanhas publicitárias"
+          />
+          
+          <SalesUploader 
+            onDataLoaded={handleSalesDataLoaded}
+            title="🛍️ Dados de Vendas"
+            description="Faça upload dos dados de vendas do e-commerce"
+          />
         </div>
 
         {/* Quick Links */}
