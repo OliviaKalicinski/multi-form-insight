@@ -2,11 +2,13 @@ import { ProcessedOrder, SampleMetrics, CustomerPurchaseHistory } from "@/types/
 import { format, differenceInDays, differenceInMonths } from "date-fns";
 
 /**
- * Identifica se um pedido contém amostra baseado no PREÇO TOTAL do pedido
- * Amostras: 0,01 ≤ Preço total ≤ 1,00
+ * Identifica se um pedido contém amostra baseado nos PRODUTOS do pedido
+ * Verifica se há pelo menos um produto com preço de amostra: 0,01 ≤ Preço ≤ 0,90
  */
 export const isSampleOrder = (order: ProcessedOrder): boolean => {
-  return order.valorTotal >= 0.01 && order.valorTotal <= 1.00;
+  return order.produtos.some(produto => 
+    produto.preco >= 0.01 && produto.preco <= 0.90
+  );
 };
 
 /**
