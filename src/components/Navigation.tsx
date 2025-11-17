@@ -24,11 +24,11 @@ export const Navigation = () => {
             <TabsTrigger value="/comportamento-cliente" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               👥 Comportamento do Cliente
             </TabsTrigger>
-            <TabsTrigger value="/seguidores" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              📈 Instagram
-            </TabsTrigger>
             <TabsTrigger value="/volume" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               📦 Produto & Operações
+            </TabsTrigger>
+            <TabsTrigger value="/seguidores" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              📈 Instagram
             </TabsTrigger>
             <TabsTrigger value="/ads" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               💰 Ads
