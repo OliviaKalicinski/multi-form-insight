@@ -1,6 +1,6 @@
 import { ProcessedOrder } from '@/types/marketing';
 import { breakdownKit } from './kitBreakdown';
-import { normalizeProductName } from './productNormalizer';
+import { standardizeProductName } from './productNormalizer';
 
 /**
  * Desmembra kits em produtos individuais
@@ -10,28 +10,32 @@ export const breakdownOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => {
     const newProducts: any[] = [];
     
     order.produtos.forEach(produto => {
-      const kitComponents = breakdownKit(produto.descricaoAjustada);
+      // Produto já está padronizado (feito no processSalesData)
+      const standardizedName = produto.descricaoAjustada;
+      
+      // Tentar desmembrar o kit
+      const kitComponents = breakdownKit(standardizedName, produto.preco);
       
       if (kitComponents && kitComponents.length > 0) {
-        // É um kit - desmembrar
+        // É um kit - desmembrar em componentes
         const totalComponents = kitComponents.reduce((sum, c) => sum + c.quantity, 0);
         const pricePerComponent = produto.preco / totalComponents;
         
         kitComponents.forEach(component => {
-          // Adicionar cada componente
+          // Adicionar cada componente (já está padronizado)
           newProducts.push({
             sku: `${produto.sku}-${component.product.replace(/\s+/g, '-')}`,
             descricao: component.product,
-            descricaoAjustada: normalizeProductName(component.product),
+            descricaoAjustada: component.product,
             quantidade: produto.quantidade * component.quantity,
             preco: pricePerComponent * component.quantity * produto.quantidade,
           });
         });
       } else {
-        // Não é kit - manter como está, mas normalizar nome
+        // Não é kit ou é Kit de Amostras - manter como está
         newProducts.push({
           ...produto,
-          descricaoAjustada: normalizeProductName(produto.descricaoAjustada)
+          descricaoAjustada: standardizedName
         });
       }
     });
