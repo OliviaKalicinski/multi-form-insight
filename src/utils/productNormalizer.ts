@@ -8,13 +8,14 @@ export const normalizeProductName = (name: string): string => {
   // Remover padrões comuns
   normalized = normalized
     .replace(/\s*-?\s*\d+g\s*/gi, '') // Remove gramas (90g, 180g, 450g, 540g)
+    .replace(/\s*\(1 pacote\)\s*/gi, '') // Remove "(1 pacote)"
+    .replace(/\s*\(3 pacotes\)\s*/gi, ' (3X)') // Padroniza formato
+    .replace(/\s*\(3X\)\s*/gi, ' (3X)') // Já padronizado
     .replace(/\s*-?\s*Compra única\s*/gi, '') // Remove tipo de compra
     .replace(/\s*-?\s*Compra mensal\s*/gi, '')
     .replace(/\s*-?\s*Plano mensal\s*/gi, '')
     .replace(/\s*\/\s*Compra única\s*/gi, '')
     .replace(/\s*-?\s*Kit\s*/gi, ' Kit ') // Normaliza "Kit"
-    .replace(/\s*\(3 pacotes\)\s*/gi, ' (3X)') // Padroniza formato
-    .replace(/\s*\(3X\)\s*/gi, ' (3X)') // Já padronizado
     .replace(/®/g, '') // Remove marca registrada
     .replace(/\s{2,}/g, ' ') // Remove espaços duplos
     .trim();
