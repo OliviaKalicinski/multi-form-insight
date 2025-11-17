@@ -1,13 +1,12 @@
 import { ProcessedOrder, SampleMetrics, CustomerPurchaseHistory } from "@/types/marketing";
-import { format, differenceInDays } from "date-fns";
-
-const SAMPLE_IDENTIFIER = "Kit de amostras - Comida de Dragão";
+import { format, differenceInDays, differenceInMonths } from "date-fns";
 
 /**
- * Identifica se um pedido contém amostra
+ * Identifica se um pedido contém amostra baseado no PREÇO TOTAL do pedido
+ * Amostras: 0,01 ≤ Preço total ≤ 1,00
  */
-export const hasSampleProduct = (order: ProcessedOrder): boolean => {
-  return order.produtos.some(p => p.descricaoAjustada === SAMPLE_IDENTIFIER);
+export const isSampleOrder = (order: ProcessedOrder): boolean => {
+  return order.valorTotal >= 0.01 && order.valorTotal <= 1.00;
 };
 
 /**
@@ -36,7 +35,7 @@ export const groupOrdersByCustomer = (orders: ProcessedOrder[]): Map<string, Cus
     customerData.totalOrders++;
     customerData.totalRevenue += order.valorTotal;
     
-    if (hasSampleProduct(order)) {
+    if (isSampleOrder(order)) {
       customerData.hasSample = true;
       if (!customerData.sampleOrder) {
         customerData.sampleOrder = order;
@@ -55,32 +54,38 @@ export const groupOrdersByCustomer = (orders: ProcessedOrder[]): Map<string, Cus
 };
 
 /**
- * Calcula métricas de volume de amostras
+ * Calcula métricas de volume de amostras - agora conta PEDIDOS únicos
  */
 export const calculateSampleVolume = (orders: ProcessedOrder[]): SampleMetrics['volume'] => {
-  const sampleProducts = orders.flatMap(o => o.produtos)
-    .filter(p => p.descricaoAjustada === SAMPLE_IDENTIFIER);
+  // Filtrar pedidos com amostra (preço entre 0,01 e 1,00)
+  const sampleOrders = orders.filter(o => isSampleOrder(o));
   
-  const ordersWithSample = orders.filter(o => hasSampleProduct(o));
-  const uniqueCustomers = new Set(ordersWithSample.map(o => o.cpfCnpj)).size;
+  // Contagem única de pedidos
+  const uniqueSampleOrders = new Set(sampleOrders.map(o => o.numeroPedido)).size;
   
-  const allProducts = orders.flatMap(o => o.produtos);
-  const percentageOfTotal = allProducts.length > 0 
-    ? (sampleProducts.length / allProducts.length) * 100 
+  // Contagem única de clientes
+  const uniqueCustomers = new Set(sampleOrders.map(o => o.cpfCnpj)).size;
+  
+  // Percentual de pedidos (não produtos)
+  const totalUniqueOrders = new Set(orders.map(o => o.numeroPedido)).size;
+  const percentageOfTotal = totalUniqueOrders > 0 
+    ? (uniqueSampleOrders / totalUniqueOrders) * 100 
     : 0;
   
   return {
-    totalSamples: sampleProducts.length,
+    totalSamples: uniqueSampleOrders, // Agora é contagem de PEDIDOS
     uniqueCustomers,
     percentageOfTotal,
   };
 };
 
 /**
- * Calcula comportamento de recompra
+ * Calcula comportamento de recompra - lógica simplificada
  */
 export const calculateRepurchaseBehavior = (orders: ProcessedOrder[]): SampleMetrics['repurchase'] => {
   const customerMap = groupOrdersByCustomer(orders);
+  
+  // Filtrar clientes que compraram amostra em QUALQUER pedido
   const sampleCustomers = Array.from(customerMap.values()).filter(c => c.hasSample);
   
   if (sampleCustomers.length === 0) {
@@ -93,57 +98,48 @@ export const calculateRepurchaseBehavior = (orders: ProcessedOrder[]): SampleMet
     };
   }
   
+  // SIMPLIFICAÇÃO: Clientes com 2+ pedidos = recompraram
   const customersWithRepurchase = sampleCustomers.filter(c => c.totalOrders >= 2);
   const repurchaseRate = (customersWithRepurchase.length / sampleCustomers.length) * 100;
   
-  // Ticket médio das recompras (excluindo pedido com amostra)
-  let totalRepurchaseValue = 0;
-  let repurchaseCount = 0;
+  // Ticket médio GERAL (incluindo pedido com amostra)
+  let totalValue = 0;
+  let orderCount = 0;
   let totalDays = 0;
   let daysCount = 0;
   let conversionsToRegular = 0;
   
   customersWithRepurchase.forEach(customer => {
-    const sortedOrders = customer.orders.sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
-    const sampleOrderIndex = sortedOrders.findIndex(o => hasSampleProduct(o));
+    // Somar TODOS os pedidos
+    customer.orders.forEach(order => {
+      totalValue += order.valorTotal;
+      orderCount++;
+    });
     
-    if (sampleOrderIndex >= 0) {
-      const sampleOrder = sortedOrders[sampleOrderIndex];
-      const subsequentOrders = sortedOrders.filter((o, idx) => 
-        idx > sampleOrderIndex || (idx === sampleOrderIndex && !hasSampleProduct(o))
-      );
-      
-      subsequentOrders.forEach(order => {
-        totalRepurchaseValue += order.valorTotal;
-        repurchaseCount++;
-      });
-      
-      // Tempo até primeira recompra
-      if (sortedOrders.length > sampleOrderIndex + 1) {
-        const nextOrder = sortedOrders[sampleOrderIndex + 1];
-        const days = differenceInDays(nextOrder.dataVenda, sampleOrder.dataVenda);
-        totalDays += days;
-        daysCount++;
-      }
-      
-      // Conversão para produto regular (qualquer produto que não seja amostra)
-      const hasRegularProduct = subsequentOrders.some(order => 
-        order.produtos.some(p => p.descricaoAjustada !== SAMPLE_IDENTIFIER)
-      );
-      if (hasRegularProduct) {
-        conversionsToRegular++;
-      }
+    // Tempo até primeira recompra
+    const sortedOrders = customer.orders.sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
+    if (sortedOrders.length >= 2) {
+      const days = differenceInDays(sortedOrders[1].dataVenda, sortedOrders[0].dataVenda);
+      totalDays += days;
+      daysCount++;
+    }
+    
+    // Conversão para produto regular (preço > 10)
+    if (customer.orders.some(o => o.valorTotal > 10)) {
+      conversionsToRegular++;
     }
   });
+  
+  const avgTicketRepurchase = orderCount > 0 ? totalValue / orderCount : 0;
+  const avgDaysToFirstRepurchase = daysCount > 0 ? totalDays / daysCount : 0;
+  const conversionToRegularProduct = (conversionsToRegular / sampleCustomers.length) * 100;
   
   return {
     repurchaseRate,
     customersWhoRepurchased: customersWithRepurchase.length,
-    avgTicketRepurchase: repurchaseCount > 0 ? totalRepurchaseValue / repurchaseCount : 0,
-    avgDaysToFirstRepurchase: daysCount > 0 ? totalDays / daysCount : 0,
-    conversionToRegularProduct: sampleCustomers.length > 0 
-      ? (conversionsToRegular / sampleCustomers.length) * 100 
-      : 0,
+    avgTicketRepurchase,
+    avgDaysToFirstRepurchase,
+    conversionToRegularProduct,
   };
 };
 
@@ -151,50 +147,58 @@ export const calculateRepurchaseBehavior = (orders: ProcessedOrder[]): SampleMet
  * Calcula métricas de cross-sell
  */
 export const calculateCrossSellMetrics = (orders: ProcessedOrder[]): SampleMetrics['crossSell'] => {
-  const ordersWithSample = orders.filter(o => hasSampleProduct(o));
+  const ordersWithSample = orders.filter(o => isSampleOrder(o));
   
-  const onlySample = ordersWithSample.filter(o => o.produtos.length === 1).length;
-  const samplePlusOthers = ordersWithSample.filter(o => o.produtos.length > 1).length;
+  if (ordersWithSample.length === 0) {
+    return {
+      onlySample: 0,
+      samplePlusOthers: 0,
+      topProductsWithSample: [],
+      avgTicketSampleOnly: 0,
+      avgTicketSamplePlusOthers: 0,
+    };
+  }
   
-  // Produtos mais comprados junto com amostra
-  const productsWithSample: Record<string, { count: number; totalValue: number; orderCount: number }> = {};
+  // Pedidos com APENAS amostra (1 linha de produto)
+  const onlySampleOrders = ordersWithSample.filter(o => o.produtos.length === 1);
+  const onlySample = new Set(onlySampleOrders.map(o => o.cpfCnpj)).size;
   
-  ordersWithSample
-    .filter(o => o.produtos.length > 1)
-    .forEach(order => {
-      order.produtos
-        .filter(p => p.descricaoAjustada !== SAMPLE_IDENTIFIER)
-        .forEach(produto => {
-          const key = produto.descricaoAjustada;
-          if (!productsWithSample[key]) {
-            productsWithSample[key] = { count: 0, totalValue: 0, orderCount: 0 };
-          }
-          productsWithSample[key].count++;
-          productsWithSample[key].totalValue += order.valorTotal;
-          productsWithSample[key].orderCount++;
-        });
+  // Pedidos com amostra + outros (2+ linhas)
+  const samplePlusOrders = ordersWithSample.filter(o => o.produtos.length > 1);
+  const samplePlusOthers = new Set(samplePlusOrders.map(o => o.cpfCnpj)).size;
+  
+  // Produtos mais comprados junto (excluir amostras)
+  const productsWithSample: Record<string, { product: string; count: number; totalValue: number }> = {};
+  samplePlusOrders.forEach(order => {
+    order.produtos.forEach(produto => {
+      // Não contar produtos com preço muito baixo (amostras)
+      if (produto.preco > 1.00) {
+        const key = produto.descricaoAjustada;
+        if (!productsWithSample[key]) {
+          productsWithSample[key] = { product: key, count: 0, totalValue: 0 };
+        }
+        productsWithSample[key].count++;
+        productsWithSample[key].totalValue += order.valorTotal;
+      }
     });
+  });
   
-  const topProductsWithSample = Object.entries(productsWithSample)
-    .map(([product, data]) => ({
-      product,
-      count: data.count,
-      avgOrderValue: data.orderCount > 0 ? data.totalValue / data.orderCount : 0,
-    }))
+  const topProductsWithSample = Object.values(productsWithSample)
     .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+    .slice(0, 10)
+    .map(p => ({
+      product: p.product,
+      count: p.count,
+      avgOrderValue: p.count > 0 ? p.totalValue / p.count : 0
+    }));
   
   // Tickets médios
-  const avgTicketSampleOnly = onlySample > 0
-    ? ordersWithSample
-        .filter(o => o.produtos.length === 1)
-        .reduce((sum, o) => sum + o.valorTotal, 0) / onlySample
+  const avgTicketSampleOnly = onlySampleOrders.length > 0
+    ? onlySampleOrders.reduce((sum, o) => sum + o.valorTotal, 0) / onlySampleOrders.length
     : 0;
-  
-  const avgTicketSamplePlusOthers = samplePlusOthers > 0
-    ? ordersWithSample
-        .filter(o => o.produtos.length > 1)
-        .reduce((sum, o) => sum + o.valorTotal, 0) / samplePlusOthers
+    
+  const avgTicketSamplePlusOthers = samplePlusOrders.length > 0
+    ? samplePlusOrders.reduce((sum, o) => sum + o.valorTotal, 0) / samplePlusOrders.length
     : 0;
   
   return {
@@ -207,54 +211,64 @@ export const calculateCrossSellMetrics = (orders: ProcessedOrder[]): SampleMetri
 };
 
 /**
- * Calcula conversão por tempo
+ * Calcula taxa de conversão por período de tempo
  */
 export const calculateConversionByTime = (orders: ProcessedOrder[]): SampleMetrics['conversionByTime'] => {
   const customerMap = groupOrdersByCustomer(orders);
   const sampleCustomers = Array.from(customerMap.values()).filter(c => c.hasSample);
   
-  const now = new Date();
-  const timeframes = [30, 60, 90, 180];
-  const conversions: Record<string, number> = {};
+  const windows = [30, 60, 90, 180];
+  const result: SampleMetrics['conversionByTime'] = {
+    days30: 0,
+    days60: 0,
+    days90: 0,
+    days180: 0,
+  };
   
-  timeframes.forEach(days => {
-    const eligibleCustomers = sampleCustomers.filter(customer => {
-      if (!customer.sampleOrder) return false;
-      const daysSinceSample = differenceInDays(now, customer.sampleOrder.dataVenda);
-      return daysSinceSample >= days;
+  if (sampleCustomers.length === 0) return result;
+  
+  const now = new Date();
+  
+  windows.forEach((days, index) => {
+    let eligible = 0;
+    let converted = 0;
+    
+    sampleCustomers.forEach(customer => {
+      const sampleOrder = customer.sampleOrder;
+      if (!sampleOrder) return;
+      
+      const daysSinceSample = differenceInDays(now, sampleOrder.dataVenda);
+      
+      // Cliente só é elegível se teve tempo suficiente
+      if (daysSinceSample >= days) {
+        eligible++;
+        
+        // Verificar se recomprou dentro do período
+        const repurchased = customer.orders.some(order => {
+          if (order === sampleOrder) return false;
+          const daysAfterSample = differenceInDays(order.dataVenda, sampleOrder.dataVenda);
+          return daysAfterSample > 0 && daysAfterSample <= days;
+        });
+        
+        if (repurchased) converted++;
+      }
     });
     
-    if (eligibleCustomers.length === 0) {
-      conversions[`days${days}`] = 0;
-      return;
+    const rate = eligible > 0 ? (converted / eligible) * 100 : 0;
+    
+    switch (index) {
+      case 0: result.days30 = rate; break;
+      case 1: result.days60 = rate; break;
+      case 2: result.days90 = rate; break;
+      case 3: result.days180 = rate; break;
     }
-    
-    const conversionsInTimeframe = eligibleCustomers.filter(customer => {
-      const sortedOrders = customer.orders.sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
-      const sampleOrderIndex = sortedOrders.findIndex(o => hasSampleProduct(o));
-      
-      if (sampleOrderIndex < 0 || sortedOrders.length <= sampleOrderIndex + 1) return false;
-      
-      const sampleDate = sortedOrders[sampleOrderIndex].dataVenda;
-      const nextOrder = sortedOrders[sampleOrderIndex + 1];
-      const daysBetween = differenceInDays(nextOrder.dataVenda, sampleDate);
-      
-      return daysBetween <= days;
-    });
-    
-    conversions[`days${days}`] = (conversionsInTimeframe.length / eligibleCustomers.length) * 100;
   });
   
-  return {
-    days30: conversions.days30 || 0,
-    days60: conversions.days60 || 0,
-    days90: conversions.days90 || 0,
-    days180: conversions.days180 || 0,
-  };
+  return result;
 };
 
 /**
- * Calcula qualidade da recompra
+ * Calcula qualidade das recompras
  */
 export const calculateRepurchaseQuality = (orders: ProcessedOrder[]): SampleMetrics['quality'] => {
   const customerMap = groupOrdersByCustomer(orders);
@@ -268,34 +282,35 @@ export const calculateRepurchaseQuality = (orders: ProcessedOrder[]): SampleMetr
     };
   }
   
-  // Número médio de recompras
-  const totalRepurchases = sampleCustomers.reduce((sum, c) => sum + Math.max(0, c.totalOrders - 1), 0);
-  const avgRepurchasesPerCustomer = totalRepurchases / sampleCustomers.length;
-  
-  // LTV médio
-  const totalRevenue = sampleCustomers.reduce((sum, c) => sum + c.totalRevenue, 0);
-  const avgLTV = totalRevenue / sampleCustomers.length;
-  
-  // Produtos preferidos na recompra
-  const repurchaseProducts: Record<string, number> = {};
+  let totalRepurchases = 0;
+  let totalLTV = 0;
+  const repurchaseProducts: Record<string, { product: string; count: number }> = {};
   
   sampleCustomers.forEach(customer => {
-    const sortedOrders = customer.orders.sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
-    const sampleOrderIndex = sortedOrders.findIndex(o => hasSampleProduct(o));
+    const repurchaseCount = customer.totalOrders - 1; // Subtrai 1 para contar apenas recompras
+    totalRepurchases += Math.max(0, repurchaseCount);
+    totalLTV += customer.totalRevenue;
     
-    if (sampleOrderIndex >= 0) {
-      sortedOrders
-        .slice(sampleOrderIndex + 1)
-        .flatMap(o => o.produtos)
-        .forEach(produto => {
+    // Produtos das recompras (pedidos após o primeiro)
+    if (customer.orders.length >= 2) {
+      const sortedOrders = customer.orders.sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
+      const repurchaseOrders = sortedOrders.slice(1);
+      
+      repurchaseOrders.forEach(order => {
+        order.produtos.forEach(produto => {
           const key = produto.descricaoAjustada;
-          repurchaseProducts[key] = (repurchaseProducts[key] || 0) + 1;
+          if (!repurchaseProducts[key]) {
+            repurchaseProducts[key] = { product: key, count: 0 };
+          }
+          repurchaseProducts[key].count++;
         });
+      });
     }
   });
   
-  const topRepurchaseProducts = Object.entries(repurchaseProducts)
-    .map(([product, count]) => ({ product, count }))
+  const avgRepurchasesPerCustomer = sampleCustomers.length > 0 ? totalRepurchases / sampleCustomers.length : 0;
+  const avgLTV = sampleCustomers.length > 0 ? totalLTV / sampleCustomers.length : 0;
+  const topRepurchaseProducts = Object.values(repurchaseProducts)
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
   
@@ -307,35 +322,51 @@ export const calculateRepurchaseQuality = (orders: ProcessedOrder[]): SampleMetr
 };
 
 /**
- * Calcula perfil do comprador
+ * Calcula perfil do cliente que compra amostra
  */
 export const calculateCustomerProfile = (orders: ProcessedOrder[]): SampleMetrics['profile'] => {
-  const ordersWithSample = orders.filter(o => hasSampleProduct(o));
+  const ordersWithSample = orders.filter(o => isSampleOrder(o));
+  
+  if (ordersWithSample.length === 0) {
+    return {
+      platformDistribution: [],
+      shippingMethods: [],
+      avgFirstOrderValue: 0,
+    };
+  }
   
   // Distribuição por plataforma
   const platformCount: Record<string, number> = {};
   ordersWithSample.forEach(order => {
-    platformCount[order.ecommerce] = (platformCount[order.ecommerce] || 0) + 1;
+    const platform = order.ecommerce || 'Desconhecido';
+    platformCount[platform] = (platformCount[platform] || 0) + 1;
   });
   
   const platformDistribution = Object.entries(platformCount)
-    .map(([platform, count]) => ({ platform, count }))
+    .map(([platform, count]) => ({
+      platform,
+      count,
+      percentage: (count / ordersWithSample.length) * 100,
+    }))
     .sort((a, b) => b.count - a.count);
   
-  // Forma de envio
+  // Forma de envio preferida
   const shippingCount: Record<string, number> = {};
   ordersWithSample.forEach(order => {
-    shippingCount[order.formaEnvio] = (shippingCount[order.formaEnvio] || 0) + 1;
+    const method = order.formaEnvio || 'Desconhecido';
+    shippingCount[method] = (shippingCount[method] || 0) + 1;
   });
   
   const shippingMethods = Object.entries(shippingCount)
-    .map(([method, count]) => ({ method, count }))
+    .map(([method, count]) => ({
+      method,
+      count,
+    }))
     .sort((a, b) => b.count - a.count);
   
-  // Ticket médio do primeiro pedido
-  const avgFirstOrderValue = ordersWithSample.length > 0
-    ? ordersWithSample.reduce((sum, o) => sum + o.valorTotal, 0) / ordersWithSample.length
-    : 0;
+  // Ticket médio do pedido com amostra
+  const totalValue = ordersWithSample.reduce((sum, o) => sum + o.valorTotal, 0);
+  const avgFirstOrderValue = ordersWithSample.length > 0 ? totalValue / ordersWithSample.length : 0;
   
   return {
     platformDistribution,
@@ -345,30 +376,39 @@ export const calculateCustomerProfile = (orders: ProcessedOrder[]): SampleMetric
 };
 
 /**
- * Calcula análise de cesta
+ * Análise de cesta de compras
  */
 export const calculateBasketAnalysis = (orders: ProcessedOrder[]): SampleMetrics['basket'] => {
-  const ordersWithSample = orders.filter(o => hasSampleProduct(o));
+  const ordersWithSample = orders.filter(o => isSampleOrder(o));
   
-  // Tamanho médio do carrinho
-  const totalProducts = ordersWithSample.reduce((sum, o) => sum + o.produtos.length, 0);
-  const avgBasketSize = ordersWithSample.length > 0 ? totalProducts / ordersWithSample.length : 0;
+  if (ordersWithSample.length === 0) {
+    return {
+      avgBasketSize: 0,
+      topCombinations: [],
+    };
+  }
   
-  // Combinações mais frequentes
-  const combinations: Record<string, number> = {};
+  let totalItems = 0;
+  const combinations: Record<string, { product: string; count: number }> = {};
   
-  ordersWithSample
-    .filter(o => o.produtos.length > 1)
-    .forEach(order => {
-      order.produtos
-        .filter(p => p.descricaoAjustada !== SAMPLE_IDENTIFIER)
-        .forEach(produto => {
-          combinations[produto.descricaoAjustada] = (combinations[produto.descricaoAjustada] || 0) + 1;
-        });
-    });
+  ordersWithSample.forEach(order => {
+    totalItems += order.produtos.length;
+    
+    if (order.produtos.length > 1) {
+      const productNames = order.produtos
+        .map(p => p.descricaoAjustada)
+        .sort()
+        .join(' + ');
+      
+      if (!combinations[productNames]) {
+        combinations[productNames] = { product: productNames, count: 0 };
+      }
+      combinations[productNames].count++;
+    }
+  });
   
-  const topCombinations = Object.entries(combinations)
-    .map(([product, count]) => ({ product, count }))
+  const avgBasketSize = ordersWithSample.length > 0 ? totalItems / ordersWithSample.length : 0;
+  const topCombinations = Object.values(combinations)
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
   
@@ -379,11 +419,19 @@ export const calculateBasketAnalysis = (orders: ProcessedOrder[]): SampleMetrics
 };
 
 /**
- * Calcula segmentação de comportamento
+ * Segmentação comportamental de clientes
  */
 export const calculateBehaviorSegmentation = (orders: ProcessedOrder[]): SampleMetrics['segmentation'] => {
   const customerMap = groupOrdersByCustomer(orders);
   const sampleCustomers = Array.from(customerMap.values()).filter(c => c.hasSample);
+  
+  if (sampleCustomers.length === 0) {
+    return {
+      oneTime: 0,
+      explorers: 0,
+      loyal: 0,
+    };
+  }
   
   const oneTime = sampleCustomers.filter(c => c.totalOrders === 1).length;
   const explorers = sampleCustomers.filter(c => c.totalOrders >= 2 && c.totalOrders <= 3).length;
@@ -397,30 +445,41 @@ export const calculateBehaviorSegmentation = (orders: ProcessedOrder[]): SampleM
 };
 
 /**
- * Calcula análise temporal
+ * Análise temporal de vendas de amostras
  */
 export const calculateTemporalAnalysis = (orders: ProcessedOrder[]): SampleMetrics['temporal'] => {
-  const ordersWithSample = orders.filter(o => hasSampleProduct(o));
+  const ordersWithSample = orders.filter(o => isSampleOrder(o));
+  
+  if (ordersWithSample.length === 0) {
+    return {
+      monthlyData: [],
+    };
+  }
   
   // Agrupar por mês
   const monthlyCount: Record<string, number> = {};
-  
   ordersWithSample.forEach(order => {
-    const month = format(order.dataVenda, "yyyy-MM");
-    monthlyCount[month] = (monthlyCount[month] || 0) + 1;
+    const monthKey = format(order.dataVenda, 'yyyy-MM');
+    monthlyCount[monthKey] = (monthlyCount[monthKey] || 0) + 1;
   });
   
-  // Calcular taxa de crescimento
-  const sortedMonths = Object.keys(monthlyCount).sort();
-  const monthlyData = sortedMonths.map((month, index) => {
+  const months = Object.keys(monthlyCount).sort();
+  const monthlyData = months.map((month, index) => {
     const count = monthlyCount[month];
-    const previousCount = index > 0 ? monthlyCount[sortedMonths[index - 1]] : count;
-    const growthRate = previousCount > 0 ? ((count - previousCount) / previousCount) * 100 : 0;
+    let growthRate = 0;
+    
+    if (index > 0) {
+      const prevMonth = months[index - 1];
+      const prevCount = monthlyCount[prevMonth];
+      if (prevCount > 0) {
+        growthRate = ((count - prevCount) / prevCount) * 100;
+      }
+    }
     
     return {
       month,
       count,
-      growthRate,
+      growthRate
     };
   });
   
@@ -430,7 +489,30 @@ export const calculateTemporalAnalysis = (orders: ProcessedOrder[]): SampleMetri
 };
 
 /**
- * Calcula todas as métricas de amostras
+ * Calcula o período de análise dos dados
+ */
+export const calculateDataPeriod = (orders: ProcessedOrder[]) => {
+  if (orders.length === 0) {
+    return null;
+  }
+  
+  const dates = orders.map(o => o.dataVenda.getTime());
+  const minDate = new Date(Math.min(...dates));
+  const maxDate = new Date(Math.max(...dates));
+  
+  const monthsDiff = differenceInMonths(maxDate, minDate);
+  const isShortPeriod = monthsDiff < 3;
+  
+  return {
+    startDate: minDate,
+    endDate: maxDate,
+    totalMonths: monthsDiff,
+    isShortPeriod,
+  };
+};
+
+/**
+ * Calcula todas as métricas de amostra de uma vez
  */
 export const calculateAllSampleMetrics = (orders: ProcessedOrder[]): SampleMetrics => {
   return {
