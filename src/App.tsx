@@ -11,6 +11,7 @@ import Volume from "./pages/Volume";
 import Ads from "./pages/Ads";
 import PerformanceFinanceira from "./pages/PerformanceFinanceira";
 import ComportamentoCliente from "./pages/ComportamentoCliente";
+import AnaliseSamples from "./pages/AnaliseSamples";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
               <Route path="/ads" element={<Ads />} />
               <Route path="/performance-financeira" element={<PerformanceFinanceira />} />
               <Route path="/comportamento-cliente" element={<ComportamentoCliente />} />
+              <Route path="/analise-samples" element={<AnaliseSamples />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
