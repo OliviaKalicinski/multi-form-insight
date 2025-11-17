@@ -37,8 +37,8 @@ const Index = () => {
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">Dashboard de Marketing</h1>
-          <p className="text-muted-foreground">Análise completa das suas métricas</p>
+          <h1 className="text-4xl font-bold text-foreground">Uploader de Dados</h1>
+          <p className="text-muted-foreground">Carregue seus arquivos CSV para análise</p>
         </div>
 
         {/* Uploaders Section */}
@@ -102,7 +102,7 @@ const Index = () => {
               <Link to="/seguidores">
                 <Button className="w-full" variant="outline">
                   <Users className="mr-2 h-4 w-4" />
-                  Ver Análise de Seguidores
+                  Ver Análise do Instagram
                 </Button>
               </Link>
               <Link to="/ads">

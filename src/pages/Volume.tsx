@@ -48,7 +48,7 @@ export default function Volume() {
               📦 Produto & Operações
             </CardTitle>
             <CardDescription>
-              Carregue os dados de vendas na página "Visão Geral" para visualizar as análises de produtos.
+              Carregue os dados de vendas na página "Uploader" para visualizar as análises de produtos.
             </CardDescription>
           </CardHeader>
         </Card>

@@ -16,7 +16,7 @@ export const Navigation = () => {
         <Tabs value={currentPath} onValueChange={(path) => navigate(path)}>
           <TabsList className="h-12 bg-card/50 backdrop-blur-sm border rounded-lg">
             <TabsTrigger value="/" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              📊 Visão Geral
+              📊 Uploader
             </TabsTrigger>
             <TabsTrigger value="/performance-financeira" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               💰 Performance Financeira
@@ -25,7 +25,7 @@ export const Navigation = () => {
               👥 Comportamento do Cliente
             </TabsTrigger>
             <TabsTrigger value="/seguidores" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              📈 Seguidores
+              📈 Instagram
             </TabsTrigger>
             <TabsTrigger value="/volume" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               📦 Produto & Operações
