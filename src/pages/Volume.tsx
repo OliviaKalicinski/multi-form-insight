@@ -4,7 +4,6 @@ import { Package, ListTree } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
-import { ProductOperationsSummaryCards } from "@/components/dashboard/ProductOperationsSummaryCards";
 import { TopProductsTable } from "@/components/dashboard/TopProductsTable";
 import { SKUAnalysisTable } from "@/components/dashboard/SKUAnalysisTable";
 import { ProductCombinationsTable } from "@/components/dashboard/ProductCombinationsTable";
@@ -112,13 +111,6 @@ export default function Volume() {
           </Button>
         </div>
       </div>
-
-      {productMetrics && (
-        <ProductOperationsSummaryCards 
-          metrics={productMetrics} 
-          viewMode={viewMode}
-        />
-      )}
 
       <Tabs defaultValue="ranking" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
