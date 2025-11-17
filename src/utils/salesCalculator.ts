@@ -1,28 +1,7 @@
 import { format, parse } from "date-fns";
 import { SalesData, ProcessedOrder, SalesMetrics } from "@/types/marketing";
 
-import { normalizeProductName, getKitType } from './productNormalizer';
-
-/**
- * Ajusta descrição do produto duplicado "Comida de Dragão"
- * Se preço = 0.01, é o "Kit de amostras"
- */
-export const adjustProductDescription = (descricao: string, preco: number): string => {
-  // Caso especial: Kit de amostras (preço R$ 0,01)
-  const isComidaDragao = descricao.includes("Comida de Dragão - Original® - 90g - Compra única");
-  if (isComidaDragao && Math.abs(preco - 0.01) < 0.001) {
-    return "Kit de amostras - Comida de Dragão";
-  }
-  
-  // Verificar se é kit conhecido e normalizar
-  const kitType = getKitType(descricao);
-  if (kitType) {
-    return kitType;
-  }
-  
-  // Para produtos não-kit, aplicar normalização padrão
-  return normalizeProductName(descricao);
-};
+import { standardizeProductName } from './productNormalizer';
 
 /**
  * Processa dados brutos do CSV e agrupa por pedido único
@@ -55,7 +34,7 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
           {
             sku: row["Código (SKU)"],
             descricao: row["Descrição do produto"],
-            descricaoAjustada: adjustProductDescription(row["Descrição do produto"], preco),
+            descricaoAjustada: standardizeProductName(row["Descrição do produto"], preco),
             preco,
             quantidade,
           },
@@ -73,7 +52,7 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
       pedido.produtos.push({
         sku: row["Código (SKU)"],
         descricao: row["Descrição do produto"],
-        descricaoAjustada: adjustProductDescription(row["Descrição do produto"], preco),
+        descricaoAjustada: standardizeProductName(row["Descrição do produto"], preco),
         preco,
         quantidade,
       });
@@ -82,6 +61,17 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
 
   const result = Array.from(pedidosMap.values());
   console.log(`📦 Total de pedidos únicos: ${result.length}`);
+  
+  // Log de exemplos de padronização
+  console.log('🏷️ Exemplos de padronização:');
+  const samples = result.slice(0, 5).flatMap(order => 
+    order.produtos.map(p => ({
+      original: p.descricao,
+      padronizado: p.descricaoAjustada,
+      preco: p.preco
+    }))
+  );
+  console.table(samples);
   
   return result;
 };

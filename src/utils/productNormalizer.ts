@@ -1,5 +1,67 @@
 /**
- * Normaliza nomes de produtos para agrupamento
+ * Padroniza nomes de produtos conforme as regras do guia
+ * Converte 37+ variações em 12 produtos padronizados
+ * REGRA ESPECIAL: Amostras por preço (R$ 0,01 a R$ 1,00) → "Kit de Amostras"
+ */
+export const standardizeProductName = (name: string, price: number): string => {
+  const desc = name.toLowerCase();
+  
+  // REGRA ESPECIAL (PRIORIDADE 1): Amostras por preço
+  if (price >= 0.01 && price <= 1.00) {
+    return 'Kit de Amostras';
+  }
+  
+  // Comida de Dragão - Original
+  if (desc.includes('comida') && desc.includes('original')) {
+    if (desc.includes('kit') || desc.includes('3')) {
+      return 'Kit Comida de Dragão - Original (3x90g)';
+    }
+    return 'Comida de Dragão - Original (90g)';
+  }
+  
+  // Kit Completo
+  if (desc.includes('kit completo') || (desc.includes('kit') && desc.includes('completo'))) {
+    return 'Kit Completo (3 produtos)';
+  }
+  
+  // Mordida Spirulina
+  if (desc.includes('mordida') && desc.includes('spirulina')) {
+    if (desc.includes('kit') || desc.includes('3 pacotes') || desc.includes('540')) {
+      return 'Kit Mordida de Dragão - Spirulina (3x180g)';
+    }
+    return 'Mordida de Dragão - Spirulina (180g)';
+  }
+  
+  // Mordida Legumes
+  if (desc.includes('mordida') && desc.includes('legumes')) {
+    if (desc.includes('kit') || desc.includes('3 pacotes') || desc.includes('540')) {
+      return 'Kit Mordida de Dragão - Legumes (3x180g)';
+    }
+    return 'Mordida de Dragão - Legumes (180g)';
+  }
+  
+  // Kit Mordida Mix (descrição exata)
+  if (name.trim() === 'Kit Mordida de Dragão') {
+    return 'Kit Mordida de Dragão Mix (2 produtos)';
+  }
+  
+  // Suplementos
+  if (desc.includes('suplemento concentrado')) {
+    return 'Suplemento Concentrado para Cães (200g)';
+  }
+  if (desc.includes('suplemento integral')) {
+    return 'Suplemento Integral para Cães (180g)';
+  }
+  if (desc.includes('suplemento para gatos')) {
+    return 'Suplemento para Gatos (180g)';
+  }
+  
+  // Fallback: usar normalização básica
+  return normalizeProductName(name);
+};
+
+/**
+ * Normaliza nomes de produtos para agrupamento (versão básica)
  * Remove variações de SKU, plano, peso, etc.
  */
 export const normalizeProductName = (name: string): string => {
