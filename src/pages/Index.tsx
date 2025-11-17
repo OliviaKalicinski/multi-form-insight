@@ -14,11 +14,14 @@ import { NewFollowersChart } from "@/components/dashboard/NewFollowersChart";
 import { CSVUploader } from "@/components/dashboard/CSVUploader";
 import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
 import { AdsUploader } from "@/components/dashboard/AdsUploader";
+import { SalesUploader } from "@/components/dashboard/SalesUploader";
+import { SalesMetricCard } from "@/components/dashboard/SalesMetricCard";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage } from "@/utils/metricsCalculator";
 import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNumber, formatFollowersGrowth } from "@/utils/followersCalculator";
 import { calculateAdsMetrics, filterAdsByMonth } from "@/utils/adsCalculator";
-import { MarketingData, FollowersData, AdsData } from "@/types/marketing";
+import { calculateSalesMetrics, filterOrdersByMonth, formatCurrency, formatPercentage as formatSalesPercentage, formatQuantity } from "@/utils/salesCalculator";
+import { MarketingData, FollowersData, AdsData, ProcessedOrder } from "@/types/marketing";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLast12Months, getPrevious12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
@@ -38,11 +41,13 @@ const Index = () => {
     marketingData,
     followersData,
     adsData,
+    salesData,
     selectedMonth,
     availableMonths,
     setMarketingData,
     setFollowersData,
     setAdsData,
+    setSalesData,
     setSelectedMonth,
     comparisonMode,
     selectedMonths,
@@ -240,6 +245,10 @@ const Index = () => {
     setAdsData(data, summaries, isHierarchical);
   };
 
+  const handleSalesDataLoaded = (data: ProcessedOrder[], fileName: string) => {
+    setSalesData(data);
+  };
+
   // Aggregate data by month for 12-month view
   const monthlyMarketingData = useMemo(() => {
     if (!isLast12MonthsView) return [];
@@ -266,15 +275,28 @@ const Index = () => {
   const hasMarketingData = marketingData.length > 0;
   const hasFollowersData = followersData.length > 0;
   const hasAdsData = adsData.length > 0;
-  const hasAnyData = hasMarketingData || hasFollowersData || hasAdsData;
+  const hasSalesData = salesData.length > 0;
+  const hasAnyData = hasMarketingData || hasFollowersData || hasAdsData || hasSalesData;
+
+  // Filter and calculate sales metrics
+  const currentMonthSalesData = useMemo(() => {
+    if (!selectedMonth || !hasSalesData) return [];
+    return filterOrdersByMonth(salesData, selectedMonth);
+  }, [salesData, selectedMonth, hasSalesData]);
+
+  const currentSalesMetrics = useMemo(() => {
+    if (currentMonthSalesData.length === 0) return null;
+    return calculateSalesMetrics(currentMonthSalesData);
+  }, [currentMonthSalesData]);
 
   return (
     <div className="container mx-auto p-6 space-y-8">
       {/* CSV Uploaders */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <CSVUploader onDataLoaded={handleDataLoaded} />
         <FollowersUploader onDataLoaded={handleFollowersDataLoaded} />
         <AdsUploader onDataLoaded={handleAdsDataLoaded} />
+        <SalesUploader onDataLoaded={handleSalesDataLoaded} />
       </div>
 
       {/* Welcome message when no data */}
@@ -288,7 +310,7 @@ const Index = () => {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              📊 CSV de Marketing • 👥 CSV de Seguidores • 📢 CSV de Anúncios Meta
+              📊 CSV de Marketing • 👥 CSV de Seguidores • 📢 CSV de Anúncios Meta • 🛒 CSV de Vendas
             </p>
           </CardContent>
         </Card>
@@ -648,6 +670,51 @@ const Index = () => {
                   description="Crescimento mensal da base de seguidores"
                 />
               </div>
+            )}
+
+            {/* Sales Performance Section */}
+            {hasSalesData && currentSalesMetrics && !comparisonMode && (
+              <>
+                <div className="col-span-full flex items-center gap-2 mt-8">
+                  <ShoppingBag className="w-6 h-6 text-primary" />
+                  <h2 className="text-2xl font-bold text-foreground">Performance de Vendas</h2>
+                </div>
+
+                <div className="col-span-full grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+                  <SalesMetricCard
+                    title="Faturamento Total"
+                    value={formatCurrency(currentSalesMetrics.faturamentoTotal)}
+                    icon={DollarSign}
+                    subtitle="No período selecionado"
+                    variant="success"
+                  />
+                  <SalesMetricCard
+                    title="Total de Pedidos"
+                    value={formatQuantity(currentSalesMetrics.totalPedidos)}
+                    icon={ShoppingCart}
+                    subtitle="Pedidos únicos"
+                  />
+                  <SalesMetricCard
+                    title="Ticket Médio"
+                    value={formatCurrency(currentSalesMetrics.ticketMedio)}
+                    icon={TrendingUp}
+                    subtitle="Por pedido"
+                  />
+                  <SalesMetricCard
+                    title="Clientes Únicos"
+                    value={formatQuantity(currentSalesMetrics.totalClientes)}
+                    icon={Users}
+                    subtitle="Compradores diferentes"
+                  />
+                  <SalesMetricCard
+                    title="Taxa de Recompra"
+                    value={formatSalesPercentage(currentSalesMetrics.taxaRecompra)}
+                    icon={Heart}
+                    subtitle="Clientes que compraram 2+ vezes"
+                    variant={currentSalesMetrics.taxaRecompra > 20 ? "success" : "default"}
+                  />
+                </div>
+              </>
             )}
           </>
         ) : null}

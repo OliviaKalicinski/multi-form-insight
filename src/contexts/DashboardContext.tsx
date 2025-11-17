@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useMemo, ReactNode } from "react";
-import { MarketingData, FollowersData, AdsData, AdsMonthSummary } from "@/types/marketing";
+import { MarketingData, FollowersData, AdsData, AdsMonthSummary, ProcessedOrder } from "@/types/marketing";
 import { extractAvailableMonths } from "@/utils/adsParserV2";
+import { format } from "date-fns";
 
 interface DashboardContextType {
   marketingData: MarketingData[];
@@ -8,6 +9,7 @@ interface DashboardContextType {
   adsData: AdsData[];
   monthlySummaries: AdsMonthSummary[];
   hasHierarchicalFormat: boolean;
+  salesData: ProcessedOrder[];
   selectedMonth: string;
   availableMonths: string[];
   comparisonMode: boolean;
@@ -15,6 +17,7 @@ interface DashboardContextType {
   setMarketingData: (data: MarketingData[]) => void;
   setFollowersData: (data: FollowersData[]) => void;
   setAdsData: (data: AdsData[], summaries?: AdsMonthSummary[], isHierarchical?: boolean) => void;
+  setSalesData: (data: ProcessedOrder[]) => void;
   setSelectedMonth: (month: string) => void;
   setComparisonMode: (enabled: boolean) => void;
   setSelectedMonths: (months: string[]) => void;
@@ -29,6 +32,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [adsData, setAdsDataState] = useState<AdsData[]>([]);
   const [monthlySummaries, setMonthlySummaries] = useState<AdsMonthSummary[]>([]);
   const [hasHierarchicalFormat, setHasHierarchicalFormat] = useState<boolean>(false);
+  const [salesData, setSalesDataState] = useState<ProcessedOrder[]>([]);
   const [selectedMonth, setSelectedMonthState] = useState<string>("");
   const [comparisonMode, setComparisonModeState] = useState<boolean>(false);
   const [selectedMonths, setSelectedMonthsState] = useState<string[]>([]);
@@ -51,10 +55,16 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     const adsMonths = extractAvailableMonths(adsData);
     adsMonths.forEach(month => months.add(month));
     
+    // Adicionar meses dos dados de vendas
+    salesData.forEach((order) => {
+      const month = format(order.dataVenda, "yyyy-MM");
+      months.add(month);
+    });
+    
     const result = Array.from(months).sort();
     console.log('📊 Available months calculated:', result);
     return result;
-  }, [marketingData, followersData, adsData]);
+  }, [marketingData, followersData, adsData, salesData]);
 
   // Auto-select latest month when data changes or month is not selected
   useMemo(() => {
@@ -78,6 +88,11 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setAdsDataState(data);
     setMonthlySummaries(summaries);
     setHasHierarchicalFormat(isHierarchical);
+    setSelectedMonthState("");
+  };
+
+  const setSalesData = (data: ProcessedOrder[]) => {
+    setSalesDataState(data);
     setSelectedMonthState("");
   };
 
@@ -106,6 +121,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     adsData,
     monthlySummaries,
     hasHierarchicalFormat,
+    salesData,
     selectedMonth,
     availableMonths,
     comparisonMode,
@@ -113,6 +129,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setMarketingData,
     setFollowersData,
     setAdsData,
+    setSalesData,
     setSelectedMonth: setSelectedMonthState,
     setComparisonMode,
     setSelectedMonths: setSelectedMonthsState,
