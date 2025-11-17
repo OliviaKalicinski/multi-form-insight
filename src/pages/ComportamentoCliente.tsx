@@ -9,19 +9,42 @@ import { OrderVolumeChart } from "@/components/dashboard/OrderVolumeChart";
 import { SalesPeaksChart } from "@/components/dashboard/SalesPeaksChart";
 import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
 import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
+import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
+import { MonthFilter } from "@/components/dashboard/MonthFilter";
+import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { calculateCustomerBehaviorMetrics } from "@/utils/customerBehaviorMetrics";
-import { formatCurrency } from "@/utils/salesCalculator";
+import { formatCurrency, filterOrdersByMonth } from "@/utils/salesCalculator";
 
 export default function ComportamentoCliente() {
-  const { salesData } = useDashboard();
+  const {
+    salesData,
+    selectedMonth,
+    availableMonths,
+    comparisonMode,
+    selectedMonths,
+    setSelectedMonth,
+    setComparisonMode,
+    toggleMonth,
+  } = useDashboard();
 
   const [volumeView, setVolumeView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
-  // Calcular métricas usando TODOS os dados (não filtrar por mês)
+  // Calcular métricas usando TODOS os dados (para análises históricas: churn, recompra, segmentação)
   const behaviorMetrics = useMemo(() => {
     if (salesData.length === 0) return null;
     return calculateCustomerBehaviorMetrics(salesData);
   }, [salesData]);
+
+  // Calcular métricas filtradas (para análises de período: volume, picos)
+  const filteredMetrics = useMemo(() => {
+    if (salesData.length === 0 || !selectedMonth) return behaviorMetrics;
+    
+    const filteredOrders = selectedMonth === 'last-12-months' 
+      ? salesData 
+      : filterOrdersByMonth(salesData, selectedMonth);
+    
+    return calculateCustomerBehaviorMetrics(filteredOrders);
+  }, [salesData, selectedMonth, behaviorMetrics]);
 
   if (salesData.length === 0) {
     return (
@@ -55,6 +78,38 @@ export default function ComportamentoCliente() {
           </div>
         </div>
       </div>
+
+      {/* Filtros */}
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+        {comparisonMode ? (
+          <MonthComparisonSelector
+            availableMonths={availableMonths}
+            selectedMonths={selectedMonths}
+            onToggleMonth={toggleMonth}
+          />
+        ) : (
+          <MonthFilter
+            availableMonths={availableMonths}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+          />
+        )}
+        <ComparisonToggle 
+          enabled={comparisonMode} 
+          onToggle={setComparisonMode} 
+        />
+      </div>
+
+      {/* Indicador de período */}
+      <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+        <CardContent className="py-3">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            💡 <strong>Nota:</strong> As métricas de <strong>Churn</strong>, <strong>Taxa de Recompra</strong> e <strong>Segmentação</strong> 
+            usam o histórico completo de dados. As análises de <strong>Volume de Pedidos</strong> e <strong>Picos de Vendas</strong> 
+            consideram o período selecionado no filtro acima.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Cards resumo */}
       {behaviorMetrics && (
@@ -128,6 +183,11 @@ export default function ComportamentoCliente() {
               <CardTitle>Volume de Pedidos ao Longo do Tempo</CardTitle>
               <CardDescription>
                 Acompanhe a evolução do número de pedidos
+                {selectedMonth && selectedMonth !== 'last-12-months' && (
+                  <span className="block text-xs text-primary mt-1">
+                    📅 Período: {selectedMonth}
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -153,14 +213,14 @@ export default function ComportamentoCliente() {
                   </button>
                 </div>
                 
-                <OrderVolumeChart
-                  data={
-                    volumeView === 'daily' ? behaviorMetrics?.pedidosPorDia || [] :
-                    volumeView === 'weekly' ? behaviorMetrics?.pedidosPorSemana.map(w => ({ date: w.week, orders: w.orders })) || [] :
-                    behaviorMetrics?.pedidosPorMes.map(m => ({ date: m.month, orders: m.orders })) || []
-                  }
-                  viewMode={volumeView}
-                />
+              <OrderVolumeChart
+                data={
+                  volumeView === 'daily' ? filteredMetrics?.pedidosPorDia || [] :
+                  volumeView === 'weekly' ? filteredMetrics?.pedidosPorSemana.map(w => ({ date: w.week, orders: w.orders })) || [] :
+                  filteredMetrics?.pedidosPorMes.map(m => ({ date: m.month, orders: m.orders })) || []
+                }
+                viewMode={volumeView}
+              />
               </div>
             </CardContent>
           </Card>
@@ -173,11 +233,16 @@ export default function ComportamentoCliente() {
               <CardTitle>Análise de Picos de Vendas</CardTitle>
               <CardDescription>
                 Dias com volume acima da média + 2 desvios padrão
+                {selectedMonth && selectedMonth !== 'last-12-months' && (
+                  <span className="block text-xs text-primary mt-1">
+                    📅 Período: {selectedMonth}
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <SalesPeaksChart
-                peaks={behaviorMetrics?.picosVendas || []}
+                peaks={filteredMetrics?.picosVendas || []}
               />
             </CardContent>
           </Card>
