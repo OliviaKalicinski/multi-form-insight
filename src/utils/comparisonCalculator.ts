@@ -49,16 +49,19 @@ export const calculateMultiMonthMetrics = (
     const color = getMonthColor(month, selectedMonths);
     const monthLabel = formatMonthLabel(month);
 
-    // Calcular mudança percentual em relação ao mês anterior
+    // Calcular métricas do mês anterior
     const prevIndex = index - 1;
-    let percentageChange: number | undefined = undefined;
+    let prevMetrics = null;
     if (prevIndex >= 0) {
       const prevMonth = selectedMonths[prevIndex];
       const prevMonthData = data.filter(item => item.Data.startsWith(prevMonth));
-      const prevMetrics = calculateMonthlyMetrics(prevMonthData);
-      if (prevMetrics.visualizacoesTotal > 0) {
-        percentageChange = ((metrics.visualizacoesTotal - prevMetrics.visualizacoesTotal) / prevMetrics.visualizacoesTotal) * 100;
-      }
+      prevMetrics = calculateMonthlyMetrics(prevMonthData);
+    }
+
+    // VISUALIZAÇÕES - cálculo específico
+    let visualizacoesChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.visualizacoesTotal > 0) {
+      visualizacoesChange = ((metrics.visualizacoesTotal - prevMetrics.visualizacoesTotal) / prevMetrics.visualizacoesTotal) * 100;
     }
 
     visualizacoes.push({
@@ -66,39 +69,63 @@ export const calculateMultiMonthMetrics = (
       monthLabel,
       value: metrics.visualizacoesTotal,
       color,
-      percentageChange,
+      percentageChange: visualizacoesChange,
     });
+
+    // ALCANCE - cálculo específico
+    let alcanceChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.alcanceTotal > 0) {
+      alcanceChange = ((metrics.alcanceTotal - prevMetrics.alcanceTotal) / prevMetrics.alcanceTotal) * 100;
+    }
 
     alcance.push({
       month,
       monthLabel,
       value: metrics.alcanceTotal,
       color,
-      percentageChange,
+      percentageChange: alcanceChange,
     });
+
+    // VISITAS - cálculo específico
+    let visitasChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.visitasTotal > 0) {
+      visitasChange = ((metrics.visitasTotal - prevMetrics.visitasTotal) / prevMetrics.visitasTotal) * 100;
+    }
 
     visitas.push({
       month,
       monthLabel,
       value: metrics.visitasTotal,
       color,
-      percentageChange,
+      percentageChange: visitasChange,
     });
+
+    // INTERAÇÕES - cálculo específico
+    let interacoesChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.interacoesTotal > 0) {
+      interacoesChange = ((metrics.interacoesTotal - prevMetrics.interacoesTotal) / prevMetrics.interacoesTotal) * 100;
+    }
 
     interacoes.push({
       month,
       monthLabel,
       value: metrics.interacoesTotal,
       color,
-      percentageChange,
+      percentageChange: interacoesChange,
     });
+
+    // CLICKS - cálculo específico
+    let clicksChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.clicksTotal > 0) {
+      clicksChange = ((metrics.clicksTotal - prevMetrics.clicksTotal) / prevMetrics.clicksTotal) * 100;
+    }
 
     clicks.push({
       month,
       monthLabel,
       value: metrics.clicksTotal,
       color,
-      percentageChange,
+      percentageChange: clicksChange,
     });
 
     // Identificar melhor e pior mês baseado em visualizações
@@ -138,16 +165,19 @@ export const calculateFollowersMultiMonthMetrics = (
     const color = getMonthColor(month, selectedMonths);
     const monthLabel = formatMonthLabel(month);
 
-    // Calcular mudança percentual em relação ao mês anterior
+    // Calcular métricas do mês anterior
     const prevIndex = index - 1;
-    let percentageChange: number | undefined = undefined;
+    let prevMetrics = null;
     if (prevIndex >= 0) {
       const prevMonth = selectedMonths[prevIndex];
       const prevMonthData = data.filter(item => item.Data.startsWith(prevMonth));
-      const prevMetrics = calculateFollowersMetrics(prevMonthData, data, prevMonth);
-      if (prevMetrics.totalSeguidores > 0) {
-        percentageChange = ((metrics.totalSeguidores - prevMetrics.totalSeguidores) / prevMetrics.totalSeguidores) * 100;
-      }
+      prevMetrics = calculateFollowersMetrics(prevMonthData, data, prevMonth);
+    }
+
+    // TOTAL DE SEGUIDORES - cálculo específico
+    let totalSeguidoresChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.totalSeguidores > 0) {
+      totalSeguidoresChange = ((metrics.totalSeguidores - prevMetrics.totalSeguidores) / prevMetrics.totalSeguidores) * 100;
     }
 
     totalSeguidores.push({
@@ -155,23 +185,30 @@ export const calculateFollowersMultiMonthMetrics = (
       monthLabel,
       value: metrics.totalSeguidores,
       color,
-      percentageChange,
+      percentageChange: totalSeguidoresChange,
     });
+
+    // NOVOS SEGUIDORES - cálculo específico
+    let novosSeguidoresChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.novosSeguidoresMes > 0) {
+      novosSeguidoresChange = ((metrics.novosSeguidoresMes - prevMetrics.novosSeguidoresMes) / prevMetrics.novosSeguidoresMes) * 100;
+    }
 
     novosSeguidores.push({
       month,
       monthLabel,
       value: metrics.novosSeguidoresMes,
       color,
-      percentageChange,
+      percentageChange: novosSeguidoresChange,
     });
 
+    // CRESCIMENTO - já é um percentual, não precisa comparar com mês anterior
     crescimento.push({
       month,
       monthLabel,
       value: metrics.crescimentoPercentual,
       color,
-      percentageChange,
+      percentageChange: undefined,
     });
   });
 
@@ -200,16 +237,19 @@ export const calculateAdsMultiMonthMetrics = (
     const color = getMonthColor(month, selectedMonths);
     const monthLabel = formatMonthLabel(month);
 
-    // Calcular mudança percentual em relação ao mês anterior
+    // Calcular métricas do mês anterior
     const prevIndex = index - 1;
-    let percentageChange: number | undefined = undefined;
+    let prevMetrics = null;
     if (prevIndex >= 0) {
       const prevMonth = selectedMonths[prevIndex];
       const prevMonthData = filterFn(data, prevMonth);
-      const prevMetrics = calculateAdsMetrics(prevMonthData);
-      if (prevMetrics.investimentoTotal > 0) {
-        percentageChange = ((metrics.investimentoTotal - prevMetrics.investimentoTotal) / prevMetrics.investimentoTotal) * 100;
-      }
+      prevMetrics = calculateAdsMetrics(prevMonthData);
+    }
+
+    // INVESTIMENTO - cálculo específico
+    let investimentoChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.investimentoTotal > 0) {
+      investimentoChange = ((metrics.investimentoTotal - prevMetrics.investimentoTotal) / prevMetrics.investimentoTotal) * 100;
     }
 
     investimento.push({
@@ -217,39 +257,63 @@ export const calculateAdsMultiMonthMetrics = (
       monthLabel,
       value: metrics.investimentoTotal,
       color,
-      percentageChange,
+      percentageChange: investimentoChange,
     });
+
+    // ROAS - cálculo específico
+    let roasChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.roas > 0) {
+      roasChange = ((metrics.roas - prevMetrics.roas) / prevMetrics.roas) * 100;
+    }
 
     roas.push({
       month,
       monthLabel,
       value: metrics.roas,
       color,
-      percentageChange,
+      percentageChange: roasChange,
     });
+
+    // COMPRAS - cálculo específico
+    let comprasChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.comprasTotal > 0) {
+      comprasChange = ((metrics.comprasTotal - prevMetrics.comprasTotal) / prevMetrics.comprasTotal) * 100;
+    }
 
     compras.push({
       month,
       monthLabel,
       value: metrics.comprasTotal,
       color,
-      percentageChange,
+      percentageChange: comprasChange,
     });
+
+    // CPC - cálculo específico
+    let cpcChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.cpcMedio > 0) {
+      cpcChange = ((metrics.cpcMedio - prevMetrics.cpcMedio) / prevMetrics.cpcMedio) * 100;
+    }
 
     cpc.push({
       month,
       monthLabel,
       value: metrics.cpcMedio,
       color,
-      percentageChange,
+      percentageChange: cpcChange,
     });
+
+    // TAXA DE CONVERSÃO - cálculo específico
+    let taxaConversaoChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.taxaConversao > 0) {
+      taxaConversaoChange = ((metrics.taxaConversao - prevMetrics.taxaConversao) / prevMetrics.taxaConversao) * 100;
+    }
 
     taxaConversao.push({
       month,
       monthLabel,
       value: metrics.taxaConversao,
       color,
-      percentageChange,
+      percentageChange: taxaConversaoChange,
     });
   });
 
