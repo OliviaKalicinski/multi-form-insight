@@ -356,8 +356,12 @@ export const calculateProductOperationsMetrics = (
     percentualFaturamento: 0, // Será recalculado
   }));
 
-  // ✅ Mesclar e reordenar por quantidade
-  const mergedByQuantity = [...topByQuantity, ...freebieAsRanking]
+  // ✅ Filtrar brindes dos arrays originais para evitar duplicação
+  const regularProductsByQuantity = topByQuantity.filter(p => p.ticketMedio > 0.02);
+  const regularProductsByRevenue = topByRevenue.filter(p => p.ticketMedio > 0.02);
+
+  // ✅ Mesclar produtos regulares + brindes e reordenar por quantidade
+  const mergedByQuantity = [...regularProductsByQuantity, ...freebieAsRanking]
     .sort((a, b) => b.quantidadeTotal - a.quantidadeTotal);
 
   // Recalcular percentuais de quantidade
@@ -366,8 +370,8 @@ export const calculateProductOperationsMetrics = (
     p.percentualQuantidade = (p.quantidadeTotal / totalQuantity) * 100;
   });
 
-  // ✅ Mesclar e reordenar por faturamento
-  const mergedByRevenue = [...topByRevenue, ...freebieAsRanking]
+  // ✅ Mesclar produtos regulares + brindes e reordenar por faturamento
+  const mergedByRevenue = [...regularProductsByRevenue, ...freebieAsRanking]
     .sort((a, b) => b.faturamentoTotal - a.faturamentoTotal);
 
   // Recalcular percentuais de faturamento
