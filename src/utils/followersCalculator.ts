@@ -59,3 +59,10 @@ export const formatFollowersNumber = (num: number): string => {
 export const formatFollowersGrowth = (num: number): string => {
   return num >= 0 ? `+${num.toLocaleString("pt-BR")}` : num.toLocaleString("pt-BR");
 };
+
+export const extractDailyFollowers = (data: FollowersData[]): { date: string; value: number }[] => {
+  return data.map(item => ({
+    date: item.Data.substring(0, 10),
+    value: parseInt(item.Seguidores),
+  }));
+};

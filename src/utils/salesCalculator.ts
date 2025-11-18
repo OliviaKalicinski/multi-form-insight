@@ -249,3 +249,31 @@ export const formatPercentage = (value: number): string => {
 export const formatQuantity = (value: number): string => {
   return new Intl.NumberFormat("pt-BR").format(value);
 };
+
+/**
+ * Extrair dados diários de receita
+ */
+export const extractDailyRevenue = (orders: ProcessedOrder[]): { date: string; value: number }[] => {
+  const dailyMap = new Map<string, number>();
+  
+  orders.forEach(order => {
+    const dateKey = format(order.dataVenda, 'yyyy-MM-dd');
+    dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + order.valorTotal);
+  });
+  
+  return Array.from(dailyMap.entries()).map(([date, value]) => ({ date, value }));
+};
+
+/**
+ * Extrair dados diários de pedidos
+ */
+export const extractDailyOrders = (orders: ProcessedOrder[]): { date: string; value: number }[] => {
+  const dailyMap = new Map<string, number>();
+  
+  orders.forEach(order => {
+    const dateKey = format(order.dataVenda, 'yyyy-MM-dd');
+    dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + 1);
+  });
+  
+  return Array.from(dailyMap.entries()).map(([date, value]) => ({ date, value }));
+};

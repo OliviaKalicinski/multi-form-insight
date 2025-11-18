@@ -11,12 +11,13 @@ import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateCh
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNumber, formatFollowersGrowth } from "@/utils/followersCalculator";
-import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage } from "@/utils/metricsCalculator";
+import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNumber, formatFollowersGrowth, extractDailyFollowers } from "@/utils/followersCalculator";
+import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage, extractDailyValues } from "@/utils/metricsCalculator";
 import { aggregateFollowersByMonth, aggregateMarketingByMonth } from "@/utils/monthlyAggregator";
 import { getLast12Months, getPrevious12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
 import { MarketingData, FollowersData } from "@/types/marketing";
 import { calculateFollowersMultiMonthMetrics, calculateMultiMonthMetrics, prepareFollowersComparisonChartData, prepareMarketingComparisonChartData, getMonthColor, formatMonthLabel } from "@/utils/comparisonCalculator";
+import { detectIncompleteMonth, calculateProjection } from "@/utils/incompleteMonthDetector";
 
 const Seguidores = () => {
   const {
@@ -134,6 +135,41 @@ const Seguidores = () => {
     return metrics;
   }, [currentMonthFollowersData, previousMonthFollowersData, followersData, selectedMonth, availableMonths, isLast12MonthsView, last12Months]);
 
+  // Detect incomplete month and calculate projections
+  const monthInfo = useMemo(() => 
+    detectIncompleteMonth(selectedMonth || ''), 
+    [selectedMonth]
+  );
+
+  const dailyFollowers = useMemo(() => 
+    extractDailyFollowers(currentMonthFollowersData),
+    [currentMonthFollowersData]
+  );
+
+  const followersProjection = useMemo(() => {
+    if (!monthInfo.isIncomplete || previousMonthFollowersData.length === 0) return null;
+    
+    const currentIndex = availableMonths.indexOf(selectedMonth || '');
+    if (currentIndex <= 0) return null;
+    
+    const previousMonth = availableMonths[currentIndex - 1];
+    const previousMonthStr = previousMonth.slice(0, 7);
+    
+    const previousMetrics = calculateFollowersMetrics(
+      previousMonthFollowersData, 
+      followersData, 
+      previousMonthStr
+    );
+    
+    return calculateProjection(
+      currentFollowersMetrics.novosSeguidoresMes,
+      previousMetrics.novosSeguidoresMes,
+      monthInfo,
+      dailyFollowers,
+      formatFollowersNumber
+    );
+  }, [monthInfo, currentFollowersMetrics, previousMonthFollowersData, followersData, dailyFollowers, availableMonths, selectedMonth]);
+
   // Aggregate data for 12-month view
   const monthlyFollowersData = useMemo(() => {
     if (!isLast12MonthsView || followersData.length === 0) return [];
@@ -147,6 +183,17 @@ const Seguidores = () => {
     if (!marketingData.length || !selectedMonth || isLast12MonthsView) return [];
     return marketingData.filter(item => item.Data.startsWith(selectedMonth));
   }, [marketingData, selectedMonth, isLast12MonthsView]);
+
+  const dailyMarketingData = useMemo(() => {
+    if (!currentMonthMarketingData.length || !monthInfo.isIncomplete) return null;
+    return {
+      visualizacoes: extractDailyValues(currentMonthMarketingData, 'visualizacoes'),
+      alcance: extractDailyValues(currentMonthMarketingData, 'alcance'),
+      visitas: extractDailyValues(currentMonthMarketingData, 'visitas'),
+      interacoes: extractDailyValues(currentMonthMarketingData, 'interacoes'),
+      clicks: extractDailyValues(currentMonthMarketingData, 'clicks'),
+    };
+  }, [currentMonthMarketingData, monthInfo.isIncomplete]);
 
   const previousMonthMarketingData = useMemo(() => {
     if (!marketingData.length || !selectedMonth || isLast12MonthsView) return [];
@@ -360,12 +407,15 @@ const Seguidores = () => {
                   icon={Users}
                   trend={previousMonthFollowersData.length > 0 ? currentFollowersMetrics.crescimentoPercentual : undefined}
                   variant="success"
+                  isIncomplete={!isLast12MonthsView && monthInfo.isIncomplete}
                 />
                 <MetricCard
                   title="Novos Seguidores"
                   value={formatFollowersNumber(currentFollowersMetrics.novosSeguidoresMes)}
                   icon={UserPlus}
                   subtitle="Total no mês"
+                  isIncomplete={!isLast12MonthsView && monthInfo.isIncomplete}
+                  projectionData={!isLast12MonthsView ? followersProjection : null}
                 />
                 <MetricCard
                   title="Crescimento"
@@ -373,6 +423,7 @@ const Seguidores = () => {
                   icon={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? TrendingUp : TrendingDown}
                   subtitle={previousMonthFollowersData.length > 0 ? `${currentFollowersMetrics.crescimentoPercentual >= 0 ? '+' : ''}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}%` : undefined}
                   variant={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? "success" : undefined}
+                  isIncomplete={!isLast12MonthsView && monthInfo.isIncomplete}
                 />
               </div>
             </div>
