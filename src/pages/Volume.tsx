@@ -12,6 +12,7 @@ import { ProductCombinationsTable } from "@/components/dashboard/ProductCombinat
 import { ShippingMethodsChart } from "@/components/dashboard/ShippingMethodsChart";
 import { NFIssuanceChart } from "@/components/dashboard/NFIssuanceChart";
 import { FreebieProductsList } from "@/components/dashboard/FreebieProductsList";
+import { TopProductsChart } from "@/components/dashboard/TopProductsChart";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
 import { filterOrdersByMonth } from "@/utils/salesCalculator";
 import { Button } from "@/components/ui/button";
@@ -168,6 +169,31 @@ export default function Volume() {
                 </div>
               </div>
             </CardHeader>
+            
+            {/* ✅ NOVO: Gráfico Unificado */}
+            <CardContent className="pb-6">
+              <TopProductsChart
+                products={
+                  productSortBy === 'quantity'
+                    ? productMetrics?.topProductsByQuantity || []
+                    : productMetrics?.topProductsByRevenue || []
+                }
+                sortBy={productSortBy}
+                viewMode={viewMode}
+                limit={15}
+              />
+            </CardContent>
+
+            {/* Separador */}
+            <div className="px-6 pb-2">
+              <div className="border-t pt-6">
+                <h3 className="text-sm font-semibold mb-2">📋 Tabela Detalhada - Top 20 Produtos</h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Detalhamento completo dos produtos mais vendidos
+                </p>
+              </div>
+            </div>
+
             <CardContent>
               <TopProductsTable
                 products={
