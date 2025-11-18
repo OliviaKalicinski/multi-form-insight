@@ -335,13 +335,46 @@ export const calculateProductOperationsMetrics = (
   // Se modo "Individual", desmembrar kits
   const processedOrders = breakdownKits ? breakdownOrders(orders) : orders;
   
-  const topByQuantity = analyzeTopProductsByQuantity(processedOrders, 20);
-  const topByRevenue = analyzeTopProductsByRevenue(processedOrders, 20);
+  const topByQuantity = analyzeTopProductsByQuantity(processedOrders, 100);
+  const topByRevenue = analyzeTopProductsByRevenue(processedOrders, 100);
   const skuAnalysis = analyzeSKUPerformance(processedOrders);
   const combinations = analyzeProductCombinations(processedOrders, 2);
   const freebies = analyzeFreebieProducts(processedOrders);
   const shipping = analyzeShippingMethods(processedOrders);
   const nfTime = analyzeNFIssuanceTime(processedOrders);
+
+  // ✅ Converter brindes para ProductRanking
+  const freebieAsRanking: ProductRanking[] = freebies.map(f => ({
+    sku: f.sku,
+    descricao: f.descricao,
+    descricaoAjustada: f.descricao,
+    quantidadeTotal: f.quantidadeTotal,
+    faturamentoTotal: f.quantidadeTotal * 0.01, // R$ 0,01 fixo
+    numeroPedidos: f.numeroPedidos,
+    ticketMedio: 0.01,
+    percentualQuantidade: 0, // Será recalculado
+    percentualFaturamento: 0, // Será recalculado
+  }));
+
+  // ✅ Mesclar e reordenar por quantidade
+  const mergedByQuantity = [...topByQuantity, ...freebieAsRanking]
+    .sort((a, b) => b.quantidadeTotal - a.quantidadeTotal);
+
+  // Recalcular percentuais de quantidade
+  const totalQuantity = mergedByQuantity.reduce((sum, p) => sum + p.quantidadeTotal, 0);
+  mergedByQuantity.forEach(p => {
+    p.percentualQuantidade = (p.quantidadeTotal / totalQuantity) * 100;
+  });
+
+  // ✅ Mesclar e reordenar por faturamento
+  const mergedByRevenue = [...topByRevenue, ...freebieAsRanking]
+    .sort((a, b) => b.faturamentoTotal - a.faturamentoTotal);
+
+  // Recalcular percentuais de faturamento
+  const totalRevenue = mergedByRevenue.reduce((sum, p) => sum + p.faturamentoTotal, 0);
+  mergedByRevenue.forEach(p => {
+    p.percentualFaturamento = (p.faturamentoTotal / totalRevenue) * 100;
+  });
 
   const uniqueProducts = new Set<string>();
   const uniqueSKUs = new Set<string>();
@@ -354,8 +387,8 @@ export const calculateProductOperationsMetrics = (
   });
 
   return {
-    topProductsByQuantity: topByQuantity,
-    topProductsByRevenue: topByRevenue,
+    topProductsByQuantity: mergedByQuantity.slice(0, 50),
+    topProductsByRevenue: mergedByRevenue.slice(0, 50),
     skuAnalysis,
     productCombinations: combinations,
     freebieProducts: freebies,
