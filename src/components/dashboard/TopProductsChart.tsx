@@ -2,8 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
 import { ProductRanking } from "@/types/marketing";
 import { formatCurrency } from "@/utils/salesCalculator";
-import { TrendingUp, Gift, Package, ListTree } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { TrendingUp } from "lucide-react";
 
 interface TopProductsChartProps {
   products: ProductRanking[];
@@ -21,8 +20,8 @@ export const TopProductsChart = ({
   const topProducts = products.slice(0, limit);
   
   const chartData = topProducts.map((p, index) => ({
-    name: p.descricaoAjustada.length > 35 
-      ? p.descricaoAjustada.substring(0, 35) + '...' 
+    name: p.descricaoAjustada.length > 28 
+      ? p.descricaoAjustada.substring(0, 28) + '...' 
       : p.descricaoAjustada,
     fullName: p.descricaoAjustada,
     value: sortBy === 'quantity' ? p.quantidadeTotal : p.faturamentoTotal,
@@ -44,41 +43,27 @@ export const TopProductsChart = ({
     return "hsl(var(--primary))"; // Azul padrão
   };
 
+  const chartHeight = Math.max(500, topProducts.length * 35);
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Top {limit} Produtos - Ranking Visual
-            </CardTitle>
-            <CardDescription>
-              Visualização gráfica com produtos regulares e brindes
-            </CardDescription>
-          </div>
-          
-          {/* Badges de Status dos Filtros */}
-          <div className="flex flex-col gap-2">
-            <Badge variant={viewMode === 'as-sold' ? 'default' : 'secondary'} className="justify-center">
-              {viewMode === 'as-sold' ? (
-                <><Package className="h-3 w-3 mr-1" /> Como Vendidos</>
-              ) : (
-                <><ListTree className="h-3 w-3 mr-1" /> Individuais</>
-              )}
-            </Badge>
-            <Badge variant={sortBy === 'quantity' ? 'default' : 'secondary'} className="justify-center">
-              {sortBy === 'quantity' ? '📊 Quantidade' : '💰 Faturamento'}
-            </Badge>
-          </div>
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5" />
+          Top {limit} Produtos - Ranking Visual
+        </CardTitle>
+        <CardDescription>
+          {viewMode === 'as-sold' ? 'Como vendidos' : 'Produtos individuais'} • 
+          Ordenado por {sortBy === 'quantity' ? 'quantidade' : 'faturamento'} • 
+          Brindes em verde
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={450}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <BarChart 
             data={chartData} 
             layout="vertical"
-            margin={{ top: 5, right: 30, left: 130, bottom: 5 }}
+            margin={{ top: 5, right: 30, left: 170, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
@@ -93,8 +78,9 @@ export const TopProductsChart = ({
             <YAxis 
               type="category"
               dataKey="name" 
-              width={120}
+              width={160}
               tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }}
+              interval={0}
             />
             <Tooltip
               contentStyle={{
