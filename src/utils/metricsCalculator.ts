@@ -57,3 +57,20 @@ export const formatNumber = (num: number): string => {
 export const formatPercentage = (num: number): string => {
   return `${num >= 0 ? "+" : ""}${num.toFixed(1)}%`;
 };
+
+export const extractDailyValues = (
+  data: MarketingData[], 
+  metric: 'visualizacoes' | 'alcance' | 'visitas' | 'interacoes' | 'clicks'
+): { date: string; value: number }[] => {
+  return data.map(item => {
+    let value = 0;
+    switch(metric) {
+      case 'visualizacoes': value = parseInt(item.Visualizações); break;
+      case 'alcance': value = parseInt(item.Alcance); break;
+      case 'visitas': value = parseInt(item.Visitas); break;
+      case 'interacoes': value = parseInt(item.Interações); break;
+      case 'clicks': value = parseInt(item["Clicks no Link"]); break;
+    }
+    return { date: item.Data.substring(0, 10), value };
+  });
+};

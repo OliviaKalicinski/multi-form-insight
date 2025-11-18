@@ -139,3 +139,21 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
     taxaAbandonoCarrinho,
   };
 };
+
+export const extractDailyAdsMetrics = (
+  data: AdsData[], 
+  metric: 'investimento' | 'compras' | 'roas'
+): { date: string; value: number }[] => {
+  return data.map(item => {
+    let value = 0;
+    const startDate = item["Início dos relatórios"];
+    
+    switch(metric) {
+      case 'investimento': value = parseAdsValue(item["Valor usado (BRL)"]); break;
+      case 'compras': value = parseAdsValue(item["Compras"]); break;
+      case 'roas': value = parseAdsValue(item["ROAS de resultados"]); break;
+    }
+    
+    return { date: startDate.substring(0, 10), value };
+  });
+};
