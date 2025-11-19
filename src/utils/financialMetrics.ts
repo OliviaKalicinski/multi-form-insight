@@ -1,6 +1,7 @@
 import { format, parse, startOfMonth, differenceInMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance } from "@/types/marketing";
+import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance, ProductRevenueData } from "@/types/marketing";
+import { extractDailyOrders } from './salesCalculator';
 
 /**
  * Filtra pedidos que contêm APENAS Kit de Amostras
@@ -243,6 +244,47 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
 };
 
 /**
+ * Calcula o faturamento acumulado por produto individual
+ * Exclui kits de produtos mas INCLUI amostras
+ */
+export const calculateAccumulatedRevenueByProduct = (
+  orders: ProcessedOrder[],
+  topN: number = 15
+): ProductRevenueData[] => {
+  const productMap = new Map<string, number>();
+  let totalRevenue = 0;
+  
+  orders.forEach(order => {
+    order.produtos.forEach(produto => {
+      // Incluir TODOS os produtos individuais (amostras incluídas)
+      // A descricaoAjustada já está normalizada
+      const productName = produto.descricaoAjustada;
+      const revenue = produto.preco * produto.quantidade;
+      
+      // Acumular faturamento
+      productMap.set(
+        productName,
+        (productMap.get(productName) || 0) + revenue
+      );
+      
+      totalRevenue += revenue;
+    });
+  });
+  
+  // Converter para array e ordenar
+  const productRevenues: ProductRevenueData[] = Array.from(productMap.entries())
+    .map(([product, revenue]) => ({
+      product,
+      revenue,
+      percentage: (revenue / totalRevenue) * 100
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, topN); // Pegar apenas top N
+  
+  return productRevenues;
+};
+
+/**
  * Calcula todas as métricas financeiras
  */
 export const calculateFinancialMetrics = (
@@ -271,6 +313,15 @@ export const calculateFinancialMetrics = (
     orders: orders.filter((o) => format(o.dataVenda, "yyyy-MM") === item.period).length,
   }));
 
+  // Calcular pedidos diários
+  const ordersByDay = extractDailyOrders(orders).map(item => ({
+    date: item.date,
+    orders: item.value
+  }));
+  
+  // Calcular faturamento por produto
+  const revenueByProduct = calculateAccumulatedRevenueByProduct(orders, 15);
+
   const seasonality = analyzeSeasonality(orders);
   const orderDistribution = getOrderValueDistribution(orders);
   const platformPerformance = getPlatformPerformance(orders);
@@ -287,6 +338,8 @@ export const calculateFinancialMetrics = (
     totalPedidosReais: totalRealOrders,
     produtoMedio,
     revenueByDay: revenueEvolution,
+    ordersByDay,
+    revenueByProduct,
     revenueByMonth,
     seasonality,
     orderDistribution,

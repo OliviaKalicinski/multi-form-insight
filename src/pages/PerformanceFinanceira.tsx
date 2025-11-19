@@ -8,7 +8,9 @@ import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { FinancialSummaryCards } from "@/components/dashboard/FinancialSummaryCards";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
-import { RevenueEvolutionChart } from "@/components/dashboard/RevenueEvolutionChart";
+import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
+import { DailyVolumeChart } from "@/components/dashboard/DailyVolumeChart";
+import { ProductAccumulatedRevenueChart } from "@/components/dashboard/ProductAccumulatedRevenueChart";
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
 import { OrderDistributionChart } from "@/components/dashboard/OrderDistributionChart";
 import { PlatformComparisonChart } from "@/components/dashboard/PlatformComparisonChart";
@@ -164,13 +166,37 @@ export default function PerformanceFinanceira() {
         </TabsList>
 
         {/* Tab 1: Evolução do faturamento */}
-        <TabsContent value="evolution">
+        <TabsContent value="evolution" className="space-y-6">
           {!comparisonMode && financialMetrics && (
-            <RevenueEvolutionChart
-              data={financialMetrics.revenueByDay}
-              title="Evolução do Faturamento ao Longo do Tempo"
-              showCumulative={true}
-            />
+            <>
+              {/* Grid com 2 gráficos lado a lado */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 1. Faturamento Diário */}
+                <DailyRevenueChart
+                  data={financialMetrics.revenueByDay.map(d => ({
+                    date: d.date,
+                    revenue: d.revenue
+                  }))}
+                  title="Faturamento Diário"
+                  description="Receita gerada por dia no período"
+                />
+                
+                {/* 2. Volume Diário */}
+                <DailyVolumeChart
+                  data={financialMetrics.ordersByDay}
+                  title="Volume Diário"
+                  description="Número de pedidos realizados por dia"
+                />
+              </div>
+              
+              {/* 3. Faturamento Acumulado por Produto */}
+              <ProductAccumulatedRevenueChart
+                data={financialMetrics.revenueByProduct}
+                title="Faturamento Acumulado por Produto"
+                description="Top 15 produtos individuais (incluindo amostras)"
+                topN={15}
+              />
+            </>
           )}
           
           {comparisonMode && comparisonMetrics && (
