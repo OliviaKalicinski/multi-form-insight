@@ -5,7 +5,7 @@ import { parseAdsValue } from "./adsCalculator";
  * Estima custo de frete com base na forma de envio
  * Valores baseados em médias do mercado brasileiro
  */
-const estimateShippingCost = (formaEnvio: string, valorPedido: number): number => {
+export const estimateShippingCost = (formaEnvio: string, valorPedido: number): number => {
   const forma = formaEnvio.toLowerCase();
   
   // PAC/Sedex - frete médio 10-15% do valor do pedido
