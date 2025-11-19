@@ -11,14 +11,10 @@ export const FinancialSummaryCards = ({ metrics }: FinancialSummaryCardsProps) =
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       <SalesMetricCard
-        title="Faturamento Bruto"
-        value={formatCurrency(metrics.faturamentoBruto)}
+        title="Faturamento Total"
+        value={formatCurrency(metrics.faturamentoTotal)}
         icon={DollarSign}
-        subtitle={
-          metrics.usandoEstimativaFrete 
-            ? "⚠️ Incluindo frete estimado" 
-            : "✅ Todas as plataformas (valores reais)"
-        }
+        subtitle="Receita de produtos (sem frete)"
         trend={
           metrics.growthRate !== 0
             ? {
@@ -27,35 +23,7 @@ export const FinancialSummaryCards = ({ metrics }: FinancialSummaryCardsProps) =
               }
             : undefined
         }
-        variant={
-          metrics.usandoEstimativaFrete 
-            ? "warning"
-            : (metrics.growthRate > 0 ? "success" : metrics.growthRate < 0 ? "warning" : "default")
-        }
-      />
-
-      <SalesMetricCard
-        title="Faturamento Líquido"
-        value={formatCurrency(metrics.faturamentoTotal)}
-        icon={Package}
-        subtitle={
-          metrics.usandoEstimativaFrete
-            ? "⚠️ Produtos (frete estimado subtraído)"
-            : "✅ Apenas produtos (sem frete)"
-        }
-        variant={metrics.usandoEstimativaFrete ? "warning" : "default"}
-      />
-
-      <SalesMetricCard
-        title="Total de Frete"
-        value={formatCurrency(metrics.totalFrete)}
-        icon={TrendingUp}
-        subtitle={
-          metrics.usandoEstimativaFrete
-            ? `⚠️ Valor estimado (${((metrics.totalFrete / metrics.faturamentoBruto) * 100).toFixed(1)}%)`
-            : `✅ Valor real (${((metrics.totalFrete / metrics.faturamentoBruto) * 100).toFixed(1)}%)`
-        }
-        variant={metrics.usandoEstimativaFrete ? "warning" : "default"}
+        variant={metrics.growthRate > 0 ? "success" : metrics.growthRate < 0 ? "warning" : "default"}
       />
 
       <SalesMetricCard

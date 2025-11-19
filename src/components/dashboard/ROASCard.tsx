@@ -23,13 +23,13 @@ export const ROASCard = ({ metrics }: ROASCardProps) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Target className="h-5 w-5" />
-          ROAS Real (Return on Ad Spend)
+          ROAS (Return on Ad Spend)
         </CardTitle>
         <CardDescription>
-          Retorno sobre investimento em anúncios META (faturamento líquido / investimento)
+          Retorno sobre investimento em anúncios META
           <br />
           <span className="text-xs text-muted-foreground">
-            💡 Faturamento Líquido = Receita de produtos (sem frete) - Custo de frete
+            💡 ROAS = Faturamento Líquido / Investimento em Ads
           </span>
         </CardDescription>
       </CardHeader>
@@ -59,7 +59,7 @@ export const ROASCard = ({ metrics }: ROASCardProps) => {
               {formatCurrency(metrics.faturamentoLiquido)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Bruto: {formatCurrency(metrics.faturamentoBruto)} - Frete: {formatCurrency(metrics.custoFrete)}
+              Receita de produtos sem frete
             </p>
           </div>
 
@@ -90,33 +90,6 @@ export const ROASCard = ({ metrics }: ROASCardProps) => {
               Margem líquida: {formatNumber(metrics.margemLiquida, 1)}%
             </p>
           </div>
-        </div>
-
-        {/* Alerta sobre fonte de dados de frete */}
-        <div className="mt-4 p-3 bg-muted rounded-lg">
-          {metrics.usandoEstimativa ? (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                ⚠️ <strong>Frete Estimado:</strong> Alguns ou todos os pedidos não possuem valor de frete informado.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                O custo de frete foi estimado automaticamente com base na forma de envio:
-              </p>
-              <ul className="text-xs text-muted-foreground ml-4 list-disc space-y-0.5">
-                <li>PAC/Sedex: ~12% do valor do pedido</li>
-                <li>Transportadora: ~15% do valor do pedido</li>
-                <li>Frete Expresso: ~18% do valor do pedido</li>
-              </ul>
-              <p className="text-xs text-muted-foreground mt-2">
-                💡 Para cálculos mais precisos, inclua a coluna <code className="bg-muted-foreground/10 px-1 py-0.5 rounded">"Valor do frete"</code> no CSV.
-              </p>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              ✅ <strong>Valores Reais:</strong> Todos os pedidos possuem valor de frete informado. 
-              O cálculo está usando dados reais de custo de frete.
-            </p>
-          )}
         </div>
       </CardContent>
     </Card>

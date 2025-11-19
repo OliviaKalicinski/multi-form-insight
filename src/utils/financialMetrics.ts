@@ -3,7 +3,6 @@ import { ptBR } from "date-fns/locale";
 import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance, ProductRevenueData } from "@/types/marketing";
 import { extractDailyOrders } from './salesCalculator';
 import { breakdownOrders } from './orderBreakdown';
-import { estimateShippingCost } from './roasCalculator';
 
 /**
  * Filtra pedidos que contêm APENAS Kit de Amostras
@@ -323,33 +322,6 @@ export const calculateFinancialMetrics = (
   const totalOrders = orders.length;
   const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
   
-  // 🆕 CALCULAR TOTAL DE FRETE (usar valores reais quando disponíveis)
-  const totalFrete = orders.reduce((sum, order) => {
-    // Se tem valor de frete real, usar ele
-    if (order.valorFrete && order.valorFrete > 0) {
-      return sum + order.valorFrete;
-    }
-    // Se não tem, estimar
-    return sum + estimateShippingCost(order.formaEnvio, order.valorTotal);
-  }, 0);
-  
-  // Contar quantos pedidos usaram valor real vs estimado
-  const pedidosComFreteReal = orders.filter(o => o.valorFrete && o.valorFrete > 0).length;
-  const usandoEstimativaFrete = pedidosComFreteReal < orders.length;
-  
-  // 🆕 CALCULAR FATURAMENTO BRUTO (Produtos + Frete)
-  const faturamentoBruto = totalRevenue + totalFrete;
-  
-  // Log para validação
-  console.log(`💰 Faturamento no período:`);
-  console.log(`   - Produtos: R$ ${totalRevenue.toFixed(2)}`);
-  console.log(`   - Frete: R$ ${totalFrete.toFixed(2)}`);
-  console.log(`   - Bruto (Total): R$ ${faturamentoBruto.toFixed(2)}`);
-  console.log(`🚚 Cálculo de frete: ${pedidosComFreteReal}/${orders.length} com valores reais`);
-  if (usandoEstimativaFrete) {
-    console.log(`⚠️ Alguns pedidos estão usando estimativa de frete`);
-  }
-  
   // ===== CÁLCULOS REAIS (sem pedidos de apenas samples) =====
   const realOrders = filterRealOrders(orders);
   const realRevenue = realOrders.reduce((sum, order) => sum + order.valorTotal, 0);
@@ -389,9 +361,6 @@ export const calculateFinancialMetrics = (
 
   return {
     faturamentoTotal: totalRevenue,
-    faturamentoBruto,
-    totalFrete,
-    usandoEstimativaFrete,
     ticketMedio: averageTicket,
     ticketMedioReal: realAverageTicket,
     totalPedidos: totalOrders,
