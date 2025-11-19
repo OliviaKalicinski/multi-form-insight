@@ -6,28 +6,37 @@ import { RecommendationCard } from "@/components/executive/RecommendationCard";
 import { ComparativeMetricCard } from "@/components/executive/ComparativeMetricCard";
 import { TrendInsightCard } from "@/components/executive/TrendInsightCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { dadosMensais, getDadosMes, getUltimosTresMeses, benchmarksPetFood } from "@/data/executiveData";
+import { benchmarksPetFood } from "@/data/executiveData";
 import { calcularHealthScore, gerarComparacaoMoM, gerarAnaliseTrimestral, gerarInsights } from "@/utils/criticalAnalysis";
 import { gerarAlertas } from "@/utils/alertSystem";
 import { gerarRecomendacoes } from "@/utils/recommendationEngine";
+import { calculateExecutiveMetrics, filterOrdersByMonth, filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
 import { FileText, TrendingUp, AlertTriangle, Target, BarChart3 } from "lucide-react";
+import { ExecutiveMetrics } from "@/types/executive";
 
 export default function AnaliseCritica() {
-  const { selectedMonth, setSelectedMonth } = useDashboard();
+  const { selectedMonth, setSelectedMonth, availableMonths, salesData, adsData } = useDashboard();
   
-  // Obter meses disponíveis dos dados executivos
-  const availableMonths = Object.keys(dadosMensais).sort().reverse();
+  // Calcular dados do mês atual a partir dos dados reais
+  const dadosAtual = useMemo(() => {
+    const ordersThisMonth = filterOrdersByMonth(salesData, selectedMonth);
+    const adsThisMonth = filterAdsByMonth(adsData, selectedMonth);
+    return calculateExecutiveMetrics(ordersThisMonth, adsThisMonth, selectedMonth);
+  }, [salesData, adsData, selectedMonth]);
   
-  // Obter dados do mês atual e anterior
-  const dadosAtual = useMemo(() => getDadosMes(selectedMonth), [selectedMonth]);
-  
+  // Calcular mês anterior
   const mesAnterior = useMemo(() => {
-    const meses = Object.keys(dadosMensais).sort();
+    const meses = availableMonths.sort();
     const index = meses.indexOf(selectedMonth);
     return index > 0 ? meses[index - 1] : null;
-  }, [selectedMonth]);
+  }, [availableMonths, selectedMonth]);
   
-  const dadosAnterior = useMemo(() => mesAnterior ? getDadosMes(mesAnterior) : null, [mesAnterior]);
+  const dadosAnterior = useMemo(() => {
+    if (!mesAnterior) return null;
+    const ordersLastMonth = filterOrdersByMonth(salesData, mesAnterior);
+    const adsLastMonth = filterAdsByMonth(adsData, mesAnterior);
+    return calculateExecutiveMetrics(ordersLastMonth, adsLastMonth, mesAnterior);
+  }, [salesData, adsData, mesAnterior]);
   
   // Cálculos
   const healthScore = useMemo(() => 
@@ -55,10 +64,25 @@ export default function AnaliseCritica() {
     [dadosAtual, dadosAnterior, healthScore]
   );
   
+  // Calcular análise trimestral
   const analiseTrimestral = useMemo(() => {
-    const meses = getUltimosTresMeses(selectedMonth);
-    return gerarAnaliseTrimestral(meses, dadosMensais);
-  }, [selectedMonth]);
+    const meses = availableMonths.sort();
+    const index = meses.indexOf(selectedMonth);
+    const ultimos3Meses = meses.slice(Math.max(0, index - 2), index + 1);
+    
+    // Calcular métricas para cada mês
+    const dadosMensaisCalculados: Record<string, ExecutiveMetrics> = {};
+    ultimos3Meses.forEach(mes => {
+      const ordersMonth = filterOrdersByMonth(salesData, mes);
+      const adsMonth = filterAdsByMonth(adsData, mes);
+      const metrics = calculateExecutiveMetrics(ordersMonth, adsMonth, mes);
+      if (metrics) {
+        dadosMensaisCalculados[mes] = metrics;
+      }
+    });
+    
+    return gerarAnaliseTrimestral(ultimos3Meses, dadosMensaisCalculados);
+  }, [selectedMonth, availableMonths, salesData, adsData]);
   
   if (!dadosAtual) {
     return (
@@ -66,7 +90,10 @@ export default function AnaliseCritica() {
         <Card className="border-yellow-500 bg-yellow-50">
           <CardContent className="p-6">
             <p className="text-center text-muted-foreground">
-              ⚠️ Dados não disponíveis para o mês selecionado: {selectedMonth}
+              ⚠️ Sem dados de vendas ou anúncios para o mês selecionado: {selectedMonth}
+            </p>
+            <p className="text-center text-sm text-muted-foreground mt-2">
+              Faça upload dos dados de vendas e/ou anúncios para visualizar a análise executiva.
             </p>
           </CardContent>
         </Card>
@@ -77,29 +104,41 @@ export default function AnaliseCritica() {
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
       {/* HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-bold flex items-center gap-3">
-            <FileText className="h-10 w-10 text-blue-600" />
-            Análise Crítica Executiva
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Insights estratégicos, alertas e recomendações acionáveis para o seu negócio
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold flex items-center gap-3">
+              <FileText className="h-10 w-10 text-blue-600" />
+              Análise Crítica Executiva
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              Insights estratégicos, alertas e recomendações acionáveis baseados nos seus dados reais
+            </p>
+          </div>
+          <div className="w-80">
+            <label className="text-sm font-medium mb-2 block">Período de Análise</label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+            >
+              {availableMonths.map((month) => (
+                <option key={month} value={month}>
+                  {month}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="w-80">
-          <label className="text-sm font-medium mb-2 block">Período de Análise</label>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="w-full border rounded-md px-3 py-2 text-sm"
-          >
-            {availableMonths.map((month) => (
-              <option key={month} value={month}>
-                {month}
-              </option>
-            ))}
-          </select>
+        
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-900">
+            📊 <strong>Analisando:</strong> {selectedMonth} 
+            {mesAnterior && <span className="ml-2">| <strong>Comparando com:</strong> {mesAnterior}</span>}
+          </p>
+          <p className="text-xs text-blue-700 mt-1">
+            ✨ Métricas executivas calculadas automaticamente a partir dos seus dados de vendas e anúncios
+          </p>
         </div>
       </div>
       
