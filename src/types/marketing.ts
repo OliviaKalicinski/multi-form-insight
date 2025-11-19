@@ -199,6 +199,8 @@ export interface ProductRevenueData {
 // Financial Metrics
 export interface FinancialMetrics {
   faturamentoTotal: number;
+  faturamentoBruto: number;
+  totalFrete: number;
   ticketMedio: number;
   ticketMedioReal: number;
   totalPedidos: number;

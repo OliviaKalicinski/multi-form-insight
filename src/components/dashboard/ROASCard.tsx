@@ -27,6 +27,10 @@ export const ROASCard = ({ metrics }: ROASCardProps) => {
         </CardTitle>
         <CardDescription>
           Retorno sobre investimento em anúncios META (faturamento líquido / investimento)
+          <br />
+          <span className="text-xs text-muted-foreground">
+            💡 Faturamento Líquido = Receita de produtos (sem frete) - Custo de frete
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent>

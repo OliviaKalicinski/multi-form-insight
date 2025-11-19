@@ -11,10 +11,10 @@ export const FinancialSummaryCards = ({ metrics }: FinancialSummaryCardsProps) =
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       <SalesMetricCard
-        title="Faturamento Total"
-        value={formatCurrency(metrics.faturamentoTotal)}
+        title="Faturamento Bruto"
+        value={formatCurrency(metrics.faturamentoBruto)}
         icon={DollarSign}
-        subtitle="No período selecionado"
+        subtitle="Todas as plataformas (período selecionado)"
         trend={
           metrics.growthRate !== 0
             ? {
@@ -27,10 +27,18 @@ export const FinancialSummaryCards = ({ metrics }: FinancialSummaryCardsProps) =
       />
 
       <SalesMetricCard
-        title="Ticket Médio Geral"
-        value={formatCurrency(metrics.ticketMedio)}
+        title="Faturamento Líquido"
+        value={formatCurrency(metrics.faturamentoTotal)}
+        icon={Package}
+        subtitle="Apenas produtos (sem frete)"
+        variant="default"
+      />
+
+      <SalesMetricCard
+        title="Total de Frete"
+        value={formatCurrency(metrics.totalFrete)}
         icon={TrendingUp}
-        subtitle={`${formatQuantity(metrics.totalPedidos)} pedidos`}
+        subtitle={`${((metrics.totalFrete / metrics.faturamentoBruto) * 100).toFixed(1)}% do faturamento bruto`}
       />
 
       <SalesMetricCard

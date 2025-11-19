@@ -322,6 +322,18 @@ export const calculateFinancialMetrics = (
   const totalOrders = orders.length;
   const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
   
+  // 🆕 CALCULAR TOTAL DE FRETE
+  const totalFrete = orders.reduce((sum, order) => sum + (order.valorFrete || 0), 0);
+  
+  // 🆕 CALCULAR FATURAMENTO BRUTO (Produtos + Frete)
+  const faturamentoBruto = totalRevenue + totalFrete;
+  
+  // Log para validação
+  console.log(`💰 Faturamento no período:`);
+  console.log(`   - Produtos: R$ ${totalRevenue.toFixed(2)}`);
+  console.log(`   - Frete: R$ ${totalFrete.toFixed(2)}`);
+  console.log(`   - Bruto (Total): R$ ${faturamentoBruto.toFixed(2)}`);
+  
   // ===== CÁLCULOS REAIS (sem pedidos de apenas samples) =====
   const realOrders = filterRealOrders(orders);
   const realRevenue = realOrders.reduce((sum, order) => sum + order.valorTotal, 0);
@@ -361,6 +373,8 @@ export const calculateFinancialMetrics = (
 
   return {
     faturamentoTotal: totalRevenue,
+    faturamentoBruto,
+    totalFrete,
     ticketMedio: averageTicket,
     ticketMedioReal: realAverageTicket,
     totalPedidos: totalOrders,
