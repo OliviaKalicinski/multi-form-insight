@@ -69,6 +69,27 @@ export const calculateRevenueEvolution = (
 };
 
 /**
+ * Calcula volume de pedidos agregado por mês
+ */
+export const calculateMonthlyOrders = (
+  orders: ProcessedOrder[]
+): { month: string; orders: number }[] => {
+  const monthlyMap = new Map<string, number>();
+  
+  orders.forEach(order => {
+    const monthKey = format(order.dataVenda, "yyyy-MM");
+    monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + 1);
+  });
+  
+  return Array.from(monthlyMap.entries())
+    .map(([month, orders]) => ({
+      month: format(parse(month, "yyyy-MM", new Date()), "MMM/yy", { locale: ptBR }),
+      orders
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+};
+
+/**
  * Analisa sazonalidade nas vendas
  */
 export const analyzeSeasonality = (orders: ProcessedOrder[]): SeasonalityAnalysis => {
@@ -291,6 +312,9 @@ export const calculateFinancialMetrics = (
   orders: ProcessedOrder[],
   selectedMonth?: string
 ): FinancialMetrics => {
+  // Detectar se é período multi-mês
+  const isMultiMonth = selectedMonth === "last-12-months" || !selectedMonth;
+  
   // ===== CÁLCULOS GERAIS (todos os pedidos) =====
   const totalRevenue = orders.reduce((sum, order) => sum + order.valorTotal, 0);
   const totalOrders = orders.length;
@@ -319,6 +343,9 @@ export const calculateFinancialMetrics = (
     orders: item.value
   }));
   
+  // Calcular pedidos por mês (agregado)
+  const ordersByMonth = calculateMonthlyOrders(orders);
+  
   // Calcular faturamento por produto
   const revenueByProduct = calculateAccumulatedRevenueByProduct(orders, 15);
 
@@ -341,8 +368,10 @@ export const calculateFinancialMetrics = (
     ordersByDay,
     revenueByProduct,
     revenueByMonth,
+    ordersByMonth,
     seasonality,
     orderDistribution,
+    isMultiMonth,
     platformPerformance,
     topPlatform,
     growthRate,
