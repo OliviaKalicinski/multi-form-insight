@@ -252,7 +252,16 @@ const AnaliseSamples = () => {
             title="Clientes que Iniciaram com Amostras"
             value={metrics.volume.uniqueCustomers.toLocaleString('pt-BR')}
             icon={Users}
-            subtitle="Primeiro pedido foi apenas Kit de Amostras"
+            subtitle={
+              <>
+                Primeiro pedido foi apenas Kit de Amostras
+                {metrics.volume.totalCustomersWithSamples > metrics.volume.uniqueCustomers && (
+                  <span className="block text-xs text-muted-foreground mt-1.5 font-normal">
+                    {metrics.volume.totalCustomersWithSamples.toLocaleString('pt-BR')} clientes compraram amostras no total
+                  </span>
+                )}
+              </>
+            }
             variant="success"
           />
           <SalesMetricCard

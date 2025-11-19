@@ -383,6 +383,7 @@ export interface SampleMetrics {
   volume: {
     totalSamples: number; // PEDIDOS únicos com amostras (não produtos individuais)
     uniqueCustomers: number;
+    totalCustomersWithSamples: number; // Total de clientes que compraram amostras (qualquer momento)
     percentageOfTotal: number;
   };
   repurchase: {

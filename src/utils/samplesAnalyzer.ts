@@ -105,6 +105,12 @@ export const calculateSampleVolume = (orders: ProcessedOrder[]): SampleMetrics['
   // Total de clientes qualificados
   const uniqueCustomers = qualifiedCustomers.size;
   
+  // Total de clientes que compraram amostras em QUALQUER momento
+  const allCustomersMap = groupOrdersByCustomer(orders);
+  const totalCustomersWithSamples = Array.from(allCustomersMap.values())
+    .filter(customer => customer.hasSample)
+    .length;
+  
   // Total de pedidos de amostra pura (primeiro pedido de cada cliente)
   const totalSampleOrders = uniqueCustomers; // 1 pedido inicial por cliente
   
@@ -117,6 +123,7 @@ export const calculateSampleVolume = (orders: ProcessedOrder[]): SampleMetrics['
   return {
     totalSamples: totalSampleOrders, // Número de CLIENTES qualificados
     uniqueCustomers,                  // Mesmo valor
+    totalCustomersWithSamples,        // Total de clientes com amostras
     percentageOfTotal,                // % sobre total de clientes
   };
 };
