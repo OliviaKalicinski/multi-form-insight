@@ -187,6 +187,13 @@ export interface SalesMetrics {
   taxaRecompra: number;
 }
 
+// Product Revenue Data
+export interface ProductRevenueData {
+  product: string;
+  revenue: number;
+  percentage: number;
+}
+
 // Financial Metrics
 export interface FinancialMetrics {
   faturamentoTotal: number;
@@ -196,6 +203,8 @@ export interface FinancialMetrics {
   totalPedidosReais: number;
   produtoMedio: number;
   revenueByDay: { date: string; revenue: number; cumulativeRevenue: number }[];
+  ordersByDay: { date: string; orders: number }[];
+  revenueByProduct: ProductRevenueData[];
   revenueByMonth: { month: string; revenue: number; orders: number }[];
   seasonality: SeasonalityAnalysis;
   orderDistribution: OrderValueDistribution[];
