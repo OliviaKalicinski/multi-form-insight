@@ -215,6 +215,16 @@ export interface FinancialMetrics {
   growthRate: number;
 }
 
+export interface ROASMetrics {
+  faturamentoBruto: number;
+  custoFrete: number;
+  faturamentoLiquido: number;
+  investimentoAds: number;
+  roas: number;
+  roi: number;
+  margemLiquida: number;
+}
+
 export interface SeasonalityAnalysis {
   monthly: { month: string; monthLabel: string; revenue: number; orders: number }[];
   quarterly: { quarter: string; revenue: number; orders: number }[];
