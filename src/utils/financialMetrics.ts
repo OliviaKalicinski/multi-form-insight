@@ -82,11 +82,11 @@ export const calculateMonthlyOrders = (
   });
   
   return Array.from(monthlyMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([month, orders]) => ({
       month: format(parse(month, "yyyy-MM", new Date()), "MMM/yy", { locale: ptBR }),
       orders
-    }))
-    .sort((a, b) => a.month.localeCompare(b.month));
+    }));
 };
 
 /**
