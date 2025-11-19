@@ -201,6 +201,7 @@ export interface FinancialMetrics {
   faturamentoTotal: number;
   faturamentoBruto: number;
   totalFrete: number;
+  usandoEstimativaFrete: boolean;
   ticketMedio: number;
   ticketMedioReal: number;
   totalPedidos: number;
