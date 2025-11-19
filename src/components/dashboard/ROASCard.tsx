@@ -88,12 +88,20 @@ export const ROASCard = ({ metrics }: ROASCardProps) => {
           </div>
         </div>
 
-        {/* Alerta sobre estimativa de frete */}
+        {/* Alerta sobre fonte de dados de frete */}
         <div className="mt-4 p-3 bg-muted rounded-lg">
-          <p className="text-xs text-muted-foreground">
-            ⚠️ <strong>Nota:</strong> O custo de frete é estimado com base na forma de envio (PAC/Sedex ~12%, Transportadora ~15%, Expresso ~18%). 
-            Para cálculos mais precisos, é recomendado usar dados reais de frete.
-          </p>
+          {metrics.usandoEstimativa ? (
+            <p className="text-xs text-muted-foreground">
+              ⚠️ <strong>Nota:</strong> Alguns pedidos não possuem valor de frete informado. 
+              O custo de frete foi estimado com base na forma de envio para esses casos 
+              (PAC/Sedex ~12%, Transportadora ~15%, Expresso ~18%).
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              ✅ <strong>Valores Reais:</strong> Todos os pedidos possuem valor de frete informado. 
+              O cálculo está usando dados reais de custo de frete.
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

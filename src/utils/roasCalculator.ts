@@ -34,6 +34,7 @@ const estimateShippingCost = (formaEnvio: string, valorPedido: number): number =
 
 /**
  * Calcula ROAS real baseado em faturamento líquido e investimento em ads
+ * Agora usa valores reais de frete quando disponíveis
  */
 export const calculateROAS = (
   orders: ProcessedOrder[],
@@ -42,10 +43,24 @@ export const calculateROAS = (
   // Calcular faturamento bruto
   const faturamentoBruto = orders.reduce((sum, order) => sum + order.valorTotal, 0);
   
-  // Estimar custo total de frete
+  // Usar valores reais de frete quando disponíveis
   const custoFrete = orders.reduce((sum, order) => {
+    // Se tem valor de frete real, usar ele
+    if (order.valorFrete && order.valorFrete > 0) {
+      return sum + order.valorFrete;
+    }
+    // Se não tem, estimar (fallback para CSVs antigos)
     return sum + estimateShippingCost(order.formaEnvio, order.valorTotal);
   }, 0);
+  
+  // Contar quantos pedidos usaram valor real vs estimado
+  const pedidosComFreteReal = orders.filter(o => o.valorFrete && o.valorFrete > 0).length;
+  const usandoEstimativa = pedidosComFreteReal < orders.length;
+  
+  console.log(`🚚 Cálculo de frete: ${pedidosComFreteReal}/${orders.length} com valores reais`);
+  if (usandoEstimativa) {
+    console.log(`⚠️ Alguns pedidos estão usando estimativa de frete`);
+  }
   
   // Calcular faturamento líquido (sem frete)
   const faturamentoLiquido = faturamentoBruto - custoFrete;
@@ -73,5 +88,6 @@ export const calculateROAS = (
     roas,
     roi,
     margemLiquida,
+    usandoEstimativa,
   };
 };

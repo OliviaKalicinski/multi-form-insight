@@ -124,14 +124,15 @@ export default function PerformanceFinanceira() {
       )}
 
       {/* Cards resumo */}
-      {!comparisonMode && financialMetrics && (
-        <>
-          <FinancialSummaryCards metrics={financialMetrics} />
-          
-          {/* Card de ROAS Real */}
-          {roasMetrics && (
-            <ROASCard metrics={roasMetrics} />
-          )}
+          {!comparisonMode && financialMetrics && (
+            <>
+              {/* Card de ROAS Real - PRIMEIRO */}
+              {roasMetrics && (
+                <ROASCard metrics={roasMetrics} />
+              )}
+              
+              {/* Cards de resumo financeiro - DEPOIS */}
+              <FinancialSummaryCards metrics={financialMetrics} />
         </>
       )}
 

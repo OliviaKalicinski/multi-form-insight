@@ -57,6 +57,7 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
     const numeroPedido = row["Número do pedido no e-commerce"];
     const preco = parseFloat(row["Preço total"].replace(",", ".")) || 0;
     const quantidade = parseInt(row["Total de itens"]) || 0;
+    const valorFrete = parseFloat(row["Valor do frete"]?.replace(",", ".") || "0") || 0;
 
     // Parse das datas
     const dataVenda = parse(row["Data da venda"], "dd/MM/yyyy", new Date());
@@ -82,6 +83,7 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
         ],
         dataVenda,
         formaEnvio: row["Forma de envio"],
+        valorFrete,
         numeroNF: row["Número (Nota Fiscal)"],
         dataEmissao,
       });
@@ -102,6 +104,12 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
 
   const result = Array.from(pedidosMap.values());
   console.log(`📦 Total de pedidos únicos: ${result.length}`);
+  
+  // Log de estatísticas de frete
+  const pedidosComFrete = result.filter(p => p.valorFrete > 0).length;
+  const totalFrete = result.reduce((sum, p) => sum + p.valorFrete, 0);
+  console.log(`🚚 Pedidos com frete: ${pedidosComFrete}/${result.length}`);
+  console.log(`🚚 Total de frete: R$ ${totalFrete.toFixed(2)}`);
   
   // Log de exemplos de padronização
   console.log('🏷️ Exemplos de padronização:');

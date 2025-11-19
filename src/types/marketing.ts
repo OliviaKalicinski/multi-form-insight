@@ -153,6 +153,7 @@ export interface SalesData {
   "Total de itens": string;
   "Data da venda": string;
   "Forma de envio": string;
+  "Valor do frete": string;
   "Número (Nota Fiscal)": string;
   "Data de Emissão": string;
 }
@@ -174,6 +175,7 @@ export interface ProcessedOrder {
   }[];
   dataVenda: Date;
   formaEnvio: string;
+  valorFrete: number;
   numeroNF: string;
   dataEmissao: Date;
 }
@@ -223,6 +225,7 @@ export interface ROASMetrics {
   roas: number;
   roi: number;
   margemLiquida: number;
+  usandoEstimativa?: boolean;
 }
 
 export interface SeasonalityAnalysis {

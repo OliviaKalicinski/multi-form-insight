@@ -26,6 +26,7 @@ const salesDataSchema = z.object({
   "Total de itens": z.string(),
   "Data da venda": z.string(),
   "Forma de envio": z.string(),
+  "Valor do frete": z.string().optional().default("0"),
   "Número (Nota Fiscal)": z.string(),
   "Data de Emissão": z.string(),
 });
