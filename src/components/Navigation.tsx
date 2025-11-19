@@ -27,6 +27,9 @@ export const Navigation = () => {
             <TabsTrigger value="/analise-samples" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               🎁 Análise de Amostras
             </TabsTrigger>
+            <TabsTrigger value="/analise-critica" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              📋 Análise Crítica
+            </TabsTrigger>
             <TabsTrigger value="/volume" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               📦 Produto & Operações
             </TabsTrigger>
