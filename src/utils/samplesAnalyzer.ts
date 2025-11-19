@@ -12,6 +12,46 @@ export const isSampleOrder = (order: ProcessedOrder): boolean => {
 };
 
 /**
+ * Identifica se um pedido contém APENAS Kit de Amostras (sem outros produtos)
+ */
+export const isOnlySampleOrder = (order: ProcessedOrder): boolean => {
+  // Verificar se TODOS os produtos são amostras (preço entre 0.01 e 0.90)
+  return order.produtos.every(produto => 
+    produto.preco >= 0.01 && produto.preco <= 0.90
+  ) && order.produtos.length > 0;
+};
+
+/**
+ * Filtra clientes que COMEÇARAM sua jornada com um pedido de apenas amostra
+ * Retorna apenas clientes qualificados (primeiro pedido = amostra pura)
+ */
+export const getQualifiedSampleCustomers = (orders: ProcessedOrder[]): Map<string, CustomerPurchaseHistory> => {
+  const customerMap = groupOrdersByCustomer(orders);
+  const qualifiedCustomers = new Map<string, CustomerPurchaseHistory>();
+  
+  customerMap.forEach((customer, key) => {
+    // Ordenar pedidos por data (do mais antigo ao mais recente)
+    const sortedOrders = [...customer.orders].sort(
+      (a, b) => a.dataVenda.getTime() - b.dataVenda.getTime()
+    );
+    
+    // Verificar se o PRIMEIRO pedido é APENAS amostra
+    const firstOrder = sortedOrders[0];
+    
+    if (isOnlySampleOrder(firstOrder)) {
+      // Cliente qualificado! Adicionar ao mapa
+      qualifiedCustomers.set(key, {
+        ...customer,
+        orders: sortedOrders, // Manter pedidos ordenados
+        sampleOrder: firstOrder, // Primeiro pedido é a amostra
+      });
+    }
+  });
+  
+  return qualifiedCustomers;
+};
+
+/**
  * Agrupa pedidos por cliente com histórico de compras
  */
 export const groupOrdersByCustomer = (orders: ProcessedOrder[]): Map<string, CustomerPurchaseHistory> => {
@@ -56,41 +96,38 @@ export const groupOrdersByCustomer = (orders: ProcessedOrder[]): Map<string, Cus
 };
 
 /**
- * Calcula métricas de volume de amostras - agora conta PEDIDOS únicos
+ * Calcula métricas de volume de amostras - conta apenas clientes qualificados
  */
 export const calculateSampleVolume = (orders: ProcessedOrder[]): SampleMetrics['volume'] => {
-  // Filtrar pedidos com amostra (preço entre 0,01 e 1,00)
-  const sampleOrders = orders.filter(o => isSampleOrder(o));
+  // Obter clientes qualificados (começaram com amostra pura)
+  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
   
-  // Contagem única de pedidos
-  const uniqueSampleOrders = new Set(sampleOrders.map(o => o.numeroPedido)).size;
+  // Total de clientes qualificados
+  const uniqueCustomers = qualifiedCustomers.size;
   
-  // Contagem única de clientes
-  const uniqueCustomers = new Set(sampleOrders.map(o => o.cpfCnpj)).size;
+  // Total de pedidos de amostra pura (primeiro pedido de cada cliente)
+  const totalSampleOrders = uniqueCustomers; // 1 pedido inicial por cliente
   
-  // Percentual de pedidos (não produtos)
-  const totalUniqueOrders = new Set(orders.map(o => o.numeroPedido)).size;
-  const percentageOfTotal = totalUniqueOrders > 0 
-    ? (uniqueSampleOrders / totalUniqueOrders) * 100 
+  // Percentual sobre o total de clientes únicos
+  const allCustomers = new Set(orders.map(o => o.cpfCnpj)).size;
+  const percentageOfTotal = allCustomers > 0 
+    ? (uniqueCustomers / allCustomers) * 100 
     : 0;
   
   return {
-    totalSamples: uniqueSampleOrders, // Agora é contagem de PEDIDOS
-    uniqueCustomers,
-    percentageOfTotal,
+    totalSamples: totalSampleOrders, // Número de CLIENTES qualificados
+    uniqueCustomers,                  // Mesmo valor
+    percentageOfTotal,                // % sobre total de clientes
   };
 };
 
 /**
- * Calcula comportamento de recompra - lógica simplificada
+ * Calcula comportamento de recompra - apenas clientes qualificados
  */
 export const calculateRepurchaseBehavior = (orders: ProcessedOrder[]): SampleMetrics['repurchase'] => {
-  const customerMap = groupOrdersByCustomer(orders);
+  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
   
-  // Filtrar clientes que compraram amostra em QUALQUER pedido
-  const sampleCustomers = Array.from(customerMap.values()).filter(c => c.hasSample);
-  
-  if (sampleCustomers.length === 0) {
+  if (qualifiedCustomers.size === 0) {
     return {
       repurchaseRate: 0,
       customersWhoRepurchased: 0,
@@ -100,11 +137,14 @@ export const calculateRepurchaseBehavior = (orders: ProcessedOrder[]): SampleMet
     };
   }
   
-  // SIMPLIFICAÇÃO: Clientes com 2+ pedidos = recompraram
-  const customersWithRepurchase = sampleCustomers.filter(c => c.totalOrders >= 2);
-  const repurchaseRate = (customersWithRepurchase.length / sampleCustomers.length) * 100;
+  // Clientes com 2+ pedidos = recompraram
+  const customersWithRepurchase = Array.from(qualifiedCustomers.values()).filter(
+    c => c.totalOrders >= 2
+  );
   
-  // Ticket médio GERAL (incluindo pedido com amostra)
+  const repurchaseRate = (customersWithRepurchase.length / qualifiedCustomers.size) * 100;
+  
+  // Calcular métricas
   let totalValue = 0;
   let orderCount = 0;
   let totalDays = 0;
@@ -112,44 +152,54 @@ export const calculateRepurchaseBehavior = (orders: ProcessedOrder[]): SampleMet
   let conversionsToRegular = 0;
   
   customersWithRepurchase.forEach(customer => {
-    // Somar TODOS os pedidos
-    customer.orders.forEach(order => {
+    const sortedOrders = customer.orders; // Já ordenados
+    
+    // PULAR o primeiro pedido (amostra) no cálculo do ticket médio
+    const repurchaseOrders = sortedOrders.slice(1);
+    
+    repurchaseOrders.forEach(order => {
       totalValue += order.valorTotal;
       orderCount++;
     });
     
-    // Tempo até primeira recompra
-    const sortedOrders = customer.orders.sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
+    // Calcular tempo até primeira recompra
     if (sortedOrders.length >= 2) {
-      const days = differenceInDays(sortedOrders[1].dataVenda, sortedOrders[0].dataVenda);
+      const firstOrder = sortedOrders[0]; // Amostra
+      const secondOrder = sortedOrders[1]; // Primeira recompra
+      const days = differenceInDays(secondOrder.dataVenda, firstOrder.dataVenda);
       totalDays += days;
       daysCount++;
-    }
-    
-    // Conversão para produto regular (preço > 10)
-    if (customer.orders.some(o => o.valorTotal > 10)) {
-      conversionsToRegular++;
+      
+      // Verificar se comprou produto regular (não-amostra)
+      const hasRegularProduct = secondOrder.produtos.some(p => p.preco > 0.90);
+      if (hasRegularProduct) {
+        conversionsToRegular++;
+      }
     }
   });
   
   const avgTicketRepurchase = orderCount > 0 ? totalValue / orderCount : 0;
   const avgDaysToFirstRepurchase = daysCount > 0 ? totalDays / daysCount : 0;
-  const conversionToRegularProduct = (conversionsToRegular / sampleCustomers.length) * 100;
+  const conversionRate = customersWithRepurchase.length > 0
+    ? (conversionsToRegular / customersWithRepurchase.length) * 100
+    : 0;
   
   return {
     repurchaseRate,
     customersWhoRepurchased: customersWithRepurchase.length,
     avgTicketRepurchase,
     avgDaysToFirstRepurchase,
-    conversionToRegularProduct,
+    conversionToRegularProduct: conversionRate,
   };
 };
 
 /**
- * Calcula métricas de cross-sell
+ * Calcula métricas de cross-sell - apenas clientes qualificados
  */
 export const calculateCrossSellMetrics = (orders: ProcessedOrder[]): SampleMetrics['crossSell'] => {
-  const ordersWithSample = orders.filter(o => isSampleOrder(o));
+  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
+  const qualifiedOrders = Array.from(qualifiedCustomers.values()).flatMap(c => c.orders);
+  const ordersWithSample = qualifiedOrders.filter(o => isSampleOrder(o));
   
   if (ordersWithSample.length === 0) {
     return {
@@ -213,11 +263,11 @@ export const calculateCrossSellMetrics = (orders: ProcessedOrder[]): SampleMetri
 };
 
 /**
- * Calcula taxa de conversão por período de tempo
+ * Calcula taxa de conversão por período de tempo - apenas clientes qualificados
  */
 export const calculateConversionByTime = (orders: ProcessedOrder[]): SampleMetrics['conversionByTime'] => {
-  const customerMap = groupOrdersByCustomer(orders);
-  const sampleCustomers = Array.from(customerMap.values()).filter(c => c.hasSample);
+  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
+  const sampleCustomers = Array.from(qualifiedCustomers.values());
   
   const windows = [30, 60, 90, 180];
   const result: SampleMetrics['conversionByTime'] = {
@@ -270,11 +320,11 @@ export const calculateConversionByTime = (orders: ProcessedOrder[]): SampleMetri
 };
 
 /**
- * Calcula qualidade das recompras
+ * Calcula qualidade das recompras - apenas clientes qualificados
  */
 export const calculateRepurchaseQuality = (orders: ProcessedOrder[]): SampleMetrics['quality'] => {
-  const customerMap = groupOrdersByCustomer(orders);
-  const sampleCustomers = Array.from(customerMap.values()).filter(c => c.hasSample);
+  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
+  const sampleCustomers = Array.from(qualifiedCustomers.values());
   
   if (sampleCustomers.length === 0) {
     return {
@@ -324,10 +374,12 @@ export const calculateRepurchaseQuality = (orders: ProcessedOrder[]): SampleMetr
 };
 
 /**
- * Calcula perfil do cliente que compra amostra
+ * Calcula perfil do cliente que compra amostra - apenas clientes qualificados
  */
 export const calculateCustomerProfile = (orders: ProcessedOrder[]): SampleMetrics['profile'] => {
-  const ordersWithSample = orders.filter(o => isSampleOrder(o));
+  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
+  const firstOrders = Array.from(qualifiedCustomers.values()).map(c => c.orders[0]);
+  const ordersWithSample = firstOrders;
   
   if (ordersWithSample.length === 0) {
     return {
@@ -378,10 +430,12 @@ export const calculateCustomerProfile = (orders: ProcessedOrder[]): SampleMetric
 };
 
 /**
- * Análise de cesta de compras
+ * Análise de cesta de compras - apenas clientes qualificados
  */
 export const calculateBasketAnalysis = (orders: ProcessedOrder[]): SampleMetrics['basket'] => {
-  const ordersWithSample = orders.filter(o => isSampleOrder(o));
+  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
+  const qualifiedOrders = Array.from(qualifiedCustomers.values()).flatMap(c => c.orders);
+  const ordersWithSample = qualifiedOrders.filter(o => isSampleOrder(o));
   
   if (ordersWithSample.length === 0) {
     return {
@@ -421,11 +475,11 @@ export const calculateBasketAnalysis = (orders: ProcessedOrder[]): SampleMetrics
 };
 
 /**
- * Segmentação comportamental de clientes
+ * Segmentação comportamental de clientes - apenas clientes qualificados
  */
 export const calculateBehaviorSegmentation = (orders: ProcessedOrder[]): SampleMetrics['segmentation'] => {
-  const customerMap = groupOrdersByCustomer(orders);
-  const sampleCustomers = Array.from(customerMap.values()).filter(c => c.hasSample);
+  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
+  const sampleCustomers = Array.from(qualifiedCustomers.values());
   
   if (sampleCustomers.length === 0) {
     return {
@@ -447,10 +501,12 @@ export const calculateBehaviorSegmentation = (orders: ProcessedOrder[]): SampleM
 };
 
 /**
- * Análise temporal de vendas de amostras
+ * Análise temporal de vendas de amostras - apenas clientes qualificados
  */
 export const calculateTemporalAnalysis = (orders: ProcessedOrder[]): SampleMetrics['temporal'] => {
-  const ordersWithSample = orders.filter(o => isSampleOrder(o));
+  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
+  const qualifiedOrders = Array.from(qualifiedCustomers.values()).flatMap(c => c.orders);
+  const ordersWithSample = qualifiedOrders.filter(o => isSampleOrder(o));
   
   if (ordersWithSample.length === 0) {
     return {

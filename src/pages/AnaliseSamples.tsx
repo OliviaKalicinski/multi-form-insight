@@ -74,9 +74,9 @@ const AnaliseSamples = () => {
     return (
       <div className="container mx-auto p-6 space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Vendas de Amostras</h1>
+        <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Clientes que Iniciaram com Amostras</h1>
         <p className="text-muted-foreground">
-          Análise detalhada do Kit de Amostras - Comida de Dragão
+          Análise de clientes cujo primeiro pedido foi apenas Kit de Amostras
           {dataPeriod && (
             <span className="block text-xs mt-1">
               Período: {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')}
@@ -150,9 +150,9 @@ const AnaliseSamples = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Vendas de Amostras</h1>
+        <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Clientes que Iniciaram com Amostras</h1>
         <p className="text-muted-foreground">
-          Análise detalhada do Kit de Amostras - Comida de Dragão
+          Análise de clientes cujo primeiro pedido foi apenas Kit de Amostras
           {dataPeriod && (
             <span className="block text-xs mt-1">
               Período: {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')}
@@ -203,10 +203,10 @@ const AnaliseSamples = () => {
       {comparisonMode && comparisonMetrics ? (
         <div className="grid gap-4 md:grid-cols-2">
           <ComparisonMetricCard
-            title="Total de Pedidos com Amostras"
-            icon={Package}
+            title="Clientes que Iniciaram com Amostras"
+            icon={Users}
             metrics={comparisonMetrics.map(m => ({
-              value: m.metrics.volume.totalSamples,
+              value: m.metrics.volume.uniqueCustomers,
               month: m.month,
               monthLabel: m.label,
               color: 'hsl(var(--primary))'
@@ -249,10 +249,11 @@ const AnaliseSamples = () => {
       ) : metrics ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <SalesMetricCard
-            title="Pedidos com Amostras"
-            value={metrics.volume.totalSamples.toLocaleString('pt-BR')}
-            icon={Package}
-            subtitle={`${metrics.volume.uniqueCustomers} clientes únicos`}
+            title="Clientes que Iniciaram com Amostras"
+            value={metrics.volume.uniqueCustomers.toLocaleString('pt-BR')}
+            icon={Users}
+            subtitle="Primeiro pedido foi apenas Kit de Amostras"
+            variant="success"
           />
           <SalesMetricCard
             title="Taxa de Recompra"
@@ -290,26 +291,29 @@ const AnaliseSamples = () => {
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total de Amostras</CardTitle>
-                <Package className="h-5 w-5 text-primary" />
+                <CardTitle className="text-sm font-medium">Clientes Qualificados</CardTitle>
+                <Users className="h-5 w-5 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{metrics.volume.totalSamples}</div>
+                <div className="text-2xl font-bold">{metrics.volume.uniqueCustomers}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {metrics.volume.percentageOfTotal.toFixed(2)}% do total de produtos
+                  {metrics.volume.percentageOfTotal.toFixed(2)}% do total de clientes
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Iniciaram jornada com apenas amostra
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Clientes Únicos</CardTitle>
-                <Users className="h-5 w-5 text-primary" />
+                <CardTitle className="text-sm font-medium">Taxa de Recompra</CardTitle>
+                <TrendingUp className="h-5 w-5 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{metrics.volume.uniqueCustomers}</div>
+                <div className="text-2xl font-bold">{metrics.repurchase.repurchaseRate.toFixed(1)}%</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Compraram pelo menos 1 amostra
+                  {metrics.repurchase.customersWhoRepurchased} clientes recompraram
                 </p>
               </CardContent>
             </Card>
