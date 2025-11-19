@@ -2,12 +2,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DailyVolumeChartProps {
-  data: { date: string; orders: number }[];
+  data: { date: string; orders: number }[] | { month: string; orders: number }[];
   title: string;
   description: string;
+  isMonthly?: boolean;
 }
 
-export const DailyVolumeChart = ({ data, title, description }: DailyVolumeChartProps) => {
+export const DailyVolumeChart = ({ data, title, description, isMonthly = false }: DailyVolumeChartProps) => {
+  // Preparar dados com a chave correta (date ou month)
+  const chartData = data.map(item => ({
+    label: 'date' in item ? item.date : item.month,
+    orders: item.orders
+  }));
   return (
     <Card>
       <CardHeader>
@@ -16,7 +22,7 @@ export const DailyVolumeChart = ({ data, title, description }: DailyVolumeChartP
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={data}>
+          <AreaChart data={chartData}>
             <defs>
               <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.8}/>
@@ -25,9 +31,12 @@ export const DailyVolumeChart = ({ data, title, description }: DailyVolumeChartP
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
-              dataKey="date" 
+              dataKey="label"
               stroke="hsl(var(--muted-foreground))"
-              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+              angle={isMonthly ? 0 : -45}
+              textAnchor={isMonthly ? "middle" : "end"}
+              height={isMonthly ? 60 : 80}
             />
             <YAxis 
               stroke="hsl(var(--muted-foreground))"

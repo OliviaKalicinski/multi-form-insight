@@ -2,12 +2,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DailyRevenueChartProps {
-  data: { date: string; revenue: number }[];
+  data: { date: string; revenue: number }[] | { month: string; revenue: number }[];
   title: string;
   description: string;
+  isMonthly?: boolean;
 }
 
-export const DailyRevenueChart = ({ data, title, description }: DailyRevenueChartProps) => {
+export const DailyRevenueChart = ({ data, title, description, isMonthly = false }: DailyRevenueChartProps) => {
+  // Preparar dados com a chave correta (date ou month)
+  const chartData = data.map(item => ({
+    label: 'date' in item ? item.date : item.month,
+    revenue: item.revenue
+  }));
   return (
     <Card>
       <CardHeader>
@@ -16,7 +22,7 @@ export const DailyRevenueChart = ({ data, title, description }: DailyRevenueChar
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={data}>
+          <AreaChart data={chartData}>
             <defs>
               <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8}/>
@@ -25,9 +31,12 @@ export const DailyRevenueChart = ({ data, title, description }: DailyRevenueChar
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
-              dataKey="date" 
+              dataKey="label"
               stroke="hsl(var(--muted-foreground))"
-              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+              angle={isMonthly ? 0 : -45}
+              textAnchor={isMonthly ? "middle" : "end"}
+              height={isMonthly ? 60 : 80}
             />
             <YAxis 
               stroke="hsl(var(--muted-foreground))"

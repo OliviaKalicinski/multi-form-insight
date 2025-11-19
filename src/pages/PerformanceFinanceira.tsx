@@ -17,6 +17,8 @@ import { PlatformComparisonChart } from "@/components/dashboard/PlatformComparis
 import { calculateFinancialMetrics, analyzeSeasonality } from "@/utils/financialMetrics";
 import { filterOrdersByMonth } from "@/utils/salesCalculator";
 import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function PerformanceFinanceira() {
   const {
@@ -171,22 +173,45 @@ export default function PerformanceFinanceira() {
             <>
               {/* Grid com 2 gráficos lado a lado */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* 1. Faturamento Diário */}
-                <DailyRevenueChart
-                  data={financialMetrics.revenueByDay.map(d => ({
-                    date: d.date,
-                    revenue: d.revenue
-                  }))}
-                  title="Faturamento Diário"
-                  description="Receita gerada por dia no período"
-                />
+                {/* 1. Faturamento (Diário ou Mensal) */}
+                {financialMetrics.isMultiMonth ? (
+                  <DailyRevenueChart
+                    data={financialMetrics.revenueByMonth.map(d => ({
+                      month: format(parse(d.month, "yyyy-MM", new Date()), "MMM/yy", { locale: ptBR }),
+                      revenue: d.revenue
+                    }))}
+                    title="Faturamento Mensal"
+                    description="Receita gerada por mês no período"
+                    isMonthly={true}
+                  />
+                ) : (
+                  <DailyRevenueChart
+                    data={financialMetrics.revenueByDay.map(d => ({
+                      date: d.date,
+                      revenue: d.revenue
+                    }))}
+                    title="Faturamento Diário"
+                    description="Receita gerada por dia no período"
+                    isMonthly={false}
+                  />
+                )}
                 
-                {/* 2. Volume Diário */}
-                <DailyVolumeChart
-                  data={financialMetrics.ordersByDay}
-                  title="Volume Diário"
-                  description="Número de pedidos realizados por dia"
-                />
+                {/* 2. Volume (Diário ou Mensal) */}
+                {financialMetrics.isMultiMonth ? (
+                  <DailyVolumeChart
+                    data={financialMetrics.ordersByMonth}
+                    title="Volume Mensal"
+                    description="Número de pedidos realizados por mês"
+                    isMonthly={true}
+                  />
+                ) : (
+                  <DailyVolumeChart
+                    data={financialMetrics.ordersByDay}
+                    title="Volume Diário"
+                    description="Número de pedidos realizados por dia"
+                    isMonthly={false}
+                  />
+                )}
               </div>
               
               {/* 3. Faturamento Acumulado por Produto */}

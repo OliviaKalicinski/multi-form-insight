@@ -206,8 +206,10 @@ export interface FinancialMetrics {
   ordersByDay: { date: string; orders: number }[];
   revenueByProduct: ProductRevenueData[];
   revenueByMonth: { month: string; revenue: number; orders: number }[];
+  ordersByMonth: { month: string; orders: number }[];
   seasonality: SeasonalityAnalysis;
   orderDistribution: OrderValueDistribution[];
+  isMultiMonth: boolean;
   platformPerformance: PlatformPerformance[];
   topPlatform: string;
   growthRate: number;
