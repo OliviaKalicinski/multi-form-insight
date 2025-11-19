@@ -123,34 +123,6 @@ export default function PerformanceFinanceira() {
         )
       )}
 
-      {/* Alerta sobre frete estimado */}
-      {!comparisonMode && financialMetrics && financialMetrics.usandoEstimativaFrete && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border-l-4 border-yellow-400 rounded-lg">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
-                ⚠️ Frete Estimado em Uso
-              </h4>
-              <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                O CSV carregado não contém a coluna <code className="bg-yellow-100 dark:bg-yellow-900 px-1 py-0.5 rounded font-mono">"Valor do frete"</code> ou 
-                ela está vazia. Os valores de frete estão sendo estimados automaticamente com base na forma de envio:
-              </p>
-              <ul className="text-xs text-yellow-700 dark:text-yellow-300 ml-4 list-disc space-y-1">
-                <li>PAC/Sedex/Correios: ~12% do valor do pedido</li>
-                <li>Transportadora/Jadlog/TNT: ~15% do valor do pedido</li>
-                <li>Frete Expresso: ~18% do valor do pedido</li>
-                <li>Frete Grátis/Retirada: R$ 0</li>
-              </ul>
-              <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                💡 <strong>Para valores precisos:</strong> Exporte os dados do Shopify/outras plataformas incluindo a coluna 
-                de valor de frete e faça o upload novamente.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Cards resumo */}
           {!comparisonMode && financialMetrics && (
             <>

@@ -199,9 +199,6 @@ export interface ProductRevenueData {
 // Financial Metrics
 export interface FinancialMetrics {
   faturamentoTotal: number;
-  faturamentoBruto: number;
-  totalFrete: number;
-  usandoEstimativaFrete: boolean;
   ticketMedio: number;
   ticketMedioReal: number;
   totalPedidos: number;
@@ -221,14 +218,11 @@ export interface FinancialMetrics {
 }
 
 export interface ROASMetrics {
-  faturamentoBruto: number;
-  custoFrete: number;
   faturamentoLiquido: number;
   investimentoAds: number;
   roas: number;
   roi: number;
   margemLiquida: number;
-  usandoEstimativa?: boolean;
 }
 
 export interface SeasonalityAnalysis {
