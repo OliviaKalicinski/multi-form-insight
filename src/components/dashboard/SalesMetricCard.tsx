@@ -8,7 +8,7 @@ interface SalesMetricCardProps {
   title: string;
   value: string | number;
   icon: LucideIcon;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   trend?: {
     value: number;
     label: string;
@@ -63,7 +63,7 @@ export const SalesMetricCard = ({
       </CardHeader>
       <CardContent>
         <div className="text-3xl font-bold text-foreground">{value}</div>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
+        {subtitle && <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>}
         {trend && (
           <p className={cn("text-sm font-medium mt-2", getTrendColor())}>
             {trend.value >= 0 ? "+" : ""}
