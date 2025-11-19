@@ -3,6 +3,22 @@ import { ptBR } from "date-fns/locale";
 import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance } from "@/types/marketing";
 
 /**
+ * Filtra pedidos que contêm APENAS Kit de Amostras
+ * Retorna apenas pedidos com produtos reais (não apenas R$ 0,01)
+ */
+const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => {
+  return orders.filter(order => {
+    // Verificar se o pedido tem outros produtos além de Kit de Amostras
+    const nonSampleProducts = order.produtos.filter(
+      p => p.descricaoAjustada !== 'Kit de Amostras'
+    );
+    
+    // Manter pedido se tiver pelo menos 1 produto que não seja Kit de Amostras
+    return nonSampleProducts.length > 0;
+  });
+};
+
+/**
  * Calcula faturamento total por período (dia/mês/ano)
  */
 export const calculateRevenueByPeriod = (
@@ -233,9 +249,16 @@ export const calculateFinancialMetrics = (
   orders: ProcessedOrder[],
   selectedMonth?: string
 ): FinancialMetrics => {
+  // ===== CÁLCULOS GERAIS (todos os pedidos) =====
   const totalRevenue = orders.reduce((sum, order) => sum + order.valorTotal, 0);
   const totalOrders = orders.length;
   const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  
+  // ===== CÁLCULOS REAIS (sem pedidos de apenas samples) =====
+  const realOrders = filterRealOrders(orders);
+  const realRevenue = realOrders.reduce((sum, order) => sum + order.valorTotal, 0);
+  const totalRealOrders = realOrders.length;
+  const realAverageTicket = totalRealOrders > 0 ? realRevenue / totalRealOrders : 0;
   
   // Calcular produto médio (média de itens por pedido)
   const totalItems = orders.reduce((sum, order) => sum + order.totalItens, 0);
@@ -259,7 +282,9 @@ export const calculateFinancialMetrics = (
   return {
     faturamentoTotal: totalRevenue,
     ticketMedio: averageTicket,
+    ticketMedioReal: realAverageTicket,
     totalPedidos: totalOrders,
+    totalPedidosReais: totalRealOrders,
     produtoMedio,
     revenueByDay: revenueEvolution,
     revenueByMonth,

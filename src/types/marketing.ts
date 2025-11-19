@@ -191,7 +191,9 @@ export interface SalesMetrics {
 export interface FinancialMetrics {
   faturamentoTotal: number;
   ticketMedio: number;
+  ticketMedioReal: number;
   totalPedidos: number;
+  totalPedidosReais: number;
   produtoMedio: number;
   revenueByDay: { date: string; revenue: number; cumulativeRevenue: number }[];
   revenueByMonth: { month: string; revenue: number; orders: number }[];
