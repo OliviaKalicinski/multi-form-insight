@@ -2,6 +2,7 @@ import { format, parse, startOfMonth, differenceInMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance, ProductRevenueData } from "@/types/marketing";
 import { extractDailyOrders } from './salesCalculator';
+import { breakdownOrders } from './orderBreakdown';
 
 /**
  * Filtra pedidos que contêm APENAS Kit de Amostras
@@ -266,19 +267,20 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
 
 /**
  * Calcula o faturamento acumulado por produto individual
- * Exclui kits de produtos mas INCLUI amostras
+ * Desmembra kits em produtos individuais
  */
 export const calculateAccumulatedRevenueByProduct = (
   orders: ProcessedOrder[],
   topN: number = 15
 ): ProductRevenueData[] => {
+  // Desmembrar kits em produtos individuais
+  const brokenDownOrders = breakdownOrders(orders);
+  
   const productMap = new Map<string, number>();
   let totalRevenue = 0;
   
-  orders.forEach(order => {
+  brokenDownOrders.forEach(order => {
     order.produtos.forEach(produto => {
-      // Incluir TODOS os produtos individuais (amostras incluídas)
-      // A descricaoAjustada já está normalizada
       const productName = produto.descricaoAjustada;
       const revenue = produto.preco * produto.quantidade;
       
@@ -300,7 +302,7 @@ export const calculateAccumulatedRevenueByProduct = (
       percentage: (revenue / totalRevenue) * 100
     }))
     .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, topN); // Pegar apenas top N
+    .slice(0, topN);
   
   return productRevenues;
 };

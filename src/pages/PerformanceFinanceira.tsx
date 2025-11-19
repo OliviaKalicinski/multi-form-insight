@@ -10,19 +10,23 @@ import { FinancialSummaryCards } from "@/components/dashboard/FinancialSummaryCa
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
 import { DailyVolumeChart } from "@/components/dashboard/DailyVolumeChart";
-import { ProductAccumulatedRevenueChart } from "@/components/dashboard/ProductAccumulatedRevenueChart";
+import { ProductRevenuePieChart } from "@/components/dashboard/ProductRevenuePieChart";
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
 import { OrderDistributionChart } from "@/components/dashboard/OrderDistributionChart";
 import { PlatformComparisonChart } from "@/components/dashboard/PlatformComparisonChart";
+import { ROASCard } from "@/components/dashboard/ROASCard";
 import { calculateFinancialMetrics, analyzeSeasonality } from "@/utils/financialMetrics";
 import { filterOrdersByMonth } from "@/utils/salesCalculator";
 import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
+import { calculateROAS } from "@/utils/roasCalculator";
+import { filterAdsByMonth } from "@/utils/adsParserV2";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function PerformanceFinanceira() {
   const {
     salesData,
+    adsData,
     selectedMonth,
     availableMonths,
     comparisonMode,
@@ -41,6 +45,16 @@ export default function PerformanceFinanceira() {
     const filteredOrders = filterOrdersByMonth(salesData, selectedMonth, availableMonths);
     return calculateFinancialMetrics(filteredOrders, selectedMonth);
   }, [salesData, selectedMonth, availableMonths]);
+
+  // Calcular ROAS
+  const roasMetrics = useMemo(() => {
+    if (salesData.length === 0 || adsData.length === 0 || !selectedMonth) return null;
+    
+    const filteredOrders = filterOrdersByMonth(salesData, selectedMonth, availableMonths);
+    const filteredAds = filterAdsByMonth(adsData, selectedMonth);
+    
+    return calculateROAS(filteredOrders, filteredAds);
+  }, [salesData, adsData, selectedMonth, availableMonths]);
 
   // Métricas de comparação (quando comparisonMode ativo)
   const comparisonMetrics = useMemo(() => {
@@ -111,7 +125,14 @@ export default function PerformanceFinanceira() {
 
       {/* Cards resumo */}
       {!comparisonMode && financialMetrics && (
-        <FinancialSummaryCards metrics={financialMetrics} />
+        <>
+          <FinancialSummaryCards metrics={financialMetrics} />
+          
+          {/* Card de ROAS Real */}
+          {roasMetrics && (
+            <ROASCard metrics={roasMetrics} />
+          )}
+        </>
       )}
 
       {/* Cards de comparação */}
@@ -215,11 +236,10 @@ export default function PerformanceFinanceira() {
               </div>
               
               {/* 3. Faturamento Acumulado por Produto */}
-              <ProductAccumulatedRevenueChart
+              <ProductRevenuePieChart
                 data={financialMetrics.revenueByProduct}
                 title="Faturamento Acumulado por Produto"
-                description="Top 15 produtos individuais (incluindo amostras)"
-                topN={15}
+                description="Top 15 produtos individuais (kits desmembrados)"
               />
             </>
           )}
