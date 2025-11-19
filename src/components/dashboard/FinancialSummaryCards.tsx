@@ -27,10 +27,18 @@ export const FinancialSummaryCards = ({ metrics }: FinancialSummaryCardsProps) =
       />
 
       <SalesMetricCard
-        title="Ticket Médio"
+        title="Ticket Médio Geral"
         value={formatCurrency(metrics.ticketMedio)}
         icon={TrendingUp}
-        subtitle="Por pedido"
+        subtitle={`${formatQuantity(metrics.totalPedidos)} pedidos`}
+      />
+
+      <SalesMetricCard
+        title="Ticket Médio Real"
+        value={formatCurrency(metrics.ticketMedioReal)}
+        icon={TrendingUp}
+        subtitle={`${formatQuantity(metrics.totalPedidosReais)} pedidos (sem samples)`}
+        variant="success"
       />
 
       <SalesMetricCard
