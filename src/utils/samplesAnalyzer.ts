@@ -218,12 +218,12 @@ export const calculateCrossSellMetrics = (orders: ProcessedOrder[]): SampleMetri
     };
   }
   
-  // Pedidos com APENAS amostra (1 linha de produto)
-  const onlySampleOrders = ordersWithSample.filter(o => o.produtos.length === 1);
+  // Pedidos com APENAS amostra (TODOS os produtos são amostras)
+  const onlySampleOrders = ordersWithSample.filter(o => isOnlySampleOrder(o));
   const onlySample = new Set(onlySampleOrders.map(o => o.numeroPedido)).size;
   
-  // Pedidos com amostra + outros (2+ linhas)
-  const samplePlusOrders = ordersWithSample.filter(o => o.produtos.length > 1);
+  // Pedidos com amostra + outros produtos (mix de amostra + produtos regulares)
+  const samplePlusOrders = ordersWithSample.filter(o => !isOnlySampleOrder(o));
   const samplePlusOthers = new Set(samplePlusOrders.map(o => o.numeroPedido)).size;
   
   // Produtos mais comprados junto (excluir amostras)
