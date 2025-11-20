@@ -38,8 +38,9 @@ const AnaliseSamples = () => {
     if (filteredOrders.length === 0) {
       return null;
     }
-    return calculateAllSampleMetrics(filteredOrders);
-  }, [filteredOrders]);
+    // Passar pedidos filtrados E histórico completo
+    return calculateAllSampleMetrics(filteredOrders, salesData);
+  }, [filteredOrders, salesData]);
 
   const dataPeriod = useMemo(() => {
     if (filteredOrders.length === 0) return null;
@@ -53,7 +54,8 @@ const AnaliseSamples = () => {
     
     return selectedMonths.map(month => {
       const orders = filterOrdersByMonth(salesData, month, availableMonths);
-      const monthMetrics = calculateAllSampleMetrics(orders);
+      // Passar pedidos filtrados E histórico completo
+      const monthMetrics = calculateAllSampleMetrics(orders, salesData);
       
       const formatMonthLabel = (m: string) => {
         if (m === 'last-12-months') return 'Últimos 12 meses';
@@ -199,6 +201,43 @@ const AnaliseSamples = () => {
         </Card>
       )}
 
+      {/* Indicador de Maturidade da Análise */}
+      {metrics.maturity && (
+        <Card className={metrics.maturity.isReliableAnalysis ? "border-primary bg-primary/5" : "border-warning bg-warning/10"}>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Clock className={`h-5 w-5 mt-0.5 ${metrics.maturity.isReliableAnalysis ? 'text-primary' : 'text-warning'}`} />
+              <div className="flex-1">
+                <p className={`font-medium ${metrics.maturity.isReliableAnalysis ? 'text-primary' : 'text-warning'}`}>
+                  {metrics.maturity.isReliableAnalysis ? '✅ Análise confiável' : '⚠️ Janela de análise limitada'}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {metrics.maturity.percentageWith60Days.toFixed(0)}% dos clientes ({metrics.maturity.customersWithAtLeast60Days} de {metrics.maturity.totalQualifiedCustomers}) 
+                  tiveram pelo menos 60 dias desde a compra da amostra.
+                </p>
+                {!metrics.maturity.isReliableAnalysis && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    📊 Muitos clientes compraram amostra recentemente. A taxa de recompra pode aumentar com o tempo.
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Tempo médio desde amostra</p>
+                    <p className="text-sm font-semibold">{Math.round(metrics.maturity.avgDaysSinceSample)} dias</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Clientes com 90+ dias</p>
+                    <p className="text-sm font-semibold">
+                      {metrics.maturity.customersWithAtLeast90Days} ({metrics.maturity.percentageWith90Days.toFixed(0)}%)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Cards principais */}
       {comparisonMode && comparisonMetrics ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -287,9 +326,10 @@ const AnaliseSamples = () => {
 
       {/* Tabs com análises detalhadas */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">📊 Visão Geral</TabsTrigger>
           <TabsTrigger value="repurchase">🔄 Recompra</TabsTrigger>
+          <TabsTrigger value="cohort">⏱️ Coorte</TabsTrigger>
           <TabsTrigger value="crosssell">🛒 Cross-sell</TabsTrigger>
           <TabsTrigger value="profile">👤 Perfil</TabsTrigger>
           <TabsTrigger value="trends">📈 Tendências</TabsTrigger>
@@ -420,6 +460,151 @@ const AnaliseSamples = () => {
               products={metrics.quality.topRepurchaseProducts.slice(0, 5)}
             />
           </div>
+        </TabsContent>
+
+        {/* Aba: Análise de Coorte Temporal */}
+        <TabsContent value="cohort" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>⏱️ Taxa de Recompra por Tempo desde Amostra</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Análise segmentada por quanto tempo os clientes tiveram desde a compra da amostra para recomprar
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4 font-semibold">Período</th>
+                      <th className="text-right py-3 px-4 font-semibold">Clientes</th>
+                      <th className="text-right py-3 px-4 font-semibold">Recompras</th>
+                      <th className="text-right py-3 px-4 font-semibold">Taxa</th>
+                      <th className="text-right py-3 px-4 font-semibold">Ticket Médio</th>
+                      <th className="text-right py-3 px-4 font-semibold">Dias até Recompra</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {metrics.cohortAnalysis.cohorts.map((cohort, index) => (
+                      <tr key={index} className="border-b hover:bg-muted/50">
+                        <td className="py-3 px-4 font-medium">{cohort.rangeLabel}</td>
+                        <td className="text-right py-3 px-4">{cohort.customerCount}</td>
+                        <td className="text-right py-3 px-4">{cohort.repurchaseCount}</td>
+                        <td className="text-right py-3 px-4">
+                          <span className={`font-semibold ${cohort.repurchaseRate > 30 ? 'text-primary' : cohort.repurchaseRate > 15 ? 'text-warning' : 'text-muted-foreground'}`}>
+                            {cohort.repurchaseRate.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="text-right py-3 px-4">
+                          {cohort.avgTicket > 0 ? formatCurrency(cohort.avgTicket) : '-'}
+                        </td>
+                        <td className="text-right py-3 px-4">
+                          {cohort.avgDaysToRepurchase > 0 ? `${Math.round(cohort.avgDaysToRepurchase)} dias` : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>📊 Taxa de Recompra por Coorte</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={metrics.cohortAnalysis.cohorts}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="rangeLabel" 
+                      tick={{ fontSize: 12 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis 
+                      label={{ value: 'Taxa de Recompra (%)', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => `${value.toFixed(1)}%`}
+                      labelFormatter={(label) => `Período: ${label}`}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="repurchaseRate" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))', r: 5 }}
+                      name="Taxa de Recompra"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>👥 Distribuição de Clientes por Coorte</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={metrics.cohortAnalysis.cohorts}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="rangeLabel" 
+                      tick={{ fontSize: 12 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis 
+                      label={{ value: 'Número de Clientes', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Tooltip 
+                      labelFormatter={(label) => `Período: ${label}`}
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="customerCount" 
+                      stroke="hsl(var(--chart-1))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-1))', r: 4 }}
+                      name="Total de Clientes"
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="repurchaseCount" 
+                      stroke="hsl(var(--chart-2))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-2))', r: 4 }}
+                      name="Clientes que Recompraram"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="bg-muted/50">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Target className="h-5 w-5 text-primary mt-0.5" />
+                <div>
+                  <p className="font-medium">💡 Insights da Análise de Coorte</p>
+                  <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+                    <li>Clientes mais recentes (0-30 dias) ainda não tiveram tempo suficiente para recomprar</li>
+                    <li>A taxa de recompra tende a estabilizar após 90+ dias desde a amostra</li>
+                    <li>Coortes com mais tempo mostram o potencial real de conversão da estratégia de amostras</li>
+                    <li>Use esta análise para projetar taxas de recompra futuras de clientes novos</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Aba: Cross-sell */}

@@ -412,7 +412,7 @@ export interface SampleMetrics {
     topRepurchaseProducts: { product: string; count: number }[];
   };
   profile: {
-    platformDistribution: { platform: string; count: number }[];
+    platformDistribution: { platform: string; count: number; percentage: number }[];
     shippingMethods: { method: string; count: number }[];
     avgFirstOrderValue: number;
   };
@@ -427,6 +427,26 @@ export interface SampleMetrics {
   };
   temporal: {
     monthlyData: { month: string; count: number; growthRate: number }[];
+  };
+  maturity: {
+    totalQualifiedCustomers: number;
+    customersWithAtLeast60Days: number;
+    customersWithAtLeast90Days: number;
+    percentageWith60Days: number;
+    percentageWith90Days: number;
+    avgDaysSinceSample: number;
+    isReliableAnalysis: boolean;
+  };
+  cohortAnalysis: {
+    cohorts: {
+      range: string;
+      rangeLabel: string;
+      customerCount: number;
+      repurchaseCount: number;
+      repurchaseRate: number;
+      avgTicket: number;
+      avgDaysToRepurchase: number;
+    }[];
   };
 }
 
