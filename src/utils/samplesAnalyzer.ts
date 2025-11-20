@@ -129,16 +129,18 @@ export const calculateSampleVolume = (orders: ProcessedOrder[]): SampleMetrics['
 };
 
 /**
- * Calcula comportamento de recompra - usa histórico COMPLETO para análise correta
+ * Calcula métricas de comportamento de recompra - apenas clientes qualificados
+ * Identifica clientes que compraram amostra NO PERÍODO FILTRADO
+ * Mas verifica se recompraram em TODO o histórico
  */
 export const calculateRepurchaseBehavior = (
   filteredOrders: ProcessedOrder[], 
   allOrders: ProcessedOrder[]
 ): SampleMetrics['repurchase'] => {
-  // Usar TODOS os pedidos para identificar clientes qualificados
-  const qualifiedCustomers = getQualifiedSampleCustomers(allOrders);
+  // 1. Identificar clientes que compraram amostra NO PERÍODO FILTRADO
+  const qualifiedCustomersInPeriod = getQualifiedSampleCustomers(filteredOrders);
   
-  if (qualifiedCustomers.size === 0) {
+  if (qualifiedCustomersInPeriod.size === 0) {
     return {
       repurchaseRate: 0,
       customersWhoRepurchased: 0,
@@ -148,12 +150,27 @@ export const calculateRepurchaseBehavior = (
     };
   }
   
-  // Clientes com 2+ pedidos = recompraram
-  const customersWithRepurchase = Array.from(qualifiedCustomers.values()).filter(
-    c => c.totalOrders >= 2
-  );
+  // 2. Para cada cliente identificado no período, buscar seu histórico COMPLETO
+  const customersWithRepurchase: CustomerPurchaseHistory[] = [];
   
-  const repurchaseRate = (customersWithRepurchase.length / qualifiedCustomers.size) * 100;
+  qualifiedCustomersInPeriod.forEach((customerInPeriod, cpfCnpj) => {
+    // Buscar TODOS os pedidos deste cliente no histórico completo
+    const allCustomerOrders = allOrders
+      .filter(o => o.cpfCnpj === cpfCnpj)
+      .sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
+    
+    // Se tem 2+ pedidos no histórico completo = recomprou
+    if (allCustomerOrders.length >= 2) {
+      customersWithRepurchase.push({
+        ...customerInPeriod,
+        orders: allCustomerOrders,
+        totalOrders: allCustomerOrders.length,
+        totalRevenue: allCustomerOrders.reduce((sum, o) => sum + o.valorTotal, 0),
+      });
+    }
+  });
+  
+  const repurchaseRate = (customersWithRepurchase.length / qualifiedCustomersInPeriod.size) * 100;
   
   // Calcular métricas
   let totalValue = 0;
@@ -637,11 +654,17 @@ export const calculateMaturityMetrics = (allOrders: ProcessedOrder[]): SampleMet
 
 /**
  * Análise de coorte temporal: agrupa clientes por tempo desde compra da amostra
+ * Analisa clientes que compraram amostra NO PERÍODO FILTRADO
+ * Mas considera recompras em TODO o histórico
  */
-export const calculateCohortAnalysis = (allOrders: ProcessedOrder[]): SampleMetrics['cohortAnalysis'] => {
-  const qualifiedCustomers = getQualifiedSampleCustomers(allOrders);
+export const calculateCohortAnalysis = (
+  filteredOrders: ProcessedOrder[],
+  allOrders: ProcessedOrder[]
+): SampleMetrics['cohortAnalysis'] => {
+  // Identificar clientes que compraram amostra NO PERÍODO FILTRADO
+  const qualifiedCustomersInPeriod = getQualifiedSampleCustomers(filteredOrders);
   
-  if (qualifiedCustomers.size === 0) {
+  if (qualifiedCustomersInPeriod.size === 0) {
     return { cohorts: [] };
   }
   
@@ -657,29 +680,41 @@ export const calculateCohortAnalysis = (allOrders: ProcessedOrder[]): SampleMetr
   ];
   
   const cohortData = cohorts.map(cohort => {
-    const customersInCohort = Array.from(qualifiedCustomers.values()).filter(customer => {
+    // Para cada cliente do período, verificar seu histórico completo
+    const customersInCohort = Array.from(qualifiedCustomersInPeriod.values()).filter(customer => {
       const firstOrder = customer.orders[0];
       const daysSinceSample = differenceInDays(today, firstOrder.dataVenda);
       return daysSinceSample >= cohort.min && daysSinceSample <= cohort.max;
     });
     
-    const customersWhoRepurchased = customersInCohort.filter(c => c.totalOrders >= 2);
+    // Para cada cliente, buscar histórico completo para verificar recompra
+    const customersWhoRepurchased = customersInCohort.filter(customerInPeriod => {
+      const allCustomerOrders = allOrders
+        .filter(o => o.cpfCnpj === customerInPeriod.cpfCnpj)
+        .sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
+      
+      return allCustomerOrders.length >= 2;
+    });
     
     let totalTicket = 0;
     let totalDaysToRepurchase = 0;
     let repurchaseCount = 0;
     
-    customersWhoRepurchased.forEach(customer => {
-      const sortedOrders = customer.orders;
-      const repurchaseOrders = sortedOrders.slice(1);
+    customersWhoRepurchased.forEach(customerInPeriod => {
+      // Buscar histórico completo deste cliente
+      const allCustomerOrders = allOrders
+        .filter(o => o.cpfCnpj === customerInPeriod.cpfCnpj)
+        .sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
+      
+      const repurchaseOrders = allCustomerOrders.slice(1);
       
       repurchaseOrders.forEach(order => {
         totalTicket += order.valorTotal;
       });
       
-      if (sortedOrders.length >= 2) {
-        const firstOrder = sortedOrders[0];
-        const secondOrder = sortedOrders[1];
+      if (allCustomerOrders.length >= 2) {
+        const firstOrder = allCustomerOrders[0];
+        const secondOrder = allCustomerOrders[1];
         const days = differenceInDays(secondOrder.dataVenda, firstOrder.dataVenda);
         totalDaysToRepurchase += days;
         repurchaseCount++;
@@ -690,8 +725,13 @@ export const calculateCohortAnalysis = (allOrders: ProcessedOrder[]): SampleMetr
       ? (customersWhoRepurchased.length / customersInCohort.length) * 100
       : 0;
     
-    const avgTicket = customersWhoRepurchased.length > 0
-      ? totalTicket / customersWhoRepurchased.reduce((sum, c) => sum + (c.totalOrders - 1), 0)
+    const totalRepurchaseOrders = customersWhoRepurchased.reduce((sum, customerInPeriod) => {
+      const allCustomerOrders = allOrders.filter(o => o.cpfCnpj === customerInPeriod.cpfCnpj);
+      return sum + (allCustomerOrders.length - 1); // -1 para excluir amostra inicial
+    }, 0);
+    
+    const avgTicket = totalRepurchaseOrders > 0
+      ? totalTicket / totalRepurchaseOrders
       : 0;
     
     const avgDaysToRepurchase = repurchaseCount > 0
@@ -753,7 +793,7 @@ export const calculateAllSampleMetrics = (
     basket: calculateBasketAnalysis(orders),
     segmentation: calculateBehaviorSegmentation(orders),
     temporal: calculateTemporalAnalysis(orders),
-    maturity: calculateMaturityMetrics(fullHistory),
-    cohortAnalysis: calculateCohortAnalysis(fullHistory),
+    maturity: calculateMaturityMetrics(orders),
+    cohortAnalysis: calculateCohortAnalysis(orders, fullHistory),
   };
 };
