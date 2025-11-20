@@ -129,10 +129,14 @@ export const calculateSampleVolume = (orders: ProcessedOrder[]): SampleMetrics['
 };
 
 /**
- * Calcula comportamento de recompra - apenas clientes qualificados
+ * Calcula comportamento de recompra - usa histórico COMPLETO para análise correta
  */
-export const calculateRepurchaseBehavior = (orders: ProcessedOrder[]): SampleMetrics['repurchase'] => {
-  const qualifiedCustomers = getQualifiedSampleCustomers(orders);
+export const calculateRepurchaseBehavior = (
+  filteredOrders: ProcessedOrder[], 
+  allOrders: ProcessedOrder[]
+): SampleMetrics['repurchase'] => {
+  // Usar TODOS os pedidos para identificar clientes qualificados
+  const qualifiedCustomers = getQualifiedSampleCustomers(allOrders);
   
   if (qualifiedCustomers.size === 0) {
     return {
@@ -577,10 +581,151 @@ export const calculateDataPeriod = (orders: ProcessedOrder[]) => {
 };
 
 /**
- * Calcula todas as métricas de amostra de uma vez
+ * Calcula métricas de maturidade dos clientes (quanto tempo tiveram para recomprar)
  */
-export const calculateAllSampleMetrics = (orders: ProcessedOrder[]): SampleMetrics => {
-  console.log(`🎁 Analisando amostras de ${orders.length} pedidos totais`);
+export const calculateMaturityMetrics = (allOrders: ProcessedOrder[]): SampleMetrics['maturity'] => {
+  const qualifiedCustomers = getQualifiedSampleCustomers(allOrders);
+  
+  if (qualifiedCustomers.size === 0) {
+    return {
+      totalQualifiedCustomers: 0,
+      customersWithAtLeast60Days: 0,
+      customersWithAtLeast90Days: 0,
+      percentageWith60Days: 0,
+      percentageWith90Days: 0,
+      avgDaysSinceSample: 0,
+      isReliableAnalysis: false,
+    };
+  }
+  
+  const today = new Date();
+  let totalDaysSinceSample = 0;
+  let customersWith60Days = 0;
+  let customersWith90Days = 0;
+  
+  qualifiedCustomers.forEach(customer => {
+    const firstOrder = customer.orders[0]; // Pedido de amostra
+    const daysSinceSample = differenceInDays(today, firstOrder.dataVenda);
+    
+    totalDaysSinceSample += daysSinceSample;
+    
+    if (daysSinceSample >= 60) {
+      customersWith60Days++;
+    }
+    if (daysSinceSample >= 90) {
+      customersWith90Days++;
+    }
+  });
+  
+  const avgDaysSinceSample = totalDaysSinceSample / qualifiedCustomers.size;
+  const percentageWith60Days = (customersWith60Days / qualifiedCustomers.size) * 100;
+  const percentageWith90Days = (customersWith90Days / qualifiedCustomers.size) * 100;
+  
+  // Análise é confiável se pelo menos 70% dos clientes tiveram 60+ dias
+  const isReliableAnalysis = percentageWith60Days >= 70;
+  
+  return {
+    totalQualifiedCustomers: qualifiedCustomers.size,
+    customersWithAtLeast60Days: customersWith60Days,
+    customersWithAtLeast90Days: customersWith90Days,
+    percentageWith60Days,
+    percentageWith90Days,
+    avgDaysSinceSample,
+    isReliableAnalysis,
+  };
+};
+
+/**
+ * Análise de coorte temporal: agrupa clientes por tempo desde compra da amostra
+ */
+export const calculateCohortAnalysis = (allOrders: ProcessedOrder[]): SampleMetrics['cohortAnalysis'] => {
+  const qualifiedCustomers = getQualifiedSampleCustomers(allOrders);
+  
+  if (qualifiedCustomers.size === 0) {
+    return { cohorts: [] };
+  }
+  
+  const today = new Date();
+  
+  // Definir coortes
+  const cohorts = [
+    { range: '0-30', rangeLabel: '0-30 dias', min: 0, max: 30 },
+    { range: '31-60', rangeLabel: '31-60 dias', min: 31, max: 60 },
+    { range: '61-90', rangeLabel: '61-90 dias', min: 61, max: 90 },
+    { range: '91-180', rangeLabel: '91-180 dias', min: 91, max: 180 },
+    { range: '181+', rangeLabel: '181+ dias', min: 181, max: Infinity },
+  ];
+  
+  const cohortData = cohorts.map(cohort => {
+    const customersInCohort = Array.from(qualifiedCustomers.values()).filter(customer => {
+      const firstOrder = customer.orders[0];
+      const daysSinceSample = differenceInDays(today, firstOrder.dataVenda);
+      return daysSinceSample >= cohort.min && daysSinceSample <= cohort.max;
+    });
+    
+    const customersWhoRepurchased = customersInCohort.filter(c => c.totalOrders >= 2);
+    
+    let totalTicket = 0;
+    let totalDaysToRepurchase = 0;
+    let repurchaseCount = 0;
+    
+    customersWhoRepurchased.forEach(customer => {
+      const sortedOrders = customer.orders;
+      const repurchaseOrders = sortedOrders.slice(1);
+      
+      repurchaseOrders.forEach(order => {
+        totalTicket += order.valorTotal;
+      });
+      
+      if (sortedOrders.length >= 2) {
+        const firstOrder = sortedOrders[0];
+        const secondOrder = sortedOrders[1];
+        const days = differenceInDays(secondOrder.dataVenda, firstOrder.dataVenda);
+        totalDaysToRepurchase += days;
+        repurchaseCount++;
+      }
+    });
+    
+    const repurchaseRate = customersInCohort.length > 0
+      ? (customersWhoRepurchased.length / customersInCohort.length) * 100
+      : 0;
+    
+    const avgTicket = customersWhoRepurchased.length > 0
+      ? totalTicket / customersWhoRepurchased.reduce((sum, c) => sum + (c.totalOrders - 1), 0)
+      : 0;
+    
+    const avgDaysToRepurchase = repurchaseCount > 0
+      ? totalDaysToRepurchase / repurchaseCount
+      : 0;
+    
+    return {
+      range: cohort.range,
+      rangeLabel: cohort.rangeLabel,
+      customerCount: customersInCohort.length,
+      repurchaseCount: customersWhoRepurchased.length,
+      repurchaseRate,
+      avgTicket,
+      avgDaysToRepurchase,
+    };
+  });
+  
+  return { cohorts: cohortData };
+};
+
+/**
+ * Calcula todas as métricas de amostra de uma vez
+ * @param orders - Pedidos filtrados pelo período selecionado
+ * @param allOrders - Histórico COMPLETO de pedidos (sem filtro)
+ */
+export const calculateAllSampleMetrics = (
+  orders: ProcessedOrder[], 
+  allOrders?: ProcessedOrder[]
+): SampleMetrics => {
+  // Se allOrders não for fornecido, usar orders como fallback
+  const fullHistory = allOrders || orders;
+  
+  console.log(`🎁 Analisando amostras de ${orders.length} pedidos filtrados`);
+  console.log(`🎁 Histórico completo: ${fullHistory.length} pedidos`);
   
   const sampleOrders = orders.filter(isSampleOrder);
   console.log(`🎁 Pedidos de amostras encontrados: ${sampleOrders.length}`);
@@ -600,7 +745,7 @@ export const calculateAllSampleMetrics = (orders: ProcessedOrder[]): SampleMetri
   
   return {
     volume: calculateSampleVolume(orders),
-    repurchase: calculateRepurchaseBehavior(orders),
+    repurchase: calculateRepurchaseBehavior(orders, fullHistory),
     crossSell: calculateCrossSellMetrics(orders),
     conversionByTime: calculateConversionByTime(orders),
     quality: calculateRepurchaseQuality(orders),
@@ -608,5 +753,7 @@ export const calculateAllSampleMetrics = (orders: ProcessedOrder[]): SampleMetri
     basket: calculateBasketAnalysis(orders),
     segmentation: calculateBehaviorSegmentation(orders),
     temporal: calculateTemporalAnalysis(orders),
+    maturity: calculateMaturityMetrics(fullHistory),
+    cohortAnalysis: calculateCohortAnalysis(fullHistory),
   };
 };
