@@ -328,9 +328,16 @@ export const calculateFinancialMetrics = (
   const totalRealOrders = realOrders.length;
   const realAverageTicket = totalRealOrders > 0 ? realRevenue / totalRealOrders : 0;
   
-  // Calcular produto médio (média de itens por pedido)
-  const totalItems = orders.reduce((sum, order) => sum + order.totalItens, 0);
-  const produtoMedio = totalOrders > 0 ? totalItems / totalOrders : 0;
+  // Calcular produto médio (média de produtos individuais por pedido, após desmembramento de kits)
+  const brokenDownOrders = breakdownOrders(orders);
+  
+  // Contar quantidade total de produtos individuais
+  const totalIndividualItems = brokenDownOrders.reduce((sum, order) => {
+    return sum + order.produtos.reduce((pSum, produto) => pSum + produto.quantidade, 0);
+  }, 0);
+  
+  // Calcular média de produtos individuais por pedido
+  const produtoMedio = totalOrders > 0 ? totalIndividualItems / totalOrders : 0;
 
   const revenueEvolution = calculateRevenueEvolution(orders);
   const revenueByMonth = calculateRevenueByPeriod(orders, 'month').map((item) => ({
