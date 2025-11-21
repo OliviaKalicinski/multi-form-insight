@@ -328,16 +328,22 @@ export const calculateFinancialMetrics = (
   const totalRealOrders = realOrders.length;
   const realAverageTicket = totalRealOrders > 0 ? realRevenue / totalRealOrders : 0;
   
-  // Calcular produto médio (média de produtos individuais por pedido, após desmembramento de kits)
-  const brokenDownOrders = breakdownOrders(orders);
+  // Calcular produto médio REAL (média de produtos individuais, excluindo amostras)
+  const brokenDownOrders = breakdownOrders(realOrders);
   
-  // Contar quantidade total de produtos individuais
+  // Contar quantidade total de produtos individuais (EXCLUINDO Kit de Amostras)
   const totalIndividualItems = brokenDownOrders.reduce((sum, order) => {
-    return sum + order.produtos.reduce((pSum, produto) => pSum + produto.quantidade, 0);
+    return sum + order.produtos.reduce((pSum, produto) => {
+      // Excluir "Kit de Amostras" da contagem
+      if (produto.descricaoAjustada === 'Kit de Amostras') {
+        return pSum;
+      }
+      return pSum + produto.quantidade;
+    }, 0);
   }, 0);
   
-  // Calcular média de produtos individuais por pedido
-  const produtoMedio = totalOrders > 0 ? totalIndividualItems / totalOrders : 0;
+  // Calcular média de produtos individuais por pedido REAL
+  const produtoMedio = totalRealOrders > 0 ? totalIndividualItems / totalRealOrders : 0;
 
   const revenueEvolution = calculateRevenueEvolution(orders);
   const revenueByMonth = calculateRevenueByPeriod(orders, 'month').map((item) => ({
