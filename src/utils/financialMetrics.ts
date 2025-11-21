@@ -378,6 +378,7 @@ export const calculateFinancialMetrics = (
     ticketMedioReal: realAverageTicket,
     totalPedidos: totalOrders,
     totalPedidosReais: totalRealOrders,
+    totalPedidosApenasAmostras: totalOrders - totalRealOrders,
     produtoMedio,
     revenueByDay: revenueEvolution,
     ordersByDay,
