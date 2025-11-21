@@ -45,7 +45,7 @@ export const FinancialSummaryCards = ({ metrics }: FinancialSummaryCardsProps) =
         title="Total de Pedidos"
         value={formatQuantity(metrics.totalPedidos)}
         icon={ShoppingCart}
-        subtitle="Pedidos únicos"
+        subtitle={`${formatQuantity(metrics.totalPedidosReais)} com produtos • ${formatQuantity(metrics.totalPedidosApenasAmostras)} só amostras`}
       />
 
       <SalesMetricCard

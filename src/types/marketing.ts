@@ -203,6 +203,7 @@ export interface FinancialMetrics {
   ticketMedioReal: number;
   totalPedidos: number;
   totalPedidosReais: number;
+  totalPedidosApenasAmostras: number;
   produtoMedio: number;
   revenueByDay: { date: string; revenue: number; cumulativeRevenue: number }[];
   ordersByDay: { date: string; orders: number }[];
