@@ -14,7 +14,153 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ads_data: {
+        Row: {
+          anuncio: string | null
+          campanha: string | null
+          cliques: number | null
+          conjunto: string | null
+          conversoes: number | null
+          created_at: string | null
+          data: string
+          gasto: number | null
+          id: string
+          impressoes: number | null
+          receita: number | null
+        }
+        Insert: {
+          anuncio?: string | null
+          campanha?: string | null
+          cliques?: number | null
+          conjunto?: string | null
+          conversoes?: number | null
+          created_at?: string | null
+          data: string
+          gasto?: number | null
+          id?: string
+          impressoes?: number | null
+          receita?: number | null
+        }
+        Update: {
+          anuncio?: string | null
+          campanha?: string | null
+          cliques?: number | null
+          conjunto?: string | null
+          conversoes?: number | null
+          created_at?: string | null
+          data?: string
+          gasto?: number | null
+          id?: string
+          impressoes?: number | null
+          receita?: number | null
+        }
+        Relationships: []
+      }
+      followers_data: {
+        Row: {
+          created_at: string | null
+          data: string
+          id: string
+          novos_seguidores: number | null
+          total_seguidores: number | null
+          unfollows: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data: string
+          id?: string
+          novos_seguidores?: number | null
+          total_seguidores?: number | null
+          unfollows?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: string
+          id?: string
+          novos_seguidores?: number | null
+          total_seguidores?: number | null
+          unfollows?: number | null
+        }
+        Relationships: []
+      }
+      marketing_data: {
+        Row: {
+          created_at: string | null
+          data: string
+          id: string
+          metrica: string | null
+          valor: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data: string
+          id?: string
+          metrica?: string | null
+          valor?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: string
+          id?: string
+          metrica?: string | null
+          valor?: number | null
+        }
+        Relationships: []
+      }
+      sales_data: {
+        Row: {
+          canal: string | null
+          cidade: string | null
+          cliente_email: string | null
+          cliente_nome: string | null
+          created_at: string | null
+          cupom: string | null
+          data_venda: string
+          estado: string | null
+          forma_envio: string | null
+          id: string
+          numero_pedido: string
+          produtos: Json
+          status: string | null
+          valor_frete: number | null
+          valor_total: number
+        }
+        Insert: {
+          canal?: string | null
+          cidade?: string | null
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          cupom?: string | null
+          data_venda: string
+          estado?: string | null
+          forma_envio?: string | null
+          id?: string
+          numero_pedido: string
+          produtos: Json
+          status?: string | null
+          valor_frete?: number | null
+          valor_total: number
+        }
+        Update: {
+          canal?: string | null
+          cidade?: string | null
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          created_at?: string | null
+          cupom?: string | null
+          data_venda?: string
+          estado?: string | null
+          forma_envio?: string | null
+          id?: string
+          numero_pedido?: string
+          produtos?: Json
+          status?: string | null
+          valor_frete?: number | null
+          valor_total?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
