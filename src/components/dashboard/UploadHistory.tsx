@@ -2,7 +2,19 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { formatDistanceToNow, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
@@ -11,8 +23,12 @@ import {
   Megaphone, 
   Users, 
   BarChart3,
-  Calendar
+  Calendar,
+  Trash2,
+  Loader2
 } from "lucide-react";
+import { useDashboard } from "@/contexts/DashboardContext";
+import { useToast } from "@/hooks/use-toast";
 
 interface UploadHistoryEntry {
   id: string;
@@ -54,31 +70,52 @@ const formatDateRange = (start: string | null, end: string | null): string | nul
 export function UploadHistory() {
   const [history, setHistory] = useState<UploadHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { deleteUpload } = useDashboard();
+  const { toast } = useToast();
+
+  const fetchHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("upload_history")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error("Error fetching upload history:", error);
+        return;
+      }
+
+      setHistory(data || []);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("upload_history")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(20);
-
-        if (error) {
-          console.error("Error fetching upload history:", error);
-          return;
-        }
-
-        setHistory(data || []);
-      } catch (err) {
-        console.error("Unexpected error:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchHistory();
   }, []);
+
+  const handleDelete = async (entry: UploadHistoryEntry) => {
+    setDeletingId(entry.id);
+    try {
+      await deleteUpload(entry.id);
+      // Remove from local state
+      setHistory(prev => prev.filter(h => h.id !== entry.id));
+    } catch (error) {
+      console.error("Error deleting upload:", error);
+      toast({
+        title: "Erro ao excluir",
+        description: "Não foi possível excluir a importação.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -136,6 +173,7 @@ export function UploadHistory() {
           const config = dataTypeConfig[entry.data_type] || dataTypeConfig.sales;
           const Icon = config.icon;
           const dateRange = formatDateRange(entry.date_range_start, entry.date_range_end);
+          const isDeleting = deletingId === entry.id;
           
           return (
             <div 
@@ -157,16 +195,59 @@ export function UploadHistory() {
                   </p>
                 )}
               </div>
-              <div className="text-right">
-                <Badge variant="secondary" className="text-xs">
-                  {entry.record_count} registros
-                </Badge>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatDistanceToNow(new Date(entry.created_at), { 
-                    addSuffix: true,
-                    locale: ptBR 
-                  })}
-                </p>
+              <div className="text-right flex items-center gap-2">
+                <div>
+                  <Badge variant="secondary" className="text-xs">
+                    {entry.record_count} registros
+                  </Badge>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatDistanceToNow(new Date(entry.created_at), { 
+                      addSuffix: true,
+                      locale: ptBR 
+                    })}
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir importação?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Isso removerá permanentemente <strong>{entry.record_count} registros</strong> de <strong>{config.label}</strong>.
+                        {dateRange && (
+                          <span className="block mt-1">
+                            Período: {dateRange}
+                          </span>
+                        )}
+                        <span className="block mt-2 text-destructive font-medium">
+                          Esta ação não pode ser desfeita.
+                        </span>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => handleDelete(entry)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           );
