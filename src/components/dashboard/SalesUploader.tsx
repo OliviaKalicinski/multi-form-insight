@@ -14,7 +14,7 @@ interface SalesUploaderProps {
   description?: string;
 }
 
-// Schema de validação Zod
+// Schema de validação Zod - aceita ambos os formatos de coluna de frete
 const salesDataSchema = z.object({
   "Nome do cliente": z.string(),
   "CPF/CNPJ": z.string(),
@@ -26,9 +26,12 @@ const salesDataSchema = z.object({
   "Total de itens": z.string(),
   "Data da venda": z.string(),
   "Forma de envio": z.string(),
-  "Valor do frete": z.string().optional().default("0"),
+  "Valor do frete": z.string().optional(),
+  "Frete no e-commerce": z.string().optional(),
   "Número (Nota Fiscal)": z.string(),
   "Data de Emissão": z.string(),
+  "Quantidade de produtos": z.string().optional(),
+  "Quantidade de volumes": z.string().optional(),
 });
 
 export const SalesUploader = ({ 

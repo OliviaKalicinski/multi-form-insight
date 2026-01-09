@@ -1,4 +1,4 @@
-import { DollarSign, TrendingUp, ShoppingCart, Award, Calendar, TrendingDown, Package } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingCart, Award, Calendar, TrendingDown, Package, Truck } from "lucide-react";
 import { SalesMetricCard } from "./SalesMetricCard";
 import { FinancialMetrics } from "@/types/marketing";
 import { formatCurrency, formatPercentage, formatQuantity } from "@/utils/salesCalculator";
@@ -8,13 +8,15 @@ interface FinancialSummaryCardsProps {
 }
 
 export const FinancialSummaryCards = ({ metrics }: FinancialSummaryCardsProps) => {
+  const hasFreightData = metrics.freteTotal > 0;
+  
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       <SalesMetricCard
-        title="Faturamento Total"
-        value={formatCurrency(metrics.faturamentoTotal)}
+        title="Receita Bruta"
+        value={formatCurrency(metrics.faturamentoBruto)}
         icon={DollarSign}
-        subtitle="Receita de produtos (sem frete)"
+        subtitle={`${formatCurrency(metrics.faturamentoLiquido)} líquido (sem frete)`}
         trend={
           metrics.growthRate !== 0
             ? {
@@ -25,6 +27,15 @@ export const FinancialSummaryCards = ({ metrics }: FinancialSummaryCardsProps) =
         }
         variant={metrics.growthRate > 0 ? "success" : metrics.growthRate < 0 ? "warning" : "default"}
       />
+
+      {hasFreightData && (
+        <SalesMetricCard
+          title="Frete Total"
+          value={formatCurrency(metrics.freteTotal)}
+          icon={Truck}
+          subtitle={`${metrics.percentualFrete.toFixed(1)}% da receita bruta`}
+        />
+      )}
 
       <SalesMetricCard
         title="Ticket Médio Real"

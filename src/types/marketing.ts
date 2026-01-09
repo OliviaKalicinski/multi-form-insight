@@ -153,9 +153,12 @@ export interface SalesData {
   "Total de itens": string;
   "Data da venda": string;
   "Forma de envio": string;
-  "Valor do frete": string;
+  "Valor do frete"?: string;
+  "Frete no e-commerce"?: string;
   "Número (Nota Fiscal)": string;
   "Data de Emissão": string;
+  "Quantidade de produtos"?: string;
+  "Quantidade de volumes"?: string;
 }
 
 // Processed Order (agrupado por pedido único)
@@ -199,8 +202,13 @@ export interface ProductRevenueData {
 // Financial Metrics
 export interface FinancialMetrics {
   faturamentoTotal: number;
+  faturamentoBruto: number;
+  faturamentoLiquido: number;
+  freteTotal: number;
+  percentualFrete: number;
   ticketMedio: number;
   ticketMedioReal: number;
+  ticketMedioBruto: number;
   totalPedidos: number;
   totalPedidosReais: number;
   totalPedidosApenasAmostras: number;

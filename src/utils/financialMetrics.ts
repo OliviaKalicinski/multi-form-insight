@@ -317,10 +317,18 @@ export const calculateFinancialMetrics = (
   // Detectar se é período multi-mês
   const isMultiMonth = selectedMonth === "last-12-months" || !selectedMonth;
   
+  // ===== CÁLCULOS DE FRETE =====
+  const freteTotal = orders.reduce((sum, order) => sum + order.valorFrete, 0);
+  
   // ===== CÁLCULOS GERAIS (todos os pedidos) =====
   const totalRevenue = orders.reduce((sum, order) => sum + order.valorTotal, 0);
+  const faturamentoBruto = totalRevenue + freteTotal;
+  const faturamentoLiquido = totalRevenue;
+  const percentualFrete = faturamentoBruto > 0 ? (freteTotal / faturamentoBruto) * 100 : 0;
+  
   const totalOrders = orders.length;
   const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const ticketMedioBruto = totalOrders > 0 ? faturamentoBruto / totalOrders : 0;
   
   // ===== CÁLCULOS REAIS (sem pedidos de apenas samples) =====
   const realOrders = filterRealOrders(orders);
@@ -374,8 +382,13 @@ export const calculateFinancialMetrics = (
 
   return {
     faturamentoTotal: totalRevenue,
+    faturamentoBruto,
+    faturamentoLiquido,
+    freteTotal,
+    percentualFrete,
     ticketMedio: averageTicket,
     ticketMedioReal: realAverageTicket,
+    ticketMedioBruto,
     totalPedidos: totalOrders,
     totalPedidosReais: totalRealOrders,
     totalPedidosApenasAmostras: totalOrders - totalRealOrders,
