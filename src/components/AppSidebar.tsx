@@ -28,9 +28,16 @@ import {
   AlertTriangle,
   Upload,
   ChevronDown,
+  Settings,
+  LogOut,
+  Shield,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface NavItem {
   title: string;
@@ -96,12 +103,20 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  
+  const { user, signOut } = useAuth();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
 
   const isActive = (url: string) => location.pathname === url;
   
   // Check if any item in section is active
   const isSectionActive = (section: NavSection) => 
     section.items.some(item => isActive(item.url));
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/login");
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -164,14 +179,64 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t">
         <SidebarMenu>
+          {/* Upload - Admin only */}
+          {isAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={isActive("/upload")}
+                onClick={() => navigate("/upload")}
+                tooltip="Upload de Dados"
+              >
+                <Upload className="h-4 w-4" />
+                <span>Upload de Dados</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+
+          {/* Settings */}
           <SidebarMenuItem>
             <SidebarMenuButton
-              isActive={isActive("/upload")}
-              onClick={() => navigate("/upload")}
-              tooltip="Upload de Dados"
+              isActive={isActive("/settings")}
+              onClick={() => navigate("/settings")}
+              tooltip="Configurações"
             >
-              <Upload className="h-4 w-4" />
-              <span>Upload de Dados</span>
+              <Settings className="h-4 w-4" />
+              <span>Configurações</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          {/* User info and logout */}
+          {!isCollapsed && user && (
+            <>
+              <Separator className="my-2" />
+              <div className="px-2 py-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                  <span className="truncate flex-1">{user.email}</span>
+                  {!roleLoading && (
+                    <Badge variant={isAdmin ? "default" : "secondary"} className="text-[10px] px-1.5">
+                      {isAdmin ? (
+                        <>
+                          <Shield className="h-3 w-3 mr-1" />
+                          Admin
+                        </>
+                      ) : (
+                        "Viewer"
+                      )}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={handleLogout}
+              tooltip="Sair"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Sair</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
