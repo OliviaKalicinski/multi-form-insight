@@ -41,9 +41,12 @@ export default function PerformanceFinanceira() {
 
   // Calcular métricas do mês selecionado
   const financialMetrics = useMemo(() => {
-    if (salesData.length === 0 || !selectedMonth) return null;
-    const filteredOrders = filterOrdersByMonth(salesData, selectedMonth, availableMonths);
-    return calculateFinancialMetrics(filteredOrders, selectedMonth);
+    if (salesData.length === 0) return null;
+    // selectedMonth null = "Todos os períodos" = usar todos os dados
+    const filteredOrders = selectedMonth 
+      ? filterOrdersByMonth(salesData, selectedMonth, availableMonths)
+      : salesData;
+    return calculateFinancialMetrics(filteredOrders, selectedMonth || 'all');
   }, [salesData, selectedMonth, availableMonths]);
 
   // Calcular métricas do mês anterior para comparação

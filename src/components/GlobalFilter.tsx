@@ -5,26 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   Calendar,
   RefreshCw,
   X,
   GitCompare,
-  CheckSquare,
 } from "lucide-react";
 
 export function GlobalFilter() {
   const context = useContext(DashboardContext);
   
-  // Se o contexto não estiver disponível, não renderiza nada
   if (!context) {
     return null;
   }
@@ -40,14 +31,13 @@ export function GlobalFilter() {
   } = context;
 
   // Formatar mês para exibição (YYYY-MM → Mês/Ano)
-  const formatMonth = (month: string | null) => {
-    if (!month) return "Todos os períodos";
+  const formatMonth = (month: string) => {
     const [year, monthNum] = month.split("-");
     const monthNames = [
       "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
       "Jul", "Ago", "Set", "Out", "Nov", "Dez"
     ];
-    return `${monthNames[parseInt(monthNum) - 1]}/${year}`;
+    return `${monthNames[parseInt(monthNum) - 1]}/${year.slice(2)}`;
   };
 
   // Limpar todos os filtros
@@ -57,12 +47,25 @@ export function GlobalFilter() {
     setSelectedMonths([]);
   };
 
-  // Refresh (pode ser usado para recarregar dados)
+  // Refresh
   const handleRefresh = () => {
     window.location.reload();
   };
 
-  // Se não há meses disponíveis, não renderiza
+  // Toggle month selection (para modo comparação)
+  const handleToggleMonth = (month: string) => {
+    if (comparisonMode) {
+      if (selectedMonths.includes(month)) {
+        setSelectedMonths(selectedMonths.filter((m) => m !== month));
+      } else {
+        setSelectedMonths([...selectedMonths, month]);
+      }
+    } else {
+      // Modo normal: seleciona apenas um mês
+      setSelectedMonth(selectedMonth === month ? null : month);
+    }
+  };
+
   if (availableMonths.length === 0) {
     return null;
   }
@@ -71,159 +74,114 @@ export function GlobalFilter() {
     <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
       <div className="container mx-auto px-6 py-3">
         <Card className="border-0 shadow-none bg-transparent">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* Lado Esquerdo - Filtros Principais */}
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Ícone de Calendário */}
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-col gap-4">
+            {/* Header com controles */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              {/* Lado Esquerdo */}
+              <div className="flex items-center gap-4">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">Período:</span>
+                
+                <Separator orientation="vertical" className="h-6" />
 
-              {/* Seletor de Mês (Modo Normal) */}
-              {!comparisonMode && (
-                <Select 
-                  value={selectedMonth || "all"} 
-                  onValueChange={(value) => setSelectedMonth(value === "all" ? null : value)}
-                >
-                  <SelectTrigger className="w-[180px] h-9">
-                    <SelectValue placeholder="Selecione um período" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os períodos</SelectItem>
-                    {availableMonths.map((month) => (
-                      <SelectItem key={month} value={month}>
-                        {formatMonth(month)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {/* Seletor Múltiplo (Modo Comparação) */}
-              {comparisonMode && (
+                {/* Toggle Modo Comparação */}
                 <div className="flex items-center gap-2">
-                  <Select
-                    value="select"
-                    onValueChange={(value) => {
-                      if (value !== "select" && !selectedMonths.includes(value)) {
-                        setSelectedMonths([...selectedMonths, value]);
+                  <Switch
+                    checked={comparisonMode}
+                    onCheckedChange={(checked) => {
+                      setComparisonMode(checked);
+                      if (!checked) {
+                        setSelectedMonths([]);
+                      } else {
+                        // Se ativar modo comparação, converter seleção atual
+                        if (selectedMonth) {
+                          setSelectedMonths([selectedMonth]);
+                          setSelectedMonth(null);
+                        }
                       }
                     }}
+                    id="comparison-mode"
+                  />
+                  <label 
+                    htmlFor="comparison-mode" 
+                    className="text-sm font-medium cursor-pointer flex items-center gap-1.5"
                   >
-                    <SelectTrigger className="w-[180px] h-9">
-                      <SelectValue placeholder="Adicionar mês" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="select" disabled>
-                        Adicionar mês
-                      </SelectItem>
-                      {availableMonths
-                        .filter((month) => !selectedMonths.includes(month))
-                        .map((month) => (
-                          <SelectItem key={month} value={month}>
-                            {formatMonth(month)}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Botão Selecionar Todos */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedMonths([...availableMonths])}
-                    disabled={selectedMonths.length === availableMonths.length}
-                    title="Selecionar todos os meses disponíveis"
-                  >
-                    <CheckSquare className="h-4 w-4 mr-1" />
-                    Todos
-                  </Button>
+                    <GitCompare className="h-4 w-4" />
+                    Comparação
+                  </label>
                 </div>
-              )}
+              </div>
 
-              <Separator orientation="vertical" className="h-6" />
-
-              {/* Toggle Modo Comparação */}
+              {/* Lado Direito - Ações */}
               <div className="flex items-center gap-2">
-                <Switch
-                  checked={comparisonMode}
-                  onCheckedChange={(checked) => {
-                    setComparisonMode(checked);
-                    if (!checked) {
-                      setSelectedMonths([]);
-                    }
-                  }}
-                  id="comparison-mode"
-                />
-                <label 
-                  htmlFor="comparison-mode" 
-                  className="text-sm font-medium cursor-pointer flex items-center gap-1.5"
-                >
-                  <GitCompare className="h-4 w-4" />
-                  Modo Comparação
-                </label>
+                {(selectedMonth || comparisonMode || selectedMonths.length > 0) && (
+                  <Button variant="ghost" size="sm" onClick={handleClearAll}>
+                    <X className="h-4 w-4 mr-1" />
+                    Limpar
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={handleRefresh}>
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Atualizar
+                </Button>
               </div>
             </div>
 
-            {/* Lado Direito - Ações */}
-            <div className="flex items-center gap-2">
-              {/* Botão Limpar */}
-              {(selectedMonth || comparisonMode || selectedMonths.length > 0) && (
-                <Button variant="ghost" size="sm" onClick={handleClearAll}>
-                  <X className="h-4 w-4 mr-1" />
-                  Limpar
-                </Button>
+            {/* Grid de Meses como Badges/Chips Clicáveis */}
+            <div className="flex flex-wrap gap-2">
+              {/* Badge "Todos" - só visível em modo normal */}
+              {!comparisonMode && (
+                <Badge
+                  variant={selectedMonth === null ? "default" : "outline"}
+                  className={cn(
+                    "cursor-pointer transition-all hover:scale-105 px-3 py-1",
+                    selectedMonth === null 
+                      ? "bg-primary text-primary-foreground" 
+                      : "hover:bg-muted"
+                  )}
+                  onClick={() => setSelectedMonth(null)}
+                >
+                  Todos
+                </Badge>
               )}
 
-              {/* Botão Refresh */}
-              <Button variant="outline" size="sm" onClick={handleRefresh}>
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Atualizar
-              </Button>
-            </div>
-          </div>
-
-          {/* Linha de Chips - Filtros Ativos */}
-          {(selectedMonth || selectedMonths.length > 0) && (
-            <div className="mt-3 pt-3 border-t">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-muted-foreground font-medium">
-                  Filtros ativos:
-                </span>
-
-                {/* Chip de Mês Único (Modo Normal) */}
-                {!comparisonMode && selectedMonth && (
-                  <Badge variant="secondary" className="flex items-center gap-1 pr-1">
-                    Período: {formatMonth(selectedMonth)}
-                    <X 
-                      className="h-3 w-3 ml-1 cursor-pointer hover:text-destructive" 
-                      onClick={() => setSelectedMonth(null)}
-                    />
-                  </Badge>
-                )}
-
-                {/* Chips de Meses Múltiplos (Modo Comparação) */}
-                {comparisonMode && selectedMonths.map((month) => (
-                  <Badge key={month} variant="secondary" className="flex items-center gap-1 pr-1">
+              {/* Badges dos meses */}
+              {availableMonths.map((month) => {
+                const isSelected = comparisonMode 
+                  ? selectedMonths.includes(month)
+                  : selectedMonth === month;
+                
+                return (
+                  <Badge
+                    key={month}
+                    variant={isSelected ? "default" : "outline"}
+                    className={cn(
+                      "cursor-pointer transition-all hover:scale-105 px-3 py-1",
+                      isSelected 
+                        ? "bg-primary text-primary-foreground" 
+                        : "hover:bg-muted"
+                    )}
+                    onClick={() => handleToggleMonth(month)}
+                  >
                     {formatMonth(month)}
-                    <X 
-                      className="h-3 w-3 ml-1 cursor-pointer hover:text-destructive" 
-                      onClick={() => setSelectedMonths(selectedMonths.filter((m) => m !== month))}
-                    />
                   </Badge>
-                ))}
-
-                {/* Indicador de Modo Comparação */}
-                {comparisonMode && (
-                  <Badge variant="outline" className={cn(
-                    "flex items-center gap-1",
-                    selectedMonths.length >= 2 ? "border-primary text-primary" : "border-muted-foreground"
-                  )}>
-                    <GitCompare className="h-3 w-3" />
-                    Comparando {selectedMonths.length} {selectedMonths.length === 1 ? "mês" : "meses"}
-                  </Badge>
-                )}
-              </div>
+                );
+              })}
             </div>
-          )}
+
+            {/* Indicador de Modo Comparação */}
+            {comparisonMode && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <GitCompare className="h-3 w-3" />
+                <span>
+                  {selectedMonths.length === 0 
+                    ? "Selecione meses para comparar"
+                    : `Comparando ${selectedMonths.length} ${selectedMonths.length === 1 ? "mês" : "meses"}`
+                  }
+                </span>
+              </div>
+            )}
+          </div>
         </Card>
       </div>
     </div>

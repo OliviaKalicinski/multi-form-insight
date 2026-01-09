@@ -71,7 +71,10 @@ const Ads = () => {
   }, [comparisonMode, selectedMonths, adsData, isLast12MonthsView]);
 
   const currentMonthAdsData = useMemo(() => {
-    if (!selectedMonth) return [];
+    // selectedMonth null = "Todos os períodos" = retornar todos os dados
+    if (!selectedMonth) {
+      return adsData;
+    }
     if (isLast12MonthsView) {
       return aggregateAdsByMonth(adsData, last12Months);
     }
@@ -196,11 +199,11 @@ const Ads = () => {
             </Button>
           </CardContent>
         </Card>
-      ) : !selectedMonth || currentMonthAdsData.length === 0 ? (
+      ) : currentMonthAdsData.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">
-              Nenhum dado de anúncios disponível para o mês selecionado.
+              Nenhum dado de anúncios disponível para o período selecionado.
             </p>
           </CardContent>
         </Card>
