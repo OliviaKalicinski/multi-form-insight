@@ -399,6 +399,12 @@ export const calculateProductOperationsMetrics = (
     shippingMethodStats: shipping,
     averageNFIssuanceTime: nfTime.averageDays,
     nfIssuanceDistribution: nfTime.distribution,
+    nfStats: {
+      averageDays: nfTime.averageDays,
+      medianDays: nfTime.medianDays,
+      minDays: nfTime.minDays,
+      maxDays: nfTime.maxDays
+    },
     totalProducts: uniqueProducts.size,
     totalSKUs: uniqueSKUs.size
   };

@@ -1,5 +1,5 @@
 import { NFIssuanceDistribution } from "@/types/marketing";
-import { Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
 
 interface NFIssuanceChartProps {
@@ -7,22 +7,24 @@ interface NFIssuanceChartProps {
   averageDays: number;
 }
 
+const getBarColor = (faixa: string) => {
+  if (faixa === "0-1 dias") return "#10b981"; // green
+  if (faixa === "2-3 dias") return "#22c55e"; // light green
+  if (faixa === "4-7 dias") return "#fbbf24"; // yellow
+  if (faixa === "8-15 dias") return "#f97316"; // orange
+  return "#ef4444"; // red for 15+
+};
+
 export const NFIssuanceChart = ({ distribution, averageDays }: NFIssuanceChartProps) => {
   const chartData = distribution.map(item => ({
     faixa: item.faixa,
     quantidade: item.quantidade,
-    percentual: item.percentual
+    percentual: item.percentual,
+    color: getBarColor(item.faixa)
   }));
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">Tempo médio de emissão</p>
-          <p className="text-2xl font-bold">{averageDays.toFixed(1)} dias</p>
-        </div>
-      </div>
-      
       <ChartContainer
         config={{
           quantidade: {
@@ -54,20 +56,30 @@ export const NFIssuanceChart = ({ distribution, averageDays }: NFIssuanceChartPr
             <Legend />
             <Bar 
               dataKey="quantidade" 
-              fill="hsl(var(--primary))" 
               radius={[4, 4, 0, 0]}
               name="Quantidade de pedidos"
-            />
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </ChartContainer>
 
-      <div className="grid grid-cols-2 gap-4 text-sm">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
         {distribution.map((item, index) => (
-          <div key={index} className="flex justify-between items-center p-2 bg-muted/50 rounded">
-            <span className="font-medium">{item.faixa}</span>
-            <span className="text-muted-foreground">
-              {item.quantidade} ({item.percentual.toFixed(1)}%)
+          <div 
+            key={index} 
+            className="flex flex-col items-center p-2 rounded"
+            style={{ backgroundColor: `${getBarColor(item.faixa)}15` }}
+          >
+            <span className="font-medium text-xs">{item.faixa}</span>
+            <span className="text-lg font-bold" style={{ color: getBarColor(item.faixa) }}>
+              {item.quantidade}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              ({item.percentual.toFixed(1)}%)
             </span>
           </div>
         ))}
