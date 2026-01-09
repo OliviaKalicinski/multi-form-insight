@@ -165,6 +165,8 @@ export type Database = {
         Row: {
           created_at: string
           data_type: string
+          date_range_end: string | null
+          date_range_start: string | null
           file_name: string | null
           id: string
           record_count: number
@@ -173,6 +175,8 @@ export type Database = {
         Insert: {
           created_at?: string
           data_type: string
+          date_range_end?: string | null
+          date_range_start?: string | null
           file_name?: string | null
           id?: string
           record_count?: number
@@ -181,6 +185,8 @@ export type Database = {
         Update: {
           created_at?: string
           data_type?: string
+          date_range_end?: string | null
+          date_range_start?: string | null
           file_name?: string | null
           id?: string
           record_count?: number
