@@ -9,9 +9,6 @@ import { OrderVolumeChart } from "@/components/dashboard/OrderVolumeChart";
 import { SalesPeaksChart } from "@/components/dashboard/SalesPeaksChart";
 import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
 import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
-import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
-import { MonthFilter } from "@/components/dashboard/MonthFilter";
-import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { calculateCustomerBehaviorMetrics } from "@/utils/customerBehaviorMetrics";
@@ -27,9 +24,6 @@ export default function ComportamentoCliente() {
     availableMonths,
     comparisonMode,
     selectedMonths,
-    setSelectedMonth,
-    setComparisonMode,
-    toggleMonth,
   } = useDashboard();
 
   const [volumeView, setVolumeView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
@@ -182,28 +176,6 @@ export default function ComportamentoCliente() {
         </div>
       </div>
 
-      {/* ComparisonToggle */}
-      {availableMonths.length > 1 && (
-        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
-      )}
-
-      {/* Filtros */}
-      {availableMonths.length > 0 && (
-        comparisonMode ? (
-          <MonthComparisonSelector
-            availableMonths={availableMonths}
-            selectedMonths={selectedMonths}
-            onToggleMonth={toggleMonth}
-          />
-        ) : (
-          <MonthFilter
-            availableMonths={availableMonths}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
-        )
-      )}
-
       {/* Indicador de período */}
       {!comparisonMode && (
         <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
@@ -211,7 +183,7 @@ export default function ComportamentoCliente() {
             <p className="text-sm text-blue-800 dark:text-blue-200">
               💡 <strong>Nota:</strong> As métricas de <strong>Churn</strong>, <strong>Taxa de Recompra</strong> e <strong>Segmentação</strong> 
               usam o histórico completo de dados. As análises de <strong>Volume de Pedidos</strong> e <strong>Picos de Vendas</strong> 
-              consideram o período selecionado no filtro acima.
+              consideram o período selecionado no filtro global.
             </p>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DollarSign,
@@ -24,9 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
-import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
-import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
-import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { filterAdsByMonth } from "@/utils/adsParserV2";
@@ -43,11 +40,8 @@ const Ads = () => {
     hasHierarchicalFormat, 
     selectedMonth, 
     availableMonths, 
-    setSelectedMonth,
     comparisonMode,
     selectedMonths,
-    setComparisonMode,
-    toggleMonth,
   } = useDashboard();
 
   // Detect 12-month view
@@ -77,13 +71,6 @@ const Ads = () => {
     return filterAdsByMonth(adsData, selectedMonth);
   }, [adsData, selectedMonth, isLast12MonthsView, last12Months]);
 
-  // Validar se o mês selecionado está disponível
-  useEffect(() => {
-    if (selectedMonth && availableMonths.length > 0 && !availableMonths.includes(selectedMonth)) {
-      console.warn('⚠️ Selected month not available, resetting to latest');
-      setSelectedMonth(availableMonths[availableMonths.length - 1]);
-    }
-  }, [selectedMonth, availableMonths, setSelectedMonth]);
 
   // Usar resumo mensal pré-calculado se disponível, senão calcular dos individuais
   const metrics = useMemo(() => {
@@ -120,50 +107,23 @@ const Ads = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-8">
-      {/* Comparison Toggle */}
-      {availableMonths.length > 1 && (
-        <ComparisonToggle
-          enabled={comparisonMode}
-          onToggle={setComparisonMode}
-        />
-      )}
-
-      {/* Month Selector */}
-      {availableMonths.length > 0 && (
-        <>
-          {comparisonMode ? (
-            <MonthComparisonSelector
-              availableMonths={availableMonths}
-              selectedMonths={selectedMonths}
-              onToggleMonth={toggleMonth}
-            />
-          ) : (
-            <MonthFilter
-              availableMonths={availableMonths}
-              selectedMonth={selectedMonth}
-              onMonthChange={setSelectedMonth}
-            />
-          )}
-          
-          {/* Period indicator badge for 12-month view */}
-          {isLast12MonthsView && last12Months.length > 0 && (
-            <Card className="border-primary/50 bg-primary/5">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      📅 Visão Anual - Análise dos Últimos {last12Months.length} Meses
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Período: {formatMonthRange(last12Months)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
+      {/* Period indicator for 12-month view */}
+      {isLast12MonthsView && last12Months.length > 0 && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  📅 Visão Anual - Análise dos Últimos {last12Months.length} Meses
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Período: {formatMonthRange(last12Months)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* KPIs */}
