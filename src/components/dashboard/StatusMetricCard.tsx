@@ -17,7 +17,7 @@ interface StatusMetricCardProps {
   };
   status?: StatusType;
   interpretation?: string;
-  size?: 'default' | 'large';
+  size?: 'compact' | 'default' | 'large';
   className?: string;
   invertTrend?: boolean; // For metrics where lower is better (CAC, CPA, etc.)
 }
@@ -84,6 +84,7 @@ export function StatusMetricCard({
     return 'text-muted-foreground';
   };
 
+  const isCompact = size === 'compact';
   const isLarge = size === 'large';
 
   return (
@@ -95,16 +96,20 @@ export function StatusMetricCard({
         className
       )}
     >
-      <CardHeader className={cn("pb-2", isLarge && "pb-3")}>
+      <CardHeader className={cn(
+        "pb-2",
+        isCompact && "p-2 pb-1",
+        isLarge && "pb-3"
+      )}>
         <CardTitle className="flex items-center justify-between">
           <div className={cn(
-            "font-medium text-muted-foreground flex items-center gap-2",
-            isLarge ? "text-sm" : "text-xs"
+            "font-medium text-muted-foreground flex items-center gap-1.5",
+            isCompact ? "text-[10px]" : isLarge ? "text-sm" : "text-xs"
           )}>
             {icon}
             {title}
           </div>
-          {status !== 'neutral' && (
+          {status !== 'neutral' && !isCompact && (
             <Badge 
               variant="outline" 
               className={cn(
@@ -118,29 +123,41 @@ export function StatusMetricCard({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className={cn(
+        "space-y-3",
+        isCompact && "p-2 pt-0 space-y-1"
+      )}>
         {/* Main Value */}
         <div className={cn(
           "font-bold",
-          isLarge ? "text-4xl" : "text-2xl",
+          isCompact ? "text-lg" : isLarge ? "text-4xl" : "text-2xl",
           status !== 'neutral' && config.color
         )}>
           {value}
         </div>
 
-        {/* Trend */}
+        {/* Trend - Compact inline version */}
         {trend !== undefined && (
-          <div className="flex items-center gap-2">
+          <div className={cn(
+            "flex items-center gap-1",
+            isCompact && "text-[10px]"
+          )}>
             {getTrendIcon()}
-            <span className={cn("text-sm font-medium", getTrendColor())}>
-              {trend >= 0 ? '+' : ''}{typeof trend === 'number' ? trend.toFixed(1) : trend}%
+            <span className={cn(
+              "font-medium",
+              isCompact ? "text-[10px]" : "text-sm",
+              getTrendColor()
+            )}>
+              {trend >= 0 ? '+' : ''}{typeof trend === 'number' ? trend.toFixed(0) : trend}%
             </span>
-            <span className="text-xs text-muted-foreground">{trendLabel}</span>
+            {!isCompact && (
+              <span className="text-xs text-muted-foreground">{trendLabel}</span>
+            )}
           </div>
         )}
 
-        {/* Benchmark */}
-        {benchmark && (
+        {/* Benchmark - Hidden in compact */}
+        {benchmark && !isCompact && (
           <div className={cn(
             "pt-2 border-t space-y-1",
             isLarge && "pt-3"
@@ -157,8 +174,8 @@ export function StatusMetricCard({
           </div>
         )}
 
-        {/* Interpretation without benchmark */}
-        {!benchmark && interpretation && (
+        {/* Interpretation without benchmark - Hidden in compact */}
+        {!benchmark && interpretation && !isCompact && (
           <p className="text-xs text-muted-foreground pt-1">
             {interpretation}
           </p>

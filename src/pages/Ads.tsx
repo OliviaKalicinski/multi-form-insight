@@ -159,30 +159,27 @@ const Ads = () => {
   const roasStatusInfo = getRoasStatus(metrics.roas);
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="container mx-auto p-4 space-y-4">
       {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold text-foreground">Análise de Anúncios</h1>
-        <p className="text-muted-foreground">Performance de campanhas de Meta Ads</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Análise de Anúncios</h1>
+          <p className="text-sm text-muted-foreground">Performance de campanhas de Meta Ads</p>
+        </div>
+        {/* Inline 12-month indicator */}
+        {isLast12MonthsView && last12Months.length > 0 && (
+          <Badge variant="outline" className="flex items-center gap-1.5">
+            <Calendar className="h-3 w-3" />
+            <span>Últimos {last12Months.length} meses</span>
+          </Badge>
+        )}
       </div>
 
-      {/* Period indicator for 12-month view */}
+      {/* Period range text for 12-month view */}
       {isLast12MonthsView && last12Months.length > 0 && (
-        <Card className="border-primary/50 bg-primary/5">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  📅 Visão Anual - Análise dos Últimos {last12Months.length} Meses
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Período: {formatMonthRange(last12Months)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <p className="text-xs text-muted-foreground">
+          Período: {formatMonthRange(last12Months)}
+        </p>
       )}
 
       {/* Empty state */}
@@ -208,7 +205,7 @@ const Ads = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-4">
           {/* Comparison Mode */}
           {comparisonMode && multiMonthMetrics ? (
             <>
@@ -248,158 +245,122 @@ const Ads = () => {
             </>
           ) : (
             <>
-              {/* ===== ROW 1: ROAS Highlight (50%) + Satellite Cards (50%) ===== */}
-              <div className="grid gap-6 lg:grid-cols-2">
-                {/* Main ROAS Card */}
+              {/* ===== ROW 1: ROAS Compact (40%) + Satellite Cards (60%) ===== */}
+              <div className="grid gap-4 lg:grid-cols-5">
+                {/* Main ROAS Card - Compact */}
                 <Card className={cn(
-                  "col-span-1 row-span-2 border-2 shadow-lg",
+                  "lg:col-span-2 border-2 relative",
                   roasStatusInfo.bgColor
                 )}>
-                  <CardContent className="p-6">
-                    <div className="space-y-6">
-                      {/* Title */}
-                      <div className="flex items-center gap-2">
-                        <Target className="h-6 w-6 text-primary" />
-                        <span className="text-lg font-semibold text-foreground">
-                          ROAS - Return on Ad Spend
-                        </span>
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      {/* Header with badge */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-semibold text-foreground">ROAS</span>
+                        </div>
+                        <Badge 
+                          variant={metrics.roas >= 3 ? "default" : "destructive"}
+                          className="text-xs"
+                        >
+                          {roasStatusInfo.badge}
+                        </Badge>
                       </div>
 
                       {/* Main Value */}
+                      <p className={cn("text-3xl font-bold", roasStatusInfo.color)}>
+                        {formatRoas(metrics.roas)}
+                      </p>
+
+                      {/* Compact Calculation */}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{formatCurrency(metrics.valorConversaoTotal)}</span>
+                        <span>/</span>
+                        <span>{formatCurrency(metrics.investimentoTotal)}</span>
+                      </div>
+
+                      {/* Progress + Trend in one line */}
                       <div className="space-y-1">
-                        <p className={cn("text-5xl font-bold", roasStatusInfo.color)}>
-                          {formatRoas(metrics.roas)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Retorno sobre investimento em anúncios
-                        </p>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Meta: {roasGoal}x</span>
+                          <div className="flex items-center gap-2">
+                            {trends && (
+                              <span className={cn(
+                                "flex items-center gap-0.5",
+                                trends.roasTrend >= 0 ? "text-green-600" : "text-red-600"
+                              )}>
+                                {trends.roasTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                {trends.roasTrend >= 0 ? '+' : ''}{trends.roasTrend.toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Progress value={roasProgress} className="h-1.5" />
                       </div>
 
-                      {/* Calculation Breakdown */}
-                      <div className="space-y-2 p-4 rounded-lg bg-background/50 border">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Receita de Anúncios:</span>
-                          <span className="font-medium text-foreground">{formatCurrency(metrics.valorConversaoTotal)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Investimento:</span>
-                          <span className="font-medium text-foreground">{formatCurrency(metrics.investimentoTotal)}</span>
-                        </div>
-                        <Separator />
-                        <div className="flex justify-between text-sm font-semibold">
-                          <span>ROAS:</span>
-                          <span className={roasStatusInfo.color}>{formatRoas(metrics.roas)}</span>
-                        </div>
-                      </div>
-
-                      {/* Benchmark Progress */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Meta mínima: {roasGoal}x</span>
-                          <span className={cn(
-                            "font-medium",
-                            metrics.roas >= roasGoal ? "text-green-600" : "text-yellow-600"
-                          )}>
-                            {metrics.roas >= roasGoal 
-                              ? `+${(((metrics.roas - roasGoal) / roasGoal) * 100).toFixed(0)}%`
-                              : `${(((metrics.roas - roasGoal) / roasGoal) * 100).toFixed(0)}%`
-                            }
-                          </span>
-                        </div>
-                        <Progress value={roasProgress} className="h-2" />
-                      </div>
-
-                      {/* Trend vs Previous Month */}
-                      {trends && (
-                        <div className="flex items-center gap-2 text-sm">
-                          {trends.roasTrend >= 0 ? (
-                            <TrendingUp className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <TrendingDown className="h-4 w-4 text-red-600" />
-                          )}
-                          <span className={cn(
-                            "font-medium",
-                            trends.roasTrend >= 0 ? "text-green-600" : "text-red-600"
-                          )}>
-                            {trends.roasTrend >= 0 ? '+' : ''}{trends.roasTrend.toFixed(1)}%
-                          </span>
-                          <span className="text-muted-foreground">vs mês anterior</span>
-                        </div>
-                      )}
-
-                      {/* Contextual Interpretation */}
-                      <div className={cn(
-                        "p-3 rounded-lg text-sm font-medium border",
-                        roasStatusInfo.bgColor
-                      )}>
+                      {/* Compact Interpretation */}
+                      <p className="text-xs font-medium">
                         {getRoasInterpretation(metrics.roas)}
-                      </div>
+                      </p>
                     </div>
-
-                    {/* Status Badge */}
-                    <Badge 
-                      variant={metrics.roas >= 3 ? "default" : "destructive"}
-                      className="absolute top-4 right-4 text-xs"
-                    >
-                      {roasStatusInfo.badge}
-                    </Badge>
                   </CardContent>
                 </Card>
 
-                {/* Satellite Cards Grid (2x3) */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Satellite Cards Grid (3x2) - Compact */}
+                <div className="lg:col-span-3 grid grid-cols-3 gap-2">
                   {/* Investment */}
                   <StatusMetricCard
                     title="Investimento"
                     value={formatCurrency(metrics.investimentoTotal)}
-                    icon={<DollarSign className="h-4 w-4" />}
+                    icon={<DollarSign className="h-3 w-3" />}
                     trend={trends?.investmentTrend}
                     status="neutral"
-                    interpretation="Total investido no período"
+                    size="compact"
                   />
 
                   {/* Revenue */}
                   <StatusMetricCard
                     title="Receita"
                     value={formatCurrency(metrics.valorConversaoTotal)}
-                    icon={<Coins className="h-4 w-4" />}
+                    icon={<Coins className="h-3 w-3" />}
                     trend={trends?.revenueTrend}
                     status={getStatusFromBenchmark(
                       metrics.valorConversaoTotal,
                       metrics.investimentoTotal * 3,
                       { warningThreshold: 0.67, dangerThreshold: 0.5 }
                     )}
-                    interpretation="De anúncios"
+                    size="compact"
                   />
 
                   {/* Net Profit */}
                   <StatusMetricCard
-                    title="Lucro Líquido"
+                    title="Lucro"
                     value={formatCurrency(netProfit)}
-                    icon={<TrendingUp className="h-4 w-4" />}
+                    icon={<TrendingUp className="h-3 w-3" />}
                     status={netProfit > 0 ? 'success' : 'danger'}
-                    interpretation="Receita - Investimento"
+                    size="compact"
                   />
 
                   {/* Conversions */}
                   <StatusMetricCard
                     title="Conversões"
                     value={formatNumber(metrics.comprasTotal)}
-                    icon={<ShoppingCart className="h-4 w-4" />}
+                    icon={<ShoppingCart className="h-3 w-3" />}
                     trend={trends?.conversionsTrend}
                     status={getStatusFromBenchmark(
                       metrics.comprasTotal,
                       10,
                       { warningThreshold: 0.8, dangerThreshold: 0.5 }
                     )}
-                    interpretation="Total de compras"
+                    size="compact"
                   />
 
                   {/* CPA */}
                   <StatusMetricCard
                     title="CPA"
                     value={formatCurrency(metrics.custoPorCompra)}
-                    icon={<Target className="h-4 w-4" />}
+                    icon={<Target className="h-3 w-3" />}
                     trend={trends?.cpaTrend}
                     invertTrend
                     status={getStatusFromBenchmark(
@@ -407,15 +368,14 @@ const Ads = () => {
                       metrics.custoPorCompra,
                       { invertComparison: true, warningThreshold: 0.8, dangerThreshold: 0.6 }
                     )}
-                    benchmark={{ value: 250, label: 'Meta: R$ 250' }}
-                    interpretation="Custo por aquisição"
+                    size="compact"
                   />
 
                   {/* CPC */}
                   <StatusMetricCard
                     title="CPC"
                     value={formatCurrency(metrics.cpcMedio)}
-                    icon={<MousePointerClick className="h-4 w-4" />}
+                    icon={<MousePointerClick className="h-3 w-3" />}
                     trend={trends?.cpcTrend}
                     invertTrend
                     status={getStatusFromBenchmark(
@@ -423,183 +383,93 @@ const Ads = () => {
                       metrics.cpcMedio,
                       { invertComparison: true, warningThreshold: 0.8, dangerThreshold: 0.6 }
                     )}
-                    benchmark={{ value: 2.5, label: 'Meta: R$ 2,50' }}
-                    interpretation="Custo por clique"
+                    size="compact"
                   />
                 </div>
               </div>
 
-              <Separator />
-
-              {/* ===== ROW 2: Performance & Reach ===== */}
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Performance & Engagement */}
+              {/* ===== ROW 2: Compact Funnel + Reach Stats ===== */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                {/* Compact Conversion Funnel */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <BarChart3 className="h-5 w-5 text-primary" />
-                      Performance & Engajamento
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Conversões</p>
-                        <p className="text-2xl font-bold text-foreground">{formatNumber(metrics.comprasTotal)}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
-                        <p className="text-2xl font-bold text-foreground">{formatPercent(metrics.taxaConversao)}</p>
-                      </div>
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ShoppingCart className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-semibold">Funil de Conversão</span>
                     </div>
-
-                    <Separator />
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">CPC Médio</p>
-                        <p className="text-xl font-semibold text-foreground">{formatCurrency(metrics.cpcMedio)}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="text-center flex-1">
+                        <p className="text-xs text-muted-foreground">Add Cart</p>
+                        <p className="text-lg font-bold">{formatPercent(metrics.taxaAddCarrinho)}</p>
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">CTR Médio</p>
-                        <p className="text-xl font-semibold text-foreground">{formatPercent(metrics.ctrMedio)}</p>
+                      <span className="text-muted-foreground">→</span>
+                      <div className="text-center flex-1">
+                        <p className="text-xs text-muted-foreground">Conv. Cart</p>
+                        <p className="text-lg font-bold text-green-600">{formatPercent(metrics.taxaConversaoCarrinho)}</p>
+                      </div>
+                      <span className="text-muted-foreground">→</span>
+                      <div className="text-center flex-1">
+                        <p className="text-xs text-muted-foreground">Abandono</p>
+                        <p className="text-lg font-bold text-yellow-600">{formatPercent(metrics.taxaAbandonoCarrinho)}</p>
+                      </div>
+                      <span className="text-muted-foreground">→</span>
+                      <div className="text-center flex-1">
+                        <p className="text-xs text-muted-foreground">Compras</p>
+                        <p className="text-lg font-bold text-primary">{formatNumber(metrics.comprasTotal)}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Reach & Visibility */}
+                {/* Compact Reach & Performance */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Eye className="h-5 w-5 text-primary" />
-                      Alcance & Visibilidade
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Impressões</p>
-                        <p className="text-2xl font-bold text-foreground">{formatNumber(metrics.impressoesTotal)}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Cliques</p>
-                        <p className="text-2xl font-bold text-foreground">{formatNumber(metrics.cliquesTotal)}</p>
-                      </div>
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Eye className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-semibold">Alcance & Performance</span>
                     </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Eficiência de Cliques (CTR)</span>
-                        <span className="font-medium">{formatPercent(metrics.ctrMedio)}</span>
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Impressões</p>
+                        <p className="text-sm font-bold">{formatNumber(metrics.impressoesTotal)}</p>
                       </div>
-                      <Progress value={Math.min(metrics.ctrMedio * 50, 100)} className="h-2" />
-                      <p className={cn(
-                        "text-xs",
-                        metrics.ctrMedio >= 2 ? "text-green-600" : 
-                        metrics.ctrMedio >= 1 ? "text-blue-600" : 
-                        "text-yellow-600"
-                      )}>
-                        {metrics.ctrMedio >= 2 
-                          ? '✅ CTR excelente' 
-                          : metrics.ctrMedio >= 1 
-                          ? '✓ CTR bom' 
-                          : '⚠️ CTR pode melhorar'}
-                      </p>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Cliques</p>
+                        <p className="text-sm font-bold">{formatNumber(metrics.cliquesTotal)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">CTR</p>
+                        <p className={cn(
+                          "text-sm font-bold",
+                          metrics.ctrMedio >= 2 ? "text-green-600" : metrics.ctrMedio >= 1 ? "text-blue-600" : "text-yellow-600"
+                        )}>{formatPercent(metrics.ctrMedio)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Conv. Rate</p>
+                        <p className="text-sm font-bold">{formatPercent(metrics.taxaConversao)}</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
-              <Separator />
-
-              {/* ===== ROW 3: Financial Summary ===== */}
-              <Card className={cn(
-                "border-2",
-                netProfit > 0 
-                  ? "border-green-200 bg-green-50/50" 
-                  : "border-red-200 bg-red-50/50"
+              {/* ===== ROW 3: Inline Financial Summary ===== */}
+              <div className={cn(
+                "flex items-center justify-between p-3 rounded-lg border",
+                netProfit > 0 ? "bg-green-50/50 border-green-200" : "bg-red-50/50 border-red-200"
               )}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Zap className="h-5 w-5 text-primary" />
-                    Resumo Financeiro do Período
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-6 text-center">
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Total Investido</p>
-                      <p className="text-2xl font-bold text-foreground">{formatCurrency(metrics.investimentoTotal)}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Receita Gerada</p>
-                      <p className="text-2xl font-bold text-green-600">{formatCurrency(metrics.valorConversaoTotal)}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Lucro Líquido</p>
-                      <p className={cn(
-                        "text-2xl font-bold",
-                        netProfit > 0 ? "text-green-600" : "text-red-600"
-                      )}>
-                        {formatCurrency(netProfit)}
-                      </p>
-                    </div>
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Eficiência:</span>
                   </div>
-
-                  <Separator className="my-6" />
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-foreground">Eficiência Geral das Campanhas</p>
-                      <p className="text-xs text-muted-foreground">
-                        Para cada R$ 1,00 investido, você obteve R$ {metrics.roas.toFixed(2)}
-                      </p>
-                    </div>
-                    <Badge 
-                      variant={metrics.roas >= 3 ? "default" : "secondary"}
-                      className="text-sm px-3 py-1"
-                    >
-                      {metrics.roas >= 3 ? '✓ Lucrativo' : '⚠️ Revisar'}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Separator />
-
-              {/* ===== ROW 4: Conversion Funnel ===== */}
-              <div className="space-y-4">
-                <h2 className="text-2xl font-semibold text-foreground">🛒 Funil de Conversão</h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <MetricCard
-                    title="Taxa Add Carrinho (%)"
-                    value={formatPercent(metrics.taxaAddCarrinho)}
-                    icon={ShoppingCart}
-                    subtitle="Adições ao carrinho / Views da LP"
-                  />
-                  <MetricCard
-                    title="Taxa Conv. Carrinho (%)"
-                    value={formatPercent(metrics.taxaConversaoCarrinho)}
-                    icon={PackageCheck}
-                    variant="success"
-                    subtitle="Compras / Adições ao carrinho"
-                  />
-                  <MetricCard
-                    title="Taxa Abandono Carrinho (%)"
-                    value={formatPercent(metrics.taxaAbandonoCarrinho)}
-                    icon={PackageX}
-                    variant="warning"
-                  />
-                  <MetricCard
-                    title="Total de Compras"
-                    value={formatNumber(metrics.comprasTotal)}
-                    icon={ShoppingBag}
-                    variant="success"
-                  />
+                  <span className="text-sm text-muted-foreground">
+                    R$ 1,00 → R$ {metrics.roas.toFixed(2)}
+                  </span>
                 </div>
+                <Badge variant={metrics.roas >= 3 ? "default" : "secondary"}>
+                  {metrics.roas >= 3 ? '✓ Lucrativo' : '⚠️ Revisar'}
+                </Badge>
               </div>
 
               {/* Ads Breakdown */}
