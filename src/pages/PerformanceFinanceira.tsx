@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
-import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
+import { DailyRevenueChart, ChartViewMode } from "@/components/dashboard/DailyRevenueChart";
 import { DailyVolumeChart } from "@/components/dashboard/DailyVolumeChart";
 import { RevenueHeroCard } from "@/components/dashboard/RevenueHeroCard";
 import { GoalsProgressCard } from "@/components/dashboard/GoalsProgressCard";
@@ -38,6 +38,7 @@ export default function PerformanceFinanceira() {
   const { financialGoals, isLoading: goalsLoading } = useAppSettings();
 
   const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
+  const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('daily');
 
   // Calcular métricas do mês selecionado
   const financialMetrics = useMemo(() => {
@@ -276,50 +277,34 @@ export default function PerformanceFinanceira() {
 
       {/* ===== BLOCO 2: EVOLUÇÃO TEMPORAL ===== */}
       {!comparisonMode && financialMetrics && (
-        <div className="space-y-6">
-          {/* Grid 50/50: Receita + Volume */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {financialMetrics.isMultiMonth ? (
-              <>
-                <DailyRevenueChart
-                  data={financialMetrics.revenueByMonth.map(d => ({
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <DailyRevenueChart
+            data={
+              chartViewMode === 'daily' 
+                ? financialMetrics.revenueByDay.map(d => ({ date: d.date, revenue: d.revenue }))
+                : chartViewMode === 'weekly'
+                ? financialMetrics.revenueByWeek
+                : financialMetrics.revenueByMonth.map(d => ({
                     month: format(parse(d.month, "yyyy-MM", new Date()), "MMM/yy", { locale: ptBR }),
                     revenue: d.revenue
-                  }))}
-                  title="📈 Faturamento Mensal"
-                  description="Receita gerada por mês no período"
-                  isMonthly={true}
-                  showMovingAverage={false}
-                />
-                <DailyVolumeChart
-                  data={financialMetrics.ordersByMonth}
-                  title="📦 Volume Mensal"
-                  description="Número de pedidos realizados por mês"
-                  isMonthly={true}
-                />
-              </>
-            ) : (
-              <>
-                <DailyRevenueChart
-                  data={financialMetrics.revenueByDay.map(d => ({
-                    date: d.date,
-                    revenue: d.revenue
-                  }))}
-                  title="📈 Faturamento Diário"
-                  description="Receita gerada por dia com média móvel 7 dias"
-                  isMonthly={false}
-                  showMovingAverage={true}
-                />
-                <DailyVolumeChart
-                  data={financialMetrics.ordersByDay}
-                  title="📦 Volume de Pedidos"
-                  description="Número de pedidos por dia com linha de média"
-                  isMonthly={false}
-                  dailyGoal={Math.round(financialGoals.pedidos / 30)}
-                />
-              </>
-            )}
-          </div>
+                  }))
+            }
+            viewMode={chartViewMode}
+            onViewModeChange={setChartViewMode}
+            showMovingAverage={true}
+          />
+          <DailyVolumeChart
+            data={
+              chartViewMode === 'daily'
+                ? financialMetrics.ordersByDay
+                : chartViewMode === 'weekly'
+                ? financialMetrics.ordersByWeek
+                : financialMetrics.ordersByMonth
+            }
+            viewMode={chartViewMode}
+            onViewModeChange={setChartViewMode}
+            dailyGoal={Math.round(financialGoals.pedidos / 30)}
+          />
         </div>
       )}
 

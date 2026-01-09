@@ -1,4 +1,4 @@
-import { format, parse, startOfMonth, differenceInMonths } from "date-fns";
+import { format, parse, startOfMonth, differenceInMonths, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance, ProductRevenueData } from "@/types/marketing";
 import { extractDailyOrders } from './salesCalculator';
@@ -87,6 +87,50 @@ export const calculateMonthlyOrders = (
     .map(([month, orders]) => ({
       month: format(parse(month, "yyyy-MM", new Date()), "MMM/yy", { locale: ptBR }),
       orders
+    }));
+};
+
+/**
+ * Calcula volume de pedidos agregado por semana
+ */
+export const calculateWeeklyOrders = (
+  orders: ProcessedOrder[]
+): { week: string; orders: number }[] => {
+  const weeklyMap = new Map<string, number>();
+  
+  orders.forEach(order => {
+    const weekStart = startOfWeek(order.dataVenda, { weekStartsOn: 0 });
+    const weekKey = format(weekStart, "yyyy-'W'ww");
+    weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + 1);
+  });
+  
+  return Array.from(weeklyMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([week, orders]) => ({
+      week,
+      orders
+    }));
+};
+
+/**
+ * Calcula faturamento agregado por semana
+ */
+export const calculateWeeklyRevenue = (
+  orders: ProcessedOrder[]
+): { week: string; revenue: number }[] => {
+  const weeklyMap = new Map<string, number>();
+  
+  orders.forEach(order => {
+    const weekStart = startOfWeek(order.dataVenda, { weekStartsOn: 0 });
+    const weekKey = format(weekStart, "yyyy-'W'ww");
+    weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + order.valorTotal);
+  });
+  
+  return Array.from(weeklyMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([week, revenue]) => ({
+      week,
+      revenue
     }));
 };
 
@@ -366,6 +410,10 @@ export const calculateFinancialMetrics = (
     orders: item.value
   }));
   
+  // Calcular pedidos e faturamento semanais
+  const ordersByWeek = calculateWeeklyOrders(orders);
+  const revenueByWeek = calculateWeeklyRevenue(orders);
+  
   // Calcular pedidos por mês (agregado)
   const ordersByMonth = calculateMonthlyOrders(orders);
   
@@ -395,6 +443,8 @@ export const calculateFinancialMetrics = (
     produtoMedio,
     revenueByDay: revenueEvolution,
     ordersByDay,
+    revenueByWeek,
+    ordersByWeek,
     revenueByProduct,
     revenueByMonth,
     ordersByMonth,
