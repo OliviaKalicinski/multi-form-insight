@@ -4,6 +4,7 @@ import { CSVUploader } from "@/components/dashboard/CSVUploader";
 import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
 import { AdsUploader } from "@/components/dashboard/AdsUploader";
 import { SalesUploader } from "@/components/dashboard/SalesUploader";
+import { UploadHistory } from "@/components/dashboard/UploadHistory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -197,6 +198,9 @@ export default function Upload() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Upload History */}
+      <UploadHistory />
 
       {/* Quick Links when data is loaded */}
       {hasAnyData && (
