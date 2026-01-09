@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { DollarSign, TrendingUp, Users, ShoppingCart, Package, AlertTriangle } from "lucide-react";
+import { DollarSign, TrendingUp, Users, ShoppingCart, Package, Percent, Target } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
 import { MonthFilter } from "@/components/dashboard/MonthFilter";
 import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
-import { FinancialSummaryCards } from "@/components/dashboard/FinancialSummaryCards";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
+import { StatusMetricCard, getStatusFromBenchmark, formatBenchmarkInterpretation } from "@/components/dashboard/StatusMetricCard";
 import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
 import { DailyVolumeChart } from "@/components/dashboard/DailyVolumeChart";
 import { ProductRevenuePieChart } from "@/components/dashboard/ProductRevenuePieChart";
@@ -20,8 +20,12 @@ import { filterOrdersByMonth } from "@/utils/salesCalculator";
 import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
 import { calculateROAS } from "@/utils/roasCalculator";
 import { filterAdsByMonth } from "@/utils/adsParserV2";
+import { benchmarksPetFood } from "@/data/executiveData";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+const formatCurrency = (value: number) => 
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 export default function PerformanceFinanceira() {
   const {
@@ -45,6 +49,35 @@ export default function PerformanceFinanceira() {
     const filteredOrders = filterOrdersByMonth(salesData, selectedMonth, availableMonths);
     return calculateFinancialMetrics(filteredOrders, selectedMonth);
   }, [salesData, selectedMonth, availableMonths]);
+
+  // Calcular métricas do mês anterior para comparação
+  const previousMonthMetrics = useMemo(() => {
+    if (salesData.length === 0 || !selectedMonth || selectedMonth === 'last-12-months') return null;
+    
+    const currentDate = parse(selectedMonth, "yyyy-MM", new Date());
+    const prevMonth = new Date(currentDate);
+    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    const prevMonthStr = format(prevMonth, "yyyy-MM");
+    
+    if (!availableMonths.includes(prevMonthStr)) return null;
+    
+    const filteredOrders = filterOrdersByMonth(salesData, prevMonthStr, availableMonths);
+    return calculateFinancialMetrics(filteredOrders, prevMonthStr);
+  }, [salesData, selectedMonth, availableMonths]);
+
+  // Calcular variações
+  const variations = useMemo(() => {
+    if (!financialMetrics || !previousMonthMetrics) return null;
+    
+    const calc = (current: number, previous: number) => 
+      previous > 0 ? ((current - previous) / previous) * 100 : 0;
+    
+    return {
+      revenue: calc(financialMetrics.faturamentoTotal, previousMonthMetrics.faturamentoTotal),
+      ticket: calc(financialMetrics.ticketMedioReal, previousMonthMetrics.ticketMedioReal),
+      orders: calc(financialMetrics.totalPedidos, previousMonthMetrics.totalPedidos),
+    };
+  }, [financialMetrics, previousMonthMetrics]);
 
   // Calcular ROAS
   const roasMetrics = useMemo(() => {
@@ -81,7 +114,7 @@ export default function PerformanceFinanceira() {
               💰 Performance Financeira
             </CardTitle>
             <CardDescription>
-              Carregue os dados de vendas na página "Uploader" para visualizar as análises financeiras.
+              Carregue os dados de vendas na página "Upload" para visualizar as análises financeiras.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -123,16 +156,83 @@ export default function PerformanceFinanceira() {
         )
       )}
 
-      {/* Cards resumo */}
-          {!comparisonMode && financialMetrics && (
-            <>
-              {/* Card de ROAS Real - PRIMEIRO */}
-              {roasMetrics && (
-                <ROASCard metrics={roasMetrics} />
+      {/* Cards resumo - HIERARQUIA VISUAL */}
+      {!comparisonMode && financialMetrics && (
+        <>
+          {/* ROAS Card */}
+          {roasMetrics && (
+            <ROASCard metrics={roasMetrics} />
+          )}
+          
+          {/* Cards com Hierarquia Visual (Área de Ouro) */}
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            {/* Card Principal - Receita (2x tamanho) */}
+            <StatusMetricCard
+              title="Receita Total"
+              value={formatCurrency(financialMetrics.faturamentoTotal)}
+              icon={<DollarSign className="h-4 w-4" />}
+              size="large"
+              trend={variations?.revenue}
+              status="neutral"
+              benchmark={{
+                value: financialMetrics.totalPedidos,
+                label: "Total de Pedidos",
+              }}
+              interpretation={`Ticket médio: ${formatCurrency(financialMetrics.ticketMedio)}`}
+            />
+
+            {/* Cards Secundários */}
+            <StatusMetricCard
+              title="Ticket Médio Real"
+              value={formatCurrency(financialMetrics.ticketMedioReal)}
+              icon={<TrendingUp className="h-3.5 w-3.5" />}
+              trend={variations?.ticket}
+              status={getStatusFromBenchmark(financialMetrics.ticketMedioReal, benchmarksPetFood.ticketMedio)}
+              benchmark={{
+                value: benchmarksPetFood.ticketMedio,
+                label: "Benchmark",
+              }}
+              interpretation={formatBenchmarkInterpretation(
+                financialMetrics.ticketMedioReal,
+                benchmarksPetFood.ticketMedio,
+                { formatValue: (v) => formatCurrency(v) }
               )}
-              
-              {/* Cards de resumo financeiro - DEPOIS */}
-              <FinancialSummaryCards metrics={financialMetrics} />
+            />
+
+            <StatusMetricCard
+              title="Total de Pedidos"
+              value={financialMetrics.totalPedidos.toLocaleString('pt-BR')}
+              icon={<ShoppingCart className="h-3.5 w-3.5" />}
+              trend={variations?.orders}
+              interpretation={`${financialMetrics.totalPedidosReais} reais + ${financialMetrics.totalPedidosApenasAmostras} samples`}
+            />
+
+            <StatusMetricCard
+              title="Produto Médio"
+              value={`${financialMetrics.produtoMedio.toFixed(1)} itens`}
+              icon={<Package className="h-3.5 w-3.5" />}
+              interpretation="Média de produtos por pedido"
+            />
+
+            <StatusMetricCard
+              title="Receita Líquida"
+              value={formatCurrency(financialMetrics.faturamentoLiquido)}
+              icon={<DollarSign className="h-3.5 w-3.5" />}
+              interpretation={`Frete: ${formatCurrency(financialMetrics.freteTotal)} (${financialMetrics.percentualFrete.toFixed(1)}%)`}
+            />
+
+            <StatusMetricCard
+              title="Crescimento"
+              value={`${(financialMetrics.growthRate || 0) >= 0 ? '+' : ''}${(financialMetrics.growthRate || 0).toFixed(1)}%`}
+              icon={<TrendingUp className="h-3.5 w-3.5" />}
+              status={
+                (financialMetrics.growthRate || 0) > 10 ? 'success' :
+                (financialMetrics.growthRate || 0) < -10 ? 'danger' :
+                (financialMetrics.growthRate || 0) < 0 ? 'warning' : 'neutral'
+              }
+              interpretation="vs mês anterior"
+            />
+          </div>
         </>
       )}
 
