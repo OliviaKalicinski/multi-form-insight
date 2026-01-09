@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import Upload from "./pages/Upload";
 import Settings from "./pages/Settings";
+import Metas from "./pages/Metas";
 import Seguidores from "./pages/Seguidores";
 import Volume from "./pages/Volume";
 import Ads from "./pages/Ads";
@@ -81,6 +82,16 @@ const App = () => (
               <AuthenticatedLayout>
                 <Settings />
               </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/metas" element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <AuthenticatedLayout>
+                  <Metas />
+                </AuthenticatedLayout>
+              </AdminRoute>
             </ProtectedRoute>
           } />
           

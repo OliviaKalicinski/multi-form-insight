@@ -179,7 +179,7 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t">
         <SidebarMenu>
-          {/* Upload - Admin only */}
+        {/* Upload - Admin only */}
           {isAdmin && (
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -189,6 +189,20 @@ export function AppSidebar() {
               >
                 <Upload className="h-4 w-4" />
                 <span>Upload de Dados</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+
+          {/* Metas Financeiras - Admin only */}
+          {isAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={isActive("/metas")}
+                onClick={() => navigate("/metas")}
+                tooltip="Metas Financeiras"
+              >
+                <Target className="h-4 w-4" />
+                <span>Metas Financeiras</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
