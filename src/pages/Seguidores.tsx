@@ -98,16 +98,30 @@ const Seguidores = () => {
       };
     }
     
-    // For 12-month view, use the last month as reference
-    const referenceMonth = isLast12MonthsView && last12Months.length > 0
-      ? last12Months[last12Months.length - 1].slice(0, 7)
-      : selectedMonth.slice(0, 7);
+    // Determine reference month - handle null (Todos os períodos)
+    let referenceMonth: string;
+    if (isLast12MonthsView && last12Months.length > 0) {
+      referenceMonth = last12Months[last12Months.length - 1].slice(0, 7);
+    } else if (!selectedMonth && availableMonths.length > 0) {
+      // "Todos os períodos" - usar o mês mais recente como referência
+      referenceMonth = availableMonths[availableMonths.length - 1].slice(0, 7);
+    } else if (selectedMonth) {
+      referenceMonth = selectedMonth.slice(0, 7);
+    } else {
+      // Fallback: extrair do próprio dado
+      referenceMonth = currentMonthFollowersData[currentMonthFollowersData.length - 1]?.Data?.slice(0, 7) || '';
+    }
     
     const metrics = calculateFollowersMetrics(
       currentMonthFollowersData,
       followersData,
       referenceMonth
     );
+    
+    // Para "Todos os períodos", não calcular crescimento vs período anterior
+    if (!selectedMonth) {
+      return metrics;
+    }
     
     if (previousMonthFollowersData.length > 0) {
       const currentIndex = availableMonths.indexOf(selectedMonth);
@@ -116,9 +130,7 @@ const Seguidores = () => {
         : availableMonths[currentIndex - 1];
       
       if (previousMonth) {
-        const previousMonthStr = isLast12MonthsView 
-          ? previousMonth.slice(0, 7)
-          : previousMonth.slice(0, 7);
+        const previousMonthStr = previousMonth.slice(0, 7);
         
         const growth = calculateFollowersGrowth(
           currentMonthFollowersData,
@@ -269,6 +281,25 @@ const Seguidores = () => {
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Período: {formatMonthRange(last12Months)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Period indicator for "Todos os Períodos" */}
+        {!selectedMonth && !comparisonMode && hasFollowersData && (
+          <Card className="border-blue-500/50 bg-blue-500/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <Calendar className="h-5 w-5 text-blue-500" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    📅 Visão Completa - Todos os Períodos
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Mostrando dados de {availableMonths.length} meses disponíveis
                   </p>
                 </div>
               </div>
