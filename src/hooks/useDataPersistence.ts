@@ -18,28 +18,36 @@ interface UpsertResult {
   total: number;
 }
 
-// Helper to record upload history
-const recordUploadHistory = async (
+// Helper to create upload history and return the ID
+const createUploadHistory = async (
   dataType: string,
   recordCount: number,
   fileName: string | null,
   dateRangeStart: string | null,
   dateRangeEnd: string | null
-) => {
+): Promise<string | null> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) return null;
 
-    await supabase.from("upload_history").insert({
+    const { data, error } = await supabase.from("upload_history").insert({
       data_type: dataType,
       record_count: recordCount,
       file_name: fileName,
       user_id: user.id,
       date_range_start: dateRangeStart,
       date_range_end: dateRangeEnd,
-    });
+    }).select("id").single();
+
+    if (error) {
+      console.error("Error creating upload history:", error);
+      return null;
+    }
+
+    return data?.id || null;
   } catch (error) {
-    console.error("Error recording upload history:", error);
+    console.error("Error creating upload history:", error);
+    return null;
   }
 };
 
@@ -217,11 +225,25 @@ export const useDataPersistence = () => {
     }
   }, [toast]);
 
-  // Save/upsert sales data
+  // Save/upsert sales data with upload_id
   const saveSalesData = useCallback(async (orders: ProcessedOrder[], fileName?: string): Promise<UpsertResult> => {
     if (orders.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
     try {
+      // Calculate date range from sales data
+      const dates = orders.map(o => o.dataVenda).filter(d => d instanceof Date && !isNaN(d.getTime()));
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
+      // Create upload history FIRST and get the ID
+      const uploadId = await createUploadHistory(
+        "sales",
+        orders.length,
+        fileName || null,
+        minDate ? format(minDate, "yyyy-MM-dd") : null,
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+      );
+
       const rows = orders.map((order) => ({
         numero_pedido: order.numeroPedido,
         data_venda: order.dataVenda.toISOString(),
@@ -236,6 +258,7 @@ export const useDataPersistence = () => {
         forma_envio: order.formaEnvio,
         produtos: order.produtos,
         cupom: "",
+        upload_id: uploadId,
       }));
 
       const { data, error } = await supabase
@@ -243,27 +266,19 @@ export const useDataPersistence = () => {
         .upsert(rows, { onConflict: "numero_pedido", ignoreDuplicates: false })
         .select();
 
-      if (error) throw error;
+      if (error) {
+        // If insert fails, delete the upload history record
+        if (uploadId) {
+          await supabase.from("upload_history").delete().eq("id", uploadId);
+        }
+        throw error;
+      }
 
       const result = {
         inserted: data?.length || 0,
         updated: 0,
         total: orders.length,
       };
-
-      // Calculate date range from sales data
-      const dates = orders.map(o => o.dataVenda).filter(d => d instanceof Date && !isNaN(d.getTime()));
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
-
-      // Record upload history
-      await recordUploadHistory(
-        "sales",
-        result.inserted,
-        fileName || null,
-        minDate ? format(minDate, "yyyy-MM-dd") : null,
-        maxDate ? format(maxDate, "yyyy-MM-dd") : null
-      );
 
       setStats((prev) => ({ ...prev, salesCount: prev.salesCount + result.inserted, lastUpdated: new Date() }));
 
@@ -315,11 +330,17 @@ export const useDataPersistence = () => {
     return parseFloat(cleaned) || 0;
   };
 
-  // Save/upsert ads data with deduplication
+  // Save/upsert ads data with deduplication and upload_id
   const saveAdsData = useCallback(async (ads: AdsData[], fileName?: string): Promise<UpsertResult & { duplicatesAggregated: number }> => {
     if (ads.length === 0) return { inserted: 0, updated: 0, total: 0, duplicatesAggregated: 0 };
 
     try {
+      // Calculate date range from ads data
+      const dateStrings = ads.map(ad => ad["Início dos relatórios"]).filter(Boolean);
+      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
       // Parse all rows first with correct monetary parsing
       const rawRows = ads.map((ad) => ({
         data: ad["Início dos relatórios"] || "",
@@ -357,12 +378,33 @@ export const useDataPersistence = () => {
 
       console.log(`📊 Deduplicação de anúncios: ${rawRows.length} linhas originais → ${uniqueRows.length} únicas (${duplicatesAggregated} duplicatas agregadas)`);
 
+      // Create upload history FIRST and get the ID
+      const uploadId = await createUploadHistory(
+        "ads",
+        uniqueRows.length,
+        fileName || null,
+        minDate ? format(minDate, "yyyy-MM-dd") : null,
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+      );
+
+      // Add upload_id to all rows
+      const rowsWithUploadId = uniqueRows.map(row => ({
+        ...row,
+        upload_id: uploadId,
+      }));
+
       const { data, error } = await supabase
         .from("ads_data")
-        .upsert(uniqueRows, { onConflict: "data,campanha,conjunto,anuncio", ignoreDuplicates: false })
+        .upsert(rowsWithUploadId, { onConflict: "data,campanha,conjunto,anuncio", ignoreDuplicates: false })
         .select();
 
-      if (error) throw error;
+      if (error) {
+        // If insert fails, delete the upload history record
+        if (uploadId) {
+          await supabase.from("upload_history").delete().eq("id", uploadId);
+        }
+        throw error;
+      }
 
       const result = {
         inserted: data?.length || 0,
@@ -370,21 +412,6 @@ export const useDataPersistence = () => {
         total: ads.length,
         duplicatesAggregated,
       };
-
-      // Calculate date range from ads data
-      const dateStrings = ads.map(ad => ad["Início dos relatórios"]).filter(Boolean);
-      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
-
-      // Record upload history
-      await recordUploadHistory(
-        "ads",
-        result.inserted,
-        fileName || null,
-        minDate ? format(minDate, "yyyy-MM-dd") : null,
-        maxDate ? format(maxDate, "yyyy-MM-dd") : null
-      );
 
       setStats((prev) => ({ ...prev, adsCount: prev.adsCount + result.inserted, lastUpdated: new Date() }));
 
@@ -395,16 +422,32 @@ export const useDataPersistence = () => {
     }
   }, []);
 
-  // Save/upsert followers data
+  // Save/upsert followers data with upload_id
   const saveFollowersData = useCallback(async (followers: FollowersData[], fileName?: string): Promise<UpsertResult> => {
     if (followers.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
     try {
+      // Calculate date range from followers data
+      const dateStrings = followers.map(f => f.Data).filter(Boolean);
+      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
+      // Create upload history FIRST and get the ID
+      const uploadId = await createUploadHistory(
+        "followers",
+        followers.length,
+        fileName || null,
+        minDate ? format(minDate, "yyyy-MM-dd") : null,
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+      );
+
       const rows = followers.map((f) => ({
         data: f.Data,
         total_seguidores: parseInt(f.Seguidores?.replace(/\./g, "") || "0"),
         novos_seguidores: 0,
         unfollows: 0,
+        upload_id: uploadId,
       }));
 
       const { data, error } = await supabase
@@ -412,28 +455,19 @@ export const useDataPersistence = () => {
         .upsert(rows, { onConflict: "data", ignoreDuplicates: false })
         .select();
 
-      if (error) throw error;
+      if (error) {
+        // If insert fails, delete the upload history record
+        if (uploadId) {
+          await supabase.from("upload_history").delete().eq("id", uploadId);
+        }
+        throw error;
+      }
 
       const result = {
         inserted: data?.length || 0,
         updated: 0,
         total: followers.length,
       };
-
-      // Calculate date range from followers data
-      const dateStrings = followers.map(f => f.Data).filter(Boolean);
-      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
-
-      // Record upload history
-      await recordUploadHistory(
-        "followers",
-        result.inserted,
-        fileName || null,
-        minDate ? format(minDate, "yyyy-MM-dd") : null,
-        maxDate ? format(maxDate, "yyyy-MM-dd") : null
-      );
 
       setStats((prev) => ({ ...prev, followersCount: prev.followersCount + result.inserted, lastUpdated: new Date() }));
 
@@ -444,21 +478,36 @@ export const useDataPersistence = () => {
     }
   }, []);
 
-  // Save/upsert marketing data
+  // Save/upsert marketing data with upload_id
   const saveMarketingData = useCallback(async (marketing: MarketingData[], fileName?: string): Promise<UpsertResult> => {
     if (marketing.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
     try {
+      // Calculate date range from marketing data
+      const dateStrings = marketing.map(m => m.Data).filter(Boolean);
+      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
+      // Create upload history FIRST and get the ID
+      const uploadId = await createUploadHistory(
+        "marketing",
+        marketing.length,
+        fileName || null,
+        minDate ? format(minDate, "yyyy-MM-dd") : null,
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+      );
+
       // Each marketing row has multiple metrics, save each as separate row
-      const rows: { data: string; metrica: string; valor: number }[] = [];
+      const rows: { data: string; metrica: string; valor: number; upload_id: string | null }[] = [];
 
       marketing.forEach((m) => {
         rows.push(
-          { data: m.Data, metrica: "visualizacoes", valor: parseFloat(m.Visualizações?.replace(/\./g, "").replace(",", ".") || "0") },
-          { data: m.Data, metrica: "visitas", valor: parseFloat(m.Visitas?.replace(/\./g, "").replace(",", ".") || "0") },
-          { data: m.Data, metrica: "interacoes", valor: parseFloat(m.Interações?.replace(/\./g, "").replace(",", ".") || "0") },
-          { data: m.Data, metrica: "clicks", valor: parseFloat(m["Clicks no Link"]?.replace(/\./g, "").replace(",", ".") || "0") },
-          { data: m.Data, metrica: "alcance", valor: parseFloat(m.Alcance?.replace(/\./g, "").replace(",", ".") || "0") }
+          { data: m.Data, metrica: "visualizacoes", valor: parseFloat(m.Visualizações?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId },
+          { data: m.Data, metrica: "visitas", valor: parseFloat(m.Visitas?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId },
+          { data: m.Data, metrica: "interacoes", valor: parseFloat(m.Interações?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId },
+          { data: m.Data, metrica: "clicks", valor: parseFloat(m["Clicks no Link"]?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId },
+          { data: m.Data, metrica: "alcance", valor: parseFloat(m.Alcance?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId }
         );
       });
 
@@ -467,28 +516,19 @@ export const useDataPersistence = () => {
         .upsert(rows, { onConflict: "data,metrica", ignoreDuplicates: false })
         .select();
 
-      if (error) throw error;
+      if (error) {
+        // If insert fails, delete the upload history record
+        if (uploadId) {
+          await supabase.from("upload_history").delete().eq("id", uploadId);
+        }
+        throw error;
+      }
 
       const result = {
         inserted: data?.length || 0,
         updated: 0,
         total: marketing.length,
       };
-
-      // Calculate date range from marketing data
-      const dateStrings = marketing.map(m => m.Data).filter(Boolean);
-      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
-
-      // Record upload history
-      await recordUploadHistory(
-        "marketing",
-        result.inserted,
-        fileName || null,
-        minDate ? format(minDate, "yyyy-MM-dd") : null,
-        maxDate ? format(maxDate, "yyyy-MM-dd") : null
-      );
 
       setStats((prev) => ({ ...prev, marketingCount: prev.marketingCount + result.inserted, lastUpdated: new Date() }));
 
@@ -499,6 +539,47 @@ export const useDataPersistence = () => {
     }
   }, []);
 
+  // Delete a specific upload and its associated data (CASCADE handles data deletion)
+  const deleteUpload = useCallback(async (uploadId: string): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from("upload_history")
+        .delete()
+        .eq("id", uploadId);
+
+      if (error) throw error;
+
+      // Reload stats after deletion
+      const [salesCount, adsCount, followersCount, marketingCount] = await Promise.all([
+        supabase.from("sales_data").select("id", { count: "exact", head: true }),
+        supabase.from("ads_data").select("id", { count: "exact", head: true }),
+        supabase.from("followers_data").select("id", { count: "exact", head: true }),
+        supabase.from("marketing_data").select("id", { count: "exact", head: true }),
+      ]);
+
+      setStats({
+        salesCount: salesCount.count || 0,
+        adsCount: adsCount.count || 0,
+        followersCount: followersCount.count || 0,
+        marketingCount: marketingCount.count || 0,
+        lastUpdated: new Date(),
+      });
+
+      toast({
+        title: "Importação excluída",
+        description: "Os dados foram removidos com sucesso.",
+      });
+    } catch (error) {
+      console.error("Erro ao excluir importação:", error);
+      toast({
+        title: "Erro ao excluir",
+        description: "Não foi possível excluir a importação.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  }, [toast]);
+
   // Clear all data
   const clearAllData = useCallback(async () => {
     try {
@@ -507,6 +588,7 @@ export const useDataPersistence = () => {
         supabase.from("ads_data").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
         supabase.from("followers_data").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
         supabase.from("marketing_data").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
+        supabase.from("upload_history").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
       ]);
 
       setStats({
@@ -561,6 +643,7 @@ export const useDataPersistence = () => {
     saveAdsData,
     saveFollowersData,
     saveMarketingData,
+    deleteUpload,
     clearAllData,
     clearAdsData,
   };

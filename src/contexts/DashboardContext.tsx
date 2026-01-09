@@ -25,10 +25,11 @@ interface DashboardContextType {
   setComparisonMode: (enabled: boolean) => void;
   setSelectedMonths: (months: string[]) => void;
   toggleMonth: (month: string) => void;
-  persistSalesData: (data: ProcessedOrder[]) => Promise<{ inserted: number; total: number }>;
-  persistAdsData: (data: AdsData[]) => Promise<{ inserted: number; total: number }>;
-  persistFollowersData: (data: FollowersData[]) => Promise<{ inserted: number; total: number }>;
-  persistMarketingData: (data: MarketingData[]) => Promise<{ inserted: number; total: number }>;
+  persistSalesData: (data: ProcessedOrder[], fileName?: string) => Promise<{ inserted: number; total: number }>;
+  persistAdsData: (data: AdsData[], fileName?: string) => Promise<{ inserted: number; total: number }>;
+  persistFollowersData: (data: FollowersData[], fileName?: string) => Promise<{ inserted: number; total: number }>;
+  persistMarketingData: (data: MarketingData[], fileName?: string) => Promise<{ inserted: number; total: number }>;
+  deleteUpload: (uploadId: string) => Promise<void>;
   clearPersistedData: () => Promise<void>;
   clearAdsData: () => Promise<void>;
   refreshFromDatabase: () => Promise<void>;
@@ -55,6 +56,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     saveAdsData,
     saveFollowersData,
     saveMarketingData,
+    deleteUpload: deleteUploadFromDb,
     clearAllData,
     clearAdsData: clearAdsDataFromDb,
   } = useDataPersistence();
@@ -156,8 +158,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Persist functions that save to database AND update local state
-  const persistSalesData = useCallback(async (data: ProcessedOrder[]) => {
-    const result = await saveSalesData(data);
+  const persistSalesData = useCallback(async (data: ProcessedOrder[], fileName?: string) => {
+    const result = await saveSalesData(data, fileName);
     // Merge new data with existing (avoiding duplicates by numero_pedido)
     setSalesDataState(prev => {
       const existingIds = new Set(prev.map(o => o.numeroPedido));
@@ -167,14 +169,14 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     return result;
   }, [saveSalesData]);
 
-  const persistAdsData = useCallback(async (data: AdsData[]) => {
-    const result = await saveAdsData(data);
+  const persistAdsData = useCallback(async (data: AdsData[], fileName?: string) => {
+    const result = await saveAdsData(data, fileName);
     setAdsDataState(prev => [...prev, ...data]);
     return result;
   }, [saveAdsData]);
 
-  const persistFollowersData = useCallback(async (data: FollowersData[]) => {
-    const result = await saveFollowersData(data);
+  const persistFollowersData = useCallback(async (data: FollowersData[], fileName?: string) => {
+    const result = await saveFollowersData(data, fileName);
     // Merge by date
     setFollowersDataState(prev => {
       const existingDates = new Set(prev.map(f => f.Data));
@@ -184,8 +186,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     return result;
   }, [saveFollowersData]);
 
-  const persistMarketingData = useCallback(async (data: MarketingData[]) => {
-    const result = await saveMarketingData(data);
+  const persistMarketingData = useCallback(async (data: MarketingData[], fileName?: string) => {
+    const result = await saveMarketingData(data, fileName);
     // Merge by date
     setMarketingDataState(prev => {
       const existingDates = new Set(prev.map(m => m.Data));
@@ -194,6 +196,17 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     });
     return result;
   }, [saveMarketingData]);
+
+  // Delete upload and refresh data from database
+  const deleteUpload = useCallback(async (uploadId: string) => {
+    await deleteUploadFromDb(uploadId);
+    // Refresh all data from database after deletion
+    const { salesData, adsData, followersData, marketingData } = await loadAllData();
+    setSalesDataState(salesData);
+    setAdsDataState(adsData);
+    setFollowersDataState(followersData);
+    setMarketingDataState(marketingData);
+  }, [deleteUploadFromDb, loadAllData]);
 
   const clearPersistedData = useCallback(async () => {
     await clearAllData();
@@ -245,6 +258,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     persistAdsData,
     persistFollowersData,
     persistMarketingData,
+    deleteUpload,
     clearPersistedData,
     clearAdsData,
     refreshFromDatabase,

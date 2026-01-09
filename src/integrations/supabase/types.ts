@@ -27,6 +27,7 @@ export type Database = {
           id: string
           impressoes: number | null
           receita: number | null
+          upload_id: string | null
         }
         Insert: {
           anuncio?: string | null
@@ -40,6 +41,7 @@ export type Database = {
           id?: string
           impressoes?: number | null
           receita?: number | null
+          upload_id?: string | null
         }
         Update: {
           anuncio?: string | null
@@ -53,8 +55,17 @@ export type Database = {
           id?: string
           impressoes?: number | null
           receita?: number | null
+          upload_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ads_data_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "upload_history"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       followers_data: {
         Row: {
@@ -64,6 +75,7 @@ export type Database = {
           novos_seguidores: number | null
           total_seguidores: number | null
           unfollows: number | null
+          upload_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -72,6 +84,7 @@ export type Database = {
           novos_seguidores?: number | null
           total_seguidores?: number | null
           unfollows?: number | null
+          upload_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -80,8 +93,17 @@ export type Database = {
           novos_seguidores?: number | null
           total_seguidores?: number | null
           unfollows?: number | null
+          upload_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "followers_data_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "upload_history"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketing_data: {
         Row: {
@@ -89,6 +111,7 @@ export type Database = {
           data: string
           id: string
           metrica: string | null
+          upload_id: string | null
           valor: number | null
         }
         Insert: {
@@ -96,6 +119,7 @@ export type Database = {
           data: string
           id?: string
           metrica?: string | null
+          upload_id?: string | null
           valor?: number | null
         }
         Update: {
@@ -103,9 +127,18 @@ export type Database = {
           data?: string
           id?: string
           metrica?: string | null
+          upload_id?: string | null
           valor?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "marketing_data_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "upload_history"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_data: {
         Row: {
@@ -122,6 +155,7 @@ export type Database = {
           numero_pedido: string
           produtos: Json
           status: string | null
+          upload_id: string | null
           valor_frete: number | null
           valor_total: number
         }
@@ -139,6 +173,7 @@ export type Database = {
           numero_pedido: string
           produtos: Json
           status?: string | null
+          upload_id?: string | null
           valor_frete?: number | null
           valor_total: number
         }
@@ -156,10 +191,19 @@ export type Database = {
           numero_pedido?: string
           produtos?: Json
           status?: string | null
+          upload_id?: string | null
           valor_frete?: number | null
           valor_total?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_data_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "upload_history"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       upload_history: {
         Row: {
