@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { Users, RefreshCcw, AlertTriangle, UserCheck, DollarSign, Calendar, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { ChurnFunnelChart } from "@/components/dashboard/ChurnFunnelChart";
 import { OrderVolumeChart } from "@/components/dashboard/OrderVolumeChart";
 import { SalesPeaksChart } from "@/components/dashboard/SalesPeaksChart";
@@ -176,8 +176,8 @@ export default function ComportamentoCliente() {
   // Calcular clientes novos vs recorrentes
   const clienteBreakdown = useMemo(() => {
     if (!behaviorMetrics) return { novos: 0, recorrentes: 0 };
-    const novosSegment = behaviorMetrics.customerSegmentation.find(s => s.segment === 'Novo');
-    const novos = novosSegment?.count || 0;
+    const inicianteSegment = behaviorMetrics.customerSegmentation.find(s => s.segment === 'Iniciante');
+    const novos = inicianteSegment?.count || 0;
     return { novos, recorrentes: behaviorMetrics.totalClientes - novos };
   }, [behaviorMetrics]);
 
@@ -348,180 +348,205 @@ export default function ComportamentoCliente() {
         </div>
       )}
 
-      {/* Tabs com análises - 3 abas otimizadas */}
-      <Tabs defaultValue="segmentation" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="segmentation">🎯 Segmentação</TabsTrigger>
-          <TabsTrigger value="churn">🚨 Churn</TabsTrigger>
-          <TabsTrigger value="volume">📊 Volume & Padrões</TabsTrigger>
-        </TabsList>
-
-        {/* Tab 1: Segmentação (Mais Visual) */}
-        <TabsContent value="segmentation" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Distribuição de Clientes</CardTitle>
-                <CardDescription>
-                  Segmentação por comportamento de compra
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CustomerSegmentationChart
-                  segments={behaviorMetrics?.customerSegmentation || []}
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Receita por Segmento</CardTitle>
-                <CardDescription>
-                  Contribuição de cada perfil para o faturamento
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SegmentRevenueChart
-                  segments={behaviorMetrics?.customerSegmentation || []}
-                />
-              </CardContent>
-            </Card>
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* SEÇÃO 1: SEGMENTAÇÃO DE CLIENTES */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🎯</span>
+          <div>
+            <h2 className="text-xl font-semibold">Segmentação de Clientes</h2>
+            <p className="text-sm text-muted-foreground">Distribuição por comportamento de compra</p>
           </div>
+        </div>
 
-          {/* Tabela detalhada de segmentos */}
+        <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Análise Detalhada por Segmento</CardTitle>
+              <CardTitle>Distribuição de Clientes</CardTitle>
               <CardDescription>
-                Métricas completas de cada perfil de cliente
+                Segmentação por comportamento de compra
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <SegmentDetailTable
+              <CustomerSegmentationChart
                 segments={behaviorMetrics?.customerSegmentation || []}
               />
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Tab 2: Análise de Churn (Sem duplicação) */}
-        <TabsContent value="churn" className="space-y-6">
-          {/* Funil maior */}
           <Card>
             <CardHeader>
-              <CardTitle>Funil de Retenção</CardTitle>
+              <CardTitle>Receita por Segmento</CardTitle>
               <CardDescription>
-                Distribuição de clientes por estágio de atividade
+                Contribuição de cada perfil para o faturamento
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[400px]">
-                <ChurnFunnelChart
-                  ativos={behaviorMetrics?.clientesAtivos || 0}
-                  emRisco={behaviorMetrics?.clientesEmRisco || 0}
-                  inativos={behaviorMetrics?.clientesInativos || 0}
-                  churn={behaviorMetrics?.clientesChurn || 0}
-                />
+              <SegmentRevenueChart
+                segments={behaviorMetrics?.customerSegmentation || []}
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabela detalhada de segmentos */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Análise Detalhada por Segmento</CardTitle>
+            <CardDescription>
+              Métricas completas de cada perfil de cliente
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SegmentDetailTable
+              segments={behaviorMetrics?.customerSegmentation || []}
+            />
+          </CardContent>
+        </Card>
+      </section>
+
+      <Separator className="my-8" />
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* SEÇÃO 2: VOLUME E PADRÕES */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">📊</span>
+          <div>
+            <h2 className="text-xl font-semibold">Volume e Padrões</h2>
+            <p className="text-sm text-muted-foreground">Evolução de pedidos e identificação de picos</p>
+          </div>
+        </div>
+
+        {/* KPIs de Volume */}
+        <VolumeKPICards
+          averageDaily={volumeAnalysis.averageDaily}
+          peakDay={volumeAnalysis.peakDay}
+          lowDay={volumeAnalysis.lowDay}
+          trend={volumeTrend}
+        />
+
+        {/* Gráfico de Volume */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle>Evolução de Pedidos</CardTitle>
+                <CardDescription>
+                  Volume de pedidos ao longo do tempo
+                  {selectedMonth && selectedMonth !== 'last-12-months' && (
+                    <span className="block text-xs text-primary mt-1">
+                      📅 Período: {selectedMonth}
+                    </span>
+                  )}
+                </CardDescription>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Tabela de clientes em risco - melhorada */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Clientes em Risco de Churn</CardTitle>
-              <CardDescription>
-                Clientes que não compram há mais de 30 dias, ordenados por valor total
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChurnRiskTable
-                customers={behaviorMetrics?.churnRiskCustomers || []}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab 3: Volume & Padrões (Consolidada) */}
-        <TabsContent value="volume" className="space-y-6">
-          {/* KPIs de Volume */}
-          <VolumeKPICards
-            averageDaily={volumeAnalysis.averageDaily}
-            peakDay={volumeAnalysis.peakDay}
-            lowDay={volumeAnalysis.lowDay}
-            trend={volumeTrend}
-          />
-
-          {/* Gráfico de Volume */}
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <CardTitle>Evolução de Pedidos</CardTitle>
-                  <CardDescription>
-                    Volume de pedidos ao longo do tempo
-                    {selectedMonth && selectedMonth !== 'last-12-months' && (
-                      <span className="block text-xs text-primary mt-1">
-                        📅 Período: {selectedMonth}
-                      </span>
-                    )}
-                  </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    className={`px-4 py-2 rounded text-sm ${volumeView === 'daily' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
-                    onClick={() => setVolumeView('daily')}
-                  >
-                    Diário
-                  </button>
-                  <button
-                    className={`px-4 py-2 rounded text-sm ${volumeView === 'weekly' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
-                    onClick={() => setVolumeView('weekly')}
-                  >
-                    Semanal
-                  </button>
-                  <button
-                    className={`px-4 py-2 rounded text-sm ${volumeView === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
-                    onClick={() => setVolumeView('monthly')}
-                  >
-                    Mensal
-                  </button>
-                </div>
+              <div className="flex gap-2">
+                <button
+                  className={`px-4 py-2 rounded text-sm ${volumeView === 'daily' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                  onClick={() => setVolumeView('daily')}
+                >
+                  Diário
+                </button>
+                <button
+                  className={`px-4 py-2 rounded text-sm ${volumeView === 'weekly' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                  onClick={() => setVolumeView('weekly')}
+                >
+                  Semanal
+                </button>
+                <button
+                  className={`px-4 py-2 rounded text-sm ${volumeView === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                  onClick={() => setVolumeView('monthly')}
+                >
+                  Mensal
+                </button>
               </div>
-            </CardHeader>
-            <CardContent>
-              <OrderVolumeChart
-                data={
-                  volumeView === 'daily' ? filteredMetrics?.pedidosPorDia || [] :
-                  volumeView === 'weekly' ? filteredMetrics?.pedidosPorSemana.map(w => ({ date: w.week, orders: w.orders })) || [] :
-                  filteredMetrics?.pedidosPorMes.map(m => ({ date: m.month, orders: m.orders })) || []
-                }
-                viewMode={volumeView}
-              />
-            </CardContent>
-          </Card>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <OrderVolumeChart
+              data={
+                volumeView === 'daily' ? filteredMetrics?.pedidosPorDia || [] :
+                volumeView === 'weekly' ? filteredMetrics?.pedidosPorSemana.map(w => ({ date: w.week, orders: w.orders })) || [] :
+                filteredMetrics?.pedidosPorMes.map(m => ({ date: m.month, orders: m.orders })) || []
+              }
+              viewMode={volumeView}
+            />
+          </CardContent>
+        </Card>
 
-          {/* Picos de Vendas (integrado) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>⚡ Dias de Pico</CardTitle>
-              <CardDescription>
-                Top 20 dias com maior volume - destaque para picos acima da média + 2σ
-                {selectedMonth && selectedMonth !== 'last-12-months' && (
-                  <span className="block text-xs text-primary mt-1">
-                    📅 Período: {selectedMonth}
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SalesPeaksChart
-                peaks={filteredMetrics?.picosVendas || []}
+        {/* Picos de Vendas */}
+        <Card>
+          <CardHeader>
+            <CardTitle>⚡ Dias de Pico</CardTitle>
+            <CardDescription>
+              Top 20 dias com maior volume - destaque para picos acima da média + 2σ
+              {selectedMonth && selectedMonth !== 'last-12-months' && (
+                <span className="block text-xs text-primary mt-1">
+                  📅 Período: {selectedMonth}
+                </span>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SalesPeaksChart
+              peaks={filteredMetrics?.picosVendas || []}
+            />
+          </CardContent>
+        </Card>
+      </section>
+
+      <Separator className="my-8" />
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* SEÇÃO 3: ANÁLISE DE CHURN */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🚨</span>
+          <div>
+            <h2 className="text-xl font-semibold">Análise de Churn</h2>
+            <p className="text-sm text-muted-foreground">Monitoramento de retenção e clientes em risco</p>
+          </div>
+        </div>
+
+        {/* Funil de Retenção */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Funil de Retenção</CardTitle>
+            <CardDescription>
+              Distribuição de clientes por estágio de atividade
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px]">
+              <ChurnFunnelChart
+                ativos={behaviorMetrics?.clientesAtivos || 0}
+                emRisco={behaviorMetrics?.clientesEmRisco || 0}
+                inativos={behaviorMetrics?.clientesInativos || 0}
+                churn={behaviorMetrics?.clientesChurn || 0}
               />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tabela de clientes em risco */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Clientes em Risco de Churn</CardTitle>
+            <CardDescription>
+              Clientes que não compram há mais de 30 dias, ordenados por valor total
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChurnRiskTable
+              customers={behaviorMetrics?.churnRiskCustomers || []}
+            />
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

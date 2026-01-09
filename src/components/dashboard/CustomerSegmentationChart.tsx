@@ -6,10 +6,10 @@ interface CustomerSegmentationChartProps {
 }
 
 const COLORS = {
-  'Novo': 'hsl(var(--chart-1))',
-  'Ativo': 'hsl(var(--chart-2))',
-  'Frequente': 'hsl(var(--chart-3))',
-  'VIP': 'hsl(var(--chart-4))',
+  'Iniciante': '#fbbf24',
+  'Ocasional': '#3b82f6',
+  'Fiel': '#10b981',
+  'VIP': '#8b5cf6',
 };
 
 export const CustomerSegmentationChart = ({ segments }: CustomerSegmentationChartProps) => {

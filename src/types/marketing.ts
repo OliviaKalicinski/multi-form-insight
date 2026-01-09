@@ -351,7 +351,7 @@ export interface NFIssuanceDistribution {
 }
 
 export interface CustomerSegment {
-  segment: 'Novo' | 'Ativo' | 'Frequente' | 'VIP';
+  segment: 'Iniciante' | 'Ocasional' | 'Fiel' | 'VIP';
   count: number;
   percentage: number;
   totalRevenue: number;

@@ -16,17 +16,17 @@ interface SegmentDetailTableProps {
 
 const SEGMENT_COLORS: Record<string, string> = {
   'VIP': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  'Frequente': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  'Ativo': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  'Novo': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  'Fiel': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  'Ocasional': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  'Iniciante': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
 };
 
 export const SegmentDetailTable = ({ segments }: SegmentDetailTableProps) => {
   const totalClientes = segments.reduce((sum, s) => sum + s.count, 0);
   const totalRevenue = segments.reduce((sum, s) => sum + s.totalRevenue, 0);
 
-  // Order: VIP, Frequente, Ativo, Novo
-  const orderedSegments = ['VIP', 'Frequente', 'Ativo', 'Novo']
+  // Order: VIP, Fiel, Ocasional, Iniciante
+  const orderedSegments = ['VIP', 'Fiel', 'Ocasional', 'Iniciante']
     .map(name => segments.find(s => s.segment === name))
     .filter(Boolean) as CustomerSegment[];
 

@@ -139,7 +139,7 @@ const AnaliseSamples = () => {
   // Preparar dados de segmentação para o gráfico
   const segmentationData = [
     {
-      segment: 'Novo' as const,
+      segment: 'Iniciante' as const,
       count: metrics.segmentation.oneTime,
       percentage: metrics.volume.uniqueCustomers > 0
         ? (metrics.segmentation.oneTime / metrics.volume.uniqueCustomers) * 100
@@ -149,7 +149,7 @@ const AnaliseSamples = () => {
       criteria: '1 compra apenas',
     },
     {
-      segment: 'Ativo' as const,
+      segment: 'Ocasional' as const,
       count: metrics.segmentation.explorers,
       percentage: metrics.volume.uniqueCustomers > 0
         ? (metrics.segmentation.explorers / metrics.volume.uniqueCustomers) * 100
