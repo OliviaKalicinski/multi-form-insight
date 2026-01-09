@@ -146,9 +146,14 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
  */
 export const filterOrdersByMonth = (
   orders: ProcessedOrder[], 
-  month: string,
+  month: string | null,
   availableMonths?: string[]
 ): ProcessedOrder[] => {
+  // Caso especial: null ou "all" = todos os períodos
+  if (!month || month === "all") {
+    return orders;
+  }
+  
   // Caso especial: "last-12-months"
   if (month === "last-12-months") {
     if (!availableMonths || availableMonths.length === 0) {

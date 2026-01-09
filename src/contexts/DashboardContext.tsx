@@ -108,12 +108,13 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     return result;
   }, [marketingData, followersData, adsData, salesData]);
 
-  // Auto-select latest month when data changes or month is not selected
-  useMemo(() => {
-    if (availableMonths.length > 0 && !selectedMonth) {
+  // Auto-select latest month ONLY on initial load (when selectedMonth is undefined/null and data just loaded)
+  useEffect(() => {
+    if (availableMonths.length > 0 && selectedMonth === null && dataLoaded) {
+      // Only auto-select on first data load, not when user explicitly selects "all"
       setSelectedMonthState(availableMonths[availableMonths.length - 1]);
     }
-  }, [availableMonths, selectedMonth]);
+  }, [dataLoaded]); // Only run when dataLoaded changes
 
   // Wrapper functions that update local state
   const setMarketingData = (data: MarketingData[]) => {
@@ -150,9 +151,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       if (prev.includes(month)) {
         return prev.filter(m => m !== month);
       }
-      if (prev.length >= 5) {
-        return prev;
-      }
+      // Sem limite de meses
       return [...prev, month].sort();
     });
   };
