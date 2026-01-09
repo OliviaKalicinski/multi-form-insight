@@ -29,7 +29,8 @@ export const CustomerSegmentationChart = ({ segments }: CustomerSegmentationChar
           cy="50%"
           labelLine={false}
           label={(entry) => `${entry.percentage.toFixed(1)}%`}
-          outerRadius={100}
+          outerRadius={120}
+          innerRadius={40}
           fill="#8884d8"
           dataKey="value"
         >
