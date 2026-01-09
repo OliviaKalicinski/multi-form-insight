@@ -1,19 +1,39 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
+import { useMemo } from "react";
 
 interface DailyVolumeChartProps {
   data: { date: string; orders: number }[] | { month: string; orders: number }[];
   title: string;
   description: string;
   isMonthly?: boolean;
+  dailyGoal?: number;
 }
 
-export const DailyVolumeChart = ({ data, title, description, isMonthly = false }: DailyVolumeChartProps) => {
+export const DailyVolumeChart = ({ 
+  data, 
+  title, 
+  description, 
+  isMonthly = false,
+  dailyGoal 
+}: DailyVolumeChartProps) => {
   // Preparar dados com a chave correta (date ou month)
-  const chartData = data.map(item => ({
-    label: 'date' in item ? item.date : item.month,
-    orders: item.orders
-  }));
+  const chartData = useMemo(() => {
+    return data.map(item => ({
+      label: 'date' in item ? item.date : item.month,
+      orders: item.orders
+    }));
+  }, [data]);
+
+  // Calcular média para linha de referência
+  const averageOrders = useMemo(() => {
+    if (chartData.length === 0) return 0;
+    return chartData.reduce((sum, d) => sum + d.orders, 0) / chartData.length;
+  }, [chartData]);
+
+  // Usar meta diária ou média como referência
+  const targetLine = dailyGoal || Math.round(averageOrders);
+
   return (
     <Card>
       <CardHeader>
@@ -22,18 +42,12 @@ export const DailyVolumeChart = ({ data, title, description, isMonthly = false }
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={chartData}>
-            <defs>
-              <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.8}/>
-                <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0}/>
-              </linearGradient>
-            </defs>
+          <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
               dataKey="label"
               stroke="hsl(var(--muted-foreground))"
-              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
               angle={isMonthly ? 0 : -45}
               textAnchor={isMonthly ? "middle" : "end"}
               height={isMonthly ? 60 : 80}
@@ -52,16 +66,54 @@ export const DailyVolumeChart = ({ data, title, description, isMonthly = false }
                 borderRadius: '8px'
               }}
             />
-            <Area 
-              type="monotone" 
-              dataKey="orders" 
-              stroke="hsl(var(--chart-2))" 
-              fillOpacity={1} 
-              fill="url(#volumeGradient)"
-              name="Pedidos"
+            
+            {/* Linha de meta/média */}
+            <ReferenceLine 
+              y={targetLine} 
+              stroke="hsl(var(--chart-4))" 
+              strokeDasharray="5 5"
+              label={{ 
+                value: dailyGoal ? 'Meta' : 'Média', 
+                position: 'right',
+                fill: 'hsl(var(--chart-4))',
+                fontSize: 10
+              }}
             />
-          </AreaChart>
+            
+            {/* Barras com cores condicionais */}
+            <Bar 
+              dataKey="orders" 
+              radius={[4, 4, 0, 0]}
+              name="Pedidos"
+            >
+              {chartData.map((entry, index) => (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={entry.orders >= targetLine 
+                    ? 'hsl(var(--chart-2))' 
+                    : 'hsl(var(--chart-3))'
+                  }
+                />
+              ))}
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
+        
+        {/* Legenda */}
+        <div className="flex items-center justify-center gap-6 mt-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: 'hsl(var(--chart-2))' }} />
+            <span>Acima da {dailyGoal ? 'meta' : 'média'}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: 'hsl(var(--chart-3))' }} />
+            <span>Abaixo da {dailyGoal ? 'meta' : 'média'}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-6 h-0.5" style={{ backgroundColor: 'hsl(var(--chart-4))', borderStyle: 'dashed' }} />
+            <span>{dailyGoal ? `Meta: ${dailyGoal}` : `Média: ${Math.round(averageOrders)}`}</span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
