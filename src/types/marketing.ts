@@ -279,6 +279,14 @@ export interface CustomerBehaviorMetrics {
   customerLifetimeValue: number;
 }
 
+// NF Issuance Stats
+export interface NFIssuanceStats {
+  averageDays: number;
+  medianDays: number;
+  minDays: number;
+  maxDays: number;
+}
+
 // Product & Operations Metrics
 export interface ProductOperationsMetrics {
   topProductsByQuantity: ProductRanking[];
@@ -289,6 +297,7 @@ export interface ProductOperationsMetrics {
   shippingMethodStats: ShippingMethodStat[];
   averageNFIssuanceTime: number;
   nfIssuanceDistribution: NFIssuanceDistribution[];
+  nfStats: NFIssuanceStats;
   totalProducts: number;
   totalSKUs: number;
 }

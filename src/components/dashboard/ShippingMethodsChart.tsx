@@ -24,7 +24,7 @@ export const ShippingMethodsChart = ({ data }: ShippingMethodsChartProps) => {
           color: COLORS[index % COLORS.length]
         }
       }), {})}
-      className="h-[300px]"
+      className="h-[350px]"
     >
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
@@ -34,7 +34,7 @@ export const ShippingMethodsChart = ({ data }: ShippingMethodsChartProps) => {
             cy="50%"
             labelLine={false}
             label={({ name, percentual }) => `${name}: ${percentual.toFixed(1)}%`}
-            outerRadius={80}
+            outerRadius={120}
             fill="#8884d8"
             dataKey="value"
           >

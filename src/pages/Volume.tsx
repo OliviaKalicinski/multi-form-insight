@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { Package, ListTree, DollarSign, ShoppingCart, BarChart3, TrendingUp } from "lucide-react";
+import { Package, ListTree, DollarSign, ShoppingCart, BarChart3, TrendingUp, Trophy, Gift, Link2, Truck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
-import { StatusMetricCard } from "@/components/dashboard/StatusMetricCard";
 import { TopProductsTable } from "@/components/dashboard/TopProductsTable";
 import { SKUAnalysisTable } from "@/components/dashboard/SKUAnalysisTable";
 import { ProductCombinationsTable } from "@/components/dashboard/ProductCombinationsTable";
@@ -12,6 +11,9 @@ import { ShippingMethodsChart } from "@/components/dashboard/ShippingMethodsChar
 import { NFIssuanceChart } from "@/components/dashboard/NFIssuanceChart";
 import { FreebieProductsList } from "@/components/dashboard/FreebieProductsList";
 import { TopProductsChart } from "@/components/dashboard/TopProductsChart";
+import { LogisticsKPICards } from "@/components/dashboard/LogisticsKPICards";
+import { CrossSellKPICards } from "@/components/dashboard/CrossSellKPICards";
+import { CrossSellBarsChart } from "@/components/dashboard/CrossSellBarsChart";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
 import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
 import { Button } from "@/components/ui/button";
@@ -158,58 +160,129 @@ export default function Volume() {
       </div>
 
 
-      {/* Cards resumo - MODO NORMAL COM HIERARQUIA VISUAL */}
+      {/* Cards resumo - HERO + SATÉLITES */}
       {!comparisonMode && productMetrics && (
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-          {/* Card Principal - Top Produto (2x tamanho) */}
-          <StatusMetricCard
-            title="Produto Top"
-            value={productMetrics.topProductsByRevenue[0]?.descricaoAjustada || 'N/A'}
-            icon={<TrendingUp className="h-4 w-4" />}
-            size="large"
-            status="success"
-            benchmark={{
-              value: productMetrics.topProductsByRevenue[0]?.quantidadeTotal || 0,
-              label: "Unidades vendidas",
-            }}
-            interpretation={`Receita: ${formatCurrency(productMetrics.topProductsByRevenue[0]?.faturamentoTotal || 0)}`}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* HERO Card - Produto Campeão */}
+          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Trophy className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Produto Campeão</p>
+                  <p className="text-xs text-muted-foreground">Maior faturamento no período</p>
+                </div>
+              </div>
+              
+              <h3 className="text-xl font-bold mb-4 line-clamp-2">
+                {productMetrics.topProductsByRevenue[0]?.descricaoAjustada || 'N/A'}
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-background/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">📦 Unidades</p>
+                  <p className="text-lg font-bold">
+                    {productMetrics.topProductsByRevenue[0]?.quantidadeTotal.toLocaleString('pt-BR') || 0}
+                  </p>
+                </div>
+                <div className="bg-background/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">💰 Receita</p>
+                  <p className="text-lg font-bold text-green-600">
+                    {formatCurrency(productMetrics.topProductsByRevenue[0]?.faturamentoTotal || 0)}
+                  </p>
+                </div>
+                <div className="bg-background/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">📈 % do Total</p>
+                  <p className="text-lg font-bold text-primary">
+                    {productMetrics.topProductsByRevenue[0]?.percentualFaturamento.toFixed(1) || 0}%
+                  </p>
+                </div>
+                <div className="bg-background/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">🛒 Pedidos</p>
+                  <p className="text-lg font-bold">
+                    {productMetrics.topProductsByRevenue[0]?.numeroPedidos.toLocaleString('pt-BR') || 0}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Cards Secundários */}
-          <StatusMetricCard
-            title="Receita Produtos"
-            value={formatCurrency(productMetrics.topProductsByRevenue.reduce((sum, p) => sum + p.faturamentoTotal, 0))}
-            icon={<DollarSign className="h-3.5 w-3.5" />}
-            interpretation="Faturamento total de produtos"
-          />
+          {/* SATÉLITES - 5 cards compactos */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Card className="bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  <span className="text-xs text-muted-foreground">Receita Total</span>
+                </div>
+                <p className="text-xl font-bold text-green-600">
+                  {formatCurrency(productMetrics.topProductsByRevenue.reduce((sum, p) => sum + p.faturamentoTotal, 0))}
+                </p>
+              </CardContent>
+            </Card>
 
-          <StatusMetricCard
-            title="Produtos Vendidos"
-            value={productMetrics.topProductsByQuantity.reduce((sum, p) => sum + p.quantidadeTotal, 0).toLocaleString('pt-BR')}
-            icon={<ShoppingCart className="h-3.5 w-3.5" />}
-            interpretation="Total de unidades vendidas"
-          />
+            <Card className="bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <ShoppingCart className="h-4 w-4 text-blue-600" />
+                  <span className="text-xs text-muted-foreground">Unidades Vendidas</span>
+                </div>
+                <p className="text-xl font-bold text-blue-600">
+                  {productMetrics.topProductsByQuantity.reduce((sum, p) => sum + p.quantidadeTotal, 0).toLocaleString('pt-BR')}
+                </p>
+              </CardContent>
+            </Card>
 
-          <StatusMetricCard
-            title="SKUs Únicos"
-            value={productMetrics.skuAnalysis.length.toLocaleString('pt-BR')}
-            icon={<BarChart3 className="h-3.5 w-3.5" />}
-            interpretation="Códigos de produto distintos"
-          />
+            <Card className="bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <BarChart3 className="h-4 w-4 text-purple-600" />
+                  <span className="text-xs text-muted-foreground">SKUs Únicos</span>
+                </div>
+                <p className="text-xl font-bold text-purple-600">
+                  {productMetrics.skuAnalysis.length.toLocaleString('pt-BR')}
+                </p>
+              </CardContent>
+            </Card>
 
-          <StatusMetricCard
-            title="Combinações"
-            value={productMetrics.productCombinations.length.toLocaleString('pt-BR')}
-            icon={<Package className="h-3.5 w-3.5" />}
-            interpretation="Produtos comprados juntos"
-          />
+            <Card className="bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Link2 className="h-4 w-4 text-orange-600" />
+                  <span className="text-xs text-muted-foreground">Combinações</span>
+                </div>
+                <p className="text-xl font-bold text-orange-600">
+                  {productMetrics.productCombinations.length.toLocaleString('pt-BR')}
+                </p>
+              </CardContent>
+            </Card>
 
-          <StatusMetricCard
-            title="Brindes"
-            value={productMetrics.freebieProducts.length.toLocaleString('pt-BR')}
-            icon={<Package className="h-3.5 w-3.5" />}
-            interpretation="Produtos R$ 0,01"
-          />
+            <Card className="bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Gift className="h-4 w-4 text-pink-600" />
+                  <span className="text-xs text-muted-foreground">Brindes</span>
+                </div>
+                <p className="text-xl font-bold text-pink-600">
+                  {productMetrics.freebieProducts.length.toLocaleString('pt-BR')}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Truck className="h-4 w-4 text-teal-600" />
+                  <span className="text-xs text-muted-foreground">Formas Envio</span>
+                </div>
+                <p className="text-xl font-bold text-teal-600">
+                  {productMetrics.shippingMethodStats.length}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
@@ -242,12 +315,11 @@ export default function Volume() {
       )}
 
       <Tabs defaultValue="ranking" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
           <TabsTrigger value="ranking">📊 Ranking</TabsTrigger>
           <TabsTrigger value="sku">🏷️ SKU</TabsTrigger>
-          <TabsTrigger value="combinations">🔗 Combinações</TabsTrigger>
-          <TabsTrigger value="shipping">🚚 Envio</TabsTrigger>
-          <TabsTrigger value="operations">⚙️ Operações</TabsTrigger>
+          <TabsTrigger value="crosssell">🔗 Cross-Sell</TabsTrigger>
+          <TabsTrigger value="logistics">📦 Logística</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ranking" className="space-y-6">
@@ -380,12 +452,33 @@ export default function Volume() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="combinations">
+        <TabsContent value="crosssell" className="space-y-6">
+          {/* KPIs de Cross-Sell */}
+          {productMetrics && productMetrics.productCombinations.length > 0 && (
+            <CrossSellKPICards combinations={productMetrics.productCombinations} />
+          )}
+
+          {/* Gráfico de Barras - Top Combinações */}
+          {productMetrics && productMetrics.productCombinations.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>🏆 Top 5 Combinações Mais Frequentes</CardTitle>
+                <CardDescription>
+                  Produtos mais comprados juntos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CrossSellBarsChart combinations={productMetrics.productCombinations} limit={5} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tabela de Combinações */}
           <Card>
             <CardHeader>
-              <CardTitle>Produtos Frequentemente Comprados Juntos</CardTitle>
+              <CardTitle>🔗 Oportunidades de Cross-Sell</CardTitle>
               <CardDescription>
-                Identificar oportunidades de cross-sell e bundles
+                Identificar oportunidades de bundles e promoções combinadas
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -402,13 +495,24 @@ export default function Volume() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="shipping">
+        <TabsContent value="logistics" className="space-y-6">
+          {/* KPIs de Nota Fiscal */}
+          {productMetrics && productMetrics.nfStats && (
+            <LogisticsKPICards
+              averageDays={productMetrics.nfStats.averageDays}
+              medianDays={productMetrics.nfStats.medianDays}
+              minDays={productMetrics.nfStats.minDays}
+              maxDays={productMetrics.nfStats.maxDays}
+            />
+          )}
+
+          {/* Gráficos lado a lado */}
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Distribuição de Formas de Envio</CardTitle>
+                <CardTitle>🚚 Métodos de Envio</CardTitle>
                 <CardDescription>
-                  Como os pedidos são entregues
+                  Distribuição de como os pedidos são entregues
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -420,57 +524,53 @@ export default function Volume() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Detalhes por Forma de Envio</CardTitle>
+                <CardTitle>⏱️ Tempo de Emissão NF</CardTitle>
                 <CardDescription>
-                  Performance de cada método de entrega
+                  Distribuição do tempo entre venda e emissão de nota fiscal
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {productMetrics?.shippingMethodStats.map((stat, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{stat.formaEnvio}</span>
-                        <span className="text-sm text-muted-foreground">
-                          {stat.percentual.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div 
-                          className="bg-primary h-2 rounded-full" 
-                          style={{ width: `${stat.percentual}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{stat.numeroPedidos} pedidos</span>
-                        <span>
-                          Ticket médio: {new Intl.NumberFormat('pt-BR', { 
-                            style: 'currency', 
-                            currency: 'BRL' 
-                          }).format(stat.ticketMedio)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <NFIssuanceChart
+                  distribution={productMetrics?.nfIssuanceDistribution || []}
+                  averageDays={productMetrics?.averageNFIssuanceTime || 0}
+                />
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        <TabsContent value="operations">
+          {/* Tabela de detalhes por método de envio */}
           <Card>
             <CardHeader>
-              <CardTitle>Tempo de Emissão de Nota Fiscal</CardTitle>
+              <CardTitle>📋 Detalhes por Forma de Envio</CardTitle>
               <CardDescription>
-                Análise do tempo entre venda e emissão de NF
+                Performance detalhada de cada método de entrega
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <NFIssuanceChart
-                distribution={productMetrics?.nfIssuanceDistribution || []}
-                averageDays={productMetrics?.averageNFIssuanceTime || 0}
-              />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium">Método</th>
+                      <th className="text-right p-3 font-medium">Pedidos</th>
+                      <th className="text-right p-3 font-medium">% Total</th>
+                      <th className="text-right p-3 font-medium">Faturamento</th>
+                      <th className="text-right p-3 font-medium">Ticket Médio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productMetrics?.shippingMethodStats.map((stat, index) => (
+                      <tr key={index} className="border-b hover:bg-muted/50">
+                        <td className="p-3 font-medium">{stat.formaEnvio}</td>
+                        <td className="p-3 text-right">{stat.numeroPedidos.toLocaleString('pt-BR')}</td>
+                        <td className="p-3 text-right">{stat.percentual.toFixed(1)}%</td>
+                        <td className="p-3 text-right font-mono">{formatCurrency(stat.faturamentoTotal)}</td>
+                        <td className="p-3 text-right font-mono">{formatCurrency(stat.ticketMedio)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
