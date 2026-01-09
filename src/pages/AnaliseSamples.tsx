@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
-import { calculateAllSampleMetrics, calculateDataPeriod } from "@/utils/samplesAnalyzer";
+import { calculateAllSampleMetrics, calculateDataPeriod, isSampleProduct } from "@/utils/samplesAnalyzer";
 import { format } from "date-fns";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { ConversionFunnelChart } from "@/components/dashboard/ConversionFunnelChart";
@@ -12,8 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, Target, Calendar, Percent, ArrowRight } from "lucide-react";
+import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, Target, Calendar, Percent, ArrowRight, Info, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const AnaliseSamples = () => {
@@ -69,26 +70,68 @@ const AnaliseSamples = () => {
     });
   }, [comparisonMode, selectedMonths, salesData, availableMonths]);
 
-  if (!metrics) {
+  // Calcular estatísticas de diagnóstico
+  const diagnosticStats = useMemo(() => {
+    if (filteredOrders.length === 0) return null;
+    
+    const allProducts = filteredOrders.flatMap(o => o.produtos);
+    const sampleProducts = allProducts.filter(p => isSampleProduct(p));
+    const uniqueSampleNames = [...new Set(sampleProducts.map(p => p.descricaoAjustada || p.descricao))];
+    
+    return {
+      totalOrders: filteredOrders.length,
+      totalProducts: allProducts.length,
+      sampleProducts: sampleProducts.length,
+      uniqueSampleNames: uniqueSampleNames.slice(0, 5),
+    };
+  }, [filteredOrders]);
+
+  // Verificar se há dados reais (não apenas metrics não-nulo)
+  const hasData = metrics && metrics.volume.uniqueCustomers > 0;
+
+  if (!hasData) {
     return (
       <div className="container mx-auto p-6 space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Clientes que Iniciaram com Amostras</h1>
-        <p className="text-muted-foreground">
-          Análise de clientes cujo primeiro pedido foi apenas Kit de Amostras
-          {dataPeriod && (
-            <span className="block text-xs mt-1">
-              Período: {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')}
-            </span>
-          )}
-        </p>
-      </div>
-      
-        <div className="text-center py-12">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Clientes que Iniciaram com Amostras</h1>
           <p className="text-muted-foreground">
-            Nenhum dado disponível. Por favor, faça upload dos dados de vendas.
+            Análise de clientes cujo primeiro pedido foi apenas Kit de Amostras
           </p>
         </div>
+      
+        <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertTitle className="text-amber-600">Nenhum cliente qualificado encontrado</AlertTitle>
+          <AlertDescription className="space-y-3">
+            <p>
+              Não foram encontrados clientes cujo <strong>primeiro pedido</strong> foi exclusivamente de amostras no período selecionado.
+            </p>
+            
+            {diagnosticStats && (
+              <div className="bg-background/50 rounded-lg p-3 space-y-2">
+                <p className="text-sm font-medium">📊 Diagnóstico do período:</p>
+                <ul className="text-sm space-y-1 ml-4">
+                  <li>• Pedidos analisados: <strong>{diagnosticStats.totalOrders}</strong></li>
+                  <li>• Produtos de amostra identificados: <strong>{diagnosticStats.sampleProducts}</strong></li>
+                  {diagnosticStats.uniqueSampleNames.length > 0 && (
+                    <li>• Exemplos: {diagnosticStats.uniqueSampleNames.join(', ')}</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            
+            <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+              <p className="text-sm font-medium">ℹ️ Critérios de identificação de amostras:</p>
+              <ul className="text-sm space-y-1 ml-4">
+                <li>• Preço do produto até R$ 1,00</li>
+                <li>• OU nome contém: amostra, sample, brinde, degustação, teste, grátis</li>
+              </ul>
+              <p className="text-sm mt-2">
+                <strong>Cliente qualificado:</strong> primeiro pedido deve conter APENAS produtos de amostra.
+              </p>
+            </div>
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }

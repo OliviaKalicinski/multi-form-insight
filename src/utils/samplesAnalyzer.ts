@@ -1,24 +1,39 @@
 import { ProcessedOrder, SampleMetrics, CustomerPurchaseHistory } from "@/types/marketing";
 import { format, differenceInDays, differenceInMonths } from "date-fns";
 
+// Palavras-chave que indicam produtos de amostra
+const SAMPLE_KEYWORDS = ['amostra', 'sample', 'kit de amostras', 'brinde', 'degustação', 'teste', 'grátis', 'gratuito'];
+
+/**
+ * Verifica se um produto individual é uma amostra
+ * Critério combinado: preço baixo (até R$ 1,00) OU nome contém palavras-chave de amostra
+ */
+export const isSampleProduct = (produto: { preco: number; descricaoAjustada?: string; descricao?: string }): boolean => {
+  // Critério 1: Preço baixo (de R$ 0,00 até R$ 1,00)
+  const isLowPrice = produto.preco >= 0.00 && produto.preco <= 1.00;
+  
+  // Critério 2: Nome contém indicadores de amostra
+  const name = (produto.descricaoAjustada || produto.descricao || '').toLowerCase();
+  const hasSampleName = SAMPLE_KEYWORDS.some(keyword => name.includes(keyword));
+  
+  // Retorna true se preço baixo OU nome indica amostra
+  return isLowPrice || hasSampleName;
+};
+
 /**
  * Identifica se um pedido contém amostra baseado nos PRODUTOS do pedido
- * Verifica se há pelo menos um produto com preço de amostra: 0,01 ≤ Preço ≤ 0,90
+ * Verifica se há pelo menos um produto identificado como amostra
  */
 export const isSampleOrder = (order: ProcessedOrder): boolean => {
-  return order.produtos.some(produto => 
-    produto.preco >= 0.01 && produto.preco <= 0.90
-  );
+  return order.produtos.some(produto => isSampleProduct(produto));
 };
 
 /**
  * Identifica se um pedido contém APENAS Kit de Amostras (sem outros produtos)
  */
 export const isOnlySampleOrder = (order: ProcessedOrder): boolean => {
-  // Verificar se TODOS os produtos são amostras (preço entre 0.01 e 0.90)
-  return order.produtos.every(produto => 
-    produto.preco >= 0.01 && produto.preco <= 0.90
-  ) && order.produtos.length > 0;
+  // Verificar se TODOS os produtos são amostras
+  return order.produtos.every(produto => isSampleProduct(produto)) && order.produtos.length > 0;
 };
 
 /**
