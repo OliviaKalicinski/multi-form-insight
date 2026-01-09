@@ -163,51 +163,65 @@ export default function Volume() {
       {/* Cards resumo - HERO + SATÉLITES */}
       {!comparisonMode && productMetrics && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* HERO Card - Produto Campeão */}
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Trophy className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Produto Campeão</p>
-                  <p className="text-xs text-muted-foreground">Maior faturamento no período</p>
-                </div>
-              </div>
-              
-              <h3 className="text-xl font-bold mb-4 line-clamp-2">
-                {productMetrics.topProductsByRevenue[0]?.descricaoAjustada || 'N/A'}
-              </h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-background/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">📦 Unidades</p>
-                  <p className="text-lg font-bold">
-                    {productMetrics.topProductsByRevenue[0]?.quantidadeTotal.toLocaleString('pt-BR') || 0}
-                  </p>
-                </div>
-                <div className="bg-background/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">💰 Receita</p>
-                  <p className="text-lg font-bold text-green-600">
-                    {formatCurrency(productMetrics.topProductsByRevenue[0]?.faturamentoTotal || 0)}
-                  </p>
-                </div>
-                <div className="bg-background/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">📈 % do Total</p>
-                  <p className="text-lg font-bold text-primary">
-                    {productMetrics.topProductsByRevenue[0]?.percentualFaturamento.toFixed(1) || 0}%
-                  </p>
-                </div>
-                <div className="bg-background/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">🛒 Pedidos</p>
-                  <p className="text-lg font-bold">
-                    {productMetrics.topProductsByRevenue[0]?.numeroPedidos.toLocaleString('pt-BR') || 0}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* HERO Card - Produto Campeão (sincronizado com toggle) */}
+          {(() => {
+            const topProduct = productSortBy === 'quantity' 
+              ? productMetrics.topProductsByQuantity[0]
+              : productMetrics.topProductsByRevenue[0];
+            
+            return (
+              <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Trophy className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Produto Campeão</p>
+                      <p className="text-xs text-muted-foreground">
+                        {productSortBy === 'quantity' 
+                          ? '🏆 Mais vendido em unidades no período' 
+                          : '💰 Maior faturamento no período'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-xl font-bold mb-4 line-clamp-2">
+                    {topProduct?.descricaoAjustada || 'N/A'}
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-background/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground">📦 Unidades</p>
+                      <p className="text-lg font-bold">
+                        {topProduct?.quantidadeTotal.toLocaleString('pt-BR') || 0}
+                      </p>
+                    </div>
+                    <div className="bg-background/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground">💰 Receita</p>
+                      <p className="text-lg font-bold text-green-600">
+                        {formatCurrency(topProduct?.faturamentoTotal || 0)}
+                      </p>
+                    </div>
+                    <div className="bg-background/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground">📈 % do Total</p>
+                      <p className="text-lg font-bold text-primary">
+                        {productSortBy === 'quantity'
+                          ? (topProduct?.percentualQuantidade?.toFixed(1) || 0)
+                          : (topProduct?.percentualFaturamento?.toFixed(1) || 0)}%
+                      </p>
+                    </div>
+                    <div className="bg-background/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground">🛒 Pedidos</p>
+                      <p className="text-lg font-bold">
+                        {topProduct?.numeroPedidos.toLocaleString('pt-BR') || 0}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* SATÉLITES - 5 cards compactos */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
