@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { Users, RefreshCcw, AlertTriangle, UserCheck, DollarSign, ShoppingCart } from "lucide-react";
+import { Users, RefreshCcw, AlertTriangle, UserCheck, DollarSign, Calendar, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CustomerSummaryCards } from "@/components/dashboard/CustomerSummaryCards";
 import { ChurnFunnelChart } from "@/components/dashboard/ChurnFunnelChart";
 import { OrderVolumeChart } from "@/components/dashboard/OrderVolumeChart";
 import { SalesPeaksChart } from "@/components/dashboard/SalesPeaksChart";
 import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
 import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
+import { SegmentRevenueChart } from "@/components/dashboard/SegmentRevenueChart";
+import { SegmentDetailTable } from "@/components/dashboard/SegmentDetailTable";
+import { VolumeKPICards } from "@/components/dashboard/VolumeKPICards";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { calculateCustomerBehaviorMetrics } from "@/utils/customerBehaviorMetrics";
@@ -44,6 +46,32 @@ export default function ComportamentoCliente() {
     
     return calculateCustomerBehaviorMetrics(filteredOrders);
   }, [salesData, selectedMonth, availableMonths, behaviorMetrics]);
+
+  // Calcular tendência de volume (últimos 7 dias vs 7 anteriores)
+  const volumeTrend = useMemo(() => {
+    if (!filteredMetrics?.pedidosPorDia || filteredMetrics.pedidosPorDia.length < 14) return undefined;
+    
+    const days = filteredMetrics.pedidosPorDia;
+    const recent7 = days.slice(-7).reduce((sum, d) => sum + d.orders, 0);
+    const previous7 = days.slice(-14, -7).reduce((sum, d) => sum + d.orders, 0);
+    
+    if (previous7 === 0) return undefined;
+    return ((recent7 - previous7) / previous7) * 100;
+  }, [filteredMetrics]);
+
+  // Peak e Low day do volume
+  const volumeAnalysis = useMemo(() => {
+    if (!filteredMetrics?.pedidosPorDia || filteredMetrics.pedidosPorDia.length === 0) {
+      return { peakDay: { date: '', orders: 0 }, lowDay: { date: '', orders: 0 }, averageDaily: 0 };
+    }
+    
+    const days = filteredMetrics.pedidosPorDia;
+    const peakDay = days.reduce((max, curr) => curr.orders > max.orders ? curr : max, days[0]);
+    const lowDay = days.reduce((min, curr) => curr.orders < min.orders ? curr : min, days[0]);
+    const averageDaily = days.reduce((sum, d) => sum + d.orders, 0) / days.length;
+    
+    return { peakDay, lowDay, averageDaily };
+  }, [filteredMetrics]);
 
   // Métricas de comparação multi-mês
   const comparisonMetrics = useMemo(() => {
@@ -145,6 +173,14 @@ export default function ComportamentoCliente() {
     return { totalClientes, taxaRecompra, clientesAtivos, receitaPorCliente };
   }, [comparisonMode, selectedMonths, salesData, availableMonths]);
 
+  // Calcular clientes novos vs recorrentes
+  const clienteBreakdown = useMemo(() => {
+    if (!behaviorMetrics) return { novos: 0, recorrentes: 0 };
+    const novosSegment = behaviorMetrics.customerSegmentation.find(s => s.segment === 'Novo');
+    const novos = novosSegment?.count || 0;
+    return { novos, recorrentes: behaviorMetrics.totalClientes - novos };
+  }, [behaviorMetrics]);
+
   if (salesData.length === 0) {
     return (
       <div className="container mx-auto px-6 py-8">
@@ -171,7 +207,7 @@ export default function ComportamentoCliente() {
         <div>
           <h1 className="text-3xl font-bold">👥 Comportamento do Cliente</h1>
           <p className="text-muted-foreground">
-            Análise de recompra, churn, volume de pedidos e picos de vendas
+            Análise de recompra, churn, volume de pedidos e segmentação
           </p>
         </div>
       </div>
@@ -189,73 +225,98 @@ export default function ComportamentoCliente() {
         </Card>
       )}
 
-      {/* Cards resumo - MODO NORMAL COM HIERARQUIA VISUAL */}
+      {/* Cards resumo - HERO + SATÉLITES */}
       {!comparisonMode && behaviorMetrics && (
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-          {/* Card Principal - Total Clientes (2x tamanho) */}
-          <StatusMetricCard
-            title="Total de Clientes"
-            value={behaviorMetrics.totalClientes.toLocaleString('pt-BR')}
-            icon={<Users className="h-4 w-4" />}
-            size="large"
-            status="neutral"
-            benchmark={{
-              value: behaviorMetrics.clientesAtivos,
-              label: "Clientes Ativos",
-            }}
-            interpretation={`${behaviorMetrics.taxaRecompra.toFixed(1)}% taxa de recompra`}
-          />
+          {/* HERO Card - Total Clientes (50% largura) */}
+          <Card className="md:col-span-3 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Total de Clientes
+                  </p>
+                  <p className="text-5xl font-bold mt-2">{behaviorMetrics.totalClientes.toLocaleString('pt-BR')}</p>
+                  <div className="flex gap-4 mt-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                      <span className="text-muted-foreground">Novos: <strong>{clienteBreakdown.novos}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="text-muted-foreground">Recorrentes: <strong>{clienteBreakdown.recorrentes}</strong></span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">CLV Médio</p>
+                  <p className="text-2xl font-bold text-primary">{formatCurrency(behaviorMetrics.customerLifetimeValue)}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ~{behaviorMetrics.averageDaysBetweenPurchases.toFixed(0)} dias entre compras
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Cards Secundários */}
-          <StatusMetricCard
-            title="Taxa de Recompra"
-            value={`${behaviorMetrics.taxaRecompra.toFixed(1)}%`}
-            icon={<RefreshCcw className="h-3.5 w-3.5" />}
-            status={getStatusFromBenchmark(behaviorMetrics.taxaRecompra, benchmarksPetFood.taxaRecompra)}
-            benchmark={{
-              value: benchmarksPetFood.taxaRecompra,
-              label: "Benchmark",
-            }}
-            interpretation={behaviorMetrics.taxaRecompra >= benchmarksPetFood.taxaRecompra 
-              ? "Acima da média do setor" 
-              : "Abaixo da média do setor"}
-          />
+          {/* Satélites (50% largura - 6 cards em 2 linhas de 3) */}
+          <div className="md:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <StatusMetricCard
+              title="Taxa Recompra"
+              value={`${behaviorMetrics.taxaRecompra.toFixed(1)}%`}
+              icon={<RefreshCcw className="h-3.5 w-3.5" />}
+              status={getStatusFromBenchmark(behaviorMetrics.taxaRecompra, benchmarksPetFood.taxaRecompra)}
+              interpretation={behaviorMetrics.taxaRecompra >= benchmarksPetFood.taxaRecompra ? "Acima benchmark" : "Abaixo benchmark"}
+              size="compact"
+            />
 
-          <StatusMetricCard
-            title="Taxa de Churn"
-            value={`${behaviorMetrics.taxaChurn.toFixed(1)}%`}
-            icon={<AlertTriangle className="h-3.5 w-3.5" />}
-            status={getStatusFromBenchmark(behaviorMetrics.taxaChurn, benchmarksPetFood.taxaChurn, { invertComparison: true })}
-            benchmark={{
-              value: benchmarksPetFood.taxaChurn,
-              label: "Benchmark",
-            }}
-            invertTrend
-            interpretation={`${behaviorMetrics.clientesChurn} clientes perdidos`}
-          />
+            <StatusMetricCard
+              title="Taxa Churn"
+              value={`${behaviorMetrics.taxaChurn.toFixed(1)}%`}
+              icon={<AlertTriangle className="h-3.5 w-3.5" />}
+              status={getStatusFromBenchmark(behaviorMetrics.taxaChurn, benchmarksPetFood.taxaChurn, { invertComparison: true })}
+              invertTrend
+              interpretation={`${behaviorMetrics.clientesChurn} perdidos`}
+              size="compact"
+            />
 
-          <StatusMetricCard
-            title="Clientes em Risco"
-            value={behaviorMetrics.clientesEmRisco.toLocaleString('pt-BR')}
-            icon={<AlertTriangle className="h-3.5 w-3.5" />}
-            status={behaviorMetrics.clientesEmRisco > behaviorMetrics.clientesAtivos * 0.3 ? 'warning' : 'neutral'}
-            interpretation={`${((behaviorMetrics.clientesEmRisco / behaviorMetrics.totalClientes) * 100).toFixed(1)}% da base`}
-          />
+            <StatusMetricCard
+              title="CLV"
+              value={formatCurrency(behaviorMetrics.customerLifetimeValue)}
+              icon={<DollarSign className="h-3.5 w-3.5" />}
+              status="success"
+              interpretation="Valor por cliente"
+              size="compact"
+            />
 
-          <StatusMetricCard
-            title="Clientes Ativos"
-            value={behaviorMetrics.clientesAtivos.toLocaleString('pt-BR')}
-            icon={<UserCheck className="h-3.5 w-3.5" />}
-            status="success"
-            interpretation={`${((behaviorMetrics.clientesAtivos / behaviorMetrics.totalClientes) * 100).toFixed(1)}% da base`}
-          />
+            <StatusMetricCard
+              title="Ativos"
+              value={behaviorMetrics.clientesAtivos.toLocaleString('pt-BR')}
+              icon={<UserCheck className="h-3.5 w-3.5" />}
+              status="success"
+              interpretation={`${((behaviorMetrics.clientesAtivos / behaviorMetrics.totalClientes) * 100).toFixed(0)}% da base`}
+              size="compact"
+            />
 
-          <StatusMetricCard
-            title="Clientes Inativos"
-            value={behaviorMetrics.clientesInativos.toLocaleString('pt-BR')}
-            icon={<Users className="h-3.5 w-3.5" />}
-            interpretation="Sem compras há mais de 60 dias"
-          />
+            <StatusMetricCard
+              title="Em Risco"
+              value={behaviorMetrics.clientesEmRisco.toLocaleString('pt-BR')}
+              icon={<AlertTriangle className="h-3.5 w-3.5" />}
+              status={behaviorMetrics.clientesEmRisco > behaviorMetrics.clientesAtivos * 0.3 ? 'warning' : 'neutral'}
+              interpretation="31-60 dias"
+              size="compact"
+            />
+
+            <StatusMetricCard
+              title="Inativos"
+              value={behaviorMetrics.clientesInativos.toLocaleString('pt-BR')}
+              icon={<Calendar className="h-3.5 w-3.5" />}
+              status="neutral"
+              interpretation="61-90 dias"
+              size="compact"
+            />
+          </div>
         </div>
       )}
 
@@ -287,40 +348,22 @@ export default function ComportamentoCliente() {
         </div>
       )}
 
-      {/* Tabs com análises */}
-      <Tabs defaultValue="churn" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
-          <TabsTrigger value="churn">🚨 Análise de Churn</TabsTrigger>
-          <TabsTrigger value="volume">📊 Volume de Pedidos</TabsTrigger>
-          <TabsTrigger value="peaks">⚡ Picos de Vendas</TabsTrigger>
+      {/* Tabs com análises - 3 abas otimizadas */}
+      <Tabs defaultValue="segmentation" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="segmentation">🎯 Segmentação</TabsTrigger>
+          <TabsTrigger value="churn">🚨 Churn</TabsTrigger>
+          <TabsTrigger value="volume">📊 Volume & Padrões</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Análise de Churn */}
-        <TabsContent value="churn" className="space-y-6">
+        {/* Tab 1: Segmentação (Mais Visual) */}
+        <TabsContent value="segmentation" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Funil de Retenção</CardTitle>
+                <CardTitle>Distribuição de Clientes</CardTitle>
                 <CardDescription>
-                  Visualize a distribuição de clientes por estágio de atividade
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChurnFunnelChart
-                  ativos={behaviorMetrics?.clientesAtivos || 0}
-                  emRisco={behaviorMetrics?.clientesEmRisco || 0}
-                  inativos={behaviorMetrics?.clientesInativos || 0}
-                  churn={behaviorMetrics?.clientesChurn || 0}
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Segmentação de Clientes</CardTitle>
-                <CardDescription>
-                  Perfil dos clientes por comportamento de compra
+                  Segmentação por comportamento de compra
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -329,14 +372,66 @@ export default function ComportamentoCliente() {
                 />
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Receita por Segmento</CardTitle>
+                <CardDescription>
+                  Contribuição de cada perfil para o faturamento
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SegmentRevenueChart
+                  segments={behaviorMetrics?.customerSegmentation || []}
+                />
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Tabela de clientes em risco */}
+          {/* Tabela detalhada de segmentos */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Análise Detalhada por Segmento</CardTitle>
+              <CardDescription>
+                Métricas completas de cada perfil de cliente
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SegmentDetailTable
+                segments={behaviorMetrics?.customerSegmentation || []}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 2: Análise de Churn (Sem duplicação) */}
+        <TabsContent value="churn" className="space-y-6">
+          {/* Funil maior */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Funil de Retenção</CardTitle>
+              <CardDescription>
+                Distribuição de clientes por estágio de atividade
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[400px]">
+                <ChurnFunnelChart
+                  ativos={behaviorMetrics?.clientesAtivos || 0}
+                  emRisco={behaviorMetrics?.clientesEmRisco || 0}
+                  inativos={behaviorMetrics?.clientesInativos || 0}
+                  churn={behaviorMetrics?.clientesChurn || 0}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tabela de clientes em risco - melhorada */}
           <Card>
             <CardHeader>
               <CardTitle>Clientes em Risco de Churn</CardTitle>
               <CardDescription>
-                Top 50 clientes que não compram há mais de 30 dias, ordenados por valor total
+                Clientes que não compram há mais de 30 dias, ordenados por valor total
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -347,43 +442,54 @@ export default function ComportamentoCliente() {
           </Card>
         </TabsContent>
 
-        {/* Tab 2: Volume de Pedidos */}
-        <TabsContent value="volume">
+        {/* Tab 3: Volume & Padrões (Consolidada) */}
+        <TabsContent value="volume" className="space-y-6">
+          {/* KPIs de Volume */}
+          <VolumeKPICards
+            averageDaily={volumeAnalysis.averageDaily}
+            peakDay={volumeAnalysis.peakDay}
+            lowDay={volumeAnalysis.lowDay}
+            trend={volumeTrend}
+          />
+
+          {/* Gráfico de Volume */}
           <Card>
             <CardHeader>
-              <CardTitle>Volume de Pedidos ao Longo do Tempo</CardTitle>
-              <CardDescription>
-                Acompanhe a evolução do número de pedidos
-                {selectedMonth && selectedMonth !== 'last-12-months' && (
-                  <span className="block text-xs text-primary mt-1">
-                    📅 Período: {selectedMonth}
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <CardTitle>Evolução de Pedidos</CardTitle>
+                  <CardDescription>
+                    Volume de pedidos ao longo do tempo
+                    {selectedMonth && selectedMonth !== 'last-12-months' && (
+                      <span className="block text-xs text-primary mt-1">
+                        📅 Período: {selectedMonth}
+                      </span>
+                    )}
+                  </CardDescription>
+                </div>
                 <div className="flex gap-2">
                   <button
-                    className={`px-4 py-2 rounded ${volumeView === 'daily' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                    className={`px-4 py-2 rounded text-sm ${volumeView === 'daily' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
                     onClick={() => setVolumeView('daily')}
                   >
                     Diário
                   </button>
                   <button
-                    className={`px-4 py-2 rounded ${volumeView === 'weekly' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                    className={`px-4 py-2 rounded text-sm ${volumeView === 'weekly' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
                     onClick={() => setVolumeView('weekly')}
                   >
                     Semanal
                   </button>
                   <button
-                    className={`px-4 py-2 rounded ${volumeView === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                    className={`px-4 py-2 rounded text-sm ${volumeView === 'monthly' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
                     onClick={() => setVolumeView('monthly')}
                   >
                     Mensal
                   </button>
                 </div>
-                
+              </div>
+            </CardHeader>
+            <CardContent>
               <OrderVolumeChart
                 data={
                   volumeView === 'daily' ? filteredMetrics?.pedidosPorDia || [] :
@@ -392,18 +498,15 @@ export default function ComportamentoCliente() {
                 }
                 viewMode={volumeView}
               />
-              </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Tab 3: Picos de Vendas */}
-        <TabsContent value="peaks">
+          {/* Picos de Vendas (integrado) */}
           <Card>
             <CardHeader>
-              <CardTitle>Análise de Picos de Vendas</CardTitle>
+              <CardTitle>⚡ Dias de Pico</CardTitle>
               <CardDescription>
-                Dias com volume acima da média + 2 desvios padrão
+                Top 20 dias com maior volume - destaque para picos acima da média + 2σ
                 {selectedMonth && selectedMonth !== 'last-12-months' && (
                   <span className="block text-xs text-primary mt-1">
                     📅 Período: {selectedMonth}
@@ -417,58 +520,6 @@ export default function ComportamentoCliente() {
               />
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Tab 4: Segmentação */}
-        <TabsContent value="segmentation">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Distribuição de Segmentos</CardTitle>
-                <CardDescription>
-                  Como seus clientes se distribuem por perfil
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CustomerSegmentationChart
-                  segments={behaviorMetrics?.customerSegmentation || []}
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Valor por Segmento</CardTitle>
-                <CardDescription>
-                  Receita gerada por cada tipo de cliente
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {behaviorMetrics?.customerSegmentation.map(segment => (
-                    <div key={segment.segment} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{segment.segment}</span>
-                        <span className="text-sm text-muted-foreground">
-                          {formatCurrency(segment.totalRevenue)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div 
-                          className="bg-primary h-2 rounded-full" 
-                          style={{ width: `${segment.percentage}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {segment.count} clientes ({segment.percentage.toFixed(1)}%) • 
-                        Ticket médio: {formatCurrency(segment.averageTicket)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
       </Tabs>
     </div>
