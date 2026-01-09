@@ -34,7 +34,7 @@ interface DashboardContextType {
   refreshFromDatabase: () => Promise<void>;
 }
 
-const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
+export const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
 export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [marketingData, setMarketingDataState] = useState<MarketingData[]>([]);

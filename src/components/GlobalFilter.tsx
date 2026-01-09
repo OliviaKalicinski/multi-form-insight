@@ -1,4 +1,5 @@
-import { useDashboard } from "@/contexts/DashboardContext";
+import { useContext } from "react";
+import { DashboardContext } from "@/contexts/DashboardContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,13 @@ import {
 } from "@/components/ui/tooltip";
 
 export function GlobalFilter() {
+  const context = useContext(DashboardContext);
+  
+  // Se o contexto não estiver disponível, não renderiza nada
+  if (!context) {
+    return null;
+  }
+
   const {
     selectedMonth,
     setSelectedMonth,
@@ -35,7 +43,7 @@ export function GlobalFilter() {
     selectedMonths,
     setSelectedMonths,
     availableMonths,
-  } = useDashboard();
+  } = context;
 
   // Formatar mês para exibição (YYYY-MM → Mês/Ano)
   const formatMonth = (month: string | null) => {
