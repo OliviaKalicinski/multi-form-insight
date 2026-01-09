@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProcessedOrder, AdsData, FollowersData, MarketingData, AdsMonthSummary } from "@/types/marketing";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, parse } from "date-fns";
 
 interface DataStats {
   salesCount: number;
@@ -17,6 +17,50 @@ interface UpsertResult {
   updated: number;
   total: number;
 }
+
+// Helper to record upload history
+const recordUploadHistory = async (
+  dataType: string,
+  recordCount: number,
+  fileName: string | null,
+  dateRangeStart: string | null,
+  dateRangeEnd: string | null
+) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.from("upload_history").insert({
+      data_type: dataType,
+      record_count: recordCount,
+      file_name: fileName,
+      user_id: user.id,
+      date_range_start: dateRangeStart,
+      date_range_end: dateRangeEnd,
+    });
+  } catch (error) {
+    console.error("Error recording upload history:", error);
+  }
+};
+
+// Helper to parse various date formats
+const parseDateString = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  
+  // Try ISO format first (YYYY-MM-DD)
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+    return parseISO(dateStr);
+  }
+  
+  // Try DD/MM/YYYY format
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
+    return parse(dateStr, "dd/MM/yyyy", new Date());
+  }
+  
+  // Try to create a Date object
+  const date = new Date(dateStr);
+  return isNaN(date.getTime()) ? null : date;
+};
 
 export const useDataPersistence = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -143,7 +187,7 @@ export const useDataPersistence = () => {
   }, [toast]);
 
   // Save/upsert sales data
-  const saveSalesData = useCallback(async (orders: ProcessedOrder[]): Promise<UpsertResult> => {
+  const saveSalesData = useCallback(async (orders: ProcessedOrder[], fileName?: string): Promise<UpsertResult> => {
     if (orders.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
     try {
@@ -176,6 +220,20 @@ export const useDataPersistence = () => {
         total: orders.length,
       };
 
+      // Calculate date range from sales data
+      const dates = orders.map(o => o.dataVenda).filter(d => d instanceof Date && !isNaN(d.getTime()));
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
+      // Record upload history
+      await recordUploadHistory(
+        "sales",
+        result.inserted,
+        fileName || null,
+        minDate ? format(minDate, "yyyy-MM-dd") : null,
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+      );
+
       setStats((prev) => ({ ...prev, salesCount: prev.salesCount + result.inserted, lastUpdated: new Date() }));
 
       return result;
@@ -186,7 +244,7 @@ export const useDataPersistence = () => {
   }, []);
 
   // Save/upsert ads data with deduplication
-  const saveAdsData = useCallback(async (ads: AdsData[]): Promise<UpsertResult & { duplicatesAggregated: number }> => {
+  const saveAdsData = useCallback(async (ads: AdsData[], fileName?: string): Promise<UpsertResult & { duplicatesAggregated: number }> => {
     if (ads.length === 0) return { inserted: 0, updated: 0, total: 0, duplicatesAggregated: 0 };
 
     try {
@@ -241,6 +299,21 @@ export const useDataPersistence = () => {
         duplicatesAggregated,
       };
 
+      // Calculate date range from ads data
+      const dateStrings = ads.map(ad => ad["Início dos relatórios"]).filter(Boolean);
+      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
+      // Record upload history
+      await recordUploadHistory(
+        "ads",
+        result.inserted,
+        fileName || null,
+        minDate ? format(minDate, "yyyy-MM-dd") : null,
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+      );
+
       setStats((prev) => ({ ...prev, adsCount: prev.adsCount + result.inserted, lastUpdated: new Date() }));
 
       return result;
@@ -251,7 +324,7 @@ export const useDataPersistence = () => {
   }, []);
 
   // Save/upsert followers data
-  const saveFollowersData = useCallback(async (followers: FollowersData[]): Promise<UpsertResult> => {
+  const saveFollowersData = useCallback(async (followers: FollowersData[], fileName?: string): Promise<UpsertResult> => {
     if (followers.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
     try {
@@ -275,6 +348,21 @@ export const useDataPersistence = () => {
         total: followers.length,
       };
 
+      // Calculate date range from followers data
+      const dateStrings = followers.map(f => f.Data).filter(Boolean);
+      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
+      // Record upload history
+      await recordUploadHistory(
+        "followers",
+        result.inserted,
+        fileName || null,
+        minDate ? format(minDate, "yyyy-MM-dd") : null,
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+      );
+
       setStats((prev) => ({ ...prev, followersCount: prev.followersCount + result.inserted, lastUpdated: new Date() }));
 
       return result;
@@ -285,7 +373,7 @@ export const useDataPersistence = () => {
   }, []);
 
   // Save/upsert marketing data
-  const saveMarketingData = useCallback(async (marketing: MarketingData[]): Promise<UpsertResult> => {
+  const saveMarketingData = useCallback(async (marketing: MarketingData[], fileName?: string): Promise<UpsertResult> => {
     if (marketing.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
     try {
@@ -314,6 +402,21 @@ export const useDataPersistence = () => {
         updated: 0,
         total: marketing.length,
       };
+
+      // Calculate date range from marketing data
+      const dateStrings = marketing.map(m => m.Data).filter(Boolean);
+      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
+      // Record upload history
+      await recordUploadHistory(
+        "marketing",
+        result.inserted,
+        fileName || null,
+        minDate ? format(minDate, "yyyy-MM-dd") : null,
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+      );
 
       setStats((prev) => ({ ...prev, marketingCount: prev.marketingCount + result.inserted, lastUpdated: new Date() }));
 

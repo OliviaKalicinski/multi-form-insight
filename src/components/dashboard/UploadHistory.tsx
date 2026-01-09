@@ -3,14 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
   History, 
   FileSpreadsheet, 
   Megaphone, 
   Users, 
-  BarChart3 
+  BarChart3,
+  Calendar
 } from "lucide-react";
 
 interface UploadHistoryEntry {
@@ -19,6 +20,8 @@ interface UploadHistoryEntry {
   record_count: number;
   file_name: string | null;
   created_at: string;
+  date_range_start: string | null;
+  date_range_end: string | null;
 }
 
 const dataTypeConfig: Record<string, { label: string; icon: typeof FileSpreadsheet; color: string }> = {
@@ -26,6 +29,26 @@ const dataTypeConfig: Record<string, { label: string; icon: typeof FileSpreadshe
   ads: { label: "Anúncios", icon: Megaphone, color: "bg-purple-500/10 text-purple-600" },
   followers: { label: "Seguidores", icon: Users, color: "bg-pink-500/10 text-pink-600" },
   marketing: { label: "Marketing", icon: BarChart3, color: "bg-emerald-500/10 text-emerald-600" },
+};
+
+const formatDateRange = (start: string | null, end: string | null): string | null => {
+  if (!start || !end) return null;
+  
+  try {
+    const startDate = parseISO(start);
+    const endDate = parseISO(end);
+    
+    const startFormatted = format(startDate, "dd/MM/yyyy", { locale: ptBR });
+    const endFormatted = format(endDate, "dd/MM/yyyy", { locale: ptBR });
+    
+    if (startFormatted === endFormatted) {
+      return startFormatted;
+    }
+    
+    return `${startFormatted} - ${endFormatted}`;
+  } catch {
+    return null;
+  }
 };
 
 export function UploadHistory() {
@@ -112,6 +135,7 @@ export function UploadHistory() {
         {history.map((entry) => {
           const config = dataTypeConfig[entry.data_type] || dataTypeConfig.sales;
           const Icon = config.icon;
+          const dateRange = formatDateRange(entry.date_range_start, entry.date_range_end);
           
           return (
             <div 
@@ -126,6 +150,12 @@ export function UploadHistory() {
                 <p className="text-xs text-muted-foreground truncate">
                   {entry.file_name || "Arquivo CSV"}
                 </p>
+                {dateRange && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Calendar className="h-3 w-3" />
+                    {dateRange}
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <Badge variant="secondary" className="text-xs">
