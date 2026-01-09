@@ -57,7 +57,9 @@ export const processSalesData = (rawData: SalesData[]): ProcessedOrder[] => {
     const numeroPedido = row["Número do pedido no e-commerce"];
     const preco = parseFloat(row["Preço total"].replace(",", ".")) || 0;
     const quantidade = parseInt(row["Total de itens"]) || 0;
-    const valorFrete = parseFloat(row["Valor do frete"]?.replace(",", ".") || "0") || 0;
+    // Aceitar ambos os nomes de coluna de frete
+    const freteStr = row["Valor do frete"] || row["Frete no e-commerce"] || "0";
+    const valorFrete = parseFloat(freteStr.replace(",", ".")) || 0;
 
     // Parse das datas
     const dataVenda = parse(row["Data da venda"], "dd/MM/yyyy", new Date());
