@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, Target, Calendar, Percent, ArrowRight, Info, AlertTriangle } from "lucide-react";
+import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, Target, Calendar, Percent, ArrowRight, Info, AlertTriangle, Dog, Cat } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const AnaliseSamples = () => {
@@ -426,7 +426,115 @@ const AnaliseSamples = () => {
         </div>
       )}
 
-      {/* LINHA 2: Taxas por Período - Compacto Horizontal */}
+      {/* Card Comparativo: Cachorro vs Gato */}
+      {metrics.byPetType && (metrics.byPetType.dog.uniqueCustomers > 0 || metrics.byPetType.cat.uniqueCustomers > 0) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Dog className="h-5 w-5 text-amber-600" />
+              Cachorro vs
+              <Cat className="h-5 w-5 text-purple-600" />
+              Gato
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Comparativo de amostras por tipo de pet
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Coluna Cachorro */}
+              <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-900">
+                <div className="flex items-center gap-2">
+                  <Dog className="h-6 w-6 text-amber-600" />
+                  <span className="font-semibold text-amber-800 dark:text-amber-200">Cachorro</span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Clientes:</span>
+                    <span className="font-bold text-amber-700 dark:text-amber-300">{metrics.byPetType.dog.uniqueCustomers}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Recompra:</span>
+                    <span className={cn(
+                      "font-bold",
+                      metrics.byPetType.dog.repurchaseRate >= 25 ? "text-emerald-600" : "text-amber-600"
+                    )}>
+                      {metrics.byPetType.dog.repurchaseRate.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Recompraram:</span>
+                    <span className="font-medium">{metrics.byPetType.dog.customersWhoRepurchased}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-amber-200 dark:border-amber-800 pt-2">
+                    <span className="text-muted-foreground">Ticket Médio:</span>
+                    <span className="font-bold text-amber-700 dark:text-amber-300">{formatCurrency(metrics.byPetType.dog.avgTicket)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Coluna Gato */}
+              <div className="space-y-3 p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-900">
+                <div className="flex items-center gap-2">
+                  <Cat className="h-6 w-6 text-purple-600" />
+                  <span className="font-semibold text-purple-800 dark:text-purple-200">Gato</span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Clientes:</span>
+                    <span className="font-bold text-purple-700 dark:text-purple-300">{metrics.byPetType.cat.uniqueCustomers}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Recompra:</span>
+                    <span className={cn(
+                      "font-bold",
+                      metrics.byPetType.cat.repurchaseRate >= 25 ? "text-emerald-600" : "text-purple-600"
+                    )}>
+                      {metrics.byPetType.cat.repurchaseRate.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Recompraram:</span>
+                    <span className="font-medium">{metrics.byPetType.cat.customersWhoRepurchased}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-purple-200 dark:border-purple-800 pt-2">
+                    <span className="text-muted-foreground">Ticket Médio:</span>
+                    <span className="font-bold text-purple-700 dark:text-purple-300">{formatCurrency(metrics.byPetType.cat.avgTicket)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Nota Histórica */}
+            {metrics.byPetType.cat.uniqueCustomers === 0 && (
+              <p className="text-xs text-muted-foreground mt-3 italic flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Amostras para gatos não identificadas. Todas classificadas como cachorro (padrão histórico).
+              </p>
+            )}
+            
+            {/* Insight comparativo */}
+            {metrics.byPetType.cat.uniqueCustomers > 0 && metrics.byPetType.dog.uniqueCustomers > 0 && (
+              <div className="mt-3 p-2 bg-muted/50 rounded text-xs">
+                {metrics.byPetType.cat.repurchaseRate > metrics.byPetType.dog.repurchaseRate ? (
+                  <span className="text-purple-700 dark:text-purple-300">
+                    🐱 Clientes de gatos têm taxa de recompra {(metrics.byPetType.cat.repurchaseRate - metrics.byPetType.dog.repurchaseRate).toFixed(1)}pp maior
+                  </span>
+                ) : metrics.byPetType.dog.repurchaseRate > metrics.byPetType.cat.repurchaseRate ? (
+                  <span className="text-amber-700 dark:text-amber-300">
+                    🐕 Clientes de cachorros têm taxa de recompra {(metrics.byPetType.dog.repurchaseRate - metrics.byPetType.cat.repurchaseRate).toFixed(1)}pp maior
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    📊 Taxas de recompra equivalentes entre cachorro e gato
+                  </span>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Calendar className="h-4 w-4" />

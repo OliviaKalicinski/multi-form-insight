@@ -3,19 +3,48 @@ import { format, differenceInDays, differenceInMonths } from "date-fns";
 
 /**
  * Identifica se um produto é uma amostra baseado em nome OU preço
- * - Nome contém "amostra" (captura: amostras, kit de amostras, amostra gatos, etc.)
+ * - Nome contém variações de "amostra" (captura: amostras, kit de amostras, amostra gatos, etc.)
  * - OU preço entre R$ 0,01 e R$ 1,00 (backup para amostras sem nome explícito)
  */
 export const isSampleProduct = (produto: { descricao?: string; descricaoAjustada?: string; preco: number }): boolean => {
   const name = (produto.descricaoAjustada || produto.descricao || '').toLowerCase();
   
-  // Critério 1: Nome contém "amostra" (captura todas as variações)
-  const hasSampleName = name.includes('amostra');
+  // Critério 1: Nome contém variações de "amostra" ou termos relacionados
+  const sampleKeywords = [
+    'amostra', 
+    'amostras', 
+    'sample',
+    'brinde',
+    'degustação',
+    'teste grátis',
+    'kit teste',
+  ];
+  const hasSampleName = sampleKeywords.some(keyword => name.includes(keyword));
   
   // Critério 2: Preço muito baixo (R$ 0,01 a R$ 1,00) como backup
   const isLowPrice = produto.preco >= 0.01 && produto.preco <= 1.00;
   
   return hasSampleName || isLowPrice;
+};
+
+/**
+ * Tipo de pet da amostra
+ */
+export type PetType = 'dog' | 'cat';
+
+/**
+ * Identifica o tipo de pet de uma amostra baseado no nome do produto
+ * Por padrão, assume "dog" (histórico: antes de existir gato, eram todas de cachorro)
+ */
+export const getSamplePetType = (produto: { descricao?: string; descricaoAjustada?: string }): PetType => {
+  const name = (produto.descricaoAjustada || produto.descricao || '').toLowerCase();
+  
+  // Palavras-chave para gatos
+  const catKeywords = ['gato', 'gatos', 'felino', 'cat', 'feline'];
+  const isCat = catKeywords.some(keyword => name.includes(keyword));
+  
+  // Histórico: antes de existir gato, todas eram para cachorro (padrão)
+  return isCat ? 'cat' : 'dog';
 };
 
 /**
@@ -766,6 +795,71 @@ export const calculateCohortAnalysis = (
 };
 
 /**
+ * Calcula métricas de amostra por tipo de pet (cachorro vs gato)
+ */
+export const calculateSampleMetricsByPetType = (
+  filteredOrders: ProcessedOrder[], 
+  allOrders: ProcessedOrder[]
+): SampleMetrics['byPetType'] => {
+  const qualifiedCustomers = getQualifiedSampleCustomers(filteredOrders);
+  
+  const result = {
+    dog: { uniqueCustomers: 0, repurchaseRate: 0, avgTicket: 0, customersWhoRepurchased: 0 },
+    cat: { uniqueCustomers: 0, repurchaseRate: 0, avgTicket: 0, customersWhoRepurchased: 0 }
+  };
+  
+  // Acumuladores para ticket médio
+  const ticketAccumulator = {
+    dog: { totalValue: 0, orderCount: 0 },
+    cat: { totalValue: 0, orderCount: 0 }
+  };
+  
+  qualifiedCustomers.forEach((customer, cpfCnpj) => {
+    // Identificar tipo de pet baseado nos produtos de amostra do primeiro pedido
+    const sampleProducts = customer.sampleOrder?.produtos.filter(isSampleProduct) || [];
+    
+    // Se qualquer produto da amostra for de gato, classifica como gato
+    const hasCatSample = sampleProducts.some(p => getSamplePetType(p) === 'cat');
+    const petType: PetType = hasCatSample ? 'cat' : 'dog';
+    
+    result[petType].uniqueCustomers++;
+    
+    // Verificar recompra no histórico completo
+    const allCustomerOrders = allOrders
+      .filter(o => o.cpfCnpj === cpfCnpj)
+      .sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
+    
+    if (allCustomerOrders.length >= 2) {
+      result[petType].customersWhoRepurchased++;
+      
+      // Calcular ticket médio das recompras (excluindo primeiro pedido - amostra)
+      const repurchaseOrders = allCustomerOrders.slice(1);
+      repurchaseOrders.forEach(order => {
+        ticketAccumulator[petType].totalValue += order.valorTotal;
+        ticketAccumulator[petType].orderCount++;
+      });
+    }
+  });
+  
+  // Calcular taxas finais
+  if (result.dog.uniqueCustomers > 0) {
+    result.dog.repurchaseRate = (result.dog.customersWhoRepurchased / result.dog.uniqueCustomers) * 100;
+    result.dog.avgTicket = ticketAccumulator.dog.orderCount > 0 
+      ? ticketAccumulator.dog.totalValue / ticketAccumulator.dog.orderCount 
+      : 0;
+  }
+  
+  if (result.cat.uniqueCustomers > 0) {
+    result.cat.repurchaseRate = (result.cat.customersWhoRepurchased / result.cat.uniqueCustomers) * 100;
+    result.cat.avgTicket = ticketAccumulator.cat.orderCount > 0 
+      ? ticketAccumulator.cat.totalValue / ticketAccumulator.cat.orderCount 
+      : 0;
+  }
+  
+  return result;
+};
+
+/**
  * Calcula todas as métricas de amostra de uma vez
  * @param orders - Pedidos filtrados pelo período selecionado
  * @param allOrders - Histórico COMPLETO de pedidos (sem filtro)
@@ -808,5 +902,6 @@ export const calculateAllSampleMetrics = (
     temporal: calculateTemporalAnalysis(orders),
     maturity: calculateMaturityMetrics(orders),
     cohortAnalysis: calculateCohortAnalysis(orders, fullHistory),
+    byPetType: calculateSampleMetricsByPetType(orders, fullHistory),
   };
 };
