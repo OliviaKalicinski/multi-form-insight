@@ -62,6 +62,37 @@ const parseDateString = (dateStr: string): Date | null => {
   return isNaN(date.getTime()) ? null : date;
 };
 
+// Helper to fetch all rows with pagination (bypasses 1000 row limit)
+const fetchAllRows = async (
+  tableName: "sales_data" | "ads_data" | "followers_data" | "marketing_data",
+  orderColumn: string
+): Promise<any[]> => {
+  const PAGE_SIZE = 1000;
+  let allData: any[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select("*")
+      .order(orderColumn, { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...data];
+      from += PAGE_SIZE;
+      hasMore = data.length === PAGE_SIZE;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allData;
+};
+
 export const useDataPersistence = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [stats, setStats] = useState<DataStats>({
@@ -73,7 +104,7 @@ export const useDataPersistence = () => {
   });
   const { toast } = useToast();
 
-  // Load all data from Supabase
+  // Load all data from Supabase with pagination
   const loadAllData = useCallback(async (): Promise<{
     salesData: ProcessedOrder[];
     adsData: AdsData[];
@@ -82,15 +113,15 @@ export const useDataPersistence = () => {
   }> => {
     setIsLoading(true);
     try {
-      const [salesRes, adsRes, followersRes, marketingRes] = await Promise.all([
-        supabase.from("sales_data").select("*").order("data_venda", { ascending: false }),
-        supabase.from("ads_data").select("*").order("data", { ascending: false }),
-        supabase.from("followers_data").select("*").order("data", { ascending: false }),
-        supabase.from("marketing_data").select("*").order("data", { ascending: false }),
+      const [salesRaw, adsRaw, followersRaw, marketingRaw] = await Promise.all([
+        fetchAllRows("sales_data", "data_venda"),
+        fetchAllRows("ads_data", "data"),
+        fetchAllRows("followers_data", "data"),
+        fetchAllRows("marketing_data", "data"),
       ]);
 
       // Transform sales data back to ProcessedOrder format
-      const salesData: ProcessedOrder[] = (salesRes.data || []).map((row: any) => ({
+      const salesData: ProcessedOrder[] = (salesRaw || []).map((row: any) => ({
         numeroPedido: row.numero_pedido,
         nomeCliente: row.cliente_nome || "",
         cpfCnpj: row.cliente_email || "",
@@ -106,7 +137,7 @@ export const useDataPersistence = () => {
       }));
 
       // Transform ads data
-      const adsData: AdsData[] = (adsRes.data || []).map((row: any) => ({
+      const adsData: AdsData[] = (adsRaw || []).map((row: any) => ({
         "Nome do anúncio": row.anuncio || "",
         "Nome do conjunto de anúncios": row.conjunto || "",
         "Valor usado (BRL)": String(row.gasto || 0),
@@ -142,13 +173,13 @@ export const useDataPersistence = () => {
       }));
 
       // Transform followers data
-      const followersData: FollowersData[] = (followersRes.data || []).map((row: any) => ({
+      const followersData: FollowersData[] = (followersRaw || []).map((row: any) => ({
         Data: row.data,
         Seguidores: String(row.total_seguidores || 0),
       }));
 
       // Transform marketing data
-      const marketingData: MarketingData[] = (marketingRes.data || []).map((row: any) => ({
+      const marketingData: MarketingData[] = (marketingRaw || []).map((row: any) => ({
         Data: row.data,
         Visualizações: row.metrica === "visualizacoes" ? String(row.valor || 0) : "0",
         Visitas: row.metrica === "visitas" ? String(row.valor || 0) : "0",
