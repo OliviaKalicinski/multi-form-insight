@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, useMemo, useEffect, useCallback, ReactNode } from "react";
 import { MarketingData, FollowersData, AdsData, AdsMonthSummary, ProcessedOrder } from "@/types/marketing";
 import { extractAvailableMonths } from "@/utils/adsParserV2";
 import { format } from "date-fns";
+import { useDataPersistence } from "@/hooks/useDataPersistence";
 
 interface DashboardContextType {
   marketingData: MarketingData[];
@@ -14,6 +15,8 @@ interface DashboardContextType {
   availableMonths: string[];
   comparisonMode: boolean;
   selectedMonths: string[];
+  isLoadingData: boolean;
+  dataLoaded: boolean;
   setMarketingData: (data: MarketingData[]) => void;
   setFollowersData: (data: FollowersData[]) => void;
   setAdsData: (data: AdsData[], summaries?: AdsMonthSummary[], isHierarchical?: boolean) => void;
@@ -22,6 +25,12 @@ interface DashboardContextType {
   setComparisonMode: (enabled: boolean) => void;
   setSelectedMonths: (months: string[]) => void;
   toggleMonth: (month: string) => void;
+  persistSalesData: (data: ProcessedOrder[]) => Promise<{ inserted: number; total: number }>;
+  persistAdsData: (data: AdsData[]) => Promise<{ inserted: number; total: number }>;
+  persistFollowersData: (data: FollowersData[]) => Promise<{ inserted: number; total: number }>;
+  persistMarketingData: (data: MarketingData[]) => Promise<{ inserted: number; total: number }>;
+  clearPersistedData: () => Promise<void>;
+  refreshFromDatabase: () => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -36,6 +45,35 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [selectedMonth, setSelectedMonthState] = useState<string | null>(null);
   const [comparisonMode, setComparisonModeState] = useState<boolean>(false);
   const [selectedMonths, setSelectedMonthsState] = useState<string[]>([]);
+  const [dataLoaded, setDataLoaded] = useState<boolean>(false);
+
+  const {
+    isLoading: isLoadingData,
+    loadAllData,
+    saveSalesData,
+    saveAdsData,
+    saveFollowersData,
+    saveMarketingData,
+    clearAllData,
+  } = useDataPersistence();
+
+  // Load data from database on mount
+  useEffect(() => {
+    const loadPersistedData = async () => {
+      console.log("🔄 Carregando dados do banco...");
+      const { salesData, adsData, followersData, marketingData } = await loadAllData();
+      
+      if (salesData.length > 0) setSalesDataState(salesData);
+      if (adsData.length > 0) setAdsDataState(adsData);
+      if (followersData.length > 0) setFollowersDataState(followersData);
+      if (marketingData.length > 0) setMarketingDataState(marketingData);
+      
+      setDataLoaded(true);
+      console.log("✅ Dados carregados com sucesso");
+    };
+
+    loadPersistedData();
+  }, [loadAllData]);
 
   // Calculate available months from all data sources
   const availableMonths = useMemo(() => {
@@ -73,7 +111,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [availableMonths, selectedMonth]);
 
-  // Wrapper functions that reset month selection on data update
+  // Wrapper functions that update local state
   const setMarketingData = (data: MarketingData[]) => {
     setMarketingDataState(data);
     setSelectedMonthState(null);
@@ -115,6 +153,64 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  // Persist functions that save to database AND update local state
+  const persistSalesData = useCallback(async (data: ProcessedOrder[]) => {
+    const result = await saveSalesData(data);
+    // Merge new data with existing (avoiding duplicates by numero_pedido)
+    setSalesDataState(prev => {
+      const existingIds = new Set(prev.map(o => o.numeroPedido));
+      const newOrders = data.filter(o => !existingIds.has(o.numeroPedido));
+      return [...prev, ...newOrders];
+    });
+    return result;
+  }, [saveSalesData]);
+
+  const persistAdsData = useCallback(async (data: AdsData[]) => {
+    const result = await saveAdsData(data);
+    setAdsDataState(prev => [...prev, ...data]);
+    return result;
+  }, [saveAdsData]);
+
+  const persistFollowersData = useCallback(async (data: FollowersData[]) => {
+    const result = await saveFollowersData(data);
+    // Merge by date
+    setFollowersDataState(prev => {
+      const existingDates = new Set(prev.map(f => f.Data));
+      const newData = data.filter(f => !existingDates.has(f.Data));
+      return [...prev, ...newData];
+    });
+    return result;
+  }, [saveFollowersData]);
+
+  const persistMarketingData = useCallback(async (data: MarketingData[]) => {
+    const result = await saveMarketingData(data);
+    // Merge by date
+    setMarketingDataState(prev => {
+      const existingDates = new Set(prev.map(m => m.Data));
+      const newData = data.filter(m => !existingDates.has(m.Data));
+      return [...prev, ...newData];
+    });
+    return result;
+  }, [saveMarketingData]);
+
+  const clearPersistedData = useCallback(async () => {
+    await clearAllData();
+    setSalesDataState([]);
+    setAdsDataState([]);
+    setFollowersDataState([]);
+    setMarketingDataState([]);
+    setMonthlySummaries([]);
+    setSelectedMonthState(null);
+  }, [clearAllData]);
+
+  const refreshFromDatabase = useCallback(async () => {
+    const { salesData, adsData, followersData, marketingData } = await loadAllData();
+    setSalesDataState(salesData);
+    setAdsDataState(adsData);
+    setFollowersDataState(followersData);
+    setMarketingDataState(marketingData);
+  }, [loadAllData]);
+
   const value = {
     marketingData,
     followersData,
@@ -126,6 +222,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     availableMonths,
     comparisonMode,
     selectedMonths,
+    isLoadingData,
+    dataLoaded,
     setMarketingData,
     setFollowersData,
     setAdsData,
@@ -134,6 +232,12 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setComparisonMode,
     setSelectedMonths: setSelectedMonthsState,
     toggleMonth,
+    persistSalesData,
+    persistAdsData,
+    persistFollowersData,
+    persistMarketingData,
+    clearPersistedData,
+    refreshFromDatabase,
   };
 
   return (

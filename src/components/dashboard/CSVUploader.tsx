@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { Upload, FileText, X } from "lucide-react";
+import { Upload, FileText, X, Loader2, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import Papa from "papaparse";
 import { MarketingData } from "@/types/marketing";
 import { z } from "zod";
+import { useDashboard } from "@/contexts/DashboardContext";
 
 interface CSVUploaderProps {
-  onDataLoaded: (data: MarketingData[], fileName: string) => void;
+  onDataLoaded?: (data: MarketingData[], fileName: string) => void;
   title?: string;
   description?: string;
 }
@@ -29,7 +30,9 @@ export const CSVUploader = ({
 }: CSVUploaderProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const { persistMarketingData, setMarketingData } = useDashboard();
 
   const validateAndProcessData = (data: any[]): MarketingData[] => {
     const validatedData: MarketingData[] = [];
@@ -70,7 +73,7 @@ export const CSVUploader = ({
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: async (results) => {
         try {
           const validatedData = validateAndProcessData(results.data);
 
@@ -83,12 +86,31 @@ export const CSVUploader = ({
             return;
           }
 
-          onDataLoaded(validatedData, file.name);
-          setUploadedFile(file.name);
-          toast({
-            title: "Sucesso!",
-            description: `${validatedData.length} registros carregados de ${file.name}`,
-          });
+          setIsSaving(true);
+          try {
+            // Save to database
+            const result = await persistMarketingData(validatedData);
+            
+            if (onDataLoaded) {
+              onDataLoaded(validatedData, file.name);
+            }
+            
+            setUploadedFile(file.name);
+            toast({
+              title: "Dados salvos com sucesso!",
+              description: `${result.inserted} registros de marketing salvos no banco.`,
+            });
+          } catch (error) {
+            console.error("Erro ao salvar:", error);
+            setMarketingData(validatedData);
+            toast({
+              title: "Dados carregados localmente",
+              description: `${validatedData.length} registros importados (não foram salvos no banco)`,
+              variant: "destructive",
+            });
+          } finally {
+            setIsSaving(false);
+          }
         } catch (error) {
           toast({
             title: "Erro ao processar arquivo",
@@ -128,66 +150,69 @@ export const CSVUploader = ({
     setUploadedFile(null);
     toast({
       title: "Arquivo removido",
-      description: "Os dados foram limpos do dashboard",
+      description: "Os dados locais foram limpos (dados no banco permanecem).",
     });
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          {description}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {!uploadedFile ? (
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-              isDragging
-                ? "border-primary bg-primary/5"
-                : "border-border hover:border-primary/50"
-            }`}
-          >
-            <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-            <p className="text-sm text-muted-foreground mb-4">
-              Arraste e solte seu arquivo CSV aqui, ou
-            </p>
-            <Button variant="outline" onClick={() => document.getElementById("csv-input")?.click()}>
-              Selecionar Arquivo
-            </Button>
-            <input
-              id="csv-input"
-              type="file"
-              accept=".csv"
-              onChange={handleFileInput}
-              className="hidden"
-            />
-            <p className="text-xs text-muted-foreground mt-4">
-              Formato esperado: Data, Visualizações, Visitas, Interações, Clicks no Link, Alcance
-            </p>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between p-4 bg-success-light rounded-lg border border-success/20">
-            <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-success" />
-              <div>
-                <p className="font-medium text-foreground">{uploadedFile}</p>
-                <p className="text-xs text-muted-foreground">Arquivo carregado com sucesso</p>
-              </div>
+    <div>
+      {!uploadedFile ? (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+            isDragging
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-primary/50"
+          }`}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="mx-auto h-10 w-10 text-primary animate-spin mb-3" />
+              <p className="text-sm text-muted-foreground">
+                Salvando dados no banco...
+              </p>
+            </>
+          ) : (
+            <>
+              <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground mb-4">
+                Arraste e solte seu arquivo CSV aqui, ou
+              </p>
+              <Button variant="outline" onClick={() => document.getElementById("csv-input")?.click()}>
+                Selecionar Arquivo
+              </Button>
+              <input
+                id="csv-input"
+                type="file"
+                accept=".csv"
+                onChange={handleFileInput}
+                className="hidden"
+              />
+              <p className="text-xs text-muted-foreground mt-4">
+                Formato esperado: Data, Visualizações, Visitas, Interações, Clicks no Link, Alcance
+              </p>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+          <div className="flex items-center gap-3">
+            <Database className="h-8 w-8 text-emerald-500" />
+            <div>
+              <p className="font-medium text-foreground">{uploadedFile}</p>
+              <p className="text-xs text-emerald-600">Salvo no banco</p>
             </div>
-            <Button variant="ghost" size="icon" onClick={clearFile}>
-              <X className="h-4 w-4" />
-            </Button>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <Button variant="ghost" size="icon" onClick={clearFile}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };

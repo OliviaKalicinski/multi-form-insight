@@ -1,0 +1,343 @@
+import { useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { ProcessedOrder, AdsData, FollowersData, MarketingData, AdsMonthSummary } from "@/types/marketing";
+import { useToast } from "@/hooks/use-toast";
+import { format, parseISO } from "date-fns";
+
+interface DataStats {
+  salesCount: number;
+  adsCount: number;
+  followersCount: number;
+  marketingCount: number;
+  lastUpdated: Date | null;
+}
+
+interface UpsertResult {
+  inserted: number;
+  updated: number;
+  total: number;
+}
+
+export const useDataPersistence = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [stats, setStats] = useState<DataStats>({
+    salesCount: 0,
+    adsCount: 0,
+    followersCount: 0,
+    marketingCount: 0,
+    lastUpdated: null,
+  });
+  const { toast } = useToast();
+
+  // Load all data from Supabase
+  const loadAllData = useCallback(async (): Promise<{
+    salesData: ProcessedOrder[];
+    adsData: AdsData[];
+    followersData: FollowersData[];
+    marketingData: MarketingData[];
+  }> => {
+    setIsLoading(true);
+    try {
+      const [salesRes, adsRes, followersRes, marketingRes] = await Promise.all([
+        supabase.from("sales_data").select("*").order("data_venda", { ascending: false }),
+        supabase.from("ads_data").select("*").order("data", { ascending: false }),
+        supabase.from("followers_data").select("*").order("data", { ascending: false }),
+        supabase.from("marketing_data").select("*").order("data", { ascending: false }),
+      ]);
+
+      // Transform sales data back to ProcessedOrder format
+      const salesData: ProcessedOrder[] = (salesRes.data || []).map((row: any) => ({
+        numeroPedido: row.numero_pedido,
+        nomeCliente: row.cliente_nome || "",
+        cpfCnpj: row.cliente_email || "",
+        ecommerce: row.canal || "",
+        valorTotal: Number(row.valor_total),
+        totalItens: row.produtos?.length || 0,
+        produtos: row.produtos || [],
+        dataVenda: new Date(row.data_venda),
+        formaEnvio: row.forma_envio || "",
+        valorFrete: Number(row.valor_frete) || 0,
+        numeroNF: "",
+        dataEmissao: new Date(row.data_venda),
+      }));
+
+      // Transform ads data
+      const adsData: AdsData[] = (adsRes.data || []).map((row: any) => ({
+        "Nome do anúncio": row.anuncio || "",
+        "Nome do conjunto de anúncios": row.conjunto || "",
+        "Valor usado (BRL)": String(row.gasto || 0),
+        "Impressões": String(row.impressoes || 0),
+        "Cliques (todos)": String(row.cliques || 0),
+        "Compras": String(row.conversoes || 0),
+        "Valor de conversão da compra": String(row.receita || 0),
+        "Início dos relatórios": row.data || "",
+        "Término dos relatórios": row.data || "",
+        // Default values for other fields
+        "CPM (custo por 1.000 impressões)": "0",
+        "CTR (todos)": "0",
+        "CTR de saída": "0",
+        "Cliques de saída": "0",
+        "Visualizações da página de destino do site": "0",
+        "Custo por visualização da página de destino": "0",
+        "Adições ao carrinho": "0",
+        "Custo por adição ao carrinho": "0",
+        "Custo por compra": "0",
+        "Tipo de resultado": "",
+        "Resultados": "0",
+        "Custo por resultado": "0",
+        "Visitas ao perfil do Instagram": "0",
+        "CPC (custo por clique no link)": "0",
+        "Cliques no link": "0",
+        "Alcance": "0",
+        "Frequência": "0",
+        "Engajamentos com o post": "0",
+        "Visualizações": "0",
+        "Tipo de valor de resultado": "",
+        "ROAS de resultados": "0",
+        "Veiculação da campanha": "",
+      }));
+
+      // Transform followers data
+      const followersData: FollowersData[] = (followersRes.data || []).map((row: any) => ({
+        Data: row.data,
+        Seguidores: String(row.total_seguidores || 0),
+      }));
+
+      // Transform marketing data
+      const marketingData: MarketingData[] = (marketingRes.data || []).map((row: any) => ({
+        Data: row.data,
+        Visualizações: row.metrica === "visualizacoes" ? String(row.valor || 0) : "0",
+        Visitas: row.metrica === "visitas" ? String(row.valor || 0) : "0",
+        Interações: row.metrica === "interacoes" ? String(row.valor || 0) : "0",
+        "Clicks no Link": row.metrica === "clicks" ? String(row.valor || 0) : "0",
+        Alcance: row.metrica === "alcance" ? String(row.valor || 0) : "0",
+      }));
+
+      setStats({
+        salesCount: salesData.length,
+        adsCount: adsData.length,
+        followersCount: followersData.length,
+        marketingCount: marketingData.length,
+        lastUpdated: new Date(),
+      });
+
+      console.log("📊 Dados carregados do banco:", {
+        vendas: salesData.length,
+        anuncios: adsData.length,
+        seguidores: followersData.length,
+        marketing: marketingData.length,
+      });
+
+      return { salesData, adsData, followersData, marketingData };
+    } catch (error) {
+      console.error("Erro ao carregar dados:", error);
+      toast({
+        title: "Erro ao carregar dados",
+        description: "Não foi possível carregar os dados salvos.",
+        variant: "destructive",
+      });
+      return { salesData: [], adsData: [], followersData: [], marketingData: [] };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  // Save/upsert sales data
+  const saveSalesData = useCallback(async (orders: ProcessedOrder[]): Promise<UpsertResult> => {
+    if (orders.length === 0) return { inserted: 0, updated: 0, total: 0 };
+
+    try {
+      const rows = orders.map((order) => ({
+        numero_pedido: order.numeroPedido,
+        data_venda: order.dataVenda.toISOString(),
+        valor_total: order.valorTotal,
+        valor_frete: order.valorFrete,
+        canal: order.ecommerce,
+        status: "completed",
+        cliente_email: order.cpfCnpj,
+        cliente_nome: order.nomeCliente,
+        cidade: "",
+        estado: "",
+        forma_envio: order.formaEnvio,
+        produtos: order.produtos,
+        cupom: "",
+      }));
+
+      const { data, error } = await supabase
+        .from("sales_data")
+        .upsert(rows, { onConflict: "numero_pedido", ignoreDuplicates: false })
+        .select();
+
+      if (error) throw error;
+
+      const result = {
+        inserted: data?.length || 0,
+        updated: 0,
+        total: orders.length,
+      };
+
+      setStats((prev) => ({ ...prev, salesCount: prev.salesCount + result.inserted, lastUpdated: new Date() }));
+
+      return result;
+    } catch (error) {
+      console.error("Erro ao salvar vendas:", error);
+      throw error;
+    }
+  }, []);
+
+  // Save/upsert ads data
+  const saveAdsData = useCallback(async (ads: AdsData[]): Promise<UpsertResult> => {
+    if (ads.length === 0) return { inserted: 0, updated: 0, total: 0 };
+
+    try {
+      const rows = ads.map((ad) => ({
+        data: ad["Início dos relatórios"] || "",
+        campanha: "",
+        conjunto: ad["Nome do conjunto de anúncios"] || "",
+        anuncio: ad["Nome do anúncio"] || "",
+        impressoes: parseInt(ad["Impressões"]?.replace(/\./g, "") || "0"),
+        cliques: parseInt(ad["Cliques (todos)"]?.replace(/\./g, "") || "0"),
+        gasto: parseFloat(ad["Valor usado (BRL)"]?.replace(/\./g, "").replace(",", ".") || "0"),
+        conversoes: parseInt(ad["Compras"]?.replace(/\./g, "") || "0"),
+        receita: parseFloat(ad["Valor de conversão da compra"]?.replace(/\./g, "").replace(",", ".") || "0"),
+      }));
+
+      const { data, error } = await supabase
+        .from("ads_data")
+        .upsert(rows, { onConflict: "data,campanha,conjunto,anuncio", ignoreDuplicates: false })
+        .select();
+
+      if (error) throw error;
+
+      const result = {
+        inserted: data?.length || 0,
+        updated: 0,
+        total: ads.length,
+      };
+
+      setStats((prev) => ({ ...prev, adsCount: prev.adsCount + result.inserted, lastUpdated: new Date() }));
+
+      return result;
+    } catch (error) {
+      console.error("Erro ao salvar anúncios:", error);
+      throw error;
+    }
+  }, []);
+
+  // Save/upsert followers data
+  const saveFollowersData = useCallback(async (followers: FollowersData[]): Promise<UpsertResult> => {
+    if (followers.length === 0) return { inserted: 0, updated: 0, total: 0 };
+
+    try {
+      const rows = followers.map((f) => ({
+        data: f.Data,
+        total_seguidores: parseInt(f.Seguidores?.replace(/\./g, "") || "0"),
+        novos_seguidores: 0,
+        unfollows: 0,
+      }));
+
+      const { data, error } = await supabase
+        .from("followers_data")
+        .upsert(rows, { onConflict: "data", ignoreDuplicates: false })
+        .select();
+
+      if (error) throw error;
+
+      const result = {
+        inserted: data?.length || 0,
+        updated: 0,
+        total: followers.length,
+      };
+
+      setStats((prev) => ({ ...prev, followersCount: prev.followersCount + result.inserted, lastUpdated: new Date() }));
+
+      return result;
+    } catch (error) {
+      console.error("Erro ao salvar seguidores:", error);
+      throw error;
+    }
+  }, []);
+
+  // Save/upsert marketing data
+  const saveMarketingData = useCallback(async (marketing: MarketingData[]): Promise<UpsertResult> => {
+    if (marketing.length === 0) return { inserted: 0, updated: 0, total: 0 };
+
+    try {
+      // Each marketing row has multiple metrics, save each as separate row
+      const rows: { data: string; metrica: string; valor: number }[] = [];
+
+      marketing.forEach((m) => {
+        rows.push(
+          { data: m.Data, metrica: "visualizacoes", valor: parseFloat(m.Visualizações?.replace(/\./g, "").replace(",", ".") || "0") },
+          { data: m.Data, metrica: "visitas", valor: parseFloat(m.Visitas?.replace(/\./g, "").replace(",", ".") || "0") },
+          { data: m.Data, metrica: "interacoes", valor: parseFloat(m.Interações?.replace(/\./g, "").replace(",", ".") || "0") },
+          { data: m.Data, metrica: "clicks", valor: parseFloat(m["Clicks no Link"]?.replace(/\./g, "").replace(",", ".") || "0") },
+          { data: m.Data, metrica: "alcance", valor: parseFloat(m.Alcance?.replace(/\./g, "").replace(",", ".") || "0") }
+        );
+      });
+
+      const { data, error } = await supabase
+        .from("marketing_data")
+        .upsert(rows, { onConflict: "data,metrica", ignoreDuplicates: false })
+        .select();
+
+      if (error) throw error;
+
+      const result = {
+        inserted: data?.length || 0,
+        updated: 0,
+        total: marketing.length,
+      };
+
+      setStats((prev) => ({ ...prev, marketingCount: prev.marketingCount + result.inserted, lastUpdated: new Date() }));
+
+      return result;
+    } catch (error) {
+      console.error("Erro ao salvar marketing:", error);
+      throw error;
+    }
+  }, []);
+
+  // Clear all data
+  const clearAllData = useCallback(async () => {
+    try {
+      await Promise.all([
+        supabase.from("sales_data").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
+        supabase.from("ads_data").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
+        supabase.from("followers_data").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
+        supabase.from("marketing_data").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
+      ]);
+
+      setStats({
+        salesCount: 0,
+        adsCount: 0,
+        followersCount: 0,
+        marketingCount: 0,
+        lastUpdated: null,
+      });
+
+      toast({
+        title: "Dados removidos",
+        description: "Todos os dados foram removidos do banco.",
+      });
+    } catch (error) {
+      console.error("Erro ao limpar dados:", error);
+      toast({
+        title: "Erro ao limpar dados",
+        description: "Não foi possível remover os dados.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  return {
+    isLoading,
+    stats,
+    loadAllData,
+    saveSalesData,
+    saveAdsData,
+    saveFollowersData,
+    saveMarketingData,
+    clearAllData,
+  };
+};

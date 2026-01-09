@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileSpreadsheet, X } from "lucide-react";
+import { Upload, FileSpreadsheet, X, Loader2, Database } from "lucide-react";
 import Papa from "papaparse";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { AdsData } from "@/types/marketing";
 import { parseHierarchicalAds, validateAdsConsistency } from "@/utils/adsParserV2";
+import { useDashboard } from "@/contexts/DashboardContext";
 
 interface AdsUploaderProps {
-  onDataLoaded: (data: AdsData[], fileName: string, summaries?: any[], isHierarchical?: boolean) => void;
+  onDataLoaded?: (data: AdsData[], fileName: string, summaries?: any[], isHierarchical?: boolean) => void;
   title?: string;
   description?: string;
 }
@@ -27,12 +28,14 @@ export const AdsUploader = ({
 }: AdsUploaderProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const { persistAdsData, setAdsData } = useDashboard();
 
-  const validateAndProcessData = (
+  const validateAndProcessData = async (
     parsedData: any[],
     fileName: string
-  ): AdsData[] | null => {
+  ): Promise<AdsData[] | null> => {
     if (!parsedData || parsedData.length === 0) {
       toast({
         variant: "destructive",
@@ -74,17 +77,33 @@ export const AdsUploader = ({
         console.warn("Avisos de consistência:", warnings);
       }
 
-      toast({
-        title: hasHierarchicalFormat 
-          ? "🟢 Formato Hierárquico Detectado" 
-          : "🟡 Formato Individual - Resumos Calculados",
-        description: hasHierarchicalFormat 
-          ? `${monthlySummaries.length} resumos mensais e ${individualAds.length} anúncios individuais carregados.`
-          : `${individualAds.length} anúncios processados. Resumos calculados para ${monthlySummaries.length} meses.`,
-      });
+      setIsSaving(true);
+      try {
+        // Save to database
+        const result = await persistAdsData(individualAds);
+        
+        toast({
+          title: "Dados salvos com sucesso!",
+          description: `${result.inserted} anúncios salvos. ${monthlySummaries.length} resumos mensais detectados.`,
+        });
 
-      onDataLoaded(individualAds, fileName, monthlySummaries, hasHierarchicalFormat);
-      return individualAds;
+        if (onDataLoaded) {
+          onDataLoaded(individualAds, fileName, monthlySummaries, hasHierarchicalFormat);
+        }
+
+        return individualAds;
+      } catch (error) {
+        console.error("Erro ao salvar:", error);
+        setAdsData(individualAds, monthlySummaries, hasHierarchicalFormat);
+        toast({
+          title: "Dados carregados localmente",
+          description: `${individualAds.length} anúncios importados (não foram salvos no banco)`,
+          variant: "destructive",
+        });
+        return individualAds;
+      } finally {
+        setIsSaving(false);
+      }
     }
 
     if (errors.length > 0 && errors.length < parsedData.length) {
@@ -94,7 +113,31 @@ export const AdsUploader = ({
       });
     }
 
-    onDataLoaded(validatedData, fileName, [], false);
+    // Save to database
+    setIsSaving(true);
+    try {
+      const result = await persistAdsData(validatedData);
+      
+      toast({
+        title: "Dados salvos com sucesso!",
+        description: `${result.inserted} anúncios salvos no banco.`,
+      });
+
+      if (onDataLoaded) {
+        onDataLoaded(validatedData, fileName, [], false);
+      }
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+      setAdsData(validatedData, [], false);
+      toast({
+        title: "Dados carregados localmente",
+        description: `${validatedData.length} anúncios importados (não foram salvos no banco)`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+
     return validatedData;
   };
 
@@ -121,7 +164,7 @@ export const AdsUploader = ({
       header: true,
       delimiter: "",
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: async (results) => {
         if (results.errors.length > 0) {
           toast({
             title: "Erro ao processar arquivo",
@@ -131,7 +174,7 @@ export const AdsUploader = ({
           return;
         }
 
-        const validData = validateAndProcessData(results.data, file.name);
+        const validData = await validateAndProcessData(results.data, file.name);
 
         if (!validData || validData.length === 0) {
           toast({
@@ -173,70 +216,76 @@ export const AdsUploader = ({
 
   const clearFile = () => {
     setUploadedFile(null);
-    onDataLoaded([], "", [], false);
+    if (onDataLoaded) {
+      onDataLoaded([], "", [], false);
+    }
     toast({
       title: "Arquivo removido",
-      description: "Dados resetados para os valores padrão.",
+      description: "Os dados locais foram limpos (dados no banco permanecem).",
     });
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          {description}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {!uploadedFile ? (
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-              isDragging
-                ? "border-primary bg-primary/5"
-                : "border-border hover:border-primary/50"
-            }`}
+    <div>
+      {!uploadedFile ? (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+            isDragging
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-primary/50"
+          }`}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="mx-auto h-10 w-10 text-primary animate-spin mb-3" />
+              <p className="text-sm text-muted-foreground">
+                Salvando dados no banco...
+              </p>
+            </>
+          ) : (
+            <>
+              <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground mb-4">
+                Arraste e solte o arquivo TSV do Meta Ads Manager aqui, ou clique para selecionar
+              </p>
+              <label htmlFor="ads-file-upload">
+                <Button variant="outline" asChild>
+                  <span>Selecionar Arquivo</span>
+                </Button>
+                <input
+                  id="ads-file-upload"
+                  type="file"
+                  accept=".csv,.tsv,.txt"
+                  onChange={handleFileInput}
+                  className="hidden"
+                />
+              </label>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-emerald-500" />
+            <span className="text-sm font-medium text-foreground">{uploadedFile}</span>
+            <span className="text-xs text-emerald-600">Salvo no banco</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFile}
+            className="text-muted-foreground hover:text-destructive"
           >
-            <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-            <p className="text-sm text-muted-foreground mb-4">
-              Arraste e solte o arquivo TSV do Meta Ads Manager aqui, ou clique para selecionar
-            </p>
-            <label htmlFor="ads-file-upload">
-              <Button variant="outline" asChild>
-                <span>Selecionar Arquivo</span>
-              </Button>
-              <input
-                id="ads-file-upload"
-                type="file"
-                accept=".csv,.tsv,.txt"
-                onChange={handleFileInput}
-                className="hidden"
-              />
-            </label>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between p-4 bg-success/10 border border-success/20 rounded-lg">
-            <div className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5 text-success" />
-              <span className="text-sm font-medium text-foreground">{uploadedFile}</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearFile}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };
