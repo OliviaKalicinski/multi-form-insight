@@ -3,9 +3,6 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { DollarSign, TrendingUp, Users, ShoppingCart, Package, Percent, Target } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
-import { MonthFilter } from "@/components/dashboard/MonthFilter";
-import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark, formatBenchmarkInterpretation } from "@/components/dashboard/StatusMetricCard";
 import { DailyRevenueChart } from "@/components/dashboard/DailyRevenueChart";
@@ -35,9 +32,6 @@ export default function PerformanceFinanceira() {
     availableMonths,
     comparisonMode,
     selectedMonths,
-    setSelectedMonth,
-    setComparisonMode,
-    toggleMonth,
   } = useDashboard();
 
   const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
@@ -135,26 +129,6 @@ export default function PerformanceFinanceira() {
         </div>
       </div>
 
-      {/* ComparisonToggle */}
-      {availableMonths.length > 1 && (
-        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
-      )}
-
-      {/* Filtro de mês */}
-      {availableMonths.length > 0 && (comparisonMode ? (
-          <MonthComparisonSelector
-            availableMonths={availableMonths}
-            selectedMonths={selectedMonths}
-            onToggleMonth={toggleMonth}
-          />
-        ) : (
-          <MonthFilter
-            availableMonths={availableMonths}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
-        )
-      )}
 
       {/* Cards resumo - HIERARQUIA VISUAL */}
       {!comparisonMode && financialMetrics && (

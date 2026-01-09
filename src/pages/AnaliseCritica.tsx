@@ -15,7 +15,7 @@ import { FileText, TrendingUp, AlertTriangle, Target, BarChart3 } from "lucide-r
 import { ExecutiveMetrics } from "@/types/executive";
 
 export default function AnaliseCritica() {
-  const { selectedMonth, setSelectedMonth, availableMonths, salesData, adsData } = useDashboard();
+  const { selectedMonth, availableMonths, salesData, adsData } = useDashboard();
   
   // Calcular dados do mês atual a partir dos dados reais
   const dadosAtual = useMemo(() => {
@@ -114,20 +114,6 @@ export default function AnaliseCritica() {
             <p className="text-muted-foreground mt-2">
               Insights estratégicos, alertas e recomendações acionáveis baseados nos seus dados reais
             </p>
-          </div>
-          <div className="w-80">
-            <label className="text-sm font-medium mb-2 block">Período de Análise</label>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm bg-background"
-            >
-              {availableMonths.map((month) => (
-                <option key={month} value={month}>
-                  {month}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
         

@@ -3,9 +3,6 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
 import { calculateAllSampleMetrics, calculateDataPeriod } from "@/utils/samplesAnalyzer";
 import { format } from "date-fns";
-import { MonthFilter } from "@/components/dashboard/MonthFilter";
-import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
-import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { SalesMetricCard } from "@/components/dashboard/SalesMetricCard";
 import { ConversionFunnelChart } from "@/components/dashboard/ConversionFunnelChart";
@@ -21,11 +18,8 @@ const AnaliseSamples = () => {
     salesData, 
     selectedMonth, 
     availableMonths, 
-    setSelectedMonth,
     comparisonMode,
     selectedMonths,
-    setComparisonMode,
-    toggleMonth,
   } = useDashboard();
 
   const filteredOrders = useMemo(() => {
@@ -87,25 +81,6 @@ const AnaliseSamples = () => {
         </p>
       </div>
       
-      {availableMonths.length > 1 && (
-        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
-      )}
-
-      {availableMonths.length > 0 && (
-        comparisonMode ? (
-          <MonthComparisonSelector
-            availableMonths={availableMonths}
-            selectedMonths={selectedMonths}
-            onToggleMonth={toggleMonth}
-          />
-        ) : (
-          <MonthFilter
-            availableMonths={availableMonths}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
-        )
-      )}
         <div className="text-center py-12">
           <p className="text-muted-foreground">
             Nenhum dado disponível. Por favor, faça upload dos dados de vendas.
@@ -163,25 +138,6 @@ const AnaliseSamples = () => {
         </p>
       </div>
       
-      {availableMonths.length > 1 && (
-        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
-      )}
-
-      {availableMonths.length > 0 && (
-        comparisonMode ? (
-          <MonthComparisonSelector
-            availableMonths={availableMonths}
-            selectedMonths={selectedMonths}
-            onToggleMonth={toggleMonth}
-          />
-        ) : (
-          <MonthFilter
-            availableMonths={availableMonths}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
-        )
-      )}
 
       {dataPeriod && dataPeriod.isShortPeriod && (
         <Card className="border-warning bg-warning/10">

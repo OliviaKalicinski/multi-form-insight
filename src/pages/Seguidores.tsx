@@ -2,13 +2,11 @@ import { useMemo } from "react";
 import { Users, UserPlus, TrendingUp, TrendingDown, Calendar, Target, Eye, MousePointerClick, Heart } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
-import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
-import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
 import { NewFollowersChart } from "@/components/dashboard/NewFollowersChart";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
-import { MonthFilter } from "@/components/dashboard/MonthFilter";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNumber, formatFollowersGrowth, extractDailyFollowers } from "@/utils/followersCalculator";
@@ -25,11 +23,8 @@ const Seguidores = () => {
     followersData,
     selectedMonth,
     availableMonths,
-    setSelectedMonth,
     comparisonMode,
     selectedMonths,
-    setComparisonMode,
-    toggleMonth,
   } = useDashboard();
 
   // Detect 12-month view
@@ -259,50 +254,23 @@ const Seguidores = () => {
           </Card>
         )}
 
-        {/* Comparison Toggle */}
-        {availableMonths.length > 1 && (
-          <ComparisonToggle
-            enabled={comparisonMode}
-            onToggle={setComparisonMode}
-          />
-        )}
-
-        {/* Month Selector */}
-        {availableMonths.length > 0 && (
-          <>
-            {comparisonMode ? (
-              <MonthComparisonSelector
-                availableMonths={availableMonths}
-                selectedMonths={selectedMonths}
-                onToggleMonth={toggleMonth}
-              />
-            ) : (
-              <MonthFilter
-                availableMonths={availableMonths}
-                selectedMonth={selectedMonth}
-                onMonthChange={setSelectedMonth}
-              />
-            )}
-            
-            {/* Period indicator badge for 12-month view */}
-            {isLast12MonthsView && last12Months.length > 0 && (
-              <Card className="border-primary/50 bg-primary/5">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        📅 Visão Anual - Análise dos Últimos {last12Months.length} Meses
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Período: {formatMonthRange(last12Months)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </>
+        {/* Period indicator for 12-month view */}
+        {isLast12MonthsView && last12Months.length > 0 && (
+          <Card className="border-primary/50 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <Calendar className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    📅 Visão Anual - Análise dos Últimos {last12Months.length} Meses
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Período: {formatMonthRange(last12Months)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Show metrics only if month is selected and data exists */}

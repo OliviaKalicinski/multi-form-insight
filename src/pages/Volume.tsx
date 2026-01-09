@@ -3,9 +3,6 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { Package, ListTree, DollarSign, ShoppingCart, BarChart3, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MonthFilter } from "@/components/dashboard/MonthFilter";
-import { MonthComparisonSelector } from "@/components/dashboard/MonthComparisonSelector";
-import { ComparisonToggle } from "@/components/dashboard/ComparisonToggle";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard } from "@/components/dashboard/StatusMetricCard";
 import { TopProductsTable } from "@/components/dashboard/TopProductsTable";
@@ -26,11 +23,8 @@ export default function Volume() {
     salesData,
     selectedMonth,
     availableMonths,
-    setSelectedMonth,
     comparisonMode,
     selectedMonths,
-    setComparisonMode,
-    toggleMonth,
   } = useDashboard();
 
   const [productSortBy, setProductSortBy] = useState<'quantity' | 'revenue'>('quantity');
@@ -163,25 +157,6 @@ export default function Volume() {
         </div>
       </div>
 
-      {availableMonths.length > 1 && (
-        <ComparisonToggle enabled={comparisonMode} onToggle={setComparisonMode} />
-      )}
-
-      {availableMonths.length > 0 && (
-        comparisonMode ? (
-          <MonthComparisonSelector
-            availableMonths={availableMonths}
-            selectedMonths={selectedMonths}
-            onToggleMonth={toggleMonth}
-          />
-        ) : (
-          <MonthFilter
-            availableMonths={availableMonths}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
-        )
-      )}
 
       {/* Cards resumo - MODO NORMAL COM HIERARQUIA VISUAL */}
       {!comparisonMode && productMetrics && (
