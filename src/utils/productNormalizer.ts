@@ -6,8 +6,9 @@
 export const standardizeProductName = (name: string, price: number): string => {
   const desc = name.toLowerCase();
   
-  // REGRA ESPECIAL (PRIORIDADE 1): Amostras por preço
-  if (price >= 0.01 && price <= 1.00) {
+  // REGRA ESPECIAL (PRIORIDADE 1): Amostras por nome OU preço
+  // Nome contém "amostra" OU preço entre R$ 0,01 e R$ 1,00
+  if (desc.includes('amostra') || (price >= 0.01 && price <= 1.00)) {
     return 'Kit de Amostras';
   }
   
