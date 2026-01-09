@@ -274,12 +274,53 @@ export const useDataPersistence = () => {
     }
   }, []);
 
+  // Helper to parse Brazilian monetary values correctly
+  // Formato brasileiro: 1.234,56 → 1234.56
+  // Formato americano: 1,234.56 → 1234.56
+  const parseMonetaryValue = (value: string): number => {
+    if (!value) return 0;
+    const cleaned = value.trim();
+    
+    // Check if it's a simple number without separators
+    if (/^[\d]+\.?\d*$/.test(cleaned)) {
+      return parseFloat(cleaned) || 0;
+    }
+    
+    // Detect format by checking position of last comma vs last dot
+    const lastComma = cleaned.lastIndexOf(',');
+    const lastDot = cleaned.lastIndexOf('.');
+    
+    if (lastComma > -1 && lastDot > -1) {
+      if (lastComma > lastDot) {
+        // Brazilian format: 1.234,56 (comma is decimal separator)
+        return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+      } else {
+        // American format: 1,234.56 (dot is decimal separator)
+        return parseFloat(cleaned.replace(/,/g, '')) || 0;
+      }
+    }
+    
+    if (lastComma > -1) {
+      // Only comma: could be "1234,56" (Brazilian decimal)
+      // Check if there are exactly 2 digits after comma
+      const afterComma = cleaned.slice(lastComma + 1);
+      if (afterComma.length <= 2) {
+        return parseFloat(cleaned.replace(',', '.')) || 0;
+      }
+      // Otherwise it's a thousand separator: "1,234"
+      return parseFloat(cleaned.replace(/,/g, '')) || 0;
+    }
+    
+    // Only dot or no separator
+    return parseFloat(cleaned) || 0;
+  };
+
   // Save/upsert ads data with deduplication
   const saveAdsData = useCallback(async (ads: AdsData[], fileName?: string): Promise<UpsertResult & { duplicatesAggregated: number }> => {
     if (ads.length === 0) return { inserted: 0, updated: 0, total: 0, duplicatesAggregated: 0 };
 
     try {
-      // Parse all rows first
+      // Parse all rows first with correct monetary parsing
       const rawRows = ads.map((ad) => ({
         data: ad["Início dos relatórios"] || "",
         campanha: "",
@@ -287,9 +328,9 @@ export const useDataPersistence = () => {
         anuncio: ad["Nome do anúncio"] || "",
         impressoes: parseInt(ad["Impressões"]?.replace(/\./g, "") || "0"),
         cliques: parseInt(ad["Cliques (todos)"]?.replace(/\./g, "") || "0"),
-        gasto: parseFloat(ad["Valor usado (BRL)"]?.replace(/\./g, "").replace(",", ".") || "0"),
+        gasto: parseMonetaryValue(ad["Valor usado (BRL)"] || "0"),
         conversoes: parseInt(ad["Compras"]?.replace(/\./g, "") || "0"),
-        receita: parseFloat(ad["Valor de conversão da compra"]?.replace(/\./g, "").replace(",", ".") || "0"),
+        receita: parseMonetaryValue(ad["Valor de conversão da compra"] || "0"),
       }));
 
       // Deduplicate by aggregating values for identical keys
