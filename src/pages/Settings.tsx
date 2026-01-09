@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useAppSettings, FinancialGoals } from "@/hooks/useAppSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Settings as SettingsIcon, 
@@ -19,16 +17,12 @@ import {
   Loader2, 
   AlertCircle,
   CheckCircle2,
-  Users,
-  Target,
-  DollarSign,
-  Info
+  Users
 } from "lucide-react";
 
 export default function Settings() {
   const { user, updatePassword } = useAuth();
-  const { isAdmin, role, isLoading: roleLoading } = useUserRole();
-  const { financialGoals, isLoading: goalsLoading, isSaving, updateFinancialGoals } = useAppSettings();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { toast } = useToast();
 
   // Password change state
@@ -44,13 +38,6 @@ export default function Settings() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
-
-  // Financial goals state
-  const [goalsForm, setGoalsForm] = useState<FinancialGoals>(financialGoals);
-
-  useEffect(() => {
-    setGoalsForm(financialGoals);
-  }, [financialGoals]);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,16 +116,6 @@ export default function Settings() {
     }
   };
 
-  const handleGoalsSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await updateFinancialGoals(goalsForm);
-  };
-
-  const handleGoalChange = (field: keyof FinancialGoals, value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setGoalsForm(prev => ({ ...prev, [field]: numValue }));
-  };
-
   if (roleLoading) {
     return (
       <div className="container mx-auto px-6 py-8 flex items-center justify-center min-h-[400px]">
@@ -186,135 +163,6 @@ export default function Settings() {
           </p>
         </CardContent>
       </Card>
-
-      {/* Financial Goals (Admin only) */}
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Metas Financeiras
-            </CardTitle>
-            <CardDescription>
-              Configure as metas mensais do dashboard
-            </CardDescription>
-          </CardHeader>
-          <form onSubmit={handleGoalsSubmit}>
-            <CardContent className="space-y-6">
-              {goalsLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : (
-                <>
-                  <div className="grid gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="goal-receita">Meta de Receita Mensal (R$)</Label>
-                      <Input
-                        id="goal-receita"
-                        type="number"
-                        placeholder="50000"
-                        value={goalsForm.receita}
-                        onChange={(e) => handleGoalChange("receita", e.target.value)}
-                        disabled={isSaving}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="goal-pedidos">Meta de Pedidos</Label>
-                      <Input
-                        id="goal-pedidos"
-                        type="number"
-                        placeholder="350"
-                        value={goalsForm.pedidos}
-                        onChange={(e) => handleGoalChange("pedidos", e.target.value)}
-                        disabled={isSaving}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="goal-ticket">Meta de Ticket Médio (R$)</Label>
-                      <Input
-                        id="goal-ticket"
-                        type="number"
-                        placeholder="150"
-                        value={goalsForm.ticketMedio}
-                        onChange={(e) => handleGoalChange("ticketMedio", e.target.value)}
-                        disabled={isSaving}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Parâmetros de Cálculo
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="goal-custo">Custo dos Produtos (%)</Label>
-                        <Input
-                          id="goal-custo"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="1"
-                          placeholder="0.65"
-                          value={goalsForm.custoFixo}
-                          onChange={(e) => handleGoalChange("custoFixo", e.target.value)}
-                          disabled={isSaving}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          % sobre a receita líquida (ex: 0.65 = 65%)
-                        </p>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="goal-margem">Meta de Margem (%)</Label>
-                        <Input
-                          id="goal-margem"
-                          type="number"
-                          placeholder="35"
-                          value={goalsForm.margem}
-                          onChange={(e) => handleGoalChange("margem", e.target.value)}
-                          disabled={isSaving}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Margem bruta esperada
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 rounded-lg bg-muted p-3">
-                      <div className="flex items-start gap-2 text-sm">
-                        <Info className="h-4 w-4 text-muted-foreground mt-0.5" />
-                        <span className="text-muted-foreground">
-                          Custo + Margem = 100% ({(goalsForm.custoFixo * 100).toFixed(0)}% + {goalsForm.margem}% = {((goalsForm.custoFixo * 100) + goalsForm.margem).toFixed(0)}%)
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" disabled={isSaving || goalsLoading}>
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  "Salvar Alterações"
-                )}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      )}
 
       {/* Change Password */}
       <Card>
