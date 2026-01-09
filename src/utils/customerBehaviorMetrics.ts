@@ -241,25 +241,25 @@ export const segmentCustomers = (orders: ProcessedOrder[]): CustomerSegment[] =>
 
   const hoje = new Date();
   const segments = {
-    'Novo': { count: 0, totalRevenue: 0, avgTicket: 0 },
-    'Ativo': { count: 0, totalRevenue: 0, avgTicket: 0 },
-    'Frequente': { count: 0, totalRevenue: 0, avgTicket: 0 },
+    'Iniciante': { count: 0, totalRevenue: 0, avgTicket: 0 },
+    'Ocasional': { count: 0, totalRevenue: 0, avgTicket: 0 },
+    'Fiel': { count: 0, totalRevenue: 0, avgTicket: 0 },
     'VIP': { count: 0, totalRevenue: 0, avgTicket: 0 }
   };
 
   clientesMap.forEach(cliente => {
     const diasDesdeUltima = differenceInDays(hoje, cliente.ultimaCompra);
     
-    let segment: 'Novo' | 'Ativo' | 'Frequente' | 'VIP';
+    let segment: 'Iniciante' | 'Ocasional' | 'Fiel' | 'VIP';
     
     if (cliente.pedidos === 1 && diasDesdeUltima <= 30) {
-      segment = 'Novo';
+      segment = 'Iniciante';
     } else if (cliente.pedidos >= 5 && cliente.valorTotal >= 500) {
       segment = 'VIP';
     } else if (cliente.pedidos >= 3) {
-      segment = 'Frequente';
+      segment = 'Fiel';
     } else {
-      segment = 'Ativo';
+      segment = 'Ocasional';
     }
 
     segments[segment].count++;
@@ -270,27 +270,27 @@ export const segmentCustomers = (orders: ProcessedOrder[]): CustomerSegment[] =>
 
   return [
     {
-      segment: 'Novo',
-      count: segments['Novo'].count,
-      percentage: (segments['Novo'].count / totalClientes) * 100,
-      totalRevenue: segments['Novo'].totalRevenue,
-      averageTicket: segments['Novo'].count > 0 ? segments['Novo'].totalRevenue / segments['Novo'].count : 0,
+      segment: 'Iniciante',
+      count: segments['Iniciante'].count,
+      percentage: (segments['Iniciante'].count / totalClientes) * 100,
+      totalRevenue: segments['Iniciante'].totalRevenue,
+      averageTicket: segments['Iniciante'].count > 0 ? segments['Iniciante'].totalRevenue / segments['Iniciante'].count : 0,
       criteria: '1 pedido nos últimos 30 dias'
     },
     {
-      segment: 'Ativo',
-      count: segments['Ativo'].count,
-      percentage: (segments['Ativo'].count / totalClientes) * 100,
-      totalRevenue: segments['Ativo'].totalRevenue,
-      averageTicket: segments['Ativo'].count > 0 ? segments['Ativo'].totalRevenue / segments['Ativo'].count : 0,
+      segment: 'Ocasional',
+      count: segments['Ocasional'].count,
+      percentage: (segments['Ocasional'].count / totalClientes) * 100,
+      totalRevenue: segments['Ocasional'].totalRevenue,
+      averageTicket: segments['Ocasional'].count > 0 ? segments['Ocasional'].totalRevenue / segments['Ocasional'].count : 0,
       criteria: '2 pedidos'
     },
     {
-      segment: 'Frequente',
-      count: segments['Frequente'].count,
-      percentage: (segments['Frequente'].count / totalClientes) * 100,
-      totalRevenue: segments['Frequente'].totalRevenue,
-      averageTicket: segments['Frequente'].count > 0 ? segments['Frequente'].totalRevenue / segments['Frequente'].count : 0,
+      segment: 'Fiel',
+      count: segments['Fiel'].count,
+      percentage: (segments['Fiel'].count / totalClientes) * 100,
+      totalRevenue: segments['Fiel'].totalRevenue,
+      averageTicket: segments['Fiel'].count > 0 ? segments['Fiel'].totalRevenue / segments['Fiel'].count : 0,
       criteria: '3-4 pedidos'
     },
     {
