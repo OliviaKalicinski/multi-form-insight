@@ -531,6 +531,28 @@ export const useDataPersistence = () => {
     }
   }, [toast]);
 
+  // Clear only ads data
+  const clearAdsData = useCallback(async () => {
+    try {
+      await supabase.from("ads_data").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+      setStats((prev) => ({ ...prev, adsCount: 0, lastUpdated: new Date() }));
+
+      toast({
+        title: "Dados de Ads removidos",
+        description: "Todos os dados de anúncios foram removidos. Faça um novo upload.",
+      });
+    } catch (error) {
+      console.error("Erro ao limpar dados de ads:", error);
+      toast({
+        title: "Erro ao limpar dados",
+        description: "Não foi possível remover os dados de anúncios.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  }, [toast]);
+
   return {
     isLoading,
     stats,
@@ -540,5 +562,6 @@ export const useDataPersistence = () => {
     saveFollowersData,
     saveMarketingData,
     clearAllData,
+    clearAdsData,
   };
 };

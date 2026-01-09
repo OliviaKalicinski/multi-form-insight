@@ -30,6 +30,7 @@ interface DashboardContextType {
   persistFollowersData: (data: FollowersData[]) => Promise<{ inserted: number; total: number }>;
   persistMarketingData: (data: MarketingData[]) => Promise<{ inserted: number; total: number }>;
   clearPersistedData: () => Promise<void>;
+  clearAdsData: () => Promise<void>;
   refreshFromDatabase: () => Promise<void>;
 }
 
@@ -55,6 +56,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     saveFollowersData,
     saveMarketingData,
     clearAllData,
+    clearAdsData: clearAdsDataFromDb,
   } = useDataPersistence();
 
   // Load data from database on mount
@@ -203,6 +205,13 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setSelectedMonthState(null);
   }, [clearAllData]);
 
+  const clearAdsData = useCallback(async () => {
+    await clearAdsDataFromDb();
+    setAdsDataState([]);
+    setMonthlySummaries([]);
+    setHasHierarchicalFormat(false);
+  }, [clearAdsDataFromDb]);
+
   const refreshFromDatabase = useCallback(async () => {
     const { salesData, adsData, followersData, marketingData } = await loadAllData();
     setSalesDataState(salesData);
@@ -237,6 +246,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     persistFollowersData,
     persistMarketingData,
     clearPersistedData,
+    clearAdsData,
     refreshFromDatabase,
   };
 
