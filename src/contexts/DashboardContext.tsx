@@ -10,7 +10,7 @@ interface DashboardContextType {
   monthlySummaries: AdsMonthSummary[];
   hasHierarchicalFormat: boolean;
   salesData: ProcessedOrder[];
-  selectedMonth: string;
+  selectedMonth: string | null;
   availableMonths: string[];
   comparisonMode: boolean;
   selectedMonths: string[];
@@ -18,7 +18,7 @@ interface DashboardContextType {
   setFollowersData: (data: FollowersData[]) => void;
   setAdsData: (data: AdsData[], summaries?: AdsMonthSummary[], isHierarchical?: boolean) => void;
   setSalesData: (data: ProcessedOrder[]) => void;
-  setSelectedMonth: (month: string) => void;
+  setSelectedMonth: (month: string | null) => void;
   setComparisonMode: (enabled: boolean) => void;
   setSelectedMonths: (months: string[]) => void;
   toggleMonth: (month: string) => void;
@@ -33,7 +33,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [monthlySummaries, setMonthlySummaries] = useState<AdsMonthSummary[]>([]);
   const [hasHierarchicalFormat, setHasHierarchicalFormat] = useState<boolean>(false);
   const [salesData, setSalesDataState] = useState<ProcessedOrder[]>([]);
-  const [selectedMonth, setSelectedMonthState] = useState<string>("");
+  const [selectedMonth, setSelectedMonthState] = useState<string | null>(null);
   const [comparisonMode, setComparisonModeState] = useState<boolean>(false);
   const [selectedMonths, setSelectedMonthsState] = useState<string[]>([]);
 
@@ -76,24 +76,24 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   // Wrapper functions that reset month selection on data update
   const setMarketingData = (data: MarketingData[]) => {
     setMarketingDataState(data);
-    setSelectedMonthState("");
+    setSelectedMonthState(null);
   };
 
   const setFollowersData = (data: FollowersData[]) => {
     setFollowersDataState(data);
-    setSelectedMonthState("");
+    setSelectedMonthState(null);
   };
 
   const setAdsData = (data: AdsData[], summaries: AdsMonthSummary[] = [], isHierarchical: boolean = false) => {
     setAdsDataState(data);
     setMonthlySummaries(summaries);
     setHasHierarchicalFormat(isHierarchical);
-    setSelectedMonthState("");
+    setSelectedMonthState(null);
   };
 
   const setSalesData = (data: ProcessedOrder[]) => {
     setSalesDataState(data);
-    setSelectedMonthState("");
+    setSelectedMonthState(null);
   };
 
   const setComparisonMode = (enabled: boolean) => {
