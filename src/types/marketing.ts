@@ -215,6 +215,8 @@ export interface FinancialMetrics {
   produtoMedio: number;
   revenueByDay: { date: string; revenue: number; cumulativeRevenue: number }[];
   ordersByDay: { date: string; orders: number }[];
+  revenueByWeek: { week: string; revenue: number }[];
+  ordersByWeek: { week: string; orders: number }[];
   revenueByProduct: ProductRevenueData[];
   revenueByMonth: { month: string; revenue: number; orders: number }[];
   ordersByMonth: { month: string; orders: number }[];
