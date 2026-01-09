@@ -185,12 +185,13 @@ export const useDataPersistence = () => {
     }
   }, []);
 
-  // Save/upsert ads data
-  const saveAdsData = useCallback(async (ads: AdsData[]): Promise<UpsertResult> => {
-    if (ads.length === 0) return { inserted: 0, updated: 0, total: 0 };
+  // Save/upsert ads data with deduplication
+  const saveAdsData = useCallback(async (ads: AdsData[]): Promise<UpsertResult & { duplicatesAggregated: number }> => {
+    if (ads.length === 0) return { inserted: 0, updated: 0, total: 0, duplicatesAggregated: 0 };
 
     try {
-      const rows = ads.map((ad) => ({
+      // Parse all rows first
+      const rawRows = ads.map((ad) => ({
         data: ad["Início dos relatórios"] || "",
         campanha: "",
         conjunto: ad["Nome do conjunto de anúncios"] || "",
@@ -202,9 +203,33 @@ export const useDataPersistence = () => {
         receita: parseFloat(ad["Valor de conversão da compra"]?.replace(/\./g, "").replace(",", ".") || "0"),
       }));
 
+      // Deduplicate by aggregating values for identical keys
+      const uniqueRowsMap = new Map<string, typeof rawRows[0]>();
+      
+      rawRows.forEach((row) => {
+        const key = `${row.data}|${row.campanha}|${row.conjunto}|${row.anuncio}`;
+        
+        if (uniqueRowsMap.has(key)) {
+          // Aggregate values for duplicate entries
+          const existing = uniqueRowsMap.get(key)!;
+          existing.impressoes += row.impressoes;
+          existing.cliques += row.cliques;
+          existing.gasto += row.gasto;
+          existing.conversoes += row.conversoes;
+          existing.receita += row.receita;
+        } else {
+          uniqueRowsMap.set(key, { ...row });
+        }
+      });
+
+      const uniqueRows = Array.from(uniqueRowsMap.values());
+      const duplicatesAggregated = rawRows.length - uniqueRows.length;
+
+      console.log(`📊 Deduplicação de anúncios: ${rawRows.length} linhas originais → ${uniqueRows.length} únicas (${duplicatesAggregated} duplicatas agregadas)`);
+
       const { data, error } = await supabase
         .from("ads_data")
-        .upsert(rows, { onConflict: "data,campanha,conjunto,anuncio", ignoreDuplicates: false })
+        .upsert(uniqueRows, { onConflict: "data,campanha,conjunto,anuncio", ignoreDuplicates: false })
         .select();
 
       if (error) throw error;
@@ -213,6 +238,7 @@ export const useDataPersistence = () => {
         inserted: data?.length || 0,
         updated: 0,
         total: ads.length,
+        duplicatesAggregated,
       };
 
       setStats((prev) => ({ ...prev, adsCount: prev.adsCount + result.inserted, lastUpdated: new Date() }));
