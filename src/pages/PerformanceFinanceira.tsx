@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar } from "lucide-react";
+import { useAppSettings } from "@/hooks/useAppSettings";
+import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
@@ -22,15 +23,6 @@ import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-// Configuração de metas financeiras
-const FINANCIAL_GOALS = {
-  receita: 50000,
-  pedidos: 350,
-  ticketMedio: 150,
-  margem: 35,
-  custoFixo: 0.65
-};
-
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
@@ -42,6 +34,8 @@ export default function PerformanceFinanceira() {
     comparisonMode,
     selectedMonths,
   } = useDashboard();
+
+  const { financialGoals, isLoading: goalsLoading } = useAppSettings();
 
   const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
 
@@ -104,29 +98,29 @@ export default function PerformanceFinanceira() {
       { 
         label: "Receita", 
         current: financialMetrics.faturamentoTotal, 
-        goal: FINANCIAL_GOALS.receita, 
+        goal: financialGoals.receita, 
         format: 'currency' as const 
       },
       { 
         label: "Pedidos", 
         current: financialMetrics.totalPedidos, 
-        goal: FINANCIAL_GOALS.pedidos, 
+        goal: financialGoals.pedidos, 
         format: 'number' as const 
       },
       { 
         label: "Ticket Médio", 
         current: financialMetrics.ticketMedioReal, 
-        goal: FINANCIAL_GOALS.ticketMedio, 
+        goal: financialGoals.ticketMedio, 
         format: 'currency' as const 
       },
       { 
         label: "Margem", 
-        current: FINANCIAL_GOALS.margem, 
-        goal: FINANCIAL_GOALS.margem, 
+        current: financialGoals.margem, 
+        goal: financialGoals.margem, 
         format: 'percent' as const 
       },
     ];
-  }, [financialMetrics]);
+  }, [financialMetrics, financialGoals]);
 
   if (salesData.length === 0) {
     return (
@@ -187,8 +181,8 @@ export default function PerformanceFinanceira() {
             netRevenue={financialMetrics.faturamentoLiquido}
             shippingTotal={financialMetrics.freteTotal}
             variation={variations?.revenue}
-            revenueGoal={FINANCIAL_GOALS.receita}
-            profitMargin={1 - FINANCIAL_GOALS.custoFixo}
+            revenueGoal={financialGoals.receita}
+            costPercentage={financialGoals.custoFixo}
           />
 
           {/* Cards Satélites (Grid 2x3) */}
@@ -211,7 +205,7 @@ export default function PerformanceFinanceira() {
             />
             <StatusMetricCard
               title="Margem Bruta"
-              value={`${((1 - FINANCIAL_GOALS.custoFixo) * 100).toFixed(0)}%`}
+              value={`${((1 - financialGoals.custoFixo) * 100).toFixed(0)}%`}
               icon={<DollarSign className="h-3 w-3" />}
               status="success"
               size="compact"
@@ -321,7 +315,7 @@ export default function PerformanceFinanceira() {
                   title="📦 Volume de Pedidos"
                   description="Número de pedidos por dia com linha de média"
                   isMonthly={false}
-                  dailyGoal={Math.round(FINANCIAL_GOALS.pedidos / 30)}
+                  dailyGoal={Math.round(financialGoals.pedidos / 30)}
                 />
               </>
             )}
@@ -389,7 +383,7 @@ export default function PerformanceFinanceira() {
             <FinancialBreakdownCard
               grossRevenue={financialMetrics.faturamentoBruto}
               shippingCost={financialMetrics.freteTotal}
-              costPercentage={FINANCIAL_GOALS.custoFixo}
+              costPercentage={financialGoals.custoFixo}
             />
           </div>
         </div>

@@ -11,6 +11,7 @@ interface RevenueHeroCardProps {
   variation?: number | null;
   revenueGoal?: number;
   profitMargin?: number;
+  costPercentage?: number;
 }
 
 const formatCurrency = (value: number) =>
@@ -33,9 +34,10 @@ export const RevenueHeroCard = ({
   variation,
   revenueGoal = 50000,
   profitMargin = 0.35,
+  costPercentage = 0.65,
 }: RevenueHeroCardProps) => {
   const goalProgress = Math.min((totalRevenue / revenueGoal) * 100, 150);
-  const estimatedProfit = netRevenue * profitMargin;
+  const estimatedProfit = netRevenue * (1 - costPercentage);
   const remainingToGoal = Math.max(revenueGoal - totalRevenue, 0);
   
   const getStatus = () => {
@@ -136,7 +138,7 @@ export const RevenueHeroCard = ({
                 {formatCurrencyCompact(estimatedProfit)}
               </p>
               <p className="text-xs text-muted-foreground">
-                (margem {(profitMargin * 100).toFixed(0)}%)
+                (margem {((1 - costPercentage) * 100).toFixed(0)}%)
               </p>
             </div>
           </div>
