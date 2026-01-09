@@ -14,7 +14,8 @@ import {
   CheckCircle2, 
   XCircle,
   ArrowRight,
-  BarChart3
+  BarChart3,
+  Trash2
 } from "lucide-react";
 
 export default function Upload() {
@@ -27,7 +28,8 @@ export default function Upload() {
     adsData, 
     setAdsData,
     salesData,
-    setSalesData 
+    setSalesData,
+    clearAdsData 
   } = useDashboard();
 
   const dataSources = [
@@ -153,12 +155,24 @@ export default function Upload() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center justify-between">
-              Dados de Anúncios (Meta Ads)
-              {adsData.length > 0 && (
-                <Badge variant="secondary" className="font-normal">
-                  {adsData.length} registros
-                </Badge>
-              )}
+              <span>Dados de Anúncios (Meta Ads)</span>
+              <div className="flex items-center gap-2">
+                {adsData.length > 0 && (
+                  <>
+                    <Badge variant="secondary" className="font-normal">
+                      {adsData.length} registros
+                    </Badge>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={clearAdsData}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Limpar
+                    </Button>
+                  </>
+                )}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
