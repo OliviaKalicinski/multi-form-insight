@@ -1,23 +1,21 @@
 import { ProcessedOrder, SampleMetrics, CustomerPurchaseHistory } from "@/types/marketing";
 import { format, differenceInDays, differenceInMonths } from "date-fns";
 
-// Palavras-chave que indicam produtos de amostra
-const SAMPLE_KEYWORDS = ['amostra', 'sample', 'kit de amostras', 'brinde', 'degustação', 'teste', 'grátis', 'gratuito'];
-
 /**
- * Verifica se um produto individual é uma amostra
- * Critério combinado: preço baixo (até R$ 1,00) OU nome contém palavras-chave de amostra
+ * Identifica se um produto é uma amostra baseado em nome OU preço
+ * - Nome contém "amostra" (captura: amostras, kit de amostras, amostra gatos, etc.)
+ * - OU preço entre R$ 0,01 e R$ 1,00 (backup para amostras sem nome explícito)
  */
-export const isSampleProduct = (produto: { preco: number; descricaoAjustada?: string; descricao?: string }): boolean => {
-  // Critério 1: Preço baixo (de R$ 0,00 até R$ 1,00)
-  const isLowPrice = produto.preco >= 0.00 && produto.preco <= 1.00;
-  
-  // Critério 2: Nome contém indicadores de amostra
+export const isSampleProduct = (produto: { descricao?: string; descricaoAjustada?: string; preco: number }): boolean => {
   const name = (produto.descricaoAjustada || produto.descricao || '').toLowerCase();
-  const hasSampleName = SAMPLE_KEYWORDS.some(keyword => name.includes(keyword));
   
-  // Retorna true se preço baixo OU nome indica amostra
-  return isLowPrice || hasSampleName;
+  // Critério 1: Nome contém "amostra" (captura todas as variações)
+  const hasSampleName = name.includes('amostra');
+  
+  // Critério 2: Preço muito baixo (R$ 0,01 a R$ 1,00) como backup
+  const isLowPrice = produto.preco >= 0.01 && produto.preco <= 1.00;
+  
+  return hasSampleName || isLowPrice;
 };
 
 /**
