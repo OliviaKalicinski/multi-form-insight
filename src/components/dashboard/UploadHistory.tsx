@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,8 +27,9 @@ import {
   Trash2,
   Loader2
 } from "lucide-react";
-import { useDashboard } from "@/contexts/DashboardContext";
+import { DashboardContext } from "@/contexts/DashboardContext";
 import { useToast } from "@/hooks/use-toast";
+import { useDataPersistence } from "@/hooks/useDataPersistence";
 
 interface UploadHistoryEntry {
   id: string;
@@ -71,7 +72,8 @@ export function UploadHistory() {
   const [history, setHistory] = useState<UploadHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const { deleteUpload } = useDashboard();
+  const dashboardContext = useContext(DashboardContext);
+  const { deleteUpload } = useDataPersistence();
   const { toast } = useToast();
 
   const fetchHistory = async () => {
@@ -105,6 +107,10 @@ export function UploadHistory() {
       await deleteUpload(entry.id);
       // Remove from local state
       setHistory(prev => prev.filter(h => h.id !== entry.id));
+      // Refresh dashboard data if context is available
+      if (dashboardContext?.refreshFromDatabase) {
+        await dashboardContext.refreshFromDatabase();
+      }
     } catch (error) {
       console.error("Error deleting upload:", error);
       toast({
