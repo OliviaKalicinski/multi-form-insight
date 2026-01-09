@@ -57,7 +57,10 @@ const Seguidores = () => {
 
   // Filter followers data by selected month or last 12 months
   const currentMonthFollowersData = useMemo(() => {
-    if (!selectedMonth) return [];
+    // selectedMonth null = "Todos os períodos" = retornar todos os dados
+    if (!selectedMonth) {
+      return followersData;
+    }
     if (isLast12MonthsView) {
       return followersData.filter((item) => 
         last12Months.some(month => item.Data.startsWith(month))
@@ -86,7 +89,7 @@ const Seguidores = () => {
 
   // Calculate followers metrics
   const currentFollowersMetrics = useMemo(() => {
-    if (!selectedMonth) {
+    if (currentMonthFollowersData.length === 0) {
       return { 
         totalSeguidores: 0, 
         novosSeguidoresMes: 0, 
@@ -363,7 +366,7 @@ const Seguidores = () => {
               </div>
             </div>
           </>
-        ) : selectedMonth && hasFollowersData && currentMonthFollowersData.length > 0 ? (
+        ) : hasFollowersData && currentMonthFollowersData.length > 0 ? (
           <>
             {/* Followers Metrics Cards */}
             <div>
