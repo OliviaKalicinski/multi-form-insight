@@ -18,14 +18,8 @@ import {
   RefreshCw,
   X,
   GitCompare,
-  Info,
+  CheckSquare,
 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 export function GlobalFilter() {
   const context = useContext(DashboardContext);
@@ -110,9 +104,7 @@ export function GlobalFilter() {
                     value="select"
                     onValueChange={(value) => {
                       if (value !== "select" && !selectedMonths.includes(value)) {
-                        if (selectedMonths.length < 5) {
-                          setSelectedMonths([...selectedMonths, value]);
-                        }
+                        setSelectedMonths([...selectedMonths, value]);
                       }
                     }}
                   >
@@ -121,7 +113,7 @@ export function GlobalFilter() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="select" disabled>
-                        Selecione até 5 meses
+                        Adicionar mês
                       </SelectItem>
                       {availableMonths
                         .filter((month) => !selectedMonths.includes(month))
@@ -133,20 +125,17 @@ export function GlobalFilter() {
                     </SelectContent>
                   </Select>
 
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Info className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-sm max-w-[200px]">
-                          Selecione até 5 meses para comparar. As métricas serão exibidas lado a lado.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  {/* Botão Selecionar Todos */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedMonths([...availableMonths])}
+                    disabled={selectedMonths.length === availableMonths.length}
+                    title="Selecionar todos os meses disponíveis"
+                  >
+                    <CheckSquare className="h-4 w-4 mr-1" />
+                    Todos
+                  </Button>
                 </div>
               )}
 
