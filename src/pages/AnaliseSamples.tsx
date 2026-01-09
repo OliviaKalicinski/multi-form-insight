@@ -4,14 +4,17 @@ import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
 import { calculateAllSampleMetrics, calculateDataPeriod } from "@/utils/samplesAnalyzer";
 import { format } from "date-fns";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
-import { SalesMetricCard } from "@/components/dashboard/SalesMetricCard";
 import { ConversionFunnelChart } from "@/components/dashboard/ConversionFunnelChart";
 import { SampleProductsTable } from "@/components/dashboard/SampleProductsTable";
 import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
+import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Package, TrendingUp, DollarSign, Clock, Users, ShoppingCart, Target, Calendar } from "lucide-react";
+import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, Target, Calendar, Percent, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const AnaliseSamples = () => {
   const { 
@@ -124,81 +127,77 @@ const AnaliseSamples = () => {
     },
   ];
 
+  // Benchmark de 25% para taxa de recompra
+  const REPURCHASE_BENCHMARK = 25;
+  const repurchaseRate = metrics.repurchase.repurchaseRate;
+  const benchmarkProgress = Math.min((repurchaseRate / REPURCHASE_BENCHMARK) * 100, 150);
+  
+  // Determinar status baseado na taxa
+  const getRepurchaseStatus = (rate: number) => {
+    if (rate >= 35) return 'success';
+    if (rate >= 25) return 'neutral';
+    if (rate >= 15) return 'warning';
+    return 'danger';
+  };
+  
+  const repurchaseStatus = getRepurchaseStatus(repurchaseRate);
+  
+  // Interpretação contextual
+  const getInterpretation = (rate: number) => {
+    if (rate >= 35) return { text: "🎯 Excelente! Taxa muito acima da média do mercado.", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+    if (rate >= 25) return { text: "✅ Bom desempenho, dentro do esperado para e-commerce.", color: "bg-blue-50 text-blue-700 border-blue-200" };
+    if (rate >= 15) return { text: "⚠️ Abaixo da média, avaliar qualidade das amostras e follow-up.", color: "bg-amber-50 text-amber-700 border-amber-200" };
+    return { text: "🚨 Taxa crítica, revisar estratégia de amostras urgentemente.", color: "bg-red-50 text-red-700 border-red-200" };
+  };
+  
+  const interpretation = getInterpretation(repurchaseRate);
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Clientes que Iniciaram com Amostras</h1>
-        <p className="text-muted-foreground">
-          Análise de clientes cujo primeiro pedido foi apenas Kit de Amostras
+    <div className="container mx-auto p-4 space-y-4">
+      {/* Header Compacto */}
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold text-foreground">🎁 Análise de Amostras</h1>
+        <p className="text-sm text-muted-foreground">
+          Clientes cujo primeiro pedido foi apenas Kit de Amostras
           {dataPeriod && (
-            <span className="block text-xs mt-1">
-              Período: {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')}
+            <span className="ml-2 text-xs">
+              • {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')}
             </span>
           )}
         </p>
       </div>
-      
 
-      {dataPeriod && dataPeriod.isShortPeriod && (
-        <Card className="border-warning bg-warning/10">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <Calendar className="h-5 w-5 text-warning mt-0.5" />
-              <div>
-                <p className="font-medium text-warning">⚠️ Período de análise curto</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Dados disponíveis: {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')} 
-                  ({dataPeriod.totalMonths} {dataPeriod.totalMonths === 1 ? 'mês' : 'meses'}).
-                  Algumas métricas de recompra podem estar subestimadas.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Alertas de Contexto - Compactos */}
+      <div className="flex flex-wrap gap-2">
+        {dataPeriod && dataPeriod.isShortPeriod && (
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+            <Calendar className="h-3 w-3 mr-1" />
+            Período curto: {dataPeriod.totalMonths} {dataPeriod.totalMonths === 1 ? 'mês' : 'meses'}
+          </Badge>
+        )}
+        {metrics.maturity && (
+          <Badge 
+            variant="outline" 
+            className={cn(
+              metrics.maturity.isReliableAnalysis 
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                : "bg-amber-50 text-amber-700 border-amber-200"
+            )}
+          >
+            {metrics.maturity.isReliableAnalysis ? (
+              <><Target className="h-3 w-3 mr-1" /> Análise confiável</>
+            ) : (
+              <><Clock className="h-3 w-3 mr-1" /> {metrics.maturity.percentageWith60Days.toFixed(0)}% com 60+ dias</>
+            )}
+          </Badge>
+        )}
+      </div>
 
-      {/* Indicador de Maturidade da Análise */}
-      {metrics.maturity && (
-        <Card className={metrics.maturity.isReliableAnalysis ? "border-primary bg-primary/5" : "border-warning bg-warning/10"}>
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <Clock className={`h-5 w-5 mt-0.5 ${metrics.maturity.isReliableAnalysis ? 'text-primary' : 'text-warning'}`} />
-              <div className="flex-1">
-                <p className={`font-medium ${metrics.maturity.isReliableAnalysis ? 'text-primary' : 'text-warning'}`}>
-                  {metrics.maturity.isReliableAnalysis ? '✅ Análise confiável' : '⚠️ Janela de análise limitada'}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {metrics.maturity.percentageWith60Days.toFixed(0)}% dos clientes ({metrics.maturity.customersWithAtLeast60Days} de {metrics.maturity.totalQualifiedCustomers}) 
-                  tiveram pelo menos 60 dias desde a compra da amostra.
-                </p>
-                {!metrics.maturity.isReliableAnalysis && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    📊 Muitos clientes compraram amostra recentemente. A taxa de recompra pode aumentar com o tempo.
-                  </p>
-                )}
-                <div className="grid grid-cols-2 gap-4 mt-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Tempo médio desde amostra</p>
-                    <p className="text-sm font-semibold">{Math.round(metrics.maturity.avgDaysSinceSample)} dias</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Clientes com 90+ dias</p>
-                    <p className="text-sm font-semibold">
-                      {metrics.maturity.customersWithAtLeast90Days} ({metrics.maturity.percentageWith90Days.toFixed(0)}%)
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Cards principais */}
+      {/* LINHA 1: Card Principal (40%) + Satélites (60%) */}
       {comparisonMode && comparisonMetrics ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <ComparisonMetricCard
-            title="Clientes que Iniciaram com Amostras"
+            title="Clientes Qualificados"
             icon={Users}
             metrics={comparisonMetrics.map(m => ({
               value: m.metrics.volume.uniqueCustomers,
@@ -219,7 +218,7 @@ const AnaliseSamples = () => {
             formatValue={(v) => `${v.toFixed(1)}%`}
           />
           <ComparisonMetricCard
-            title="Ticket Médio Geral"
+            title="Ticket Médio"
             icon={DollarSign}
             metrics={comparisonMetrics.map(m => ({
               value: m.metrics.repurchase.avgTicketRepurchase,
@@ -230,7 +229,7 @@ const AnaliseSamples = () => {
             formatValue={(v) => formatCurrency(v)}
           />
           <ComparisonMetricCard
-            title="Tempo Médio até Primeira Recompra"
+            title="Tempo até Recompra"
             icon={Clock}
             metrics={comparisonMetrics.map(m => ({
               value: m.metrics.repurchase.avgDaysToFirstRepurchase,
@@ -241,104 +240,191 @@ const AnaliseSamples = () => {
             formatValue={(v) => `${Math.round(v)} dias`}
           />
         </div>
-      ) : metrics ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <SalesMetricCard
-            title="Clientes que Iniciaram com Amostras"
-            value={metrics.volume.uniqueCustomers.toLocaleString('pt-BR')}
-            icon={Users}
-            subtitle={
-              <>
-                Primeiro pedido foi apenas Kit de Amostras
-                {metrics.volume.totalCustomersWithSamples > metrics.volume.uniqueCustomers && (
-                  <span className="block text-xs text-muted-foreground mt-1.5 font-normal">
-                    {metrics.volume.totalCustomersWithSamples.toLocaleString('pt-BR')} clientes compraram amostras no total
-                  </span>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-5">
+          {/* Card Principal - Taxa de Recompra (40% = 2 colunas) */}
+          <Card className={cn(
+            "lg:col-span-2 transition-all",
+            repurchaseStatus === 'success' && "border-emerald-300 bg-gradient-to-br from-emerald-50/50 to-background",
+            repurchaseStatus === 'warning' && "border-amber-300 bg-gradient-to-br from-amber-50/50 to-background",
+            repurchaseStatus === 'danger' && "border-red-300 bg-gradient-to-br from-red-50/50 to-background"
+          )}>
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Percent className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium text-muted-foreground">Taxa de Recompra</span>
+                  </div>
+                  <Badge 
+                    variant="outline"
+                    className={cn(
+                      "text-xs",
+                      repurchaseStatus === 'success' && "bg-emerald-100 text-emerald-700 border-emerald-300",
+                      repurchaseStatus === 'neutral' && "bg-blue-100 text-blue-700 border-blue-300",
+                      repurchaseStatus === 'warning' && "bg-amber-100 text-amber-700 border-amber-300",
+                      repurchaseStatus === 'danger' && "bg-red-100 text-red-700 border-red-300"
+                    )}
+                  >
+                    {repurchaseStatus === 'success' ? '🏆 Premium' : 
+                     repurchaseStatus === 'neutral' ? '✓ Benchmark' :
+                     repurchaseStatus === 'warning' ? '⚠️ Atenção' : '🚨 Crítico'}
+                  </Badge>
+                </div>
+
+                {/* Valor Principal */}
+                <div className={cn(
+                  "text-3xl font-bold",
+                  repurchaseStatus === 'success' && "text-emerald-600",
+                  repurchaseStatus === 'neutral' && "text-blue-600",
+                  repurchaseStatus === 'warning' && "text-amber-600",
+                  repurchaseStatus === 'danger' && "text-red-600"
+                )}>
+                  {repurchaseRate.toFixed(1)}%
+                </div>
+
+                {/* Cálculo Visível */}
+                <div className="text-xs space-y-1 text-muted-foreground bg-muted/30 rounded-md p-2">
+                  <div className="flex justify-between">
+                    <span>Clientes qualificados:</span>
+                    <span className="font-medium text-foreground">{metrics.volume.uniqueCustomers}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Recompraram:</span>
+                    <span className="font-semibold text-primary">{metrics.repurchase.customersWhoRepurchased}</span>
+                  </div>
+                  <div className="border-t pt-1 flex justify-between font-medium">
+                    <span>Taxa:</span>
+                    <span>{metrics.repurchase.customersWhoRepurchased} ÷ {metrics.volume.uniqueCustomers} = {repurchaseRate.toFixed(1)}%</span>
+                  </div>
+                </div>
+
+                {/* Progress vs Benchmark */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Benchmark: {REPURCHASE_BENCHMARK}%</span>
+                    <span className={cn(
+                      "font-medium",
+                      repurchaseRate >= REPURCHASE_BENCHMARK ? "text-emerald-600" : "text-amber-600"
+                    )}>
+                      {repurchaseRate >= REPURCHASE_BENCHMARK 
+                        ? `+${(repurchaseRate - REPURCHASE_BENCHMARK).toFixed(0)}pp acima`
+                        : `${(repurchaseRate - REPURCHASE_BENCHMARK).toFixed(0)}pp abaixo`
+                      }
+                    </span>
+                  </div>
+                  <Progress value={benchmarkProgress} className="h-2" />
+                </div>
+
+                {/* Interpretação */}
+                <p className={cn("text-xs p-2 rounded-md border", interpretation.color)}>
+                  {interpretation.text}
+                </p>
+
+                {/* Receita Gerada */}
+                {metrics.quality.avgLTV > 0 && (
+                  <div className="pt-2 border-t text-xs">
+                    <span className="text-muted-foreground">LTV médio dos convertidos: </span>
+                    <span className="font-semibold text-primary">{formatCurrency(metrics.quality.avgLTV)}</span>
+                  </div>
                 )}
-              </>
-            }
-            variant="success"
-          />
-          <SalesMetricCard
-            title="Taxa de Recompra"
-            value={`${metrics.repurchase.repurchaseRate.toFixed(1)}%`}
-            icon={TrendingUp}
-            subtitle={`${metrics.repurchase.customersWhoRepurchased} clientes recompraram`}
-          />
-          <SalesMetricCard
-            title="Ticket Médio das Recompras"
-            value={`R$ ${metrics.repurchase.avgTicketRepurchase.toFixed(2)}`}
-            icon={DollarSign}
-            subtitle="Excluindo pedido da amostra"
-          />
-          <SalesMetricCard
-            title="Tempo Médio até Recompra"
-            value={`${Math.round(metrics.repurchase.avgDaysToFirstRepurchase)} dias`}
-            icon={Clock}
-            subtitle="Primeira recompra após amostra"
-          />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Grid de 6 Satélites (60% = 3 colunas, 2 linhas) */}
+          <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-2">
+            <StatusMetricCard
+              title="Clientes Qualificados"
+              value={metrics.volume.uniqueCustomers.toLocaleString('pt-BR')}
+              icon={<Users className="h-3 w-3" />}
+              status={metrics.volume.uniqueCustomers >= 30 ? 'success' : 'warning'}
+              interpretation={`${metrics.volume.percentageOfTotal.toFixed(1)}% do total`}
+              size="compact"
+            />
+            <StatusMetricCard
+              title="Recompraram"
+              value={metrics.repurchase.customersWhoRepurchased.toLocaleString('pt-BR')}
+              icon={<ShoppingCart className="h-3 w-3" />}
+              status={getStatusFromBenchmark(repurchaseRate, REPURCHASE_BENCHMARK)}
+              size="compact"
+            />
+            <StatusMetricCard
+              title="Ticket Médio"
+              value={formatCurrency(metrics.repurchase.avgTicketRepurchase)}
+              icon={<DollarSign className="h-3 w-3" />}
+              status="neutral"
+              size="compact"
+            />
+            <StatusMetricCard
+              title="Tempo até Recompra"
+              value={`${Math.round(metrics.repurchase.avgDaysToFirstRepurchase)} dias`}
+              icon={<Clock className="h-3 w-3" />}
+              status={metrics.repurchase.avgDaysToFirstRepurchase <= 45 ? 'success' : 'warning'}
+              invertTrend
+              size="compact"
+            />
+            <StatusMetricCard
+              title="LTV Médio"
+              value={formatCurrency(metrics.quality.avgLTV)}
+              icon={<TrendingUp className="h-3 w-3" />}
+              status={metrics.quality.avgLTV >= 300 ? 'success' : 'neutral'}
+              size="compact"
+            />
+            <StatusMetricCard
+              title="Conv. Produto Regular"
+              value={`${metrics.repurchase.conversionToRegularProduct.toFixed(1)}%`}
+              icon={<Target className="h-3 w-3" />}
+              status={metrics.repurchase.conversionToRegularProduct >= 50 ? 'success' : 'warning'}
+              size="compact"
+            />
+          </div>
         </div>
-      ) : null}
+      )}
+
+      {/* LINHA 2: Taxas por Período - Compacto Horizontal */}
+      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <Calendar className="h-4 w-4" />
+          Taxa por Período
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground">30 dias</p>
+            <p className="text-sm font-bold">{metrics.conversionByTime.days30.toFixed(1)}%</p>
+          </div>
+          <ArrowRight className="h-3 w-3 text-muted-foreground" />
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground">60 dias</p>
+            <p className="text-sm font-bold">{metrics.conversionByTime.days60.toFixed(1)}%</p>
+          </div>
+          <ArrowRight className="h-3 w-3 text-muted-foreground" />
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground">90 dias</p>
+            <p className="text-sm font-bold">{metrics.conversionByTime.days90.toFixed(1)}%</p>
+          </div>
+          <ArrowRight className="h-3 w-3 text-muted-foreground" />
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground">180 dias</p>
+            <p className="text-sm font-bold text-primary">{metrics.conversionByTime.days180.toFixed(1)}%</p>
+          </div>
+        </div>
+      </div>
 
       {/* Tabs com análises detalhadas */}
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">📊 Visão Geral</TabsTrigger>
-          <TabsTrigger value="repurchase">🔄 Recompra</TabsTrigger>
-          <TabsTrigger value="cohort">⏱️ Coorte</TabsTrigger>
-          <TabsTrigger value="crosssell">🛒 Cross-sell</TabsTrigger>
-          <TabsTrigger value="profile">👤 Perfil</TabsTrigger>
-          <TabsTrigger value="trends">📈 Tendências</TabsTrigger>
+          <TabsTrigger value="overview" className="text-xs">📊 Visão Geral</TabsTrigger>
+          <TabsTrigger value="repurchase" className="text-xs">🔄 Recompra</TabsTrigger>
+          <TabsTrigger value="cohort" className="text-xs">⏱️ Coorte</TabsTrigger>
+          <TabsTrigger value="crosssell" className="text-xs">🛒 Cross-sell</TabsTrigger>
+          <TabsTrigger value="profile" className="text-xs">👤 Perfil</TabsTrigger>
+          <TabsTrigger value="trends" className="text-xs">📈 Tendências</TabsTrigger>
         </TabsList>
 
-        {/* Aba: Visão Geral */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Clientes Qualificados</CardTitle>
-                <Users className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics.volume.uniqueCustomers}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {metrics.volume.percentageOfTotal.toFixed(2)}% do total de clientes
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Iniciaram jornada com apenas amostra
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa de Recompra</CardTitle>
-                <TrendingUp className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics.repurchase.repurchaseRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {metrics.repurchase.customersWhoRepurchased} clientes recompraram
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Conversão para Regular</CardTitle>
-                <Target className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {metrics.repurchase.conversionToRegularProduct.toFixed(1)}%
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Compraram produto regular após amostra
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
+        {/* Aba: Visão Geral - Simplificada */}
+        <TabsContent value="overview" className="space-y-4">
           <ConversionFunnelChart
             totalSampleCustomers={metrics.volume.uniqueCustomers}
             customersWhoRepurchased={metrics.repurchase.customersWhoRepurchased}
@@ -346,49 +432,8 @@ const AnaliseSamples = () => {
           />
         </TabsContent>
 
-        {/* Aba: Recompra */}
-        <TabsContent value="repurchase" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa 30 dias</CardTitle>
-                <Calendar className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics.conversionByTime.days30.toFixed(1)}%</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa 60 dias</CardTitle>
-                <Calendar className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics.conversionByTime.days60.toFixed(1)}%</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa 90 dias</CardTitle>
-                <Calendar className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics.conversionByTime.days90.toFixed(1)}%</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa 180 dias</CardTitle>
-                <Calendar className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics.conversionByTime.days180.toFixed(1)}%</div>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Aba: Recompra - Sem cards duplicados */}
+        <TabsContent value="repurchase" className="space-y-4">
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
