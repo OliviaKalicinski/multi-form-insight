@@ -1,5 +1,5 @@
 import { FollowersData, FollowersMetrics } from "@/types/marketing";
-import { endOfMonth, parse, isValid } from "date-fns";
+import { endOfMonth, parse, isValid, parseISO, startOfWeek, endOfWeek, startOfMonth, eachWeekOfInterval, eachMonthOfInterval, format } from "date-fns";
 
 // Helper: parseInt seguro (evita NaN)
 const safeInt = (v?: string): number => {
@@ -91,6 +91,84 @@ export const extractDailyFollowers = (
       value: safeInt(item.Seguidores),
     }))
     .filter((d) => d.date.length === 10);
+};
+
+// Aggregate followers data by week
+export const aggregateFollowersByWeek = (
+  data: FollowersData[]
+): { date: string; value: number }[] => {
+  const dailyData = extractDailyFollowers(data);
+  if (dailyData.length === 0) return [];
+  
+  const validData = dailyData.filter(d => {
+    try {
+      return isValid(parseISO(d.date));
+    } catch {
+      return false;
+    }
+  });
+  if (validData.length === 0) return [];
+
+  const dates = validData.map(d => parseISO(d.date));
+  const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+  const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+  const weeks = eachWeekOfInterval({ start: minDate, end: maxDate }, { weekStartsOn: 1 });
+  
+  return weeks.map(weekStart => {
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+    const weekData = validData.filter(d => {
+      const date = parseISO(d.date);
+      return date >= weekStart && date <= weekEnd;
+    });
+    return {
+      date: format(weekStart, "yyyy-MM-dd"),
+      value: weekData.reduce((sum, d) => sum + d.value, 0),
+    };
+  });
+};
+
+// Aggregate followers data by month
+export const aggregateFollowersByMonthData = (
+  data: FollowersData[]
+): { date: string; value: number }[] => {
+  const dailyData = extractDailyFollowers(data);
+  if (dailyData.length === 0) return [];
+  
+  const validData = dailyData.filter(d => {
+    try {
+      return isValid(parseISO(d.date));
+    } catch {
+      return false;
+    }
+  });
+  if (validData.length === 0) return [];
+
+  const dates = validData.map(d => parseISO(d.date));
+  const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+  const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+  const months = eachMonthOfInterval({ start: startOfMonth(minDate), end: endOfMonth(maxDate) });
+  
+  return months.map(monthStart => {
+    const monthEnd = endOfMonth(monthStart);
+    const monthData = validData.filter(d => {
+      const date = parseISO(d.date);
+      return date >= monthStart && date <= monthEnd;
+    });
+    return {
+      date: format(monthStart, "yyyy-MM-dd"),
+      value: monthData.reduce((sum, d) => sum + d.value, 0),
+    };
+  });
+};
+
+// Calculate daily average for a period
+export const calculateDailyAverage = (data: FollowersData[]): number => {
+  const dailyData = extractDailyFollowers(data);
+  if (dailyData.length === 0) return 0;
+  const total = dailyData.reduce((sum, d) => sum + d.value, 0);
+  return total / dailyData.length;
 };
 
 // Helper exportado para uso em componentes

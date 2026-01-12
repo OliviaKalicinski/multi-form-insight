@@ -1,15 +1,25 @@
-import { useMemo } from "react";
-import { Users, UserPlus, TrendingUp, TrendingDown, Calendar, Target, Eye, MousePointerClick, Heart } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Users, UserPlus, TrendingUp, TrendingDown, Calendar, Target, Eye, MousePointerClick, Heart, Percent, BarChart3 } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
 import { NewFollowersChart } from "@/components/dashboard/NewFollowersChart";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
+import { FollowersHeroCard } from "@/components/dashboard/FollowersHeroCard";
+import { FollowersTrendChart, ViewMode } from "@/components/dashboard/FollowersTrendChart";
+import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { calculateFollowersMetrics, calculateFollowersGrowth, formatFollowersNumber, formatFollowersGrowth, extractDailyFollowers } from "@/utils/followersCalculator";
+import { 
+  calculateFollowersMetrics, 
+  calculateFollowersGrowth, 
+  formatFollowersNumber, 
+  formatFollowersGrowth, 
+  extractDailyFollowers,
+  calculateDailyAverage 
+} from "@/utils/followersCalculator";
 import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage, extractDailyValues } from "@/utils/metricsCalculator";
 import { aggregateFollowersByMonth, aggregateMarketingByMonth } from "@/utils/monthlyAggregator";
 import { getLast12Months, getPrevious12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
@@ -27,8 +37,14 @@ const Seguidores = () => {
     selectedMonths,
   } = useDashboard();
 
+  // Chart view mode state
+  const [chartViewMode, setChartViewMode] = useState<ViewMode>("daily");
+
   // Detect 12-month view
   const isLast12MonthsView = selectedMonth === "last-12-months";
+  
+  // Detect "Todos os períodos" view
+  const isAllPeriodsView = !selectedMonth && !comparisonMode;
 
   // Comparison mode calculations
   const multiMonthMetrics = useMemo(() => {
@@ -156,6 +172,12 @@ const Seguidores = () => {
     [currentMonthFollowersData]
   );
 
+  // Calculate daily average
+  const mediaDiaria = useMemo(() => 
+    calculateDailyAverage(currentMonthFollowersData),
+    [currentMonthFollowersData]
+  );
+
   const followersProjection = useMemo(() => {
     if (!monthInfo.isIncomplete || previousMonthFollowersData.length === 0) return null;
     
@@ -190,9 +212,15 @@ const Seguidores = () => {
   
   // Filter marketing data by selected month or last 12 months
   const currentMonthMarketingData = useMemo(() => {
-    if (!marketingData.length || !selectedMonth || isLast12MonthsView) return [];
+    if (!marketingData.length) return [];
+    if (!selectedMonth) return marketingData; // Todos os períodos
+    if (isLast12MonthsView) {
+      return marketingData.filter(item => 
+        last12Months.some(month => item.Data.startsWith(month))
+      );
+    }
     return marketingData.filter(item => item.Data.startsWith(selectedMonth));
-  }, [marketingData, selectedMonth, isLast12MonthsView]);
+  }, [marketingData, selectedMonth, isLast12MonthsView, last12Months]);
 
   const dailyMarketingData = useMemo(() => {
     if (!currentMonthMarketingData.length || !monthInfo.isIncomplete) return null;
@@ -239,6 +267,24 @@ const Seguidores = () => {
 
   const hasFollowersData = followersData && followersData.length > 0;
   const hasMarketingData = marketingData && marketingData.length > 0;
+
+  // Prepare chart data for FollowersTrendChart
+  const followersChartData = useMemo(() => {
+    if (isAllPeriodsView || isLast12MonthsView) {
+      // For "Todos" or 12-month view, use all available data
+      return extractDailyFollowers(currentMonthFollowersData);
+    }
+    return dailyFollowers;
+  }, [isAllPeriodsView, isLast12MonthsView, currentMonthFollowersData, dailyFollowers]);
+
+  // Set default view mode based on filter
+  useMemo(() => {
+    if (isAllPeriodsView) {
+      setChartViewMode("monthly");
+    } else if (isLast12MonthsView) {
+      setChartViewMode("monthly");
+    }
+  }, [isAllPeriodsView, isLast12MonthsView]);
 
   return (
     <div className="container mx-auto px-6 py-8">
@@ -289,7 +335,7 @@ const Seguidores = () => {
         )}
 
         {/* Period indicator for "Todos os Períodos" */}
-        {!selectedMonth && !comparisonMode && hasFollowersData && (
+        {isAllPeriodsView && hasFollowersData && (
           <Card className="border-blue-500/50 bg-blue-500/5">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -399,181 +445,163 @@ const Seguidores = () => {
           </>
         ) : hasFollowersData && currentMonthFollowersData.length > 0 ? (
           <>
-            {/* Followers Metrics Cards */}
-            <div>
-              <h2 className="text-2xl font-semibold mb-4 text-foreground">📊 Métricas de Seguidores</h2>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <MetricCard
-                  title="Total Acumulado (seguidores ganhos)"
-                  value={formatFollowersNumber(currentFollowersMetrics.totalSeguidores)}
-                  icon={Users}
-                  trend={previousMonthFollowersData.length > 0 ? currentFollowersMetrics.crescimentoPercentual : undefined}
-                  variant="success"
-                  isIncomplete={!isLast12MonthsView && monthInfo.isIncomplete}
-                />
-                <MetricCard
+            {/* Hero Section: Hero Card + Satellite Cards */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Hero Card */}
+              <FollowersHeroCard
+                totalAcumulado={currentFollowersMetrics.totalSeguidores}
+                novosNoMes={currentFollowersMetrics.novosSeguidoresMes}
+                crescimentoPercentual={currentFollowersMetrics.crescimentoPercentual}
+                mediaDiaria={mediaDiaria}
+                meta={undefined} // TODO: Add goal from settings
+              />
+
+              {/* Satellite Cards Grid */}
+              <div className="grid gap-3 grid-cols-2">
+                <StatusMetricCard
                   title="Novos Seguidores"
                   value={formatFollowersNumber(currentFollowersMetrics.novosSeguidoresMes)}
-                  icon={UserPlus}
-                  subtitle="Total no mês"
-                  isIncomplete={!isLast12MonthsView && monthInfo.isIncomplete}
-                  projectionData={!isLast12MonthsView ? followersProjection : null}
+                  icon={<UserPlus className="h-3 w-3" />}
+                  trend={previousMonthFollowersData.length > 0 ? currentFollowersMetrics.crescimentoPercentual : undefined}
+                  status={getStatusFromBenchmark(
+                    currentFollowersMetrics.crescimentoPercentual, 
+                    0, 
+                    { warningThreshold: -10, dangerThreshold: -25 }
+                  )}
+                  size="compact"
                 />
-                <MetricCard
+                <StatusMetricCard
                   title="Crescimento"
                   value={formatFollowersGrowth(currentFollowersMetrics.crescimentoAbsoluto)}
-                  icon={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? TrendingUp : TrendingDown}
-                  subtitle={
+                  icon={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  status={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? "success" : "danger"}
+                  interpretation={
                     previousMonthFollowersData.length > 0 
-                      ? (
-                          // Se anterior = 0 e atual > 0, mostrar "Novo" em vez de 0%
-                          currentFollowersMetrics.novosSeguidoresMes > 0 && 
-                          currentFollowersMetrics.crescimentoPercentual === 0 &&
-                          currentFollowersMetrics.crescimentoAbsoluto > 0
-                            ? "Novo"
-                            : `${currentFollowersMetrics.crescimentoPercentual >= 0 ? '+' : ''}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}%`
-                        )
+                      ? (currentFollowersMetrics.novosSeguidoresMes > 0 && 
+                         currentFollowersMetrics.crescimentoPercentual === 0 &&
+                         currentFollowersMetrics.crescimentoAbsoluto > 0
+                          ? "Primeiro período"
+                          : `${currentFollowersMetrics.crescimentoPercentual >= 0 ? '+' : ''}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}% vs anterior`)
                       : undefined
                   }
-                  variant={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? "success" : undefined}
-                  isIncomplete={!isLast12MonthsView && monthInfo.isIncomplete}
+                  size="compact"
                 />
+                {hasMarketingData && currentMarketingMetrics && (
+                  <>
+                    <StatusMetricCard
+                      title="Visualizações"
+                      value={formatNumber(currentMarketingMetrics.visualizacoesTotal)}
+                      icon={<Eye className="h-3 w-3" />}
+                      trend={previousMonthMarketingData.length > 0 ? growthMarketingMetrics.crescimentoVisualizacoes : undefined}
+                      status={getStatusFromBenchmark(
+                        growthMarketingMetrics.crescimentoVisualizacoes, 
+                        0, 
+                        { warningThreshold: -10, dangerThreshold: -25 }
+                      )}
+                      size="compact"
+                    />
+                    <StatusMetricCard
+                      title="Alcance"
+                      value={formatNumber(currentMarketingMetrics.alcanceTotal)}
+                      icon={<Users className="h-3 w-3" />}
+                      trend={previousMonthMarketingData.length > 0 ? growthMarketingMetrics.crescimentoAlcance : undefined}
+                      status={getStatusFromBenchmark(
+                        growthMarketingMetrics.crescimentoAlcance, 
+                        0, 
+                        { warningThreshold: -10, dangerThreshold: -25 }
+                      )}
+                      size="compact"
+                    />
+                    <StatusMetricCard
+                      title="Taxa Alcance → Visita"
+                      value={`${currentMarketingMetrics.taxaAlcanceVisita.toFixed(2)}%`}
+                      icon={<Percent className="h-3 w-3" />}
+                      status={getStatusFromBenchmark(
+                        currentMarketingMetrics.taxaAlcanceVisita, 
+                        1, 
+                        { warningThreshold: 0.5, dangerThreshold: 0.25 }
+                      )}
+                      size="compact"
+                    />
+                    <StatusMetricCard
+                      title="Taxa Engajamento"
+                      value={`${currentMarketingMetrics.taxaEngajamento.toFixed(2)}%`}
+                      icon={<Heart className="h-3 w-3" />}
+                      status={getStatusFromBenchmark(
+                        currentMarketingMetrics.taxaEngajamento, 
+                        1, 
+                        { warningThreshold: 0.5, dangerThreshold: 0.25 }
+                      )}
+                      size="compact"
+                    />
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Efficiency Metrics - Only in single month view */}
-            {!isLast12MonthsView && hasMarketingData && currentMarketingMetrics && currentMonthMarketingData.length > 0 && (
-              <div>
-                <h2 className="text-2xl font-semibold mb-4 text-foreground">🎯 Eficiência (Taxas)</h2>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <MetricCard
-                    title="Taxa Alcance → Visita"
-                    value={`${currentMarketingMetrics.taxaAlcanceVisita.toFixed(2)}%`}
-                    icon={Target}
-                    subtitle="Visitas / Alcance × 100"
-                    variant="success"
-                  />
-                  <MetricCard
-                    title="Taxa de Engajamento"
-                    value={`${currentMarketingMetrics.taxaEngajamento.toFixed(2)}%`}
-                    icon={TrendingUp}
-                    subtitle="Interações / Alcance × 100"
-                    variant={currentMarketingMetrics.taxaEngajamento > 1 ? "success" : "warning"}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Growth Metrics */}
-            {!isLast12MonthsView && hasMarketingData && previousMonthMarketingData.length > 0 && (
-              <div>
-                <h2 className="text-2xl font-semibold mb-4 text-foreground">📈 Crescimento (vs Mês Anterior)</h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <MetricCard
-                    title="👁️ Crescimento de Visualizações"
-                    value={formatPercentage(growthMarketingMetrics.crescimentoVisualizacoes)}
-                    icon={growthMarketingMetrics.crescimentoVisualizacoes >= 0 ? TrendingUp : TrendingDown}
-                    variant={growthMarketingMetrics.crescimentoVisualizacoes >= 0 ? "success" : undefined}
-                  />
-                  <MetricCard
-                    title="📊 Crescimento de Alcance"
-                    value={formatPercentage(growthMarketingMetrics.crescimentoAlcance)}
-                    icon={growthMarketingMetrics.crescimentoAlcance >= 0 ? TrendingUp : TrendingDown}
-                    variant={growthMarketingMetrics.crescimentoAlcance >= 0 ? "success" : undefined}
-                  />
-                  <MetricCard
-                    title="👤 Crescimento de Visitas"
-                    value={formatPercentage(growthMarketingMetrics.crescimentoVisitas)}
-                    icon={growthMarketingMetrics.crescimentoVisitas >= 0 ? TrendingUp : TrendingDown}
-                    variant={growthMarketingMetrics.crescimentoVisitas >= 0 ? "success" : undefined}
-                  />
-                </div>
-              </div>
+            {/* Main Trend Chart with Toggle */}
+            {followersChartData.length > 0 && (
+              <FollowersTrendChart
+                data={followersChartData}
+                viewMode={chartViewMode}
+                onViewModeChange={setChartViewMode}
+                title="📈 Evolução de Seguidores"
+                description="Novos seguidores ao longo do tempo"
+                color="hsl(var(--chart-1))"
+                showMovingAverage={chartViewMode === "daily"}
+              />
             )}
 
             {/* Charts - Visualizações × Alcance */}
-            {hasMarketingData && (
-              isLast12MonthsView && monthlyMarketingData.length > 0 ? (
-                <MonthlyAggregateChart
-                  data={monthlyMarketingData}
-                  title="📊 Visualizações × Alcance (Evolução Mensal)"
-                  description="Compare o volume mensal de visualizações com o alcance total"
-                  metrics={[
-                    {
-                      dataKey: "Visualizações",
-                      name: "Visualizações",
-                      color: "hsl(var(--chart-4))",
-                    },
-                    {
-                      dataKey: "Alcance",
-                      name: "Alcance",
-                      color: "hsl(var(--chart-1))",
-                    },
-                  ]}
-                />
-              ) : currentMonthMarketingData.length > 0 ? (
-                <TrendChart
-                  data={currentMonthMarketingData}
-                  title="📊 Visualizações × Alcance"
-                  description="Compare o volume de visualizações com o alcance total"
-                  metrics={[
-                    {
-                      dataKey: "visualizacoes",
-                      name: "Visualizações",
-                      color: "hsl(var(--chart-4))",
-                    },
-                    {
-                      dataKey: "alcance",
-                      name: "Alcance",
-                      color: "hsl(var(--chart-1))",
-                    },
-                  ]}
-                />
-              ) : null
+            {hasMarketingData && currentMonthMarketingData.length > 0 && (
+              <div className="grid gap-6 lg:grid-cols-2">
+                {isLast12MonthsView && monthlyMarketingData.length > 0 ? (
+                  <>
+                    <MonthlyAggregateChart
+                      data={monthlyMarketingData}
+                      title="📊 Visualizações × Alcance"
+                      description="Evolução mensal"
+                      metrics={[
+                        { dataKey: "Visualizações", name: "Visualizações", color: "hsl(var(--chart-4))" },
+                        { dataKey: "Alcance", name: "Alcance", color: "hsl(var(--chart-1))" },
+                      ]}
+                    />
+                    <MonthlyAggregateChart
+                      data={monthlyMarketingData}
+                      title="👥 Visitas × Interações"
+                      description="Evolução mensal"
+                      metrics={[
+                        { dataKey: "Visitas", name: "Visitas", color: "hsl(var(--chart-2))" },
+                        { dataKey: "Interações", name: "Interações", color: "hsl(var(--chart-3))" },
+                      ]}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <TrendChart
+                      data={currentMonthMarketingData}
+                      title="📊 Visualizações × Alcance"
+                      description="Compare o volume de visualizações com o alcance total"
+                      metrics={[
+                        { dataKey: "visualizacoes", name: "Visualizações", color: "hsl(var(--chart-4))" },
+                        { dataKey: "alcance", name: "Alcance", color: "hsl(var(--chart-1))" },
+                      ]}
+                    />
+                    <TrendChart
+                      data={currentMonthMarketingData}
+                      title="👥 Visitas × Interações"
+                      description="Acompanhe as visitas ao perfil e o nível de engajamento"
+                      metrics={[
+                        { dataKey: "visitas", name: "Visitas", color: "hsl(var(--chart-2))" },
+                        { dataKey: "interacoes", name: "Interações", color: "hsl(var(--chart-3))" },
+                      ]}
+                    />
+                  </>
+                )}
+              </div>
             )}
 
-            {/* Charts - Visitas × Interações */}
-            {hasMarketingData && (
-              isLast12MonthsView && monthlyMarketingData.length > 0 ? (
-                <MonthlyAggregateChart
-                  data={monthlyMarketingData}
-                  title="👥 Visitas × Interações (Evolução Mensal)"
-                  description="Acompanhe a evolução mensal das visitas ao perfil e o nível de engajamento"
-                  metrics={[
-                    {
-                      dataKey: "Visitas",
-                      name: "Visitas",
-                      color: "hsl(var(--chart-2))",
-                    },
-                    {
-                      dataKey: "Interações",
-                      name: "Interações",
-                      color: "hsl(var(--chart-3))",
-                    },
-                  ]}
-                />
-              ) : currentMonthMarketingData.length > 0 ? (
-                <TrendChart
-                  data={currentMonthMarketingData}
-                  title="👥 Visitas × Interações"
-                  description="Acompanhe as visitas ao perfil e o nível de engajamento"
-                  metrics={[
-                    {
-                      dataKey: "visitas",
-                      name: "Visitas",
-                      color: "hsl(var(--chart-2))",
-                    },
-                    {
-                      dataKey: "interacoes",
-                      name: "Interações",
-                      color: "hsl(var(--chart-3))",
-                    },
-                  ]}
-                />
-              ) : null
-            )}
-
-            {/* Charts - Followers */}
+            {/* Charts - Followers (only in 12-month view) */}
             {monthlyFollowersData.length > 0 && (
               <div className="grid gap-4 md:grid-cols-2">
                 <AccumulatedFollowersChart
