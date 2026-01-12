@@ -1,11 +1,17 @@
 import { MarketingData, MonthlyMetrics, GrowthMetrics } from "@/types/marketing";
 
+// Helper: parseInt seguro (evita NaN)
+const safeInt = (v?: string): number => {
+  const n = parseInt((v ?? "0").trim(), 10);
+  return Number.isFinite(n) ? n : 0;
+};
+
 export const calculateMonthlyMetrics = (data: MarketingData[]): MonthlyMetrics => {
-  const visualizacoesTotal = data.reduce((sum, item) => sum + parseInt(item.Visualizações), 0);
-  const alcanceTotal = data.reduce((sum, item) => sum + parseInt(item.Alcance), 0);
-  const visitasTotal = data.reduce((sum, item) => sum + parseInt(item.Visitas), 0);
-  const interacoesTotal = data.reduce((sum, item) => sum + parseInt(item.Interações), 0);
-  const clicksTotal = data.reduce((sum, item) => sum + parseInt(item["Clicks no Link"]), 0);
+  const visualizacoesTotal = data.reduce((sum, item) => sum + safeInt(item.Visualizações), 0);
+  const alcanceTotal = data.reduce((sum, item) => sum + safeInt(item.Alcance), 0);
+  const visitasTotal = data.reduce((sum, item) => sum + safeInt(item.Visitas), 0);
+  const interacoesTotal = data.reduce((sum, item) => sum + safeInt(item.Interações), 0);
+  const clicksTotal = data.reduce((sum, item) => sum + safeInt(item["Clicks no Link"]), 0);
 
   const taxaAlcanceVisita = alcanceTotal > 0 ? (visitasTotal / alcanceTotal) * 100 : 0;
   const taxaEngajamento = alcanceTotal > 0 ? (interacoesTotal / alcanceTotal) * 100 : 0;
@@ -65,11 +71,11 @@ export const extractDailyValues = (
   return data.map(item => {
     let value = 0;
     switch(metric) {
-      case 'visualizacoes': value = parseInt(item.Visualizações); break;
-      case 'alcance': value = parseInt(item.Alcance); break;
-      case 'visitas': value = parseInt(item.Visitas); break;
-      case 'interacoes': value = parseInt(item.Interações); break;
-      case 'clicks': value = parseInt(item["Clicks no Link"]); break;
+      case 'visualizacoes': value = safeInt(item.Visualizações); break;
+      case 'alcance': value = safeInt(item.Alcance); break;
+      case 'visitas': value = safeInt(item.Visitas); break;
+      case 'interacoes': value = safeInt(item.Interações); break;
+      case 'clicks': value = safeInt(item["Clicks no Link"]); break;
     }
     return { date: item.Data.substring(0, 10), value };
   });
