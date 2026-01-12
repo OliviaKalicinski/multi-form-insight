@@ -12,6 +12,7 @@ import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/contexts/DashboardContext";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { 
   calculateFollowersMetrics, 
   calculateFollowersGrowth, 
@@ -36,6 +37,8 @@ const Seguidores = () => {
     comparisonMode,
     selectedMonths,
   } = useDashboard();
+
+  const { instagramGoals } = useAppSettings();
 
   // Chart view mode state
   const [chartViewMode, setChartViewMode] = useState<ViewMode>("daily");
@@ -453,7 +456,8 @@ const Seguidores = () => {
                 novosNoMes={currentFollowersMetrics.novosSeguidoresMes}
                 crescimentoPercentual={currentFollowersMetrics.crescimentoPercentual}
                 mediaDiaria={mediaDiaria}
-                meta={undefined} // TODO: Add goal from settings
+                meta={instagramGoals.metaSeguidoresMes}
+                baselineSeguidores={instagramGoals.baselineSeguidores}
               />
 
               {/* Satellite Cards Grid */}
