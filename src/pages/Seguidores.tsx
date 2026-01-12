@@ -315,7 +315,7 @@ const Seguidores = () => {
               <h2 className="text-2xl font-semibold mb-4 text-foreground">📊 Métricas Comparativas</h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <ComparisonMetricCard
-                  title="Total de Seguidores"
+                  title="Total Acumulado"
                   icon={Users}
                   metrics={multiMonthMetrics.totalSeguidores}
                   formatValue={formatFollowersNumber}
@@ -404,7 +404,7 @@ const Seguidores = () => {
               <h2 className="text-2xl font-semibold mb-4 text-foreground">📊 Métricas de Seguidores</h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <MetricCard
-                  title="Total de Seguidores (Mês)"
+                  title="Total Acumulado (seguidores ganhos)"
                   value={formatFollowersNumber(currentFollowersMetrics.totalSeguidores)}
                   icon={Users}
                   trend={previousMonthFollowersData.length > 0 ? currentFollowersMetrics.crescimentoPercentual : undefined}
@@ -423,7 +423,18 @@ const Seguidores = () => {
                   title="Crescimento"
                   value={formatFollowersGrowth(currentFollowersMetrics.crescimentoAbsoluto)}
                   icon={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? TrendingUp : TrendingDown}
-                  subtitle={previousMonthFollowersData.length > 0 ? `${currentFollowersMetrics.crescimentoPercentual >= 0 ? '+' : ''}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}%` : undefined}
+                  subtitle={
+                    previousMonthFollowersData.length > 0 
+                      ? (
+                          // Se anterior = 0 e atual > 0, mostrar "Novo" em vez de 0%
+                          currentFollowersMetrics.novosSeguidoresMes > 0 && 
+                          currentFollowersMetrics.crescimentoPercentual === 0 &&
+                          currentFollowersMetrics.crescimentoAbsoluto > 0
+                            ? "Novo"
+                            : `${currentFollowersMetrics.crescimentoPercentual >= 0 ? '+' : ''}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}%`
+                        )
+                      : undefined
+                  }
                   variant={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? "success" : undefined}
                   isIncomplete={!isLast12MonthsView && monthInfo.isIncomplete}
                 />

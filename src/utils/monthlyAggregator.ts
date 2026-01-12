@@ -7,6 +7,12 @@ export interface MonthlyAggregate {
   [key: string]: any;
 }
 
+// Helper: parseInt seguro (evita NaN)
+const safeInt = (v?: string): number => {
+  const n = parseInt((v ?? "0").trim(), 10);
+  return Number.isFinite(n) ? n : 0;
+};
+
 export const aggregateMarketingByMonth = (
   data: MarketingData[],
   months: string[]
@@ -16,7 +22,10 @@ export const aggregateMarketingByMonth = (
     "Jul", "Ago", "Set", "Out", "Nov", "Dez"
   ];
 
-  return months.map((month) => {
+  // Garantir ordem cronológica
+  const sortedMonths = [...months].sort();
+
+  return sortedMonths.map((month) => {
     const monthData = data.filter((item) => item.Data.startsWith(month));
     
     const [year, monthNum] = month.split("-");
@@ -25,11 +34,11 @@ export const aggregateMarketingByMonth = (
     return {
       month,
       monthLabel,
-      Visualizações: monthData.reduce((sum, item) => sum + parseInt(item.Visualizações || "0"), 0),
-      Alcance: monthData.reduce((sum, item) => sum + parseInt(item.Alcance || "0"), 0),
-      Visitas: monthData.reduce((sum, item) => sum + parseInt(item.Visitas || "0"), 0),
-      Interações: monthData.reduce((sum, item) => sum + parseInt(item.Interações || "0"), 0),
-      "Clicks no Link": monthData.reduce((sum, item) => sum + parseInt(item["Clicks no Link"] || "0"), 0),
+      Visualizações: monthData.reduce((sum, item) => sum + safeInt(item.Visualizações), 0),
+      Alcance: monthData.reduce((sum, item) => sum + safeInt(item.Alcance), 0),
+      Visitas: monthData.reduce((sum, item) => sum + safeInt(item.Visitas), 0),
+      Interações: monthData.reduce((sum, item) => sum + safeInt(item.Interações), 0),
+      "Clicks no Link": monthData.reduce((sum, item) => sum + safeInt(item["Clicks no Link"]), 0),
     };
   });
 };
@@ -43,9 +52,12 @@ export const aggregateFollowersByMonth = (
     "Jul", "Ago", "Set", "Out", "Nov", "Dez"
   ];
 
+  // Garantir ordem cronológica
+  const sortedMonths = [...months].sort();
+
   let cumulativeGrowth = 0;
 
-  return months.map((month, index) => {
+  return sortedMonths.map((month) => {
     const monthData = data.filter((item) => item.Data.startsWith(month));
     
     const [year, monthNum] = month.split("-");
@@ -53,7 +65,7 @@ export const aggregateFollowersByMonth = (
 
     // Somar TODOS os valores do mês (cada valor representa novos seguidores do dia)
     const newFollowers = monthData.reduce((sum, item) => {
-      return sum + parseInt(item.Seguidores || "0");
+      return sum + safeInt(item.Seguidores);
     }, 0);
 
     // Acumular o crescimento
@@ -79,4 +91,3 @@ export const aggregateAdsByMonth = (
     return months.includes(adMonth);
   });
 };
-

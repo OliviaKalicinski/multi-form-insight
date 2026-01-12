@@ -1,4 +1,20 @@
 import { FollowersData, FollowersMetrics } from "@/types/marketing";
+import { endOfMonth, parse, isValid } from "date-fns";
+
+// Helper: parseInt seguro (evita NaN)
+const safeInt = (v?: string): number => {
+  const n = parseInt((v ?? "0").trim(), 10);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Helper: parse de data robusto
+const parseFollowerDate = (s: string): Date | null => {
+  if (!s) return null;
+  // Normaliza "YYYY-MM-DD HH:MM:SS" -> "YYYY-MM-DDTHH:MM:SS"
+  const normalized = s.includes(" ") ? s.replace(" ", "T") : s;
+  const d = new Date(normalized);
+  return isValid(d) ? d : null;
+};
 
 export const calculateFollowersMetrics = (
   data: FollowersData[],
@@ -14,16 +30,25 @@ export const calculateFollowersMetrics = (
     };
   }
 
-  // Novos seguidores = soma do mês atual
-  const novosSeguidoresMes = data.reduce((sum, item) => sum + parseInt(item.Seguidores), 0);
-  
-  // Total acumulado = soma de TODOS os dados até o mês selecionado
-  const monthEnd = `${selectedMonth}-31 23:59:59`;
-  const allDataUntilMonth = allData.filter(item => item.Data <= monthEnd);
-  const totalSeguidores = allDataUntilMonth.reduce((sum, item) => sum + parseInt(item.Seguidores), 0);
+  // Novos seguidores = soma do mês atual (delta)
+  const novosSeguidoresMes = data.reduce(
+    (sum, item) => sum + safeInt(item.Seguidores), 
+    0
+  );
+
+  // Total acumulado = soma de TODOS os deltas até o fim do mês selecionado
+  const monthDate = parse(selectedMonth, "yyyy-MM", new Date());
+  const monthEndDate = endOfMonth(monthDate);
+
+  const totalAcumuladoAteMes = allData.reduce((sum, item) => {
+    const d = parseFollowerDate(item.Data);
+    if (!d) return sum;
+    if (d <= monthEndDate) return sum + safeInt(item.Seguidores);
+    return sum;
+  }, 0);
 
   return {
-    totalSeguidores,
+    totalSeguidores: totalAcumuladoAteMes,
     novosSeguidoresMes,
     crescimentoAbsoluto: 0,
     crescimentoPercentual: 0,
@@ -31,7 +56,7 @@ export const calculateFollowersMetrics = (
 };
 
 export const calculateFollowersGrowth = (
-  currentMonth: FollowersData[], 
+  currentMonth: FollowersData[],
   previousMonth: FollowersData[],
   allData: FollowersData[],
   currentMonthStr: string,
@@ -40,16 +65,13 @@ export const calculateFollowersGrowth = (
   const currentMetrics = calculateFollowersMetrics(currentMonth, allData, currentMonthStr);
   const previousMetrics = calculateFollowersMetrics(previousMonth, allData, previousMonthStr);
 
-  // Crescimento = diferença entre NOVOS seguidores (não total acumulado)
   const crescimentoAbsoluto = currentMetrics.novosSeguidoresMes - previousMetrics.novosSeguidoresMes;
-  const crescimentoPercentual = previousMetrics.novosSeguidoresMes > 0
-    ? (crescimentoAbsoluto / previousMetrics.novosSeguidoresMes) * 100
-    : 0;
+  const crescimentoPercentual =
+    previousMetrics.novosSeguidoresMes > 0 
+      ? (crescimentoAbsoluto / previousMetrics.novosSeguidoresMes) * 100 
+      : 0;
 
-  return {
-    crescimentoAbsoluto,
-    crescimentoPercentual,
-  };
+  return { crescimentoAbsoluto, crescimentoPercentual };
 };
 
 export const formatFollowersNumber = (num: number): string => {
@@ -60,9 +82,16 @@ export const formatFollowersGrowth = (num: number): string => {
   return num >= 0 ? `+${num.toLocaleString("pt-BR")}` : num.toLocaleString("pt-BR");
 };
 
-export const extractDailyFollowers = (data: FollowersData[]): { date: string; value: number }[] => {
-  return data.map(item => ({
-    date: item.Data.substring(0, 10),
-    value: parseInt(item.Seguidores),
-  }));
+export const extractDailyFollowers = (
+  data: FollowersData[]
+): { date: string; value: number }[] => {
+  return data
+    .map((item) => ({
+      date: (item.Data ?? "").substring(0, 10),
+      value: safeInt(item.Seguidores),
+    }))
+    .filter((d) => d.date.length === 10);
 };
+
+// Helper exportado para uso em componentes
+export const safeIntFollowers = safeInt;
