@@ -83,6 +83,8 @@ export interface AdsMetrics {
   cpmMedio: number;
   frequenciaMedia: number;
   cliquesTotal: number;
+  cliquesTodosTotal: number;       // Cliques (todos) para referência
+  clicksForFunnel: number;         // Cliques usados para CTR/CPC/Conversão
   ctrMedio: number;
   cpcMedio: number;
   cliquesLinkTotal: number;

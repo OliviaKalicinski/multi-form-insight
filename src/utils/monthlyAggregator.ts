@@ -1,4 +1,5 @@
 import { MarketingData, FollowersData, AdsData } from "@/types/marketing";
+import { extractMonth } from "./adsParserV2";
 
 export interface MonthlyAggregate {
   month: string;
@@ -71,20 +72,11 @@ export const aggregateFollowersByMonth = (
 export const aggregateAdsByMonth = (
   data: AdsData[],
   months: string[]
-): any => {
-  // Agregar todas as métricas dos anúncios para os meses especificados
-  const filteredAds = data.filter((ad) => {
-    if (ad["Mês"]) {
-      return months.includes(ad["Mês"]);
-    }
-    // Fallback para ads sem campo Mês
-    const startDate = ad["Início dos relatórios"];
-    if (startDate) {
-      const monthKey = startDate.substring(0, 7);
-      return months.includes(monthKey);
-    }
-    return false;
+): AdsData[] => {
+  // Usar extractMonth para consistência com o resto do sistema
+  return data.filter((ad) => {
+    const adMonth = extractMonth(ad);
+    return months.includes(adMonth);
   });
-
-  return filteredAds;
 };
+
