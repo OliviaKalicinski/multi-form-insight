@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +18,14 @@ import {
   Loader2, 
   AlertCircle,
   CheckCircle2,
-  Users
+  Users,
+  Instagram
 } from "lucide-react";
 
 export default function Settings() {
   const { user, updatePassword } = useAuth();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { instagramGoals, updateInstagramGoals, isSaving: instagramSaving } = useAppSettings();
   const { toast } = useToast();
 
   // Password change state
@@ -38,6 +41,33 @@ export default function Settings() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
+
+  // Instagram settings state
+  const [baselineSeguidores, setBaselineSeguidores] = useState(instagramGoals.baselineSeguidores);
+  const [metaSeguidoresMes, setMetaSeguidoresMes] = useState(instagramGoals.metaSeguidoresMes);
+  const [dataBaseline, setDataBaseline] = useState(instagramGoals.dataBaseline);
+  const [instagramSuccess, setInstagramSuccess] = useState(false);
+
+  useEffect(() => {
+    setBaselineSeguidores(instagramGoals.baselineSeguidores);
+    setMetaSeguidoresMes(instagramGoals.metaSeguidoresMes);
+    setDataBaseline(instagramGoals.dataBaseline);
+  }, [instagramGoals]);
+
+  const handleInstagramSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInstagramSuccess(false);
+    
+    const result = await updateInstagramGoals({
+      baselineSeguidores,
+      metaSeguidoresMes,
+      dataBaseline,
+    });
+    
+    if (result.success) {
+      setInstagramSuccess(true);
+    }
+  };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,6 +257,85 @@ export default function Settings() {
                 </>
               ) : (
                 "Alterar Senha"
+              )}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+
+      {/* Instagram Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Instagram className="h-4 w-4" />
+            Configurações do Instagram
+          </CardTitle>
+          <CardDescription>
+            Configure o total de seguidores e metas mensais
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleInstagramSave}>
+          <CardContent className="space-y-4">
+            {instagramSuccess && (
+              <Alert>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <AlertDescription>Configurações salvas com sucesso!</AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="baseline-seguidores">Total de Seguidores Atual</Label>
+              <Input
+                id="baseline-seguidores"
+                type="number"
+                placeholder="7025"
+                value={baselineSeguidores}
+                onChange={(e) => setBaselineSeguidores(Number(e.target.value))}
+                required
+                disabled={instagramSaving}
+              />
+              <p className="text-xs text-muted-foreground">
+                Este é o total atual de seguidores do seu perfil
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="data-baseline">Data de Referência</Label>
+              <Input
+                id="data-baseline"
+                type="date"
+                value={dataBaseline}
+                onChange={(e) => setDataBaseline(e.target.value)}
+                required
+                disabled={instagramSaving}
+              />
+              <p className="text-xs text-muted-foreground">
+                Data em que você verificou o total de seguidores
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="meta-seguidores">Meta de Novos Seguidores/Mês</Label>
+              <Input
+                id="meta-seguidores"
+                type="number"
+                placeholder="500"
+                value={metaSeguidoresMes}
+                onChange={(e) => setMetaSeguidoresMes(Number(e.target.value))}
+                required
+                disabled={instagramSaving}
+              />
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={instagramSaving}>
+              {instagramSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar Configurações"
               )}
             </Button>
           </CardFooter>

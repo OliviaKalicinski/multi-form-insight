@@ -9,6 +9,7 @@ interface FollowersHeroCardProps {
   crescimentoPercentual: number;
   mediaDiaria: number;
   meta?: number;
+  baselineSeguidores?: number;
 }
 
 const formatNumber = (num: number): string => {
@@ -23,7 +24,10 @@ export const FollowersHeroCard = ({
   crescimentoPercentual,
   mediaDiaria,
   meta,
+  baselineSeguidores = 0,
 }: FollowersHeroCardProps) => {
+  // Total real = baseline + acumulado dos dados importados
+  const totalReal = baselineSeguidores > 0 ? baselineSeguidores : totalAcumulado;
   const progressoMeta = meta ? Math.min((novosNoMes / meta) * 100, 100) : 0;
   const metaAtingida = meta ? novosNoMes >= meta : false;
   
@@ -66,7 +70,7 @@ export const FollowersHeroCard = ({
         <div className="mb-4">
           <div className="flex items-baseline gap-3">
             <span className="text-4xl font-bold tracking-tight">
-              {formatNumber(totalAcumulado)}
+              {formatNumber(totalReal)}
             </span>
             <div className={`flex items-center gap-1 text-sm font-medium ${
               crescimentoPercentual >= 0 ? "text-green-600" : "text-red-600"
@@ -82,7 +86,7 @@ export const FollowersHeroCard = ({
               </span>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">seguidores ganhos desde o início</p>
+          <p className="text-sm text-muted-foreground mt-1">seguidores no perfil</p>
         </div>
 
         {/* Progress bar (if meta exists) */}
