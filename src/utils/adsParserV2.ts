@@ -3,12 +3,33 @@ import { calculateAdsMetrics } from "./adsCalculator";
 
 /**
  * Extrai o mês no formato YYYY-MM de uma string de período
- * Exemplo: "2025-10-01 - 2025-10-31" => "2025-10"
+ * Suporta múltiplos formatos:
+ * - "2025-10" => "2025-10"
+ * - "2025-10-01 - 2025-10-31" => "2025-10"
+ * - "2025-10-01" => "2025-10"
+ * - "01/10/2025" => "2025-10"
  */
 export const extractMonthFromPeriod = (period: string): string => {
   if (!period) return "";
-  const match = period.match(/(\d{4}-\d{2})-\d{2}/);
-  return match ? match[1] : "";
+  
+  const trimmed = period.trim();
+  
+  // Formato puro YYYY-MM
+  const pureDateMatch = trimmed.match(/^(\d{4}-\d{2})$/);
+  if (pureDateMatch) return pureDateMatch[1];
+  
+  // Formato com dia: YYYY-MM-DD ou "YYYY-MM-DD - YYYY-MM-DD"
+  const dateWithDayMatch = trimmed.match(/(\d{4}-\d{2})-\d{2}/);
+  if (dateWithDayMatch) return dateWithDayMatch[1];
+  
+  // Formato DD/MM/YYYY
+  const brDateMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (brDateMatch) {
+    const [, , month, year] = brDateMatch;
+    return `${year}-${month}`;
+  }
+  
+  return "";
 };
 
 /**
@@ -22,8 +43,7 @@ export const extractMonth = (row: AdsData): string => {
   
   // Formato antigo: coluna "Início dos relatórios"
   if (row["Início dos relatórios"]) {
-    const match = row["Início dos relatórios"].match(/(\d{4}-\d{2})-\d{2}/);
-    return match ? match[1] : "";
+    return extractMonthFromPeriod(row["Início dos relatórios"]);
   }
   
   return "";
@@ -135,16 +155,31 @@ export const validateAdsConsistency = (
     // Calcular métricas dos anúncios individuais
     const calculatedMetrics = calculateAdsMetrics(monthAds);
     
-    // Comparar investimento total (com margem de erro de 1%)
+    // Evitar divisão por zero
+    const investmentDenominator = summary.data.investimentoTotal || 1;
     const investmentDiff = Math.abs(
       summary.data.investimentoTotal - calculatedMetrics.investimentoTotal
-    ) / summary.data.investimentoTotal;
+    ) / investmentDenominator;
     
     if (investmentDiff > 0.01) {
       warnings.push(
         `Divergência de investimento em ${summary.month}: ` +
         `Resumo: R$ ${summary.data.investimentoTotal.toFixed(2)}, ` +
         `Calculado: R$ ${calculatedMetrics.investimentoTotal.toFixed(2)}`
+      );
+    }
+
+    // Validar impressões também
+    const impressionsDenominator = summary.data.impressoesTotal || 1;
+    const impressionsDiff = Math.abs(
+      summary.data.impressoesTotal - calculatedMetrics.impressoesTotal
+    ) / impressionsDenominator;
+
+    if (impressionsDiff > 0.01) {
+      warnings.push(
+        `Divergência de impressões em ${summary.month}: ` +
+        `Resumo: ${summary.data.impressoesTotal.toLocaleString()}, ` +
+        `Calculado: ${calculatedMetrics.impressoesTotal.toLocaleString()}`
       );
     }
   }
