@@ -54,9 +54,8 @@ export type PetType = 'dog' | 'cat';
 export const getSamplePetType = (produto: { descricao?: string; descricaoAjustada?: string }): PetType => {
   const name = (produto.descricaoAjustada || produto.descricao || '').toLowerCase();
   
-  // Palavras-chave para gatos
-  const catKeywords = ['gato', 'gatos', 'felino', 'cat', 'feline'];
-  const isCat = catKeywords.some(keyword => name.includes(keyword));
+  // Regra restrita: gato só quando aparece "gato" (já pega "gatos" também)
+  const isCat = name.includes("gato");
   
   // Histórico: antes de existir gato, todas eram para cachorro (padrão)
   return isCat ? 'cat' : 'dog';

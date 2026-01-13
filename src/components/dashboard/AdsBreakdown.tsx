@@ -31,10 +31,41 @@ const formatCurrency = (value: number) =>
 const formatNumber = (value: number) => 
   new Intl.NumberFormat('pt-BR').format(value);
 
-const parseValue = (value: string): number => {
-  if (!value || value === "") return 0;
-  const cleaned = value.replace(/[^\d.,-]/g, '').replace(',', '.');
-  return parseFloat(cleaned) || 0;
+const parseValue = (value: string | number | undefined | null): number => {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const s = String(value).trim();
+  if (s === "" || s === "-" || s.toLowerCase() === "n/a") return 0;
+
+  let cleaned = s.replace(/[^\d.,-]/g, "");
+  const hasComma = cleaned.includes(",");
+  const hasDot = cleaned.includes(".");
+
+  if (hasComma && hasDot) {
+    if (cleaned.lastIndexOf(".") > cleaned.lastIndexOf(",")) {
+      cleaned = cleaned.replace(/,/g, "");      // US: 1,234.56
+    } else {
+      cleaned = cleaned.replace(/\./g, "").replace(",", "."); // BR: 1.234,56
+    }
+  } else if (hasComma) {
+    cleaned = cleaned.replace(",", ".");
+  }
+
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const calculateRoas = (ad: AdsData): number => {
+  // 1. Tentar pegar do export direto
+  const roasExported = parseValue(ad["ROAS de resultados"]);
+  if (roasExported > 0) return roasExported;
+
+  // 2. Calcular manualmente se não veio
+  const investment = parseValue(ad["Valor usado (BRL)"]);
+  const revenue = parseValue(ad["Valor de conversão da compra"]);
+
+  return investment > 0 && revenue > 0 ? revenue / investment : 0;
 };
 
 type SortColumn = 'investment' | 'impressions' | 'clicks' | 'ctr' | 'purchases' | 'roas' | null;
@@ -272,7 +303,7 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                 const clicks = parseValue(ad["Cliques (todos)"]);
                 const ctr = parseValue(ad["CTR (todos)"]);
                 const purchases = parseValue(ad["Compras"]);
-                const roas = parseValue(ad["ROAS de resultados"]);
+                const roas = calculateRoas(ad);
                 const status = ad["Veiculação da campanha"];
 
                 return (
