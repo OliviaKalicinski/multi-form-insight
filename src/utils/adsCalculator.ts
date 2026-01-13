@@ -37,14 +37,28 @@ export const parseAdsValue = (value: string): number => {
   return parseFloat(cleaned) || 0;
 };
 
+/**
+ * Helper para buscar valor em múltiplos nomes de coluna possíveis
+ * Retorna o primeiro valor encontrado, ou 0 se nenhum existir
+ */
+const getValue = (item: AdsData, keys: string[]): number => {
+  for (const key of keys) {
+    const value = (item as unknown as Record<string, string>)[key];
+    if (value !== undefined && value !== "" && value !== null) {
+      return parseAdsValue(value);
+    }
+  }
+  return 0;
+};
+
 // Helper para LPV com múltiplos nomes de coluna
 const getLPV = (item: AdsData): number => {
-  return parseAdsValue(
-    item["Visualizações da página de destino do site"] ?? 
-    (item as any)["Visualizações da página de destino"] ?? 
-    (item as any)["Landing page views"] ?? 
-    "0"
-  );
+  return getValue(item, [
+    "Visualizações da página de destino do site",
+    "Visualizações da página de destino",
+    "Landing page views",
+    "Website landing page views",
+  ]);
 };
 
 export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
@@ -84,23 +98,111 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
     };
   }
 
-  // Calcular totais
-  const investimentoTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Valor usado (BRL)"]), 0);
-  const impressoesTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Impressões"]), 0);
-  const alcanceTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Alcance"]), 0);
-  const cliquesTodosTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Cliques (todos)"]), 0);
-  const cliquesLinkTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Cliques no link"]), 0);
-  const cliquesDesaida = data.reduce((sum, item) => sum + parseAdsValue(item["Cliques de saída"]), 0);
-  const comprasTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Compras"]), 0);
-  const valorConversaoTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Valor de conversão da compra"]), 0);
-  const adicoesCarrinhoTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Adições ao carrinho"]), 0);
+  // Calcular totais com suporte a múltiplos nomes de coluna (PT/EN)
+  const investimentoTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Valor usado (BRL)",
+      "Amount spent (BRL)",
+      "Amount spent",
+      "Valor gasto",
+      "Spent",
+    ]), 0);
+
+  const impressoesTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Impressões",
+      "Impressions",
+    ]), 0);
+
+  const alcanceTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Alcance",
+      "Reach",
+      "Alcance (pessoas)",
+      "Alcance único",
+      "Accounts reached",
+      "People reached",
+    ]), 0);
+
+  const cliquesTodosTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Cliques (todos)",
+      "Clicks (all)",
+      "All clicks",
+    ]), 0);
+
+  const cliquesLinkTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Cliques no link",
+      "Link clicks",
+      "Cliques de link",
+    ]), 0);
+
+  const cliquesDesaida = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Cliques de saída",
+      "Outbound clicks",
+      "Cliques externos",
+    ]), 0);
+
+  const comprasTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Compras",
+      "Purchases",
+      "Purchase",
+    ]), 0);
+
+  const valorConversaoTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Valor de conversão da compra",
+      "Purchase conversion value",
+      "Conversion value",
+      "Valor de conversão",
+    ]), 0);
+
+  const adicoesCarrinhoTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Adições ao carrinho",
+      "Adds to cart",
+      "Add to cart",
+    ]), 0);
+
   const visualizacoesPaginaTotal = data.reduce((sum, item) => sum + getLPV(item), 0);
-  const engajamentosTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Engajamentos com o post"]), 0);
-  const visualizacoesTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Visualizações"]), 0);
+
+  const engajamentosTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Engajamentos com o post",
+      "Post engagements",
+      "Engagements",
+      "Post engagement",
+      "Engajamentos",
+    ]), 0);
+
+  const visualizacoesTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Visualizações",
+      "Views",
+      "Video views",
+      "ThruPlays",
+    ]), 0);
 
   // Métricas de Engajamento (novas)
-  const resultadosTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Resultados"]), 0);
-  const visitasPerfilTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Visitas ao perfil do Instagram"]), 0);
+  const resultadosTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Resultados",
+      "Results",
+      "Resultado",
+      "Result",
+    ]), 0);
+
+  const visitasPerfilTotal = data.reduce((sum, item) => 
+    sum + getValue(item, [
+      "Visitas ao perfil do Instagram",
+      "Instagram profile visits",
+      "Profile visits",
+      "Visitas ao perfil",
+    ]), 0);
+
   const custoPorResultadoMedio = resultadosTotal > 0 ? investimentoTotal / resultadosTotal : 0;
 
   // Fonte de cliques consistente para funil (prioridade: saída > link > todos)
@@ -123,7 +225,10 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
   // Novos KPIs
   const roi = investimentoTotal > 0 ? ((valorConversaoTotal - investimentoTotal) / investimentoTotal) * 100 : 0;
   const ticketMedio = comprasTotal > 0 ? valorConversaoTotal / comprasTotal : 0;
-  const taxaEngajamento = alcanceTotal > 0 ? (engajamentosTotal / alcanceTotal) * 100 : 0;
+  
+  // Taxa de engajamento: usar resultados OU engajamentos (o que existir)
+  const baseEngagement = resultadosTotal > 0 ? resultadosTotal : engajamentosTotal;
+  const taxaEngajamento = alcanceTotal > 0 ? (baseEngagement / alcanceTotal) * 100 : 0;
   
   // Taxa de conversão consistente com CTR/CPC (usa clicksForFunnel)
   const taxaConversao = clicksForFunnel > 0 ? (comprasTotal / clicksForFunnel) * 100 : 0;
