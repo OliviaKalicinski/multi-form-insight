@@ -77,6 +77,10 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
       taxaConversao: 0,
       taxaAddCarrinho: 0,
       taxaAbandonoCarrinho: 0,
+      // Métricas de Engajamento
+      resultadosTotal: 0,
+      custoPorResultadoMedio: 0,
+      visitasPerfilTotal: 0,
     };
   }
 
@@ -93,6 +97,11 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
   const visualizacoesPaginaTotal = data.reduce((sum, item) => sum + getLPV(item), 0);
   const engajamentosTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Engajamentos com o post"]), 0);
   const visualizacoesTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Visualizações"]), 0);
+
+  // Métricas de Engajamento (novas)
+  const resultadosTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Resultados"]), 0);
+  const visitasPerfilTotal = data.reduce((sum, item) => sum + parseAdsValue(item["Visitas ao perfil do Instagram"]), 0);
+  const custoPorResultadoMedio = resultadosTotal > 0 ? investimentoTotal / resultadosTotal : 0;
 
   // Fonte de cliques consistente para funil (prioridade: saída > link > todos)
   const clicksForFunnel = cliquesDesaida || cliquesLinkTotal || cliquesTodosTotal;
@@ -149,6 +158,10 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
     taxaConversao,
     taxaAddCarrinho,
     taxaAbandonoCarrinho,
+    // Métricas de Engajamento
+    resultadosTotal,
+    custoPorResultadoMedio,
+    visitasPerfilTotal,
   };
 };
 
