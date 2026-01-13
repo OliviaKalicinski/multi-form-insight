@@ -45,27 +45,50 @@ export default function ExecutiveDashboard() {
     return salesData as ProcessedOrder[];
   }, [salesData]);
 
-  // Get current and previous month data
+  // Extrair meses disponíveis dos dados de vendas
+  const availableSalesMonths = useMemo(() => {
+    const months = new Set<string>();
+    processedOrders.forEach(o => months.add(format(o.dataVenda, "yyyy-MM")));
+    return Array.from(months).sort();
+  }, [processedOrders]);
+
+  // Get current and previous month data - suporta "Todos" (selectedMonth = null)
   const { currentMetrics, previousMetrics, platformData, topProducts } = useMemo(() => {
-    if (!selectedMonth || processedOrders.length === 0) {
+    if (processedOrders.length === 0) {
       return { currentMetrics: null, previousMetrics: null, platformData: [], topProducts: [] };
     }
 
-    const monthOrders = filterOrdersByMonth(processedOrders, selectedMonth);
-    const monthAds = filterAdsByMonth(adsData, selectedMonth);
+    // Se não há mês selecionado, usar todos os pedidos
+    const isAllMonths = !selectedMonth;
+    const monthOrders = isAllMonths 
+      ? processedOrders 
+      : filterOrdersByMonth(processedOrders, selectedMonth);
     
-    // Previous month
-    const currentDate = parse(selectedMonth, "yyyy-MM", new Date());
-    const prevDate = subMonths(currentDate, 1);
-    const prevMonth = format(prevDate, "yyyy-MM");
+    const monthAds = isAllMonths 
+      ? adsData 
+      : filterAdsByMonth(adsData, selectedMonth);
     
-    const prevMonthOrders = filterOrdersByMonth(processedOrders, prevMonth);
-    const prevMonthAds = filterAdsByMonth(adsData, prevMonth);
+    // Para "Todos", calcular métricas agregadas
+    const currentMetrics = calculateExecutiveMetrics(
+      monthOrders, 
+      monthAds, 
+      isAllMonths ? "all" : selectedMonth
+    );
 
-    const currentMetrics = calculateExecutiveMetrics(monthOrders, monthAds, selectedMonth);
-    const previousMetrics = calculateExecutiveMetrics(prevMonthOrders, prevMonthAds, prevMonth);
+    // Previous period (apenas quando há mês específico selecionado)
+    let previousMetrics = null;
+    if (!isAllMonths && selectedMonth) {
+      const currentDate = parse(selectedMonth, "yyyy-MM", new Date());
+      const prevDate = subMonths(currentDate, 1);
+      const prevMonth = format(prevDate, "yyyy-MM");
+      
+      const prevMonthOrders = filterOrdersByMonth(processedOrders, prevMonth);
+      const prevMonthAds = filterAdsByMonth(adsData, prevMonth);
+      
+      previousMetrics = calculateExecutiveMetrics(prevMonthOrders, prevMonthAds, prevMonth);
+    }
 
-    // Platform performance
+    // Platform performance e Top products (usar pedidos filtrados)
     const platformData = getPlatformPerformance(monthOrders).slice(0, 5);
 
     // Top products
@@ -94,18 +117,18 @@ export default function ExecutiveDashboard() {
     return { currentMetrics, previousMetrics, platformData, topProducts };
   }, [processedOrders, adsData, selectedMonth]);
 
-  // Calculate variations
+  // Calculate variations - null quando não há mês anterior (período "Todos")
   const variations = useMemo(() => {
     if (!currentMetrics || !previousMetrics) return null;
     
     const calc = (current: number, previous: number) => 
-      previous > 0 ? ((current - previous) / previous) * 100 : 0;
+      previous > 0 ? ((current - previous) / previous) * 100 : null;
     
     return {
       receita: calc(currentMetrics.vendas.receita, previousMetrics.vendas.receita),
       pedidos: calc(currentMetrics.vendas.pedidos, previousMetrics.vendas.pedidos),
       ticket: calc(currentMetrics.vendas.ticketMedioReal, previousMetrics.vendas.ticketMedioReal),
-      margem: 0, // Margem fixa
+      margem: null, // Margem fixa
       roas: currentMetrics.marketing.roasAds - previousMetrics.marketing.roasAds,
       ltv: calc(currentMetrics.clientes.ltv, previousMetrics.clientes.ltv),
       cac: calc(currentMetrics.clientes.cac, previousMetrics.clientes.cac),
@@ -190,7 +213,9 @@ export default function ExecutiveDashboard() {
               {/* Title */}
               <div className="flex items-center gap-2 text-muted-foreground">
                 <DollarSign className="h-5 w-5" />
-                <span className="text-sm font-medium">Receita do Mês</span>
+                <span className="text-sm font-medium">
+                  {selectedMonth ? "Receita do Mês" : "Receita Total"}
+                </span>
               </div>
 
               {/* Main Value */}
@@ -199,12 +224,14 @@ export default function ExecutiveDashboard() {
                   {formatCurrency(currentMetrics.vendas.receita)}
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Receita bruta do período selecionado
+                  {selectedMonth 
+                    ? "Receita bruta do período selecionado"
+                    : `Receita acumulada de ${availableSalesMonths.length} meses`}
                 </p>
               </div>
 
-              {/* Progress Goal */}
-              {revenueGoal > 0 && (
+              {/* Progress Goal - ocultar quando em "Todos" */}
+              {selectedMonth && revenueGoal > 0 && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
@@ -236,16 +263,18 @@ export default function ExecutiveDashboard() {
                   )}>
                     {formatPercent(variations.receita)}
                   </span>
-                  <span className="text-sm text-muted-foreground">vs mês anterior</span>
+                  {selectedMonth && <span className="text-sm text-muted-foreground">vs mês anterior</span>}
                 </div>
               )}
 
               {/* Status Badge */}
               <Badge 
-                variant={goalProgress >= 100 ? "default" : "secondary"}
+                variant={selectedMonth && goalProgress >= 100 ? "default" : "secondary"}
                 className="text-xs"
               >
-                {goalProgress >= 100 
+                {!selectedMonth 
+                  ? '📊 Visão Consolidada'
+                  : goalProgress >= 100 
                   ? '🎯 Meta Atingida' 
                   : goalProgress >= 80 
                   ? '📊 Próximo da Meta' 
