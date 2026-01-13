@@ -58,7 +58,7 @@ export interface HealthScore {
     vendas: number;
     clientes: number;
     produtos: number;
-    operacoes: number;
+    operacoes: number | null; // null = dados estimados/não confiáveis
   };
   status: 'critical' | 'warning' | 'good' | 'excellent';
 }

@@ -73,26 +73,44 @@ export const HealthScoreCard = ({ healthScore }: HealthScoreCardProps) => {
         
         <div className="space-y-3">
           <div className="text-xs font-semibold text-muted-foreground mb-2">BREAKDOWN POR ÁREA</div>
-          {Object.entries(healthScore.breakdown).map(([key, value]) => (
-            <div key={key} className="flex items-center justify-between">
-              <span className="text-sm capitalize">{key}</span>
-              <div className="flex items-center gap-2">
-                <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      "h-full transition-all",
-                      value >= 80 ? "bg-green-500" :
-                      value >= 60 ? "bg-blue-500" :
-                      value >= 40 ? "bg-yellow-500" :
-                      "bg-red-500"
-                    )}
-                    style={{ width: `${value}%` }}
-                  />
+          {Object.entries(healthScore.breakdown).map(([key, value]) => {
+            const isNA = value === null || value === undefined || !Number.isFinite(Number(value));
+            const numericValue = isNA ? 0 : Number(value);
+
+            const barClass = isNA
+              ? "bg-muted"
+              : numericValue >= 80
+                ? "bg-green-500"
+                : numericValue >= 60
+                  ? "bg-blue-500"
+                  : numericValue >= 40
+                    ? "bg-yellow-500"
+                    : "bg-red-500";
+
+            return (
+              <div key={key}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm capitalize">{key}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full transition-all", barClass)}
+                        style={{ width: `${isNA ? 0 : Math.max(0, Math.min(100, numericValue))}%` }}
+                      />
+                    </div>
+                    <span className={cn("text-sm font-semibold w-8", isNA && "text-muted-foreground")}>
+                      {isNA ? "N/A" : numericValue}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-sm font-semibold w-8">{value}</span>
+                {isNA && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5 text-right">
+                    Sem dados reais suficientes
+                  </p>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>

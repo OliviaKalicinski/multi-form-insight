@@ -7,27 +7,40 @@ export const calcularVariacao = (atual: number, anterior: number): number => {
   return ((atual - anterior) / anterior) * 100;
 };
 
+// Detectar se operações usa valores hardcoded (estimativas)
+const isOperacoesEstimada = (operacoes: ExecutiveMetrics["operacoes"]): boolean => {
+  // Valores hardcoded no executiveMetricsCalculator
+  const tempoEnvioHardcoded = operacoes.tempoEnvio === 2.5;
+  const taxaEntregaHardcoded = operacoes.taxaEntrega === 96;
+  return tempoEnvioHardcoded || taxaEntregaHardcoded;
+};
+
 // Calcular Health Score
 export const calcularHealthScore = (metrics: ExecutiveMetrics): HealthScore => {
-  const scores = {
+  const breakdown = {
     marketing: calcularScoreMarketing(metrics.marketing),
     vendas: calcularScoreVendas(metrics.vendas),
     clientes: calcularScoreClientes(metrics.clientes),
     produtos: calcularScoreProdutos(metrics.produtos),
     operacoes: calcularScoreOperacoes(metrics.operacoes),
   };
-  
-  const overall = Math.round(
-    Object.values(scores).reduce((a, b) => a + b, 0) / 5
+
+  // Filtrar apenas scores válidos (exclui null)
+  const validScores = Object.values(breakdown).filter(
+    (v): v is number => typeof v === 'number' && Number.isFinite(v)
   );
-  
+
+  const overall = validScores.length > 0
+    ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length)
+    : 0;
+
   let status: HealthScore['status'];
   if (overall >= 80) status = 'excellent';
   else if (overall >= 60) status = 'good';
   else if (overall >= 40) status = 'warning';
   else status = 'critical';
-  
-  return { overall, breakdown: scores, status };
+
+  return { overall, breakdown, status };
 };
 
 const calcularScoreMarketing = (marketing: ExecutiveMetrics['marketing']): number => {
@@ -94,7 +107,10 @@ const calcularScoreProdutos = (produtos: ExecutiveMetrics['produtos']): number =
   return Math.round(score);
 };
 
-const calcularScoreOperacoes = (operacoes: ExecutiveMetrics['operacoes']): number => {
+const calcularScoreOperacoes = (operacoes: ExecutiveMetrics['operacoes']): number | null => {
+  // Retornar null se dados são estimativas (não confiáveis para score)
+  if (isOperacoesEstimada(operacoes)) return null;
+
   let score = 0;
   
   // Taxa de Entrega (50 pontos)
