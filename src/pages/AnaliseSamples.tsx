@@ -95,7 +95,7 @@ const AnaliseSamples = () => {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-foreground">🎁 Análise de Clientes que Iniciaram com Amostras</h1>
           <p className="text-muted-foreground">
-            Análise de clientes cujo primeiro pedido foi apenas Kit de Amostras
+            Análise de clientes cujo primeiro pedido foi apenas amostra (sem produto regular)
           </p>
         </div>
       
@@ -201,7 +201,7 @@ const AnaliseSamples = () => {
       <div className="space-y-1">
         <h1 className="text-2xl font-bold text-foreground">🎁 Análise de Amostras</h1>
         <p className="text-sm text-muted-foreground">
-          Clientes cujo primeiro pedido foi apenas Kit de Amostras
+          Clientes cujo primeiro pedido foi apenas amostra (sem produto regular)
           {dataPeriod && (
             <span className="ml-2 text-xs">
               • {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')}
@@ -298,7 +298,7 @@ const AnaliseSamples = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Percent className="h-5 w-5 text-primary" />
-                    <span className="text-sm font-medium text-muted-foreground">Taxa de Recompra</span>
+                    <span className="text-sm font-medium text-muted-foreground">Taxa de Conversão (amostra → regular)</span>
                   </div>
                   <Badge 
                     variant="outline"
@@ -334,7 +334,7 @@ const AnaliseSamples = () => {
                     <span className="font-medium text-foreground">{metrics.volume.uniqueCustomers}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Recompraram:</span>
+                    <span>Converteram (produto regular):</span>
                     <span className="font-semibold text-primary">{metrics.repurchase.customersWhoRepurchased}</span>
                   </div>
                   <div className="border-t pt-1 flex justify-between font-medium">
@@ -387,14 +387,14 @@ const AnaliseSamples = () => {
               size="compact"
             />
             <StatusMetricCard
-              title="Recompraram"
+              title="Converteram (regular)"
               value={metrics.repurchase.customersWhoRepurchased.toLocaleString('pt-BR')}
               icon={<ShoppingCart className="h-3 w-3" />}
               status={getStatusFromBenchmark(repurchaseRate, REPURCHASE_BENCHMARK)}
               size="compact"
             />
             <StatusMetricCard
-              title="Ticket Médio"
+              title="Ticket Médio Recompra"
               value={formatCurrency(metrics.repurchase.avgTicketRepurchase)}
               icon={<DollarSign className="h-3 w-3" />}
               status="neutral"
@@ -416,8 +416,8 @@ const AnaliseSamples = () => {
               size="compact"
             />
             <StatusMetricCard
-              title="Conv. Produto Regular"
-              value={`${metrics.repurchase.conversionToRegularProduct.toFixed(1)}%`}
+              title="% Conversão 60d"
+              value={`${metrics.conversionByTime.days60.toFixed(1)}%`}
               icon={<Target className="h-3 w-3" />}
               status={metrics.repurchase.conversionToRegularProduct >= 50 ? 'success' : 'warning'}
               size="compact"
