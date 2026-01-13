@@ -117,20 +117,19 @@ export const calculateExecutiveMetrics = (
   const margemMedia = 18;
 
   // ===== OPERAÇÕES =====
-  // Tempo médio de emissão de NF
+  // Tempo médio de emissão de NF (DADO REAL - calculado do CSV)
   const pedidosComNF = orders.filter(o => o.numeroNF && o.dataEmissao);
   const tempoEmissaoNF = pedidosComNF.length > 0
     ? pedidosComNF.reduce((sum, o) => sum + differenceInDays(o.dataEmissao, o.dataVenda), 0) / pedidosComNF.length
     : 3.0;
 
-  // Tempo de envio (estimativa)
-  const tempoEnvio = 2.5;
-  
-  // Taxa de entrega (assumir 96% - alta performance)
-  const taxaEntrega = 96;
-  
-  // Pedidos cancelados (estimar 3-5% dos pedidos)
-  const pedidosCancelados = Math.round(pedidos * 0.04);
+  // ═══════════════════════════════════════════════════════════════
+  // ESTIMATIVAS (não há dados reais no CSV)
+  // Esses valores NÃO são usados no HealthScore (peso zero)
+  // ═══════════════════════════════════════════════════════════════
+  const tempoEnvio = 2.5;      // ESTIMATIVA: dias médios até despacho
+  const taxaEntrega = 96;      // ESTIMATIVA: % entregas bem-sucedidas
+  const pedidosCancelados = Math.round(pedidos * 0.04); // ESTIMATIVA: 4%
 
   return {
     vendas: {
