@@ -230,6 +230,10 @@ export const calculateAdsMultiMonthMetrics = (
   const compras: MonthMetric[] = [];
   const cpc: MonthMetric[] = [];
   const taxaConversao: MonthMetric[] = [];
+  // Novas métricas de Engajamento
+  const resultados: MonthMetric[] = [];
+  const cpe: MonthMetric[] = [];
+  const taxaEngajamento: MonthMetric[] = [];
 
   selectedMonths.forEach((month, index) => {
     const monthData = filterFn(data, month);
@@ -315,6 +319,48 @@ export const calculateAdsMultiMonthMetrics = (
       color,
       percentageChange: taxaConversaoChange,
     });
+
+    // RESULTADOS (Engajamento) - cálculo específico
+    let resultadosChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.resultadosTotal > 0) {
+      resultadosChange = ((metrics.resultadosTotal - prevMetrics.resultadosTotal) / prevMetrics.resultadosTotal) * 100;
+    }
+
+    resultados.push({
+      month,
+      monthLabel,
+      value: metrics.resultadosTotal,
+      color,
+      percentageChange: resultadosChange,
+    });
+
+    // CPE (Custo por Resultado) - cálculo específico
+    let cpeChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.custoPorResultadoMedio > 0) {
+      cpeChange = ((metrics.custoPorResultadoMedio - prevMetrics.custoPorResultadoMedio) / prevMetrics.custoPorResultadoMedio) * 100;
+    }
+
+    cpe.push({
+      month,
+      monthLabel,
+      value: metrics.custoPorResultadoMedio,
+      color,
+      percentageChange: cpeChange,
+    });
+
+    // TAXA DE ENGAJAMENTO - cálculo específico
+    let taxaEngajamentoChange: number | undefined = undefined;
+    if (prevMetrics && prevMetrics.taxaEngajamento > 0) {
+      taxaEngajamentoChange = ((metrics.taxaEngajamento - prevMetrics.taxaEngajamento) / prevMetrics.taxaEngajamento) * 100;
+    }
+
+    taxaEngajamento.push({
+      month,
+      monthLabel,
+      value: metrics.taxaEngajamento,
+      color,
+      percentageChange: taxaEngajamentoChange,
+    });
   });
 
   return {
@@ -323,6 +369,10 @@ export const calculateAdsMultiMonthMetrics = (
     compras,
     cpc,
     taxaConversao,
+    // Novas métricas de Engajamento
+    resultados,
+    cpe,
+    taxaEngajamento,
   };
 };
 

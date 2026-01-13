@@ -37,6 +37,9 @@ export interface FollowersMetrics {
 
 export interface AdsData {
   "Mês"?: string; // Novo campo para o formato hierárquico
+  "Objetivo"?: string; // "OUTCOME_SALES" | "OUTCOME_ENGAGEMENT"
+  "Status de veiculação"?: string; // Novo JSON
+  "Nível de veiculação"?: string; // Novo JSON
   "Nome do anúncio": string;
   "Nome do conjunto de anúncios": string;
   "Valor usado (BRL)": string;
@@ -104,6 +107,10 @@ export interface AdsMetrics {
   taxaConversao: number;
   taxaAddCarrinho: number;
   taxaAbandonoCarrinho: number;
+  // Métricas de Engajamento
+  resultadosTotal: number;
+  custoPorResultadoMedio: number;
+  visitasPerfilTotal: number;
 }
 
 export interface MonthMetric {
@@ -141,6 +148,10 @@ export interface AdsMultiMonthMetrics {
   compras: MonthMetric[];
   cpc: MonthMetric[];
   taxaConversao: MonthMetric[];
+  // Métricas de Engajamento para comparação
+  resultados: MonthMetric[];
+  cpe: MonthMetric[];
+  taxaEngajamento: MonthMetric[];
 }
 
 // Sales/E-commerce Data
