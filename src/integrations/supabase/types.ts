@@ -16,46 +16,64 @@ export type Database = {
     Tables: {
       ads_data: {
         Row: {
+          alcance: number | null
           anuncio: string | null
           campanha: string | null
           cliques: number | null
           conjunto: string | null
           conversoes: number | null
           created_at: string | null
+          custo_por_resultado: number | null
           data: string
+          engajamentos: number | null
           gasto: number | null
           id: string
           impressoes: number | null
           receita: number | null
+          resultados: number | null
+          tipo_resultado: string | null
           upload_id: string | null
+          visitas_perfil: number | null
         }
         Insert: {
+          alcance?: number | null
           anuncio?: string | null
           campanha?: string | null
           cliques?: number | null
           conjunto?: string | null
           conversoes?: number | null
           created_at?: string | null
+          custo_por_resultado?: number | null
           data: string
+          engajamentos?: number | null
           gasto?: number | null
           id?: string
           impressoes?: number | null
           receita?: number | null
+          resultados?: number | null
+          tipo_resultado?: string | null
           upload_id?: string | null
+          visitas_perfil?: number | null
         }
         Update: {
+          alcance?: number | null
           anuncio?: string | null
           campanha?: string | null
           cliques?: number | null
           conjunto?: string | null
           conversoes?: number | null
           created_at?: string | null
+          custo_por_resultado?: number | null
           data?: string
+          engajamentos?: number | null
           gasto?: number | null
           id?: string
           impressoes?: number | null
           receita?: number | null
+          resultados?: number | null
+          tipo_resultado?: string | null
           upload_id?: string | null
+          visitas_perfil?: number | null
         }
         Relationships: [
           {

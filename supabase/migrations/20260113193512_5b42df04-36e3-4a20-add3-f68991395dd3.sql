@@ -1,0 +1,8 @@
+-- Add engagement metrics columns to ads_data table
+ALTER TABLE ads_data 
+ADD COLUMN IF NOT EXISTS alcance INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS resultados INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS engajamentos INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS tipo_resultado TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS custo_por_resultado NUMERIC(10,4) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS visitas_perfil INTEGER DEFAULT 0;

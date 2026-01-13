@@ -155,7 +155,14 @@ export const useDataPersistence = () => {
         "Valor de conversão da compra": String(row.receita || 0),
         "Início dos relatórios": row.data || "",
         "Término dos relatórios": row.data || "",
-        // Default values for other fields
+        // Metrics from database
+        "Alcance": String(row.alcance || 0),
+        "Resultados": String(row.resultados || 0),
+        "Engajamentos com o post": String(row.engajamentos || 0),
+        "Tipo de resultado": row.tipo_resultado || "",
+        "Custo por resultado": String(row.custo_por_resultado || 0),
+        "Visitas ao perfil do Instagram": String(row.visitas_perfil || 0),
+        // Default values for calculated fields
         "CPM (custo por 1.000 impressões)": "0",
         "CTR (todos)": "0",
         "CTR de saída": "0",
@@ -165,15 +172,9 @@ export const useDataPersistence = () => {
         "Adições ao carrinho": "0",
         "Custo por adição ao carrinho": "0",
         "Custo por compra": "0",
-        "Tipo de resultado": "",
-        "Resultados": "0",
-        "Custo por resultado": "0",
-        "Visitas ao perfil do Instagram": "0",
         "CPC (custo por clique no link)": "0",
         "Cliques no link": "0",
-        "Alcance": "0",
         "Frequência": "0",
-        "Engajamentos com o post": "0",
         "Visualizações": "0",
         "Tipo de valor de resultado": "",
         "ROAS de resultados": "0",
@@ -341,9 +342,20 @@ export const useDataPersistence = () => {
       const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
       const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
 
+      // Helper to get integer value from various possible column names
+      const getIntValue = (ad: AdsData, keys: string[]): number => {
+        for (const key of keys) {
+          const value = (ad as unknown as Record<string, string>)[key];
+          if (value !== undefined && value !== "" && value !== null) {
+            return parseInt(String(value).replace(/\./g, "").replace(/,/g, "")) || 0;
+          }
+        }
+        return 0;
+      };
+
       // Parse all rows first with correct monetary parsing
       const rawRows = ads.map((ad) => ({
-        data: ad["Início dos relatórios"] || "",
+        data: ad["Início dos relatórios"] || ad["Mês"] || "",
         campanha: "",
         conjunto: ad["Nome do conjunto de anúncios"] || "",
         anuncio: ad["Nome do anúncio"] || "",
@@ -352,6 +364,13 @@ export const useDataPersistence = () => {
         gasto: parseMonetaryValue(ad["Valor usado (BRL)"] || "0"),
         conversoes: parseInt(ad["Compras"]?.replace(/\./g, "") || "0"),
         receita: parseMonetaryValue(ad["Valor de conversão da compra"] || "0"),
+        // New engagement metrics
+        alcance: getIntValue(ad, ["Alcance", "Reach", "Alcance (pessoas)", "Alcance único"]),
+        resultados: getIntValue(ad, ["Resultados", "Results"]),
+        engajamentos: getIntValue(ad, ["Engajamentos com o post", "Post engagements", "Engajamentos", "Engagements"]),
+        tipo_resultado: ad["Tipo de resultado"] || ad["Result type"] || "",
+        custo_por_resultado: parseMonetaryValue(ad["Custo por resultado"] || ad["Cost per result"] || "0"),
+        visitas_perfil: getIntValue(ad, ["Visitas ao perfil do Instagram", "Instagram profile visits", "Profile visits"]),
       }));
 
       // Deduplicate by aggregating values for identical keys
@@ -368,6 +387,10 @@ export const useDataPersistence = () => {
           existing.gasto += row.gasto;
           existing.conversoes += row.conversoes;
           existing.receita += row.receita;
+          existing.alcance += row.alcance;
+          existing.resultados += row.resultados;
+          existing.engajamentos += row.engajamentos;
+          existing.visitas_perfil += row.visitas_perfil;
         } else {
           uniqueRowsMap.set(key, { ...row });
         }
