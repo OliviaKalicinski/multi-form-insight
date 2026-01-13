@@ -315,15 +315,16 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
  */
 export const calculateAccumulatedRevenueByProduct = (
   orders: ProcessedOrder[],
-  topN: number = 15
+  topN: number = 15,
+  breakdownKits: boolean = true  // Padrão TRUE = desmembrar kits em produtos individuais
 ): ProductRevenueData[] => {
-  // Desmembrar kits em produtos individuais
-  const brokenDownOrders = breakdownOrders(orders);
+  // Desmembrar kits em produtos individuais apenas se breakdownKits = true
+  const ordersToProcess = breakdownKits ? breakdownOrders(orders) : orders;
   
   const productMap = new Map<string, number>();
   let totalRevenue = 0;
   
-  brokenDownOrders.forEach(order => {
+  ordersToProcess.forEach(order => {
     order.produtos.forEach(produto => {
       const productName = produto.descricaoAjustada;
       const revenue = produto.preco * produto.quantidade;

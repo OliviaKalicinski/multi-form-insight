@@ -5,6 +5,7 @@ import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCar
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
 import { NewFollowersChart } from "@/components/dashboard/NewFollowersChart";
 import { TrendChart } from "@/components/dashboard/TrendChart";
+import { TrendChartWithFilter } from "@/components/dashboard/TrendChartWithFilter";
 import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateChart";
 import { FollowersHeroCard } from "@/components/dashboard/FollowersHeroCard";
 import { FollowersTrendChart, ViewMode } from "@/components/dashboard/FollowersTrendChart";
@@ -582,22 +583,22 @@ const Seguidores = () => {
                   </>
                 ) : (
                   <>
-                    <TrendChart
+                    <TrendChartWithFilter
                       data={currentMonthMarketingData}
                       title="📊 Visualizações × Alcance"
                       description="Compare o volume de visualizações com o alcance total"
                       metrics={[
-                        { dataKey: "visualizacoes", name: "Visualizações", color: "hsl(var(--chart-4))" },
-                        { dataKey: "alcance", name: "Alcance", color: "hsl(var(--chart-1))" },
+                        { dataKey: "visualizacoes", name: "Visualizações", stroke: "hsl(var(--chart-4))" },
+                        { dataKey: "alcance", name: "Alcance", stroke: "hsl(var(--chart-1))" },
                       ]}
                     />
-                    <TrendChart
+                    <TrendChartWithFilter
                       data={currentMonthMarketingData}
                       title="👥 Visitas × Interações"
                       description="Acompanhe as visitas ao perfil e o nível de engajamento"
                       metrics={[
-                        { dataKey: "visitas", name: "Visitas", color: "hsl(var(--chart-2))" },
-                        { dataKey: "interacoes", name: "Interações", color: "hsl(var(--chart-3))" },
+                        { dataKey: "visitas", name: "Visitas", stroke: "hsl(var(--chart-2))" },
+                        { dataKey: "interacoes", name: "Interações", stroke: "hsl(var(--chart-3))" },
                       ]}
                     />
                   </>
