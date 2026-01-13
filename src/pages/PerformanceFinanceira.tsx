@@ -40,14 +40,22 @@ export default function PerformanceFinanceira() {
   const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
   const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('daily');
 
+  const isLast12MonthsView = selectedMonth === "last-12-months";
+
+  const availableSalesMonths = useMemo(() => {
+    const months = new Set<string>();
+    salesData.forEach(o => months.add(format(o.dataVenda, "yyyy-MM")));
+    return Array.from(months).sort();
+  }, [salesData]);
+
   // Calcular métricas do mês selecionado
   const financialMetrics = useMemo(() => {
     if (salesData.length === 0) return null;
-    const filteredOrders = selectedMonth 
-      ? filterOrdersByMonth(salesData, selectedMonth, availableMonths)
+    const filteredOrders = selectedMonth
+      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
       : salesData;
     return calculateFinancialMetrics(filteredOrders, selectedMonth || 'all');
-  }, [salesData, selectedMonth, availableMonths]);
+  }, [salesData, selectedMonth, availableSalesMonths]);
 
   // Calcular métricas do mês anterior para comparação
   const previousMonthMetrics = useMemo(() => {
@@ -58,18 +66,18 @@ export default function PerformanceFinanceira() {
     prevMonth.setMonth(prevMonth.getMonth() - 1);
     const prevMonthStr = format(prevMonth, "yyyy-MM");
     
-    if (!availableMonths.includes(prevMonthStr)) return null;
+    if (!availableSalesMonths.includes(prevMonthStr)) return null;
     
-    const filteredOrders = filterOrdersByMonth(salesData, prevMonthStr, availableMonths);
+    const filteredOrders = filterOrdersByMonth(salesData, prevMonthStr, availableSalesMonths);
     return calculateFinancialMetrics(filteredOrders, prevMonthStr);
-  }, [salesData, selectedMonth, availableMonths]);
+  }, [salesData, selectedMonth, availableSalesMonths]);
 
   // Calcular variações
-  const variations = useMemo(() => {
+  const variations = useMemo((): { revenue: number | null; ticket: number | null; orders: number | null } | null => {
     if (!financialMetrics || !previousMonthMetrics) return null;
     
-    const calc = (current: number, previous: number) => 
-      previous > 0 ? ((current - previous) / previous) * 100 : 0;
+    const calc = (current: number, previous: number): number | null =>
+      previous > 0 ? ((current - previous) / previous) * 100 : null;
     
     return {
       revenue: calc(financialMetrics.faturamentoTotal, previousMonthMetrics.faturamentoTotal),
@@ -114,11 +122,11 @@ export default function PerformanceFinanceira() {
         goal: financialGoals.ticketMedio, 
         format: 'currency' as const 
       },
-      { 
-        label: "Margem", 
-        current: financialGoals.margem, 
-        goal: financialGoals.margem, 
-        format: 'percent' as const 
+      {
+        label: "Margem",
+        current: (1 - financialGoals.custoFixo) * 100,
+        goal: financialGoals.margem,
+        format: "percent" as const
       },
     ];
   }, [financialMetrics, financialGoals]);
@@ -136,6 +144,19 @@ export default function PerformanceFinanceira() {
               Carregue os dados de vendas na página "Upload" para visualizar as análises financeiras.
             </CardDescription>
           </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  if (goalsLoading) {
+    return (
+      <div className="container mx-auto px-6 py-8">
+        <Card>
+          <CardContent className="py-10 flex items-center justify-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando metas...
+          </CardContent>
         </Card>
       </div>
     );
@@ -165,7 +186,25 @@ export default function PerformanceFinanceira() {
                   📅 Visão Completa - Todos os Períodos
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Mostrando dados de {availableMonths.length} meses disponíveis
+                  Mostrando dados de {availableSalesMonths.length} meses com vendas
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isLast12MonthsView && !comparisonMode && (
+        <Card className="border-blue-500/50 bg-blue-500/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  📅 Visão - Últimos 12 meses
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Mostrando janela móvel dos últimos 12 meses
                 </p>
               </div>
             </div>
@@ -375,45 +414,48 @@ export default function PerformanceFinanceira() {
       )}
 
       {/* Comparison mode - evolution tab content */}
-      {comparisonMode && comparisonMetrics && (
-        <Card>
-          <CardHeader>
-            <CardTitle>📊 Comparação de Faturamento por Mês</CardTitle>
-            <CardDescription>
-              Comparando {selectedMonths.length} meses selecionados
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {comparisonMetrics.revenue.map((metric) => (
-                <div key={metric.month} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: metric.color }}
-                      />
-                      <span className="font-medium">{metric.monthLabel}</span>
+      {comparisonMode && comparisonMetrics && (() => {
+        const maxRevenue = Math.max(...comparisonMetrics.revenue.map(m => m.value), 0);
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>📊 Comparação de Faturamento por Mês</CardTitle>
+              <CardDescription>
+                Comparando {selectedMonths.length} meses selecionados
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {comparisonMetrics.revenue.map((metric) => (
+                  <div key={metric.month} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: metric.color }}
+                        />
+                        <span className="font-medium">{metric.monthLabel}</span>
+                      </div>
+                      <span className="text-lg font-bold">
+                        {formatCurrency(metric.value)}
+                      </span>
                     </div>
-                    <span className="text-lg font-bold">
-                      {formatCurrency(metric.value)}
-                    </span>
+                    <div className="w-full bg-muted rounded-full h-3">
+                      <div
+                        className="h-3 rounded-full transition-all"
+                        style={{
+                          width: `${maxRevenue > 0 ? (metric.value / maxRevenue) * 100 : 0}%`,
+                          backgroundColor: metric.color,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full bg-muted rounded-full h-3">
-                    <div
-                      className="h-3 rounded-full transition-all"
-                      style={{
-                        width: `${(metric.value / Math.max(...comparisonMetrics.revenue.map(m => m.value))) * 100}%`,
-                        backgroundColor: metric.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
