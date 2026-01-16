@@ -275,6 +275,7 @@ export default function ComportamentoCliente() {
               status={getStatusFromBenchmark(behaviorMetrics.taxaRecompra, benchmarksPetFood.taxaRecompra)}
               interpretation={behaviorMetrics.taxaRecompra >= benchmarksPetFood.taxaRecompra ? "Acima benchmark" : "Abaixo benchmark"}
               size="compact"
+              tooltipKey="taxa_recompra"
             />
 
             <StatusMetricCard
@@ -285,6 +286,7 @@ export default function ComportamentoCliente() {
               invertTrend
               interpretation={`${behaviorMetrics.clientesChurn} perdidos`}
               size="compact"
+              tooltipKey="taxa_churn"
             />
 
             <StatusMetricCard
@@ -294,6 +296,7 @@ export default function ComportamentoCliente() {
               status="success"
               interpretation="Valor por cliente"
               size="compact"
+              tooltipKey="clv"
             />
 
             <StatusMetricCard
@@ -303,6 +306,7 @@ export default function ComportamentoCliente() {
               status="success"
               interpretation={`${((behaviorMetrics.clientesAtivos / behaviorMetrics.totalClientes) * 100).toFixed(0)}% da base`}
               size="compact"
+              tooltipKey="clientes_ativos"
             />
 
             <StatusMetricCard
@@ -312,6 +316,7 @@ export default function ComportamentoCliente() {
               status={behaviorMetrics.clientesEmRisco > behaviorMetrics.clientesAtivos * 0.3 ? 'warning' : 'neutral'}
               interpretation="31-60 dias"
               size="compact"
+              tooltipKey="clientes_em_risco"
             />
 
             <StatusMetricCard
@@ -321,6 +326,7 @@ export default function ComportamentoCliente() {
               status="neutral"
               interpretation="61-90 dias"
               size="compact"
+              tooltipKey="clientes_inativos"
             />
           </div>
         </div>
