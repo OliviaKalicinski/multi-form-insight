@@ -306,4 +306,92 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
     description: "Receita potencial que pode ser perdida se os clientes em risco não forem reativados.",
     rules: ["Baseado no histórico de compras", "Indica urgência de reativação"]
   },
+
+  // === MÉTRICAS DE PRODUTOS (PÁGINA PRODUTOS) ===
+  produto_campeao: {
+    formula: "TOP 1(produtos por [critério selecionado])",
+    description: "Produto com maior volume ou faturamento no período, dependendo do critério de ordenação selecionado.",
+    rules: ["Ordenação por quantidade = mais unidades", "Ordenação por faturamento = maior receita"]
+  },
+  receita_total_produtos: {
+    formula: "Σ(faturamento de todos os produtos)",
+    description: "Soma do faturamento gerado por todos os produtos vendidos no período.",
+  },
+  unidades_vendidas: {
+    formula: "Σ(quantidades vendidas de cada produto)",
+    description: "Total de unidades de produtos vendidas no período selecionado.",
+  },
+  skus_unicos: {
+    formula: "COUNT(DISTINCT SKU)",
+    description: "Quantidade de produtos diferentes (SKUs únicos) vendidos no período.",
+    rules: ["Cada código de produto conta uma vez"]
+  },
+  combinacoes_produtos: {
+    formula: "COUNT(pares de produtos com ≥2 ocorrências)",
+    description: "Número de combinações de produtos que foram comprados juntos pelo menos 2 vezes.",
+    rules: ["Mínimo de 2 ocorrências para considerar", "Indica oportunidades de cross-sell"]
+  },
+  brindes: {
+    formula: "COUNT(produtos com valor R$0,01)",
+    description: "Produtos distribuídos como cortesia, amostras ou brindes promocionais.",
+  },
+
+  // === MÉTRICAS DE OPERAÇÕES (PÁGINA OPERAÇÕES) ===
+  forma_envio_principal: {
+    formula: "TOP 1(métodos de envio por volume)",
+    description: "Método de entrega mais utilizado no período em número de pedidos.",
+    rules: ["Inclui todos os pedidos processados"]
+  },
+  total_pedidos_ops: {
+    formula: "COUNT(pedidos únicos no período)",
+    description: "Total de pedidos processados no período selecionado.",
+  },
+  formas_envio_total: {
+    formula: "COUNT(DISTINCT formas de envio)",
+    description: "Quantidade de métodos de envio diferentes utilizados no período.",
+  },
+  faturamento_periodo: {
+    formula: "Σ(valor total dos pedidos)",
+    description: "Faturamento total do período, incluindo todos os pedidos processados.",
+  },
+
+  // === MÉTRICAS DE ADS (PÁGINA MARKETING) ===
+  alcance_ads: {
+    formula: "COUNT(DISTINCT pessoas atingidas)",
+    description: "Número de pessoas únicas que viram pelo menos uma vez os anúncios.",
+    rules: ["Cada pessoa é contada uma única vez", "Diferente de impressões que conta visualizações"]
+  },
+  impressoes_ads: {
+    formula: "Σ(visualizações dos anúncios)",
+    description: "Total de vezes que os anúncios foram exibidos, incluindo repetições.",
+    rules: ["Uma pessoa pode gerar múltiplas impressões"]
+  },
+  cliques_ads: {
+    formula: "Σ(cliques nos anúncios)",
+    description: "Total de cliques recebidos nos anúncios.",
+  },
+  taxa_engajamento: {
+    formula: "(Engajamentos ÷ Alcance) × 100",
+    description: "Percentual de pessoas que interagiram com o conteúdo em relação ao alcance.",
+    rules: ["≥5% = Excelente", "3-5% = Bom", "1-3% = Médio", "<1% = Baixo"]
+  },
+  resultados_engagement: {
+    formula: "Σ(resultados por objetivo de engajamento)",
+    description: "Total de resultados obtidos conforme o objetivo definido na campanha.",
+    rules: ["Tipo de resultado varia conforme configuração da campanha"]
+  },
+  custo_por_resultado: {
+    formula: "Investimento ÷ Resultados",
+    description: "Custo médio para obter cada resultado da campanha de engajamento.",
+    rules: ["Quanto menor, mais eficiente a campanha"]
+  },
+  conversoes_total: {
+    formula: "COUNT(compras atribuídas aos anúncios)",
+    description: "Total de compras realizadas e atribuídas às campanhas de anúncios.",
+  },
+  lucro_liquido_ads: {
+    formula: "Receita de Conversões - Investimento em Ads",
+    description: "Lucro ou prejuízo líquido após descontar o investimento em anúncios.",
+    rules: ["Positivo = lucro", "Negativo = prejuízo"]
+  },
 };
