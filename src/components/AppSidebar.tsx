@@ -126,7 +126,7 @@ export function AppSidebar() {
           <img 
             src={comidaDragaoLogo} 
             alt="Comida de Dragão" 
-            className="h-12 w-auto object-contain"
+            className="h-24 w-auto object-contain"
           />
         </div>
       </SidebarHeader>
