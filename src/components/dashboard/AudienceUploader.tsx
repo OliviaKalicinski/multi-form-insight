@@ -46,7 +46,17 @@ export function AudienceUploader({
     setIsSaving(true);
 
     try {
-      const text = await file.text();
+      // Try reading as UTF-8 first
+      let text = await file.text();
+      
+      // Detect UTF-16 encoding (null bytes or BOM)
+      if (text.charCodeAt(0) === 0xFFFE || text.charCodeAt(0) === 0xFEFF || text.includes('\x00')) {
+        const buffer = await file.arrayBuffer();
+        // Try UTF-16 LE (most common for Windows/Excel exports)
+        const decoder = new TextDecoder('utf-16le');
+        text = decoder.decode(buffer);
+      }
+      
       const parsedData = parseAudienceCSV(text);
       const validation = validateAudienceData(parsedData);
 

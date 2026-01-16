@@ -11,6 +11,26 @@ const AGE_MIDPOINTS: Record<string, number> = {
 };
 
 /**
+ * Normalize CSV text from various encodings (UTF-16, UTF-8 with BOM, etc.)
+ */
+function normalizeCSVText(text: string): string {
+  let normalized = text;
+  
+  // Remove null bytes (UTF-16 artifact)
+  if (normalized.includes('\x00')) {
+    normalized = normalized.replace(/\x00/g, '');
+  }
+  
+  // Remove BOM characters (UTF-8/UTF-16)
+  normalized = normalized.replace(/^\uFEFF|\uFFFE/g, '');
+  
+  // Remove sep= directive line (Excel/Instagram export artifact)
+  normalized = normalized.replace(/^sep=.*\r?\n/i, '');
+  
+  return normalized.trim();
+}
+
+/**
  * Parse the multi-section Instagram Audience CSV
  * Format:
  * - Section 1: "Faixa etária e gênero" (Age/Gender table)
@@ -18,7 +38,10 @@ const AGE_MIDPOINTS: Record<string, number> = {
  * - Section 3: "Principais países" (Countries - 2 rows: names, percentages)
  */
 export function parseAudienceCSV(csvText: string): AudienceData {
-  const lines = csvText.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+  // Normalize encoding before processing
+  const normalizedText = normalizeCSVText(csvText);
+  
+  const lines = normalizedText.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
   
   // Find section indices
   let ageGenderStart = -1;
