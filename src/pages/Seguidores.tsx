@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Users, UserPlus, TrendingUp, TrendingDown, Calendar, Target, Eye, MousePointerClick, Heart, Percent, BarChart3 } from "lucide-react";
+import { Users, UserPlus, TrendingUp, TrendingDown, Calendar, Target, Eye, MousePointerClick, Heart, Percent, BarChart3, ExternalLink } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
@@ -10,8 +10,10 @@ import { MonthlyAggregateChart } from "@/components/dashboard/MonthlyAggregateCh
 import { FollowersHeroCard } from "@/components/dashboard/FollowersHeroCard";
 import { FollowersTrendChart, ViewMode } from "@/components/dashboard/FollowersTrendChart";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
+import { KPITooltip } from "@/components/dashboard/KPITooltip";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import { 
@@ -295,9 +297,12 @@ const Seguidores = () => {
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-4">
-          <h1 className="text-3xl font-bold text-foreground">👥 Seguidores</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-foreground">📸 Instagram</h1>
+            <Badge variant="secondary" className="text-xs">Orgânico</Badge>
+          </div>
           <p className="text-muted-foreground">
-            Análise de crescimento da sua audiência
+            Métricas de atenção, alcance e engajamento orgânico
           </p>
         </div>
 
@@ -461,8 +466,9 @@ const Seguidores = () => {
                 baselineSeguidores={instagramGoals.baselineSeguidores}
               />
 
-              {/* Satellite Cards Grid */}
+              {/* Satellite Cards Grid - Reorganized by Dimensions */}
               <div className="grid gap-3 grid-cols-2">
+                {/* Dimensão: Seguidores */}
                 <StatusMetricCard
                   title="Novos Seguidores"
                   value={formatFollowersNumber(currentFollowersMetrics.novosSeguidoresMes)}
@@ -474,6 +480,7 @@ const Seguidores = () => {
                     { warningThreshold: -10, dangerThreshold: -25 }
                   )}
                   size="compact"
+                  tooltipKey="novos_seguidores"
                 />
                 <StatusMetricCard
                   title="Crescimento"
@@ -490,9 +497,11 @@ const Seguidores = () => {
                       : undefined
                   }
                   size="compact"
+                  tooltipKey="crescimento_seguidores"
                 />
                 {hasMarketingData && currentMarketingMetrics && (
                   <>
+                    {/* Dimensão: Atenção */}
                     <StatusMetricCard
                       title="Visualizações"
                       value={formatNumber(currentMarketingMetrics.visualizacoesTotal)}
@@ -504,7 +513,9 @@ const Seguidores = () => {
                         { warningThreshold: -10, dangerThreshold: -25 }
                       )}
                       size="compact"
+                      tooltipKey="visualizacoes_instagram"
                     />
+                    {/* Dimensão: Alcance */}
                     <StatusMetricCard
                       title="Alcance"
                       value={formatNumber(currentMarketingMetrics.alcanceTotal)}
@@ -516,33 +527,117 @@ const Seguidores = () => {
                         { warningThreshold: -10, dangerThreshold: -25 }
                       )}
                       size="compact"
+                      tooltipKey="alcance_instagram"
                     />
+                    {/* Dimensão: Interesse */}
                     <StatusMetricCard
-                      title="Taxa Alcance → Visita"
-                      value={`${currentMarketingMetrics.taxaAlcanceVisita.toFixed(2)}%`}
-                      icon={<Percent className="h-3 w-3" />}
-                      status={getStatusFromBenchmark(
-                        currentMarketingMetrics.taxaAlcanceVisita, 
-                        1, 
-                        { warningThreshold: 0.5, dangerThreshold: 0.25 }
-                      )}
-                      size="compact"
-                    />
-                    <StatusMetricCard
-                      title="Taxa Engajamento"
-                      value={`${currentMarketingMetrics.taxaEngajamento.toFixed(2)}%`}
+                      title="Interações"
+                      value={formatNumber(currentMarketingMetrics.interacoesTotal)}
                       icon={<Heart className="h-3 w-3" />}
                       status={getStatusFromBenchmark(
-                        currentMarketingMetrics.taxaEngajamento, 
-                        1, 
-                        { warningThreshold: 0.5, dangerThreshold: 0.25 }
+                        currentMarketingMetrics.interacoesTotal, 
+                        1000, 
+                        { warningThreshold: 500, dangerThreshold: 100 }
                       )}
                       size="compact"
+                      tooltipKey="interacoes_instagram"
+                    />
+                    {/* Dimensão: Intenção */}
+                    <StatusMetricCard
+                      title="Visitas ao Perfil"
+                      value={formatNumber(currentMarketingMetrics.visitasTotal)}
+                      icon={<MousePointerClick className="h-3 w-3" />}
+                      trend={previousMonthMarketingData.length > 0 ? growthMarketingMetrics.crescimentoVisitas : undefined}
+                      status={getStatusFromBenchmark(
+                        growthMarketingMetrics.crescimentoVisitas, 
+                        0, 
+                        { warningThreshold: -10, dangerThreshold: -25 }
+                      )}
+                      size="compact"
+                      tooltipKey="visitas_perfil_instagram"
+                    />
+                    <StatusMetricCard
+                      title="Cliques no Link"
+                      value={formatNumber(currentMarketingMetrics.clicksTotal)}
+                      icon={<ExternalLink className="h-3 w-3" />}
+                      status={getStatusFromBenchmark(
+                        currentMarketingMetrics.clicksTotal, 
+                        100, 
+                        { warningThreshold: 50, dangerThreshold: 10 }
+                      )}
+                      size="compact"
+                      tooltipKey="cliques_link_instagram"
                     />
                   </>
                 )}
               </div>
             </div>
+
+            {/* Taxas Derivadas - Nova Seção */}
+            {hasMarketingData && currentMarketingMetrics && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-foreground">📊 Taxas Derivadas</h2>
+                  <Badge variant="outline" className="text-xs">Orgânico</Badge>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <StatusMetricCard
+                    title="Taxa de Engajamento"
+                    value={`${currentMarketingMetrics.taxaEngajamento.toFixed(2)}%`}
+                    icon={<Heart className="h-4 w-4" />}
+                    status={getStatusFromBenchmark(
+                      currentMarketingMetrics.taxaEngajamento, 
+                      3, 
+                      { warningThreshold: 1, dangerThreshold: 0.5 }
+                    )}
+                    benchmark={{ value: 3, label: "Meta: 3%" }}
+                    interpretation={
+                      currentMarketingMetrics.taxaEngajamento >= 5 ? "🏆 Excelente engajamento" :
+                      currentMarketingMetrics.taxaEngajamento >= 3 ? "✅ Bom engajamento" :
+                      currentMarketingMetrics.taxaEngajamento >= 1 ? "⚠️ Engajamento médio" :
+                      "📉 Engajamento baixo"
+                    }
+                    tooltipKey="taxa_engajamento_instagram"
+                  />
+                  <StatusMetricCard
+                    title="Taxa Alcance → Visita"
+                    value={`${currentMarketingMetrics.taxaAlcanceVisita.toFixed(2)}%`}
+                    icon={<MousePointerClick className="h-4 w-4" />}
+                    status={getStatusFromBenchmark(
+                      currentMarketingMetrics.taxaAlcanceVisita, 
+                      1, 
+                      { warningThreshold: 0.5, dangerThreshold: 0.25 }
+                    )}
+                    benchmark={{ value: 1, label: "Meta: 1%" }}
+                    interpretation={
+                      currentMarketingMetrics.taxaAlcanceVisita >= 2 ? "🏆 Excelente conversão" :
+                      currentMarketingMetrics.taxaAlcanceVisita >= 1 ? "✅ Boa conversão" :
+                      currentMarketingMetrics.taxaAlcanceVisita >= 0.5 ? "⚠️ Conversão média" :
+                      "📉 Conversão baixa"
+                    }
+                    tooltipKey="taxa_alcance_visita"
+                  />
+                  <StatusMetricCard
+                    title="Taxa Visita → Clique"
+                    value={`${currentMarketingMetrics.taxaVisitaClique.toFixed(2)}%`}
+                    icon={<ExternalLink className="h-4 w-4" />}
+                    status={getStatusFromBenchmark(
+                      currentMarketingMetrics.taxaVisitaClique, 
+                      10, 
+                      { warningThreshold: 5, dangerThreshold: 2 }
+                    )}
+                    benchmark={{ value: 10, label: "Meta: 10%" }}
+                    interpretation={
+                      currentMarketingMetrics.taxaVisitaClique >= 15 ? "🏆 Excelente conversão para ação" :
+                      currentMarketingMetrics.taxaVisitaClique >= 10 ? "✅ Boa conversão para ação" :
+                      currentMarketingMetrics.taxaVisitaClique >= 5 ? "⚠️ Conversão média" :
+                      "📉 Conversão baixa - revisar CTA"
+                    }
+                    tooltipKey="taxa_visita_clique"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Main Trend Chart with Toggle */}
             {followersChartData.length > 0 && (
