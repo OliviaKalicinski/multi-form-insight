@@ -15,6 +15,7 @@ export const CustomerSummaryCards = ({ metrics }: CustomerSummaryCardsProps) => 
         value={formatQuantity(metrics.totalClientes)}
         icon={Users}
         subtitle="Clientes únicos"
+        tooltipKey="total_clientes"
       />
       
       <SalesMetricCard
@@ -23,6 +24,7 @@ export const CustomerSummaryCards = ({ metrics }: CustomerSummaryCardsProps) => 
         icon={Repeat}
         subtitle="Clientes com 2+ pedidos"
         variant={metrics.taxaRecompra >= 30 ? "success" : "warning"}
+        tooltipKey="taxa_recompra"
       />
       
       <SalesMetricCard
@@ -31,6 +33,7 @@ export const CustomerSummaryCards = ({ metrics }: CustomerSummaryCardsProps) => 
         icon={CheckCircle}
         subtitle="Última compra < 30 dias"
         variant="success"
+        tooltipKey="clientes_ativos"
       />
       
       <SalesMetricCard
@@ -39,6 +42,7 @@ export const CustomerSummaryCards = ({ metrics }: CustomerSummaryCardsProps) => 
         icon={AlertTriangle}
         subtitle="31-60 dias sem comprar"
         variant="warning"
+        tooltipKey="clientes_em_risco"
       />
       
       <SalesMetricCard
@@ -46,6 +50,7 @@ export const CustomerSummaryCards = ({ metrics }: CustomerSummaryCardsProps) => 
         value={formatQuantity(metrics.clientesInativos)}
         icon={Moon}
         subtitle="61-90 dias sem comprar"
+        tooltipKey="clientes_inativos"
       />
       
       <SalesMetricCard
@@ -53,6 +58,7 @@ export const CustomerSummaryCards = ({ metrics }: CustomerSummaryCardsProps) => 
         value={formatQuantity(metrics.clientesChurn)}
         icon={XCircle}
         subtitle="90+ dias sem comprar"
+        tooltipKey="clientes_churn"
       />
       
       <SalesMetricCard
@@ -61,6 +67,7 @@ export const CustomerSummaryCards = ({ metrics }: CustomerSummaryCardsProps) => 
         icon={Shield}
         subtitle="Clientes não perdidos"
         variant={metrics.taxaRetencao >= 70 ? "success" : "warning"}
+        tooltipKey="taxa_retencao"
       />
       
       <SalesMetricCard
@@ -68,6 +75,7 @@ export const CustomerSummaryCards = ({ metrics }: CustomerSummaryCardsProps) => 
         value={formatCurrency(metrics.customerLifetimeValue)}
         icon={DollarSign}
         subtitle="Valor médio por cliente"
+        tooltipKey="clv"
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { Clock, Zap, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { KPITooltip } from "./KPITooltip";
 
 interface LogisticsKPICardsProps {
   averageDays: number;
@@ -31,24 +32,28 @@ export const LogisticsKPICards = ({
       title: "Tempo Médio NF",
       value: `${averageDays.toFixed(1)} dias`,
       icon: Clock,
+      tooltipKey: "tempo_medio_nf",
       ...avgStatus
     },
     {
       title: "Mediana NF",
       value: `${medianDays} dia${medianDays !== 1 ? 's' : ''}`,
       icon: Clock,
+      tooltipKey: "mediana_nf",
       ...medianStatus
     },
     {
       title: "Mais Rápido",
       value: `${minDays} dia${minDays !== 1 ? 's' : ''}`,
       icon: Zap,
+      tooltipKey: "mais_rapido",
       ...minStatus
     },
     {
       title: "Mais Lento",
       value: `${maxDays} dias`,
       icon: AlertTriangle,
+      tooltipKey: "mais_lento",
       ...maxStatus
     }
   ];
@@ -56,26 +61,27 @@ export const LogisticsKPICards = ({
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {kpis.map((kpi, index) => (
-        <Card 
-          key={index} 
-          className={cn(
-            "border transition-colors",
-            kpi.borderClass,
-            kpi.bgClass
-          )}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <kpi.icon className={cn("h-4 w-4", kpi.textClass)} />
-              <span className="text-xs font-medium text-muted-foreground">
-                {kpi.title}
-              </span>
-            </div>
-            <p className={cn("text-2xl font-bold", kpi.textClass)}>
-              {kpi.value}
-            </p>
-          </CardContent>
-        </Card>
+        <KPITooltip key={index} metricKey={kpi.tooltipKey}>
+          <Card 
+            className={cn(
+              "border transition-colors",
+              kpi.borderClass,
+              kpi.bgClass
+            )}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <kpi.icon className={cn("h-4 w-4", kpi.textClass)} />
+                <span className="text-xs font-medium text-muted-foreground">
+                  {kpi.title}
+                </span>
+              </div>
+              <p className={cn("text-2xl font-bold", kpi.textClass)}>
+                {kpi.value}
+              </p>
+            </CardContent>
+          </Card>
+        </KPITooltip>
       ))}
     </div>
   );

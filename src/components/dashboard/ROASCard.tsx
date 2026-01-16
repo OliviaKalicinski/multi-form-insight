@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, DollarSign, Target, Percent } from "lucide-react";
 import { ROASMetrics } from "@/types/marketing";
+import { KPITooltip } from "./KPITooltip";
 
 interface ROASCardProps {
   metrics: ROASMetrics;
@@ -36,60 +37,68 @@ export const ROASCard = ({ metrics }: ROASCardProps) => {
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* ROAS */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <TrendingUp className="h-4 w-4" />
-              <span>ROAS</span>
+          <KPITooltip metricKey="roas">
+            <div className="space-y-2 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-help">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <TrendingUp className="h-4 w-4" />
+                <span>ROAS</span>
+              </div>
+              <div className="text-3xl font-bold">
+                {formatNumber(metrics.roas, 2)}x
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Para cada R$ 1 investido, retornou R$ {formatNumber(metrics.roas, 2)}
+              </p>
             </div>
-            <div className="text-3xl font-bold">
-              {formatNumber(metrics.roas, 2)}x
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Para cada R$ 1 investido, retornou R$ {formatNumber(metrics.roas, 2)}
-            </p>
-          </div>
+          </KPITooltip>
 
           {/* Faturamento Líquido */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <DollarSign className="h-4 w-4" />
-              <span>Faturamento Líquido</span>
+          <KPITooltip metricKey="receita_liquida_ads">
+            <div className="space-y-2 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-help">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <DollarSign className="h-4 w-4" />
+                <span>Faturamento Líquido</span>
+              </div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(metrics.faturamentoLiquido)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Receita de produtos sem frete
+              </p>
             </div>
-            <div className="text-2xl font-bold">
-              {formatCurrency(metrics.faturamentoLiquido)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Receita de produtos sem frete
-            </p>
-          </div>
+          </KPITooltip>
 
           {/* Investimento Ads */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Target className="h-4 w-4" />
-              <span>Investimento META Ads</span>
+          <KPITooltip metricKey="investimento_ads">
+            <div className="space-y-2 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-help">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Target className="h-4 w-4" />
+                <span>Investimento META Ads</span>
+              </div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(metrics.investimentoAds)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total investido em anúncios no período
+              </p>
             </div>
-            <div className="text-2xl font-bold">
-              {formatCurrency(metrics.investimentoAds)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Total investido em anúncios no período
-            </p>
-          </div>
+          </KPITooltip>
 
           {/* ROI */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Percent className="h-4 w-4" />
-              <span>ROI</span>
+          <KPITooltip metricKey="roi">
+            <div className="space-y-2 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-help">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Percent className="h-4 w-4" />
+                <span>ROI</span>
+              </div>
+              <div className="text-2xl font-bold">
+                {formatNumber(metrics.roi, 1)}%
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Margem líquida: {formatNumber(metrics.margemLiquida, 1)}%
+              </p>
             </div>
-            <div className="text-2xl font-bold">
-              {formatNumber(metrics.roi, 1)}%
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Margem líquida: {formatNumber(metrics.margemLiquida, 1)}%
-            </p>
-          </div>
+          </KPITooltip>
         </div>
       </CardContent>
     </Card>

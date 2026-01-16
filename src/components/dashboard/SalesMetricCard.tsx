@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProjectionData } from "@/utils/incompleteMonthDetector";
+import { KPITooltip } from "./KPITooltip";
 
 interface SalesMetricCardProps {
   title: string;
@@ -16,6 +17,7 @@ interface SalesMetricCardProps {
   variant?: "default" | "success" | "warning";
   isIncomplete?: boolean;
   projectionData?: ProjectionData | null;
+  tooltipKey?: string;
 }
 
 export const SalesMetricCard = ({ 
@@ -27,6 +29,7 @@ export const SalesMetricCard = ({
   variant = "default",
   isIncomplete = false,
   projectionData = null,
+  tooltipKey,
 }: SalesMetricCardProps) => {
   const getTrendColor = () => {
     if (!trend) return "";
@@ -46,7 +49,7 @@ export const SalesMetricCard = ({
     }
   };
 
-  return (
+  const cardContent = (
     <Card className={cn("transition-all duration-300 hover:shadow-lg", getVariantStyles())}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="flex items-center gap-2">
@@ -90,4 +93,10 @@ export const SalesMetricCard = ({
       </CardContent>
     </Card>
   );
+
+  if (tooltipKey) {
+    return <KPITooltip metricKey={tooltipKey}>{cardContent}</KPITooltip>;
+  }
+
+  return cardContent;
 };

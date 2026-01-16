@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
 import { MonthMetric } from "@/types/marketing";
 import { IncompleteMonthInfo } from "@/utils/incompleteMonthDetector";
+import { KPITooltip } from "./KPITooltip";
 
 interface ComparisonMetricCardProps {
   title: string;
@@ -10,6 +11,7 @@ interface ComparisonMetricCardProps {
   metrics: MonthMetric[];
   formatValue?: (value: number) => string;
   incompleteMonthsInfo?: Map<string, IncompleteMonthInfo>;
+  tooltipKey?: string;
 }
 
 export const ComparisonMetricCard = ({
@@ -18,6 +20,7 @@ export const ComparisonMetricCard = ({
   metrics,
   formatValue = (v) => v.toLocaleString("pt-BR"),
   incompleteMonthsInfo = new Map(),
+  tooltipKey,
 }: ComparisonMetricCardProps) => {
   if (metrics.length === 0) return null;
 
@@ -25,7 +28,7 @@ export const ComparisonMetricCard = ({
   const bestMonth = sortedMetrics[0];
   const worstMonth = sortedMetrics[sortedMetrics.length - 1];
 
-  return (
+  const cardContent = (
     <Card className="transition-all duration-300 hover:shadow-lg">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -103,4 +106,10 @@ export const ComparisonMetricCard = ({
       </CardContent>
     </Card>
   );
+
+  if (tooltipKey) {
+    return <KPITooltip metricKey={tooltipKey}>{cardContent}</KPITooltip>;
+  }
+
+  return cardContent;
 };

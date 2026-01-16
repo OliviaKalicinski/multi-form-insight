@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { KPITooltip } from "./KPITooltip";
 
 export type StatusType = 'success' | 'warning' | 'danger' | 'neutral';
 
@@ -20,6 +21,8 @@ interface StatusMetricCardProps {
   size?: 'compact' | 'default' | 'large';
   className?: string;
   invertTrend?: boolean; // For metrics where lower is better (CAC, CPA, etc.)
+  tooltipKey?: string;
+}
 }
 
 const statusConfig: Record<StatusType, { color: string; bgColor: string; borderColor: string; badge: string }> = {
@@ -61,6 +64,7 @@ export function StatusMetricCard({
   size = 'default',
   className,
   invertTrend = false,
+  tooltipKey,
 }: StatusMetricCardProps) {
   const config = statusConfig[status];
   
@@ -87,7 +91,7 @@ export function StatusMetricCard({
   const isCompact = size === 'compact';
   const isLarge = size === 'large';
 
-  return (
+  const cardContent = (
     <Card 
       className={cn(
         "transition-all",
@@ -183,6 +187,12 @@ export function StatusMetricCard({
       </CardContent>
     </Card>
   );
+
+  if (tooltipKey) {
+    return <KPITooltip metricKey={tooltipKey}>{cardContent}</KPITooltip>;
+  }
+
+  return cardContent;
 }
 
 // Helper function to determine status based on value and benchmark

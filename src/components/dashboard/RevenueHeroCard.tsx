@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { TrendingUp, TrendingDown, DollarSign, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { KPITooltip } from "./KPITooltip";
 
 interface RevenueHeroCardProps {
   totalRevenue: number;
@@ -77,70 +78,78 @@ export const RevenueHeroCard = ({
           </div>
 
           {/* Main Value */}
-          <div>
-            <p className="text-4xl font-bold text-foreground">
-              {formatCurrency(totalRevenue)}
-            </p>
-            
-            {/* Variation trend */}
-            {variation !== null && variation !== undefined && (
-              <div className={cn(
-                "flex items-center gap-1 mt-1 text-sm font-medium",
-                variation >= 0 ? "text-green-600" : "text-red-600"
-              )}>
-                {variation >= 0 ? (
-                  <TrendingUp className="h-4 w-4" />
-                ) : (
-                  <TrendingDown className="h-4 w-4" />
-                )}
-                <span>{variation >= 0 ? '+' : ''}{variation.toFixed(1)}% vs mês anterior</span>
-              </div>
-            )}
-          </div>
+          <KPITooltip metricKey="faturamento_total">
+            <div className="cursor-help">
+              <p className="text-4xl font-bold text-foreground">
+                {formatCurrency(totalRevenue)}
+              </p>
+              
+              {/* Variation trend */}
+              {variation !== null && variation !== undefined && (
+                <div className={cn(
+                  "flex items-center gap-1 mt-1 text-sm font-medium",
+                  variation >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {variation >= 0 ? (
+                    <TrendingUp className="h-4 w-4" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4" />
+                  )}
+                  <span>{variation >= 0 ? '+' : ''}{variation.toFixed(1)}% vs mês anterior</span>
+                </div>
+              )}
+            </div>
+          </KPITooltip>
 
           {/* Progress bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground flex items-center gap-1">
-                <Target className="h-3 w-3" />
-                Meta: {formatCurrencyCompact(revenueGoal)}
-              </span>
-              <span className={cn(
-                "font-semibold",
-                goalProgress >= 100 ? "text-green-600" : 
-                goalProgress >= 80 ? "text-yellow-600" : "text-foreground"
-              )}>
-                {goalProgress.toFixed(0)}%
-              </span>
+          <KPITooltip metricKey="receita_meta">
+            <div className="space-y-2 cursor-help">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Target className="h-3 w-3" />
+                  Meta: {formatCurrencyCompact(revenueGoal)}
+                </span>
+                <span className={cn(
+                  "font-semibold",
+                  goalProgress >= 100 ? "text-green-600" : 
+                  goalProgress >= 80 ? "text-yellow-600" : "text-foreground"
+                )}>
+                  {goalProgress.toFixed(0)}%
+                </span>
+              </div>
+              <Progress value={Math.min(goalProgress, 100)} className="h-2" />
+              {remainingToGoal > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Faltam {formatCurrencyCompact(remainingToGoal)} para a meta
+                </p>
+              )}
             </div>
-            <Progress value={Math.min(goalProgress, 100)} className="h-2" />
-            {remainingToGoal > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Faltam {formatCurrencyCompact(remainingToGoal)} para a meta
-              </p>
-            )}
-          </div>
+          </KPITooltip>
 
           {/* Quick breakdown */}
           <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border/50">
-            <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Receita Líquida</p>
-              <p className="text-lg font-semibold text-foreground">
-                {formatCurrencyCompact(netRevenue)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                (-{formatCurrencyCompact(shippingTotal)} frete)
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-0.5">Lucro Estimado</p>
-              <p className="text-lg font-semibold text-green-600">
-                {formatCurrencyCompact(estimatedProfit)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                (margem {((1 - costPercentage) * 100).toFixed(0)}%)
-              </p>
-            </div>
+            <KPITooltip metricKey="faturamento_liquido">
+              <div className="cursor-help">
+                <p className="text-xs text-muted-foreground mb-0.5">Receita Líquida</p>
+                <p className="text-lg font-semibold text-foreground">
+                  {formatCurrencyCompact(netRevenue)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  (-{formatCurrencyCompact(shippingTotal)} frete)
+                </p>
+              </div>
+            </KPITooltip>
+            <KPITooltip metricKey="lucro_estimado">
+              <div className="cursor-help">
+                <p className="text-xs text-muted-foreground mb-0.5">Lucro Estimado</p>
+                <p className="text-lg font-semibold text-green-600">
+                  {formatCurrencyCompact(estimatedProfit)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  (margem {((1 - costPercentage) * 100).toFixed(0)}%)
+                </p>
+              </div>
+            </KPITooltip>
           </div>
         </div>
       </CardContent>

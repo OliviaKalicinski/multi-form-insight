@@ -2,6 +2,7 @@ import { TrendingUp, Crown, TrendingDown, ArrowUpRight, ArrowDownRight } from "l
 import { Card, CardContent } from "@/components/ui/card";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { KPITooltip } from "./KPITooltip";
 
 interface VolumeKPICardsProps {
   averageDaily: number;
@@ -24,58 +25,66 @@ export const VolumeKPICards = ({ averageDaily, peakDay, lowDay, trend }: VolumeK
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {/* Média Diária */}
-      <Card>
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-            <TrendingUp className="h-4 w-4" />
-            <span>Média/Dia</span>
-          </div>
-          <p className="text-2xl font-bold">{averageDaily.toFixed(1)}</p>
-          <p className="text-xs text-muted-foreground">pedidos</p>
-        </CardContent>
-      </Card>
+      <KPITooltip metricKey="media_diaria">
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+              <TrendingUp className="h-4 w-4" />
+              <span>Média/Dia</span>
+            </div>
+            <p className="text-2xl font-bold">{averageDaily.toFixed(1)}</p>
+            <p className="text-xs text-muted-foreground">pedidos</p>
+          </CardContent>
+        </Card>
+      </KPITooltip>
 
       {/* Pico */}
-      <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm mb-1">
-            <Crown className="h-4 w-4" />
-            <span>Pico</span>
-          </div>
-          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{peakDay.orders}</p>
-          <p className="text-xs text-muted-foreground">{formatDate(peakDay.date)}</p>
-        </CardContent>
-      </Card>
+      <KPITooltip metricKey="pico">
+        <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm mb-1">
+              <Crown className="h-4 w-4" />
+              <span>Pico</span>
+            </div>
+            <p className="text-2xl font-bold text-green-700 dark:text-green-300">{peakDay.orders}</p>
+            <p className="text-xs text-muted-foreground">{formatDate(peakDay.date)}</p>
+          </CardContent>
+        </Card>
+      </KPITooltip>
 
       {/* Vale */}
-      <Card className="border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20">
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm mb-1">
-            <TrendingDown className="h-4 w-4" />
-            <span>Vale</span>
-          </div>
-          <p className="text-2xl font-bold text-red-700 dark:text-red-300">{lowDay.orders}</p>
-          <p className="text-xs text-muted-foreground">{formatDate(lowDay.date)}</p>
-        </CardContent>
-      </Card>
+      <KPITooltip metricKey="vale">
+        <Card className="border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm mb-1">
+              <TrendingDown className="h-4 w-4" />
+              <span>Vale</span>
+            </div>
+            <p className="text-2xl font-bold text-red-700 dark:text-red-300">{lowDay.orders}</p>
+            <p className="text-xs text-muted-foreground">{formatDate(lowDay.date)}</p>
+          </CardContent>
+        </Card>
+      </KPITooltip>
 
       {/* Tendência */}
-      <Card>
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-            {trend && trend >= 0 ? (
-              <ArrowUpRight className="h-4 w-4 text-green-500" />
-            ) : (
-              <ArrowDownRight className="h-4 w-4 text-red-500" />
-            )}
-            <span>Tendência</span>
-          </div>
-          <p className={`text-2xl font-bold ${trend && trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {trend !== undefined ? `${trend >= 0 ? '+' : ''}${trend.toFixed(1)}%` : '-'}
-          </p>
-          <p className="text-xs text-muted-foreground">vs período anterior</p>
-        </CardContent>
-      </Card>
+      <KPITooltip metricKey="tendencia">
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+              {trend && trend >= 0 ? (
+                <ArrowUpRight className="h-4 w-4 text-green-500" />
+              ) : (
+                <ArrowDownRight className="h-4 w-4 text-red-500" />
+              )}
+              <span>Tendência</span>
+            </div>
+            <p className={`text-2xl font-bold ${trend && trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {trend !== undefined ? `${trend >= 0 ? '+' : ''}${trend.toFixed(1)}%` : '-'}
+            </p>
+            <p className="text-xs text-muted-foreground">vs período anterior</p>
+          </CardContent>
+        </Card>
+      </KPITooltip>
     </div>
   );
 };
