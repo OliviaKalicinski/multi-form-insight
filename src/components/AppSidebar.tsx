@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import comidaDragaoLogo from "@/assets/comida-dragao-logo.svg";
 import {
   Sidebar,
   SidebarContent,
@@ -125,7 +126,11 @@ export function AppSidebar() {
           "flex items-center gap-2 px-2 py-3",
           isCollapsed && "justify-center"
         )}>
-          <span className="text-xl">🐉</span>
+          <img 
+            src={comidaDragaoLogo} 
+            alt="Comida de Dragão" 
+            className="h-8 w-8 object-contain"
+          />
           {!isCollapsed && (
             <span className="font-bold text-sm">Comida de Dragão</span>
           )}
