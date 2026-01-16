@@ -17,17 +17,27 @@ function normalizeCSVText(text: string): string {
   let normalized = text;
   
   // Remove null bytes (UTF-16 artifact)
-  if (normalized.includes('\x00')) {
-    normalized = normalized.replace(/\x00/g, '');
-  }
+  normalized = normalized.replace(/\x00/g, '');
   
-  // Remove BOM characters (UTF-8/UTF-16)
-  normalized = normalized.replace(/^\uFEFF|\uFFFE/g, '');
+  // Remove ALL possible BOM characters at the start
+  normalized = normalized.replace(/^[\uFEFF\uFFFE]+/, '');
   
-  // Remove sep= directive line (Excel/Instagram export artifact)
-  normalized = normalized.replace(/^sep=.*\r?\n/i, '');
+  // Remove sep= directive line with various formats (Excel/Instagram export artifact)
+  // Can be: sep=, "sep=", 'sep=', sep=; etc.
+  normalized = normalized.replace(/^["']?sep=.?["']?\s*[\r\n]+/i, '');
   
-  return normalized.trim();
+  // Split into lines and filter out empty/invalid lines
+  const lines = normalized.split(/\r?\n/).filter(line => {
+    const trimmed = line.trim();
+    // Remove empty lines, lines with only quotes, or lines with only separators
+    return trimmed.length > 0 && 
+           trimmed !== '""' && 
+           trimmed !== "''" && 
+           trimmed !== ";" && 
+           trimmed !== ",";
+  });
+  
+  return lines.join('\n');
 }
 
 /**
@@ -41,7 +51,16 @@ export function parseAudienceCSV(csvText: string): AudienceData {
   // Normalize encoding before processing
   const normalizedText = normalizeCSVText(csvText);
   
+  // DEBUG: Log parsing information
+  console.log("=== AUDIENCE CSV DEBUG ===");
+  console.log("Raw text length:", csvText.length);
+  console.log("Normalized text length:", normalizedText.length);
+  console.log("First 500 chars of normalized:", normalizedText.substring(0, 500));
+  
   const lines = normalizedText.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+  
+  console.log("Total lines found:", lines.length);
+  console.log("First 15 lines:", lines.slice(0, 15));
   
   // Find section indices
   let ageGenderStart = -1;
