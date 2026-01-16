@@ -215,14 +215,36 @@ export const extractAvailableMonths = (data: AdsData[]): string[] => {
 
 /**
  * Extrai o objetivo de um anúncio
+ * Prioriza o campo "Objetivo" explícito, com fallback de inferência por métricas
  */
 export const getAdObjective = (ad: AdsData): string => {
   const objetivo = ad["Objetivo"] || "";
+  
+  // 1. Se já tem objetivo explícito, usar
   if (objetivo.includes("OUTCOME_SALES")) return "OUTCOME_SALES";
   if (objetivo.includes("OUTCOME_ENGAGEMENT")) return "OUTCOME_ENGAGEMENT";
   if (objetivo.includes("OUTCOME_TRAFFIC")) return "OUTCOME_TRAFFIC";
   if (objetivo.includes("OUTCOME_AWARENESS")) return "OUTCOME_AWARENESS";
   if (objetivo.includes("OUTCOME_LEADS")) return "OUTCOME_LEADS";
+  
+  // 2. FALLBACK: Inferir baseado nas métricas disponíveis
+  // Se tem compras, receita ou adições ao carrinho → é Sales
+  const compras = parseFloat(ad["Compras"] || "0");
+  const receita = parseFloat(ad["Valor de conversão da compra"] || "0");
+  const adicoesCarrinho = parseFloat(ad["Adições ao carrinho"] || "0");
+  
+  if (compras > 0 || receita > 0 || adicoesCarrinho > 0) {
+    return "OUTCOME_SALES";
+  }
+  
+  // Se tem engajamentos ou resultados (sem sales) → é Engagement
+  const engajamentos = parseFloat(ad["Engajamentos com o post"] || "0");
+  const resultados = parseFloat(ad["Resultados"] || "0");
+  
+  if (engajamentos > 0 || resultados > 0) {
+    return "OUTCOME_ENGAGEMENT";
+  }
+  
   return "UNKNOWN";
 };
 

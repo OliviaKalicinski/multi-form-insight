@@ -423,6 +423,17 @@ export const useDataPersistence = () => {
         };
       });
 
+      // Helper para preencher campo de texto se vazio
+      const fillIfEmpty = (
+        existing: Record<string, any>, 
+        incoming: Record<string, any>, 
+        field: string
+      ): void => {
+        if ((!existing[field] || existing[field] === "") && incoming[field]) {
+          existing[field] = incoming[field];
+        }
+      };
+
       // Deduplicate by aggregating values for identical keys
       const uniqueRowsMap = new Map<string, typeof rawRows[0]>();
       
@@ -446,6 +457,15 @@ export const useDataPersistence = () => {
           existing.visualizacoes_pagina += row.visualizacoes_pagina;
           existing.adicoes_carrinho += row.adicoes_carrinho;
           existing.cliques_link += row.cliques_link;
+          
+          // Preservar/atualizar campos de texto (fix: bug do objetivo vazio)
+          fillIfEmpty(existing, row, "objetivo");
+          fillIfEmpty(existing, row, "tipo_resultado");
+          fillIfEmpty(existing, row, "status_veiculacao");
+          fillIfEmpty(existing, row, "nivel_veiculacao");
+          fillIfEmpty(existing, row, "campanha");
+          fillIfEmpty(existing, row, "conjunto");
+          fillIfEmpty(existing, row, "anuncio");
         } else {
           uniqueRowsMap.set(key, { ...row });
         }
