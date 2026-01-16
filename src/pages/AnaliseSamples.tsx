@@ -385,6 +385,7 @@ const AnaliseSamples = () => {
               status={metrics.volume.uniqueCustomers >= 30 ? 'success' : 'warning'}
               interpretation={`${metrics.volume.percentageOfTotal.toFixed(1)}% do total`}
               size="compact"
+              tooltipKey="clientes_qualificados"
             />
             <StatusMetricCard
               title="Converteram (regular)"
@@ -392,12 +393,14 @@ const AnaliseSamples = () => {
               icon={<ShoppingCart className="h-3 w-3" />}
               status={getStatusFromBenchmark(repurchaseRate, REPURCHASE_BENCHMARK)}
               size="compact"
+              tooltipKey="converteram_regular"
             />
             <StatusMetricCard
               title="Ticket Médio Recompra"
               value={formatCurrency(metrics.repurchase.avgTicketRepurchase)}
               icon={<DollarSign className="h-3 w-3" />}
               status="neutral"
+              tooltipKey="ticket_medio_recompra"
               size="compact"
             />
             <StatusMetricCard
@@ -407,6 +410,7 @@ const AnaliseSamples = () => {
               status={metrics.repurchase.avgDaysToFirstRepurchase <= 45 ? 'success' : 'warning'}
               invertTrend
               size="compact"
+              tooltipKey="tempo_ate_recompra"
             />
             <StatusMetricCard
               title="LTV Médio"
@@ -414,6 +418,7 @@ const AnaliseSamples = () => {
               icon={<TrendingUp className="h-3 w-3" />}
               status={metrics.quality.avgLTV >= 300 ? 'success' : 'neutral'}
               size="compact"
+              tooltipKey="ltv_medio_samples"
             />
             <StatusMetricCard
               title="% Conversão 60d"
@@ -421,6 +426,7 @@ const AnaliseSamples = () => {
               icon={<Target className="h-3 w-3" />}
               status={metrics.repurchase.conversionToRegularProduct >= 50 ? 'success' : 'warning'}
               size="compact"
+              tooltipKey="conversao_60d"
             />
           </div>
         </div>
