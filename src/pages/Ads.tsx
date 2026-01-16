@@ -437,6 +437,7 @@ const Ads = () => {
                         trend={trends?.investmentTrend}
                         status="neutral"
                         size="compact"
+                        tooltipKey="investimento_ads"
                       />
 
                       {/* Revenue */}
@@ -451,6 +452,7 @@ const Ads = () => {
                           { warningThreshold: 0.67, dangerThreshold: 0.5 }
                         )}
                         size="compact"
+                        tooltipKey="receita_ads"
                       />
 
                       {/* Net Profit */}
@@ -460,6 +462,7 @@ const Ads = () => {
                         icon={<TrendingUp className="h-3 w-3" />}
                         status={netProfit > 0 ? 'success' : 'danger'}
                         size="compact"
+                        tooltipKey="lucro_liquido_ads"
                       />
 
                       {/* Conversions */}
@@ -474,6 +477,7 @@ const Ads = () => {
                           { warningThreshold: 0.8, dangerThreshold: 0.5 }
                         )}
                         size="compact"
+                        tooltipKey="conversoes_total"
                       />
 
                       {/* CPA */}
@@ -489,6 +493,7 @@ const Ads = () => {
                           { invertComparison: true, warningThreshold: 0.8, dangerThreshold: 0.6 }
                         )}
                         size="compact"
+                        tooltipKey="cpa"
                       />
 
                       {/* CPC */}
@@ -504,6 +509,7 @@ const Ads = () => {
                           { invertComparison: true, warningThreshold: 0.8, dangerThreshold: 0.6 }
                         )}
                         size="compact"
+                        tooltipKey="cpc"
                       />
                     </div>
                   </div>
@@ -518,25 +524,33 @@ const Ads = () => {
                           <span className="text-sm font-semibold">Funil de Conversão</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <div className="text-center flex-1">
-                            <p className="text-xs text-muted-foreground">Add Cart</p>
-                            <p className="text-lg font-bold">{formatPercent(metrics.taxaAddCarrinho)}</p>
-                          </div>
+                          <KPITooltip metricKey="taxa_add_cart">
+                            <div className="text-center flex-1 cursor-help">
+                              <p className="text-xs text-muted-foreground">Add Cart</p>
+                              <p className="text-lg font-bold">{formatPercent(metrics.taxaAddCarrinho)}</p>
+                            </div>
+                          </KPITooltip>
                           <span className="text-muted-foreground">→</span>
-                          <div className="text-center flex-1">
-                            <p className="text-xs text-muted-foreground">Conv. Cart</p>
-                            <p className="text-lg font-bold text-green-600">{formatPercent(metrics.taxaConversaoCarrinho)}</p>
-                          </div>
+                          <KPITooltip metricKey="taxa_conversao_carrinho">
+                            <div className="text-center flex-1 cursor-help">
+                              <p className="text-xs text-muted-foreground">Conv. Cart</p>
+                              <p className="text-lg font-bold text-green-600">{formatPercent(metrics.taxaConversaoCarrinho)}</p>
+                            </div>
+                          </KPITooltip>
                           <span className="text-muted-foreground">→</span>
-                          <div className="text-center flex-1">
-                            <p className="text-xs text-muted-foreground">Abandono</p>
-                            <p className="text-lg font-bold text-yellow-600">{formatPercent(metrics.taxaAbandonoCarrinho)}</p>
-                          </div>
+                          <KPITooltip metricKey="taxa_abandono_carrinho">
+                            <div className="text-center flex-1 cursor-help">
+                              <p className="text-xs text-muted-foreground">Abandono</p>
+                              <p className="text-lg font-bold text-yellow-600">{formatPercent(metrics.taxaAbandonoCarrinho)}</p>
+                            </div>
+                          </KPITooltip>
                           <span className="text-muted-foreground">→</span>
-                          <div className="text-center flex-1">
-                            <p className="text-xs text-muted-foreground">Compras</p>
-                            <p className="text-lg font-bold text-primary">{formatNumber(metrics.comprasTotal)}</p>
-                          </div>
+                          <KPITooltip metricKey="conversoes_total">
+                            <div className="text-center flex-1 cursor-help">
+                              <p className="text-xs text-muted-foreground">Compras</p>
+                              <p className="text-lg font-bold text-primary">{formatNumber(metrics.comprasTotal)}</p>
+                            </div>
+                          </KPITooltip>
                         </div>
                       </CardContent>
                     </Card>
@@ -549,25 +563,69 @@ const Ads = () => {
                           <span className="text-sm font-semibold">Alcance & Performance</span>
                         </div>
                         <div className="grid grid-cols-4 gap-4">
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">Alcance</p>
-                            <p className="text-lg font-bold">{formatNumber(metrics.alcanceTotal)}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">Impressões</p>
-                            <p className="text-lg font-bold">{formatNumber(metrics.impressoesTotal)}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">CTR</p>
-                            <p className="text-lg font-bold">{formatPercent(metrics.ctrMedio)}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">Frequência</p>
-                            <p className="text-lg font-bold">{metrics.frequenciaMedia.toFixed(2)}</p>
-                          </div>
+                          <KPITooltip metricKey="alcance_total">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">Alcance</p>
+                              <p className="text-lg font-bold">{formatNumber(metrics.alcanceTotal)}</p>
+                            </div>
+                          </KPITooltip>
+                          <KPITooltip metricKey="impressoes_total">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">Impressões</p>
+                              <p className="text-lg font-bold">{formatNumber(metrics.impressoesTotal)}</p>
+                            </div>
+                          </KPITooltip>
+                          <KPITooltip metricKey="ctr">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">CTR</p>
+                              <p className="text-lg font-bold">{formatPercent(metrics.ctrMedio)}</p>
+                            </div>
+                          </KPITooltip>
+                          <KPITooltip metricKey="frequencia">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">Frequência</p>
+                              <p className="text-lg font-bold">{metrics.frequenciaMedia.toFixed(2)}</p>
+                            </div>
+                          </KPITooltip>
                         </div>
                       </CardContent>
                     </Card>
+                  </div>
+
+                  {/* ===== ROW 2.5: Métricas Adicionais (LPV, Ticket Médio, ROI) ===== */}
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <StatusMetricCard
+                      title="LPV"
+                      value={formatNumber(metrics.visualizacoesPaginaTotal)}
+                      icon={<Eye className="h-3 w-3" />}
+                      status="neutral"
+                      size="compact"
+                      tooltipKey="lpv"
+                    />
+                    <StatusMetricCard
+                      title="Ticket Médio Ads"
+                      value={formatCurrency(metrics.ticketMedio)}
+                      icon={<Coins className="h-3 w-3" />}
+                      status="neutral"
+                      size="compact"
+                      tooltipKey="ticket_medio_ads"
+                    />
+                    <StatusMetricCard
+                      title="ROI"
+                      value={`${metrics.roi >= 0 ? '+' : ''}${metrics.roi.toFixed(0)}%`}
+                      icon={<TrendingUp className="h-3 w-3" />}
+                      status={metrics.roi >= 200 ? 'success' : metrics.roi >= 100 ? 'warning' : 'danger'}
+                      size="compact"
+                      tooltipKey="roi_ads"
+                    />
+                    <StatusMetricCard
+                      title="CPM"
+                      value={formatCurrency(metrics.cpmMedio)}
+                      icon={<Eye className="h-3 w-3" />}
+                      status="neutral"
+                      size="compact"
+                      tooltipKey="cpm"
+                    />
                   </div>
                 </>
               ) : (
@@ -644,6 +702,7 @@ const Ads = () => {
                         trend={trends?.investmentTrend}
                         status="neutral"
                         size="compact"
+                        tooltipKey="investimento_ads"
                       />
 
                       {/* Results */}
@@ -658,6 +717,7 @@ const Ads = () => {
                           { warningThreshold: 0.5, dangerThreshold: 0.25 }
                         )}
                         size="compact"
+                        tooltipKey="resultados_engagement"
                       />
 
                       {/* CPE (Cost per Result) */}
@@ -673,6 +733,7 @@ const Ads = () => {
                           { invertComparison: true, warningThreshold: 0.8, dangerThreshold: 0.5 }
                         )}
                         size="compact"
+                        tooltipKey="cpe"
                       />
 
                       {/* Reach */}
@@ -682,6 +743,7 @@ const Ads = () => {
                         icon={<Users className="h-3 w-3" />}
                         status="neutral"
                         size="compact"
+                        tooltipKey="alcance_total"
                       />
 
                       {/* Impressions */}
@@ -691,6 +753,7 @@ const Ads = () => {
                         icon={<Eye className="h-3 w-3" />}
                         status="neutral"
                         size="compact"
+                        tooltipKey="impressoes_total"
                       />
 
                       {/* Clicks */}
@@ -700,6 +763,7 @@ const Ads = () => {
                         icon={<MousePointerClick className="h-3 w-3" />}
                         status="neutral"
                         size="compact"
+                        tooltipKey="cliques_total"
                       />
                     </div>
                   </div>
@@ -714,22 +778,30 @@ const Ads = () => {
                           <span className="text-sm font-semibold">Detalhes de Engajamento</span>
                         </div>
                         <div className="grid grid-cols-4 gap-4">
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">Engajamentos</p>
-                            <p className="text-lg font-bold">{formatNumber(metrics.engajamentosTotal)}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">Visitas Perfil</p>
-                            <p className="text-lg font-bold">{formatNumber(metrics.visitasPerfilTotal)}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">Visualizações</p>
-                            <p className="text-lg font-bold">{formatNumber(metrics.visualizacoesTotal)}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">CTR</p>
-                            <p className="text-lg font-bold">{formatPercent(metrics.ctrMedio)}</p>
-                          </div>
+                          <KPITooltip metricKey="resultados_engagement">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">Engajamentos</p>
+                              <p className="text-lg font-bold">{formatNumber(metrics.engajamentosTotal)}</p>
+                            </div>
+                          </KPITooltip>
+                          <KPITooltip metricKey="visitas_perfil">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">Visitas Perfil</p>
+                              <p className="text-lg font-bold">{formatNumber(metrics.visitasPerfilTotal)}</p>
+                            </div>
+                          </KPITooltip>
+                          <KPITooltip metricKey="alcance_total">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">Visualizações</p>
+                              <p className="text-lg font-bold">{formatNumber(metrics.visualizacoesTotal)}</p>
+                            </div>
+                          </KPITooltip>
+                          <KPITooltip metricKey="ctr">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">CTR</p>
+                              <p className="text-lg font-bold">{formatPercent(metrics.ctrMedio)}</p>
+                            </div>
+                          </KPITooltip>
                         </div>
                       </CardContent>
                     </Card>
@@ -742,22 +814,30 @@ const Ads = () => {
                           <span className="text-sm font-semibold">Eficiência de Custo</span>
                         </div>
                         <div className="grid grid-cols-4 gap-4">
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">CPM</p>
-                            <p className="text-lg font-bold">{formatCurrency(metrics.cpmMedio)}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">CPC</p>
-                            <p className="text-lg font-bold">{formatCurrency(metrics.cpcMedio)}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">CPE</p>
-                            <p className="text-lg font-bold text-primary">{formatCurrency(metrics.custoPorResultadoMedio)}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">Frequência</p>
-                            <p className="text-lg font-bold">{metrics.frequenciaMedia.toFixed(2)}</p>
-                          </div>
+                          <KPITooltip metricKey="cpm">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">CPM</p>
+                              <p className="text-lg font-bold">{formatCurrency(metrics.cpmMedio)}</p>
+                            </div>
+                          </KPITooltip>
+                          <KPITooltip metricKey="cpc">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">CPC</p>
+                              <p className="text-lg font-bold">{formatCurrency(metrics.cpcMedio)}</p>
+                            </div>
+                          </KPITooltip>
+                          <KPITooltip metricKey="cpe">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">CPE</p>
+                              <p className="text-lg font-bold text-primary">{formatCurrency(metrics.custoPorResultadoMedio)}</p>
+                            </div>
+                          </KPITooltip>
+                          <KPITooltip metricKey="frequencia">
+                            <div className="text-center cursor-help">
+                              <p className="text-xs text-muted-foreground">Frequência</p>
+                              <p className="text-lg font-bold">{metrics.frequenciaMedia.toFixed(2)}</p>
+                            </div>
+                          </KPITooltip>
                         </div>
                       </CardContent>
                     </Card>
