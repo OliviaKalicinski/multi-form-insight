@@ -25,6 +25,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
+import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { filterAdsByMonth } from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
@@ -294,30 +295,35 @@ const Ads = () => {
                   icon={DollarSign}
                   metrics={multiMonthMetrics.investimento}
                   formatValue={formatCurrency}
+                  tooltipKey="investimento_ads"
                 />
                 <ComparisonMetricCard
                   title="ROAS"
                   icon={TrendingUp}
                   metrics={multiMonthMetrics.roas}
                   formatValue={formatRoas}
+                  tooltipKey="roas"
                 />
                 <ComparisonMetricCard
                   title="Conversões (Compras)"
                   icon={ShoppingCart}
                   metrics={multiMonthMetrics.compras}
                   formatValue={formatNumber}
+                  tooltipKey="conversoes_total"
                 />
                 <ComparisonMetricCard
                   title="CPC Médio"
                   icon={Coins}
                   metrics={multiMonthMetrics.cpc}
                   formatValue={formatCurrency}
+                  tooltipKey="cpc"
                 />
                 <ComparisonMetricCard
                   title="Taxa de Conversão"
                   icon={Percent}
                   metrics={multiMonthMetrics.taxaConversao}
                   formatValue={formatPercent}
+                  tooltipKey="ctr"
                 />
               </div>
               
@@ -331,18 +337,21 @@ const Ads = () => {
                       icon={Zap}
                       metrics={multiMonthMetrics.resultados}
                       formatValue={formatNumber}
+                      tooltipKey="resultados_engagement"
                     />
                     <ComparisonMetricCard
                       title="Custo por Resultado"
                       icon={Target}
                       metrics={multiMonthMetrics.cpe}
                       formatValue={formatCurrency}
+                      tooltipKey="custo_por_resultado"
                     />
                     <ComparisonMetricCard
                       title="Taxa de Engajamento"
                       icon={Heart}
                       metrics={multiMonthMetrics.taxaEngajamento}
                       formatValue={formatPercent}
+                      tooltipKey="taxa_engajamento"
                     />
                   </div>
                 </>
@@ -357,64 +366,66 @@ const Ads = () => {
                   {/* ===== ROW 1: ROAS Compact (40%) + Satellite Cards (60%) ===== */}
                   <div className="grid gap-4 lg:grid-cols-5">
                     {/* Main ROAS Card - Compact */}
-                    <Card className={cn(
-                      "lg:col-span-2 border-2 relative",
-                      roasStatusInfo.bgColor
-                    )}>
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          {/* Header with badge */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Target className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-semibold text-foreground">ROAS</span>
-                            </div>
-                            <Badge 
-                              variant={metrics.roas >= 3 ? "default" : "destructive"}
-                              className="text-xs"
-                            >
-                              {roasStatusInfo.badge}
-                            </Badge>
-                          </div>
-
-                          {/* Main Value */}
-                          <p className={cn("text-3xl font-bold", roasStatusInfo.color)}>
-                            {formatRoas(metrics.roas)}
-                          </p>
-
-                          {/* Compact Calculation */}
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{formatCurrency(metrics.valorConversaoTotal)}</span>
-                            <span>/</span>
-                            <span>{formatCurrency(metrics.investimentoTotal)}</span>
-                          </div>
-
-                          {/* Progress + Trend in one line */}
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">Meta: {roasGoal}x</span>
+                    <KPITooltip metricKey="roas">
+                      <Card className={cn(
+                        "lg:col-span-2 border-2 relative",
+                        roasStatusInfo.bgColor
+                      )}>
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            {/* Header with badge */}
+                            <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                {trends && (
-                                  <span className={cn(
-                                    "flex items-center gap-0.5",
-                                    trends.roasTrend >= 0 ? "text-green-600" : "text-red-600"
-                                  )}>
-                                    {trends.roasTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                                    {trends.roasTrend >= 0 ? '+' : ''}{trends.roasTrend.toFixed(0)}%
-                                  </span>
-                                )}
+                                <Target className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-semibold text-foreground">ROAS</span>
                               </div>
+                              <Badge 
+                                variant={metrics.roas >= 3 ? "default" : "destructive"}
+                                className="text-xs"
+                              >
+                                {roasStatusInfo.badge}
+                              </Badge>
                             </div>
-                            <Progress value={roasProgress} className="h-1.5" />
-                          </div>
 
-                          {/* Compact Interpretation */}
-                          <p className="text-xs font-medium">
-                            {getRoasInterpretation(metrics.roas)}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                            {/* Main Value */}
+                            <p className={cn("text-3xl font-bold", roasStatusInfo.color)}>
+                              {formatRoas(metrics.roas)}
+                            </p>
+
+                            {/* Compact Calculation */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{formatCurrency(metrics.valorConversaoTotal)}</span>
+                              <span>/</span>
+                              <span>{formatCurrency(metrics.investimentoTotal)}</span>
+                            </div>
+
+                            {/* Progress + Trend in one line */}
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Meta: {roasGoal}x</span>
+                                <div className="flex items-center gap-2">
+                                  {trends && (
+                                    <span className={cn(
+                                      "flex items-center gap-0.5",
+                                      trends.roasTrend >= 0 ? "text-green-600" : "text-red-600"
+                                    )}>
+                                      {trends.roasTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                      {trends.roasTrend >= 0 ? '+' : ''}{trends.roasTrend.toFixed(0)}%
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <Progress value={roasProgress} className="h-1.5" />
+                            </div>
+
+                            {/* Compact Interpretation */}
+                            <p className="text-xs font-medium">
+                              {getRoasInterpretation(metrics.roas)}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </KPITooltip>
 
                     {/* Satellite Cards Grid (3x2) - Compact */}
                     <div className="lg:col-span-3 grid grid-cols-3 gap-2">
@@ -565,61 +576,63 @@ const Ads = () => {
                   {/* ===== ROW 1: Engagement Card (40%) + Satellite Cards (60%) ===== */}
                   <div className="grid gap-4 lg:grid-cols-5">
                     {/* Main Engagement Card - Compact */}
-                    <Card className={cn(
-                      "lg:col-span-2 border-2 relative",
-                      engagementStatusInfo.bgColor
-                    )}>
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          {/* Header with badge */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Heart className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-semibold text-foreground">Taxa de Engajamento</span>
+                    <KPITooltip metricKey="taxa_engajamento">
+                      <Card className={cn(
+                        "lg:col-span-2 border-2 relative",
+                        engagementStatusInfo.bgColor
+                      )}>
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            {/* Header with badge */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Heart className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-semibold text-foreground">Taxa de Engajamento</span>
+                              </div>
+                              <Badge 
+                                variant={metrics.taxaEngajamento >= 3 ? "default" : "secondary"}
+                                className="text-xs"
+                              >
+                                {engagementStatusInfo.badge}
+                              </Badge>
                             </div>
-                            <Badge 
-                              variant={metrics.taxaEngajamento >= 3 ? "default" : "secondary"}
-                              className="text-xs"
-                            >
-                              {engagementStatusInfo.badge}
-                            </Badge>
-                          </div>
 
-                          {/* Main Value */}
-                          <p className={cn("text-3xl font-bold", engagementStatusInfo.color)}>
-                            {formatPercent(metrics.taxaEngajamento)}
-                          </p>
+                            {/* Main Value */}
+                            <p className={cn("text-3xl font-bold", engagementStatusInfo.color)}>
+                              {formatPercent(metrics.taxaEngajamento)}
+                            </p>
 
-                          {/* Compact Calculation */}
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{formatNumber(metrics.engajamentosTotal)} engajamentos</span>
-                            <span>/</span>
-                            <span>{formatNumber(metrics.alcanceTotal)} alcance</span>
-                          </div>
-
-                          {/* Trend */}
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">Benchmark: 3%+</span>
-                            <div className="flex items-center gap-2">
-                              {trends && (
-                                <span className={cn(
-                                  "flex items-center gap-0.5",
-                                  trends.engagementRateTrend >= 0 ? "text-green-600" : "text-red-600"
-                                )}>
-                                  {trends.engagementRateTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                                  {trends.engagementRateTrend >= 0 ? '+' : ''}{trends.engagementRateTrend.toFixed(0)}%
-                                </span>
-                              )}
+                            {/* Compact Calculation */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{formatNumber(metrics.engajamentosTotal)} engajamentos</span>
+                              <span>/</span>
+                              <span>{formatNumber(metrics.alcanceTotal)} alcance</span>
                             </div>
-                          </div>
 
-                          {/* Compact Interpretation */}
-                          <p className="text-xs font-medium">
-                            {getEngagementInterpretation(metrics.taxaEngajamento)}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                            {/* Trend */}
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Benchmark: 3%+</span>
+                              <div className="flex items-center gap-2">
+                                {trends && (
+                                  <span className={cn(
+                                    "flex items-center gap-0.5",
+                                    trends.engagementRateTrend >= 0 ? "text-green-600" : "text-red-600"
+                                  )}>
+                                    {trends.engagementRateTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                    {trends.engagementRateTrend >= 0 ? '+' : ''}{trends.engagementRateTrend.toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Compact Interpretation */}
+                            <p className="text-xs font-medium">
+                              {getEngagementInterpretation(metrics.taxaEngajamento)}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </KPITooltip>
 
                     {/* Satellite Cards Grid (3x2) - Compact for Engagement */}
                     <div className="lg:col-span-3 grid grid-cols-3 gap-2">

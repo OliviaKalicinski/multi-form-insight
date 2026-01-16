@@ -11,12 +11,12 @@ import { FreebieProductsList } from "@/components/dashboard/FreebieProductsList"
 import { TopProductsChart } from "@/components/dashboard/TopProductsChart";
 import { CrossSellKPICards } from "@/components/dashboard/CrossSellKPICards";
 import { CrossSellBarsChart } from "@/components/dashboard/CrossSellBarsChart";
+import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
 import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
 import { Button } from "@/components/ui/button";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
 export default function Produtos() {
   const {
     salesData,
@@ -224,120 +224,132 @@ export default function Produtos() {
               : productMetrics.topProductsByRevenue[0];
             
             return (
-              <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Trophy className="h-6 w-6 text-primary" />
+              <KPITooltip metricKey="produto_campeao">
+                <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Trophy className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Produto Campeão</p>
+                        <p className="text-xs text-muted-foreground">
+                          {productSortBy === 'quantity' 
+                            ? '🏆 Mais vendido em unidades no período' 
+                            : '💰 Maior faturamento no período'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Produto Campeão</p>
-                      <p className="text-xs text-muted-foreground">
-                        {productSortBy === 'quantity' 
-                          ? '🏆 Mais vendido em unidades no período' 
-                          : '💰 Maior faturamento no período'}
-                      </p>
+                    
+                    <h3 className="text-xl font-bold mb-4 line-clamp-2">
+                      {topProduct?.descricaoAjustada || 'N/A'}
+                    </h3>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-background/50 rounded-lg p-3">
+                        <p className="text-xs text-muted-foreground">📦 Unidades</p>
+                        <p className="text-lg font-bold">
+                          {topProduct?.quantidadeTotal.toLocaleString('pt-BR') || 0}
+                        </p>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3">
+                        <p className="text-xs text-muted-foreground">💰 Receita</p>
+                        <p className="text-lg font-bold text-green-600">
+                          {formatCurrency(topProduct?.faturamentoTotal || 0)}
+                        </p>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3">
+                        <p className="text-xs text-muted-foreground">📈 % do Total</p>
+                        <p className="text-lg font-bold text-primary">
+                          {productSortBy === 'quantity'
+                            ? (topProduct?.percentualQuantidade?.toFixed(1) || 0)
+                            : (topProduct?.percentualFaturamento?.toFixed(1) || 0)}%
+                        </p>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-3">
+                        <p className="text-xs text-muted-foreground">🛒 Pedidos</p>
+                        <p className="text-lg font-bold">
+                          {topProduct?.numeroPedidos.toLocaleString('pt-BR') || 0}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <h3 className="text-xl font-bold mb-4 line-clamp-2">
-                    {topProduct?.descricaoAjustada || 'N/A'}
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-background/50 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">📦 Unidades</p>
-                      <p className="text-lg font-bold">
-                        {topProduct?.quantidadeTotal.toLocaleString('pt-BR') || 0}
-                      </p>
-                    </div>
-                    <div className="bg-background/50 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">💰 Receita</p>
-                      <p className="text-lg font-bold text-green-600">
-                        {formatCurrency(topProduct?.faturamentoTotal || 0)}
-                      </p>
-                    </div>
-                    <div className="bg-background/50 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">📈 % do Total</p>
-                      <p className="text-lg font-bold text-primary">
-                        {productSortBy === 'quantity'
-                          ? (topProduct?.percentualQuantidade?.toFixed(1) || 0)
-                          : (topProduct?.percentualFaturamento?.toFixed(1) || 0)}%
-                      </p>
-                    </div>
-                    <div className="bg-background/50 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">🛒 Pedidos</p>
-                      <p className="text-lg font-bold">
-                        {topProduct?.numeroPedidos.toLocaleString('pt-BR') || 0}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </KPITooltip>
             );
           })()}
 
           {/* SATÉLITES - 5 cards compactos */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                  <span className="text-xs text-muted-foreground">Receita Total</span>
-                </div>
-                <p className="text-xl font-bold text-green-600">
-                  {formatCurrency(productMetrics.topProductsByRevenue.reduce((sum, p) => sum + p.faturamentoTotal, 0))}
-                </p>
-              </CardContent>
-            </Card>
+            <KPITooltip metricKey="receita_total_produtos">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    <span className="text-xs text-muted-foreground">Receita Total</span>
+                  </div>
+                  <p className="text-xl font-bold text-green-600">
+                    {formatCurrency(productMetrics.topProductsByRevenue.reduce((sum, p) => sum + p.faturamentoTotal, 0))}
+                  </p>
+                </CardContent>
+              </Card>
+            </KPITooltip>
 
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <ShoppingCart className="h-4 w-4 text-blue-600" />
-                  <span className="text-xs text-muted-foreground">Unidades Vendidas</span>
-                </div>
-                <p className="text-xl font-bold text-blue-600">
-                  {productMetrics.topProductsByQuantity.reduce((sum, p) => sum + p.quantidadeTotal, 0).toLocaleString('pt-BR')}
-                </p>
-              </CardContent>
-            </Card>
+            <KPITooltip metricKey="unidades_vendidas">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShoppingCart className="h-4 w-4 text-blue-600" />
+                    <span className="text-xs text-muted-foreground">Unidades Vendidas</span>
+                  </div>
+                  <p className="text-xl font-bold text-blue-600">
+                    {productMetrics.topProductsByQuantity.reduce((sum, p) => sum + p.quantidadeTotal, 0).toLocaleString('pt-BR')}
+                  </p>
+                </CardContent>
+              </Card>
+            </KPITooltip>
 
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <BarChart3 className="h-4 w-4 text-purple-600" />
-                  <span className="text-xs text-muted-foreground">SKUs Únicos</span>
-                </div>
-                <p className="text-xl font-bold text-purple-600">
-                  {productMetrics.skuAnalysis.length.toLocaleString('pt-BR')}
-                </p>
-              </CardContent>
-            </Card>
+            <KPITooltip metricKey="skus_unicos">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BarChart3 className="h-4 w-4 text-purple-600" />
+                    <span className="text-xs text-muted-foreground">SKUs Únicos</span>
+                  </div>
+                  <p className="text-xl font-bold text-purple-600">
+                    {productMetrics.skuAnalysis.length.toLocaleString('pt-BR')}
+                  </p>
+                </CardContent>
+              </Card>
+            </KPITooltip>
 
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Link2 className="h-4 w-4 text-orange-600" />
-                  <span className="text-xs text-muted-foreground">Combinações</span>
-                </div>
-                <p className="text-xl font-bold text-orange-600">
-                  {productMetrics.productCombinations.length.toLocaleString('pt-BR')}
-                </p>
-              </CardContent>
-            </Card>
+            <KPITooltip metricKey="combinacoes_produtos">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Link2 className="h-4 w-4 text-orange-600" />
+                    <span className="text-xs text-muted-foreground">Combinações</span>
+                  </div>
+                  <p className="text-xl font-bold text-orange-600">
+                    {productMetrics.productCombinations.length.toLocaleString('pt-BR')}
+                  </p>
+                </CardContent>
+              </Card>
+            </KPITooltip>
 
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Gift className="h-4 w-4 text-pink-600" />
-                  <span className="text-xs text-muted-foreground">Brindes</span>
-                </div>
-                <p className="text-xl font-bold text-pink-600">
-                  {productMetrics.freebieProducts.length.toLocaleString('pt-BR')}
-                </p>
-              </CardContent>
-            </Card>
+            <KPITooltip metricKey="brindes">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Gift className="h-4 w-4 text-pink-600" />
+                    <span className="text-xs text-muted-foreground">Brindes</span>
+                  </div>
+                  <p className="text-xl font-bold text-pink-600">
+                    {productMetrics.freebieProducts.length.toLocaleString('pt-BR')}
+                  </p>
+                </CardContent>
+              </Card>
+            </KPITooltip>
           </div>
         </div>
       )}
@@ -350,22 +362,26 @@ export default function Produtos() {
             icon={DollarSign}
             metrics={comparisonMetrics.receitaProdutos}
             formatValue={(v) => formatCurrency(v)}
+            tooltipKey="receita_total_produtos"
           />
           <ComparisonMetricCard
             title="Produtos Vendidos"
             icon={ShoppingCart}
             metrics={comparisonMetrics.produtosVendidos}
+            tooltipKey="unidades_vendidas"
           />
           <ComparisonMetricCard
             title="SKUs Únicos"
             icon={BarChart3}
             metrics={comparisonMetrics.skusUnicos}
+            tooltipKey="skus_unicos"
           />
           <ComparisonMetricCard
             title="Top Produto (Receita)"
             icon={TrendingUp}
             metrics={comparisonMetrics.topProduto}
             formatValue={(v) => formatCurrency(v)}
+            tooltipKey="produto_campeao"
           />
         </div>
       )}

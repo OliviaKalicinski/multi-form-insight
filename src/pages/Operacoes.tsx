@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { Package, Truck, Clock, CheckCircle, DollarSign, TrendingUp } from "lucide-react";
+import { Package, Truck, Clock, DollarSign } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { ShippingMethodsChart } from "@/components/dashboard/ShippingMethodsChart";
 import { NFIssuanceChart } from "@/components/dashboard/NFIssuanceChart";
 import { LogisticsKPICards } from "@/components/dashboard/LogisticsKPICards";
+import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
 import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
 import { format, parse } from "date-fns";
@@ -171,102 +172,112 @@ export default function Operacoes() {
       {!comparisonMode && productMetrics && summaryMetrics && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* HERO Card - Forma de Envio Principal */}
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Truck className="h-6 w-6 text-primary" />
+          <KPITooltip metricKey="forma_envio_principal">
+            <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Truck className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Forma de Envio Principal</p>
+                    <p className="text-xs text-muted-foreground">
+                      🚚 Método mais utilizado no período
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Forma de Envio Principal</p>
-                  <p className="text-xs text-muted-foreground">
-                    🚚 Método mais utilizado no período
-                  </p>
+                
+                <h3 className="text-xl font-bold mb-4 line-clamp-2">
+                  {summaryMetrics.mainShipping?.formaEnvio || 'N/A'}
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-background/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">📦 Pedidos</p>
+                    <p className="text-lg font-bold">
+                      {summaryMetrics.mainShipping?.numeroPedidos.toLocaleString('pt-BR') || 0}
+                    </p>
+                  </div>
+                  <div className="bg-background/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">💰 Faturamento</p>
+                    <p className="text-lg font-bold text-green-600">
+                      {formatCurrency(summaryMetrics.mainShipping?.faturamentoTotal || 0)}
+                    </p>
+                  </div>
+                  <div className="bg-background/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">📈 % do Total</p>
+                    <p className="text-lg font-bold text-primary">
+                      {summaryMetrics.mainShipping?.percentual.toFixed(1) || 0}%
+                    </p>
+                  </div>
+                  <div className="bg-background/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">🎫 Ticket Médio</p>
+                    <p className="text-lg font-bold">
+                      {formatCurrency(summaryMetrics.mainShipping?.ticketMedio || 0)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              
-              <h3 className="text-xl font-bold mb-4 line-clamp-2">
-                {summaryMetrics.mainShipping?.formaEnvio || 'N/A'}
-              </h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-background/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">📦 Pedidos</p>
-                  <p className="text-lg font-bold">
-                    {summaryMetrics.mainShipping?.numeroPedidos.toLocaleString('pt-BR') || 0}
-                  </p>
-                </div>
-                <div className="bg-background/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">💰 Faturamento</p>
-                  <p className="text-lg font-bold text-green-600">
-                    {formatCurrency(summaryMetrics.mainShipping?.faturamentoTotal || 0)}
-                  </p>
-                </div>
-                <div className="bg-background/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">📈 % do Total</p>
-                  <p className="text-lg font-bold text-primary">
-                    {summaryMetrics.mainShipping?.percentual.toFixed(1) || 0}%
-                  </p>
-                </div>
-                <div className="bg-background/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">🎫 Ticket Médio</p>
-                  <p className="text-lg font-bold">
-                    {formatCurrency(summaryMetrics.mainShipping?.ticketMedio || 0)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </KPITooltip>
 
           {/* SATÉLITES - 4 cards compactos */}
           <div className="grid grid-cols-2 gap-4">
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Package className="h-4 w-4 text-blue-600" />
-                  <span className="text-xs text-muted-foreground">Total Pedidos</span>
-                </div>
-                <p className="text-xl font-bold text-blue-600">
-                  {summaryMetrics.totalOrders.toLocaleString('pt-BR')}
-                </p>
-              </CardContent>
-            </Card>
+            <KPITooltip metricKey="total_pedidos">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Package className="h-4 w-4 text-blue-600" />
+                    <span className="text-xs text-muted-foreground">Total Pedidos</span>
+                  </div>
+                  <p className="text-xl font-bold text-blue-600">
+                    {summaryMetrics.totalOrders.toLocaleString('pt-BR')}
+                  </p>
+                </CardContent>
+              </Card>
+            </KPITooltip>
 
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Truck className="h-4 w-4 text-teal-600" />
-                  <span className="text-xs text-muted-foreground">Formas de Envio</span>
-                </div>
-                <p className="text-xl font-bold text-teal-600">
-                  {summaryMetrics.totalShippingMethods}
-                </p>
-              </CardContent>
-            </Card>
+            <KPITooltip metricKey="formas_envio_total">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Truck className="h-4 w-4 text-teal-600" />
+                    <span className="text-xs text-muted-foreground">Formas de Envio</span>
+                  </div>
+                  <p className="text-xl font-bold text-teal-600">
+                    {summaryMetrics.totalShippingMethods}
+                  </p>
+                </CardContent>
+              </Card>
+            </KPITooltip>
 
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className={`h-4 w-4 ${summaryMetrics.avgNFTime <= 1 ? 'text-green-600' : summaryMetrics.avgNFTime <= 3 ? 'text-yellow-600' : 'text-red-600'}`} />
-                  <span className="text-xs text-muted-foreground">Tempo Médio NF</span>
-                </div>
-                <p className={`text-xl font-bold ${summaryMetrics.avgNFTime <= 1 ? 'text-green-600' : summaryMetrics.avgNFTime <= 3 ? 'text-yellow-600' : 'text-red-600'}`}>
-                  {summaryMetrics.avgNFTime.toFixed(1)} dias
-                </p>
-              </CardContent>
-            </Card>
+            <KPITooltip metricKey="tempo_medio_nf">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className={`h-4 w-4 ${summaryMetrics.avgNFTime <= 1 ? 'text-green-600' : summaryMetrics.avgNFTime <= 3 ? 'text-yellow-600' : 'text-red-600'}`} />
+                    <span className="text-xs text-muted-foreground">Tempo Médio NF</span>
+                  </div>
+                  <p className={`text-xl font-bold ${summaryMetrics.avgNFTime <= 1 ? 'text-green-600' : summaryMetrics.avgNFTime <= 3 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {summaryMetrics.avgNFTime.toFixed(1)} dias
+                  </p>
+                </CardContent>
+              </Card>
+            </KPITooltip>
 
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                  <span className="text-xs text-muted-foreground">Faturamento</span>
-                </div>
-                <p className="text-xl font-bold text-green-600">
-                  {formatCurrency(summaryMetrics.totalRevenue)}
-                </p>
-              </CardContent>
-            </Card>
+            <KPITooltip metricKey="faturamento_periodo">
+              <Card className="bg-muted/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    <span className="text-xs text-muted-foreground">Faturamento</span>
+                  </div>
+                  <p className="text-xl font-bold text-green-600">
+                    {formatCurrency(summaryMetrics.totalRevenue)}
+                  </p>
+                </CardContent>
+              </Card>
+            </KPITooltip>
           </div>
         </div>
       )}
@@ -278,23 +289,27 @@ export default function Operacoes() {
             title="Total de Pedidos"
             icon={Package}
             metrics={comparisonMetrics.totalPedidos}
+            tooltipKey="total_pedidos"
           />
           <ComparisonMetricCard
             title="Tempo Médio NF"
             icon={Clock}
             metrics={comparisonMetrics.tempoMedioNF}
             formatValue={(v) => `${v.toFixed(1)} dias`}
+            tooltipKey="tempo_medio_nf"
           />
           <ComparisonMetricCard
             title="Forma Envio Principal"
             icon={Truck}
             metrics={comparisonMetrics.formaEnvioPrincipal}
+            tooltipKey="forma_envio_principal"
           />
           <ComparisonMetricCard
             title="Faturamento"
             icon={DollarSign}
             metrics={comparisonMetrics.faturamento}
             formatValue={(v) => formatCurrency(v)}
+            tooltipKey="faturamento_periodo"
           />
         </div>
       )}
