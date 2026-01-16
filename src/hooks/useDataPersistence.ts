@@ -607,15 +607,55 @@ export const useDataPersistence = () => {
     }
   }, []);
 
-  // Delete a specific upload and its associated data (CASCADE handles data deletion)
+  // Helper to map data type to table name
+  const getDataTableForType = (dataType: string): "sales_data" | "ads_data" | "followers_data" | "marketing_data" | null => {
+    const mapping: Record<string, "sales_data" | "ads_data" | "followers_data" | "marketing_data"> = {
+      sales: "sales_data",
+      ads: "ads_data",
+      followers: "followers_data",
+      marketing: "marketing_data",
+    };
+    return mapping[dataType] || null;
+  };
+
+  // Delete a specific upload and its associated data
   const deleteUpload = useCallback(async (uploadId: string): Promise<void> => {
     try {
-      const { error } = await supabase
+      // First, fetch the data_type to know which table to clean
+      const { data: uploadEntry, error: fetchError } = await supabase
+        .from("upload_history")
+        .select("data_type")
+        .eq("id", uploadId)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (!uploadEntry) {
+        throw new Error("Upload não encontrado");
+      }
+
+      // Delete data from the corresponding table by upload_id
+      const dataTable = getDataTableForType(uploadEntry.data_type);
+      if (dataTable) {
+        console.log(`🗑️ Deletando dados de ${dataTable} para upload_id: ${uploadId}`);
+        const { error: dataError } = await supabase
+          .from(dataTable)
+          .delete()
+          .eq("upload_id", uploadId);
+        
+        if (dataError) {
+          console.error(`Erro ao deletar dados de ${dataTable}:`, dataError);
+          // Continue to delete the upload history even if data deletion fails
+        }
+      }
+
+      // Then delete the upload history record
+      const { error: historyError } = await supabase
         .from("upload_history")
         .delete()
         .eq("id", uploadId);
 
-      if (error) throw error;
+      if (historyError) throw historyError;
 
       // Reload stats after deletion
       const [salesCount, adsCount, followersCount, marketingCount] = await Promise.all([
