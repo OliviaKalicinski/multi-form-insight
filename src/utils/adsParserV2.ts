@@ -212,3 +212,39 @@ export const extractAvailableMonths = (data: AdsData[]): string[] => {
   
   return Array.from(months).sort();
 };
+
+/**
+ * Extrai o objetivo de um anúncio
+ */
+export const getAdObjective = (ad: AdsData): string => {
+  const objetivo = ad["Objetivo"] || "";
+  if (objetivo.includes("OUTCOME_SALES")) return "OUTCOME_SALES";
+  if (objetivo.includes("OUTCOME_ENGAGEMENT")) return "OUTCOME_ENGAGEMENT";
+  if (objetivo.includes("OUTCOME_TRAFFIC")) return "OUTCOME_TRAFFIC";
+  if (objetivo.includes("OUTCOME_AWARENESS")) return "OUTCOME_AWARENESS";
+  if (objetivo.includes("OUTCOME_LEADS")) return "OUTCOME_LEADS";
+  return "UNKNOWN";
+};
+
+/**
+ * Filtra anúncios por objetivo
+ * @param data Array de anúncios
+ * @param objective Objetivo desejado (OUTCOME_SALES, OUTCOME_ENGAGEMENT, etc)
+ * @returns Apenas anúncios com o objetivo especificado
+ */
+export const filterAdsByObjective = (data: AdsData[], objective: string): AdsData[] => {
+  return data.filter(ad => getAdObjective(ad) === objective);
+};
+
+/**
+ * Determina o objetivo principal baseado na hierarquia: Sales > Engagement > outros
+ * @returns O objetivo principal ou "ALL" se não houver distinção
+ */
+export const determinePrimaryObjective = (data: AdsData[]): "OUTCOME_SALES" | "OUTCOME_ENGAGEMENT" | "ALL" => {
+  const hasSales = data.some(ad => getAdObjective(ad) === "OUTCOME_SALES");
+  const hasEngagement = data.some(ad => getAdObjective(ad) === "OUTCOME_ENGAGEMENT");
+  
+  if (hasSales) return "OUTCOME_SALES";
+  if (hasEngagement) return "OUTCOME_ENGAGEMENT";
+  return "ALL";
+};
