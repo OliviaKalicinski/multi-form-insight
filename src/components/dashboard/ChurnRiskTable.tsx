@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { ChurnRiskCustomer } from "@/types/marketing";
 import { formatCurrency } from "@/utils/salesCalculator";
-import { format, differenceInDays } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,11 +22,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Search, Download, AlertTriangle } from "lucide-react";
+import { Search, Download, AlertTriangle, ArrowUp, ArrowDown } from "lucide-react";
 
 interface ChurnRiskTableProps {
   customers: ChurnRiskCustomer[];
 }
+
+type SortField = 'nomeCliente' | 'ultimaCompra' | 'diasSemComprar' | 'totalPedidos' | 'valorTotal' | 'riskLevel';
+type SortDirection = 'asc' | 'desc';
 
 const getRiskBadgeVariant = (risk: string): "destructive" | "secondary" | "default" | "outline" => {
   switch (risk) {
@@ -53,11 +56,15 @@ const formatDaysAgo = (days: number): string => {
   return `há ${Math.floor(days / 30)} meses`;
 };
 
+const riskOrder: Record<string, number> = { 'low': 1, 'medium': 2, 'high': 3, 'critical': 4 };
+
 export const ChurnRiskTable = ({ customers }: ChurnRiskTableProps) => {
   const [filterRisk, setFilterRisk] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
+  const [sortField, setSortField] = useState<SortField>('diasSemComprar');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const filteredCustomers = useMemo(() => {
     let filtered = customers;
@@ -74,8 +81,46 @@ export const ChurnRiskTable = ({ customers }: ChurnRiskTableProps) => {
       );
     }
     
+    // Sorting
+    filtered = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortField) {
+        case 'nomeCliente':
+          comparison = a.nomeCliente.localeCompare(b.nomeCliente);
+          break;
+        case 'ultimaCompra':
+          comparison = new Date(a.ultimaCompra).getTime() - new Date(b.ultimaCompra).getTime();
+          break;
+        case 'diasSemComprar':
+          comparison = a.diasSemComprar - b.diasSemComprar;
+          break;
+        case 'totalPedidos':
+          comparison = a.totalPedidos - b.totalPedidos;
+          break;
+        case 'valorTotal':
+          comparison = a.valorTotal - b.valorTotal;
+          break;
+        case 'riskLevel':
+          comparison = (riskOrder[a.riskLevel] || 0) - (riskOrder[b.riskLevel] || 0);
+          break;
+      }
+      
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    
     return filtered;
-  }, [customers, filterRisk, searchTerm]);
+  }, [customers, filterRisk, searchTerm, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+    setCurrentPage(1);
+  };
 
   const totalPages = Math.ceil(filteredCustomers.length / pageSize);
   const paginatedCustomers = filteredCustomers.slice(
@@ -168,12 +213,72 @@ export const ChurnRiskTable = ({ customers }: ChurnRiskTableProps) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Última Compra</TableHead>
-                <TableHead className="text-right">Tempo</TableHead>
-                <TableHead className="text-right">Pedidos</TableHead>
-                <TableHead className="text-right">Valor Total</TableHead>
-                <TableHead>Risco</TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none"
+                  onClick={() => handleSort('nomeCliente')}
+                >
+                  <div className="flex items-center gap-1">
+                    Cliente
+                    {sortField === 'nomeCliente' && (
+                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none"
+                  onClick={() => handleSort('ultimaCompra')}
+                >
+                  <div className="flex items-center gap-1">
+                    Última Compra
+                    {sortField === 'ultimaCompra' && (
+                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none text-right"
+                  onClick={() => handleSort('diasSemComprar')}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Tempo
+                    {sortField === 'diasSemComprar' && (
+                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none text-right"
+                  onClick={() => handleSort('totalPedidos')}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Pedidos
+                    {sortField === 'totalPedidos' && (
+                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none text-right"
+                  onClick={() => handleSort('valorTotal')}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Valor Total
+                    {sortField === 'valorTotal' && (
+                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none"
+                  onClick={() => handleSort('riskLevel')}
+                >
+                  <div className="flex items-center gap-1">
+                    Risco
+                    {sortField === 'riskLevel' && (
+                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

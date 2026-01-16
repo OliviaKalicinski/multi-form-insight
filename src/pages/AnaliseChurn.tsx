@@ -1,45 +1,20 @@
 import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { calculateCustomerBehaviorMetrics } from "@/utils/customerBehaviorMetrics";
-import { filterOrdersByMonth } from "@/utils/salesCalculator";
 import { EmptyState } from "@/components/EmptyState";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChurnFunnelChart } from "@/components/dashboard/ChurnFunnelChart";
 import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
-import { AlertTriangle, Users, UserMinus, UserX, TrendingDown, DollarSign, FileWarning } from "lucide-react";
-import { format, parse } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { AlertTriangle, Users, UserMinus, DollarSign, FileWarning, TrendingDown } from "lucide-react";
 
 export default function AnaliseChurn() {
-  const { salesData, selectedMonth, availableMonths } = useDashboard();
+  const { salesData } = useDashboard();
 
-  // Calculate metrics based on selected filter
+  // ALWAYS use all data for churn analysis - ignore month filter
   const behaviorMetrics = useMemo(() => {
     if (salesData.length === 0) return null;
-
-    if (!selectedMonth) {
-      return calculateCustomerBehaviorMetrics(salesData);
-    }
-
-    const filteredOrders = selectedMonth === 'last-12-months'
-      ? salesData
-      : filterOrdersByMonth(salesData, selectedMonth, availableMonths);
-
-    if (filteredOrders.length === 0) return null;
-
-    return calculateCustomerBehaviorMetrics(filteredOrders);
-  }, [salesData, selectedMonth, availableMonths]);
-
-  // Format selected period for display
-  const formatSelectedPeriod = () => {
-    if (!selectedMonth) return 'Todos os períodos';
-    if (selectedMonth === 'last-12-months') return 'Últimos 12 meses';
-    try {
-      return format(parse(selectedMonth, "yyyy-MM", new Date()), "MMMM 'de' yyyy", { locale: ptBR });
-    } catch {
-      return selectedMonth;
-    }
-  };
+    return calculateCustomerBehaviorMetrics(salesData);
+  }, [salesData]);
 
   if (salesData.length === 0) {
     return (
@@ -87,7 +62,7 @@ export default function AnaliseChurn() {
         {/* Period indicator */}
         <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
           <p className="text-sm text-blue-800 dark:text-blue-200">
-            📅 <strong>Período:</strong> {formatSelectedPeriod()}
+            📅 <strong>Período:</strong> Todo o histórico
           </p>
         </div>
       </div>
