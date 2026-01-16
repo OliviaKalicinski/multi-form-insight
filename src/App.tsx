@@ -21,6 +21,7 @@ import PerformanceFinanceira from "./pages/PerformanceFinanceira";
 import ComportamentoCliente from "./pages/ComportamentoCliente";
 import AnaliseSamples from "./pages/AnaliseSamples";
 import AnaliseCritica from "./pages/AnaliseCritica";
+import AnaliseChurn from "./pages/AnaliseChurn";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -131,6 +132,14 @@ const App = () => (
             <ProtectedRoute>
               <AuthenticatedLayout>
                 <ComportamentoCliente />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/analise-churn" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <AnaliseChurn />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />

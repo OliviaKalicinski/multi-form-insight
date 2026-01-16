@@ -3,11 +3,9 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { Users, RefreshCcw, AlertTriangle, UserCheck, DollarSign, Calendar, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ChurnFunnelChart } from "@/components/dashboard/ChurnFunnelChart";
 import { OrderVolumeChart } from "@/components/dashboard/OrderVolumeChart";
 import { SalesPeaksChart } from "@/components/dashboard/SalesPeaksChart";
 import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
-import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
 import { SegmentRevenueChart } from "@/components/dashboard/SegmentRevenueChart";
 import { SegmentDetailTable } from "@/components/dashboard/SegmentDetailTable";
 import { VolumeKPICards } from "@/components/dashboard/VolumeKPICards";
@@ -505,56 +503,6 @@ export default function ComportamentoCliente() {
           <CardContent>
             <SalesPeaksChart
               peaks={behaviorMetrics?.picosVendas || []}
-            />
-          </CardContent>
-        </Card>
-      </section>
-
-      <Separator className="my-8" />
-
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* SEÇÃO 3: ANÁLISE DE CHURN */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🚨</span>
-          <div>
-            <h2 className="text-xl font-semibold">Análise de Churn</h2>
-            <p className="text-sm text-muted-foreground">Monitoramento de retenção e clientes em risco</p>
-          </div>
-        </div>
-
-        {/* Funil de Retenção */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Funil de Retenção</CardTitle>
-            <CardDescription>
-              Distribuição de clientes por estágio de atividade
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px]">
-              <ChurnFunnelChart
-                ativos={behaviorMetrics?.clientesAtivos || 0}
-                emRisco={behaviorMetrics?.clientesEmRisco || 0}
-                inativos={behaviorMetrics?.clientesInativos || 0}
-                churn={behaviorMetrics?.clientesChurn || 0}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tabela de clientes em risco */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Clientes em Risco de Churn</CardTitle>
-            <CardDescription>
-              Clientes que não compram há mais de 30 dias, ordenados por valor total
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChurnRiskTable
-              customers={behaviorMetrics?.churnRiskCustomers || []}
             />
           </CardContent>
         </Card>

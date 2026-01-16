@@ -73,6 +73,7 @@ const navSections: NavSection[] = [
     icon: Users,
     items: [
       { title: "Comportamento", url: "/comportamento-cliente", icon: UserCheck },
+      { title: "Análise de Churn", url: "/analise-churn", icon: AlertTriangle },
     ],
   },
   {
