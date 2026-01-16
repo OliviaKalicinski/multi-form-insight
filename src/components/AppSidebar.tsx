@@ -20,6 +20,7 @@ import {
   Gift,
   Users,
   UserCheck,
+  PieChart,
   Package,
   BarChart3,
   Target,
@@ -73,6 +74,7 @@ const navSections: NavSection[] = [
     icon: Users,
     items: [
       { title: "Comportamento", url: "/comportamento-cliente", icon: UserCheck },
+      { title: "Segmentação", url: "/segmentacao-clientes", icon: PieChart },
       { title: "Análise de Churn", url: "/analise-churn", icon: AlertTriangle },
     ],
   },

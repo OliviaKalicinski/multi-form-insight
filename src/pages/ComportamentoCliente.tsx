@@ -2,12 +2,8 @@ import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { Users, RefreshCcw, AlertTriangle, UserCheck, DollarSign, Calendar, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { OrderVolumeChart } from "@/components/dashboard/OrderVolumeChart";
 import { SalesPeaksChart } from "@/components/dashboard/SalesPeaksChart";
-import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
-import { SegmentRevenueChart } from "@/components/dashboard/SegmentRevenueChart";
-import { SegmentDetailTable } from "@/components/dashboard/SegmentDetailTable";
 import { VolumeKPICards } from "@/components/dashboard/VolumeKPICards";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
@@ -358,68 +354,9 @@ export default function ComportamentoCliente() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* SEÇÃO 1: SEGMENTAÇÃO DE CLIENTES */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🎯</span>
-          <div>
-            <h2 className="text-xl font-semibold">Segmentação de Clientes</h2>
-            <p className="text-sm text-muted-foreground">Distribuição por comportamento de compra</p>
-          </div>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Distribuição de Clientes</CardTitle>
-              <CardDescription>
-                Segmentação por comportamento de compra
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CustomerSegmentationChart
-                segments={behaviorMetrics?.customerSegmentation || []}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Receita por Segmento</CardTitle>
-              <CardDescription>
-                Contribuição de cada perfil para o faturamento
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SegmentRevenueChart
-                segments={behaviorMetrics?.customerSegmentation || []}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tabela detalhada de segmentos */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Análise Detalhada por Segmento</CardTitle>
-            <CardDescription>
-              Métricas completas de cada perfil de cliente
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SegmentDetailTable
-              segments={behaviorMetrics?.customerSegmentation || []}
-            />
-          </CardContent>
-        </Card>
-      </section>
-
-      <Separator className="my-8" />
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* SEÇÃO 2: VOLUME E PADRÕES */}
+      {/* SEÇÃO: VOLUME E PADRÕES */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <section className="space-y-6">
         <div className="flex items-center gap-3">
