@@ -390,8 +390,128 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
     description: "Total de compras realizadas e atribuídas às campanhas de anúncios.",
   },
   lucro_liquido_ads: {
-    formula: "Receita de Conversões - Investimento em Ads",
-    description: "Lucro ou prejuízo líquido após descontar o investimento em anúncios.",
-    rules: ["Positivo = lucro", "Negativo = prejuízo"]
+    formula: "Valor Conversão - Investimento",
+    description: "Lucro líquido gerado pelas campanhas de ads, descontando o investimento.",
+    rules: [
+      "Positivo = campanha lucrativa",
+      "Negativo = campanha no prejuízo",
+      "Compare com margem do produto para avaliar sustentabilidade",
+    ],
+  },
+  // Métricas de Funil e Performance Ads
+  lpv: {
+    formula: "Landing Page Views (Visualizações da página de destino)",
+    description: "Número de visualizações da página de destino após clique no anúncio. Indica quantas pessoas chegaram ao site.",
+    rules: [
+      "LPV baixo vs cliques alto = problema de carregamento da página",
+      "Compare com cliques para calcular taxa de chegada",
+    ],
+  },
+  taxa_add_cart: {
+    formula: "(Adições ao Carrinho ÷ LPV) × 100",
+    description: "Percentual de visitantes que adicionaram produtos ao carrinho após visualizar a página.",
+    rules: [
+      "Acima de 10% = excelente interesse no produto",
+      "Entre 5-10% = bom desempenho",
+      "Abaixo de 5% = revisar página de produto",
+    ],
+  },
+  taxa_conversao_carrinho: {
+    formula: "(Compras ÷ Adições ao Carrinho) × 100",
+    description: "Percentual de carrinhos que se converteram em compras efetivas.",
+    rules: [
+      "Acima de 50% = excelente checkout",
+      "Entre 30-50% = normal para e-commerce",
+      "Abaixo de 30% = revisar processo de checkout",
+    ],
+  },
+  taxa_abandono_carrinho: {
+    formula: "100 - (Compras ÷ Adições ao Carrinho × 100)",
+    description: "Percentual de carrinhos abandonados antes de finalizar a compra.",
+    rules: [
+      "Abaixo de 50% = excelente retenção",
+      "Entre 50-70% = normal para e-commerce",
+      "Acima de 70% = problema no checkout ou preço",
+    ],
+  },
+  ticket_medio_ads: {
+    formula: "Valor de Conversão ÷ Número de Compras",
+    description: "Valor médio por compra atribuída aos anúncios.",
+    rules: [
+      "Compare com ticket médio geral do e-commerce",
+      "Ticket baixo pode indicar produto de entrada",
+      "Ticket alto pode indicar audiência qualificada",
+    ],
+  },
+  cpa: {
+    formula: "Investimento ÷ Número de Compras",
+    description: "Custo por Aquisição - quanto custou cada conversão em compra.",
+    rules: [
+      "CPA deve ser menor que o ticket médio",
+      "Ideal: CPA < 30% do ticket médio",
+      "CPA alto indica ineficiência na campanha",
+    ],
+  },
+  alcance_total: {
+    formula: "Pessoas únicas atingidas pelos anúncios",
+    description: "Número de pessoas distintas que viram seus anúncios pelo menos uma vez.",
+    rules: [
+      "Alcance alto = maior awareness",
+      "Compare com impressões para calcular frequência",
+      "Alcance crescente indica expansão de audiência",
+    ],
+  },
+  impressoes_total: {
+    formula: "Total de vezes que os anúncios foram exibidos",
+    description: "Número total de exibições dos anúncios, incluindo repetições para a mesma pessoa.",
+    rules: [
+      "Impressões ÷ Alcance = Frequência média",
+      "Frequência alta (>4) pode causar fadiga de anúncio",
+      "Impressões crescentes = mais visibilidade",
+    ],
+  },
+  cliques_total: {
+    formula: "Total de cliques nos anúncios",
+    description: "Número total de cliques recebidos em todos os anúncios.",
+    rules: [
+      "Cliques ÷ Impressões = CTR",
+      "CTR baixo = criativo pouco atrativo",
+      "CTR alto = boa relevância do anúncio",
+    ],
+  },
+  roi_ads: {
+    formula: "((Receita - Investimento) ÷ Investimento) × 100",
+    description: "Retorno sobre Investimento em percentual - quanto cada real investido retornou.",
+    rules: [
+      "ROI 100% = dobrou o investimento",
+      "ROI 200% = triplicou o investimento (ROAS 3x)",
+      "ROI negativo = prejuízo na campanha",
+    ],
+  },
+  cpe: {
+    formula: "Investimento ÷ Resultados (Engajamentos)",
+    description: "Custo por Engajamento - quanto custou cada interação com o conteúdo.",
+    rules: [
+      "CPE baixo = conteúdo ressonando bem",
+      "CPE alto = revisar criativo ou segmentação",
+      "Compare entre campanhas para otimizar",
+    ],
+  },
+  visitas_perfil: {
+    formula: "Total de visitas ao perfil do Instagram",
+    description: "Número de pessoas que visitaram o perfil após ver ou interagir com o anúncio.",
+    rules: [
+      "Indica interesse na marca",
+      "Pode levar a seguidores orgânicos",
+      "Alto volume = boa curiosidade gerada",
+    ],
+  },
+  receita_ads: {
+    formula: "Valor total de conversão atribuído aos anúncios",
+    description: "Receita gerada pelas campanhas conforme atribuição do Meta Ads.",
+    rules: [
+      "Janela de atribuição padrão: 7 dias clique, 1 dia visualização",
+      "Compare com receita real para calibrar expectativas",
+    ],
   },
 };
