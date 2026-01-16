@@ -19,6 +19,7 @@ import Volume from "./pages/Volume";
 import Ads from "./pages/Ads";
 import PerformanceFinanceira from "./pages/PerformanceFinanceira";
 import ComportamentoCliente from "./pages/ComportamentoCliente";
+import SegmentacaoClientes from "./pages/SegmentacaoClientes";
 import AnaliseSamples from "./pages/AnaliseSamples";
 import AnaliseCritica from "./pages/AnaliseCritica";
 import AnaliseChurn from "./pages/AnaliseChurn";
@@ -132,6 +133,14 @@ const App = () => (
             <ProtectedRoute>
               <AuthenticatedLayout>
                 <ComportamentoCliente />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/segmentacao-clientes" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <SegmentacaoClientes />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />
