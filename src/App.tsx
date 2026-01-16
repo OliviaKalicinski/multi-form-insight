@@ -23,6 +23,7 @@ import SegmentacaoClientes from "./pages/SegmentacaoClientes";
 import AnaliseSamples from "./pages/AnaliseSamples";
 import AnaliseCritica from "./pages/AnaliseCritica";
 import AnaliseChurn from "./pages/AnaliseChurn";
+import Publico from "./pages/Publico";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -157,6 +158,14 @@ const App = () => (
             <ProtectedRoute>
               <AuthenticatedLayout>
                 <AnaliseSamples />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/publico" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <Publico />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />

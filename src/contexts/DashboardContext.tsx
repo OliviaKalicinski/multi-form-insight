@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useMemo, useEffect, useCallback, ReactNode } from "react";
-import { MarketingData, FollowersData, AdsData, AdsMonthSummary, ProcessedOrder } from "@/types/marketing";
+import { MarketingData, FollowersData, AdsData, AdsMonthSummary, ProcessedOrder, AudienceData } from "@/types/marketing";
 import { extractAvailableMonths } from "@/utils/adsParserV2";
 import { format } from "date-fns";
 import { useDataPersistence } from "@/hooks/useDataPersistence";
@@ -11,6 +11,7 @@ interface DashboardContextType {
   monthlySummaries: AdsMonthSummary[];
   hasHierarchicalFormat: boolean;
   salesData: ProcessedOrder[];
+  audienceData: AudienceData | null;
   selectedMonth: string | null;
   availableMonths: string[];
   comparisonMode: boolean;
@@ -21,6 +22,7 @@ interface DashboardContextType {
   setFollowersData: (data: FollowersData[]) => void;
   setAdsData: (data: AdsData[], summaries?: AdsMonthSummary[], isHierarchical?: boolean) => void;
   setSalesData: (data: ProcessedOrder[]) => void;
+  setAudienceData: (data: AudienceData | null) => void;
   setSelectedMonth: (month: string | null) => void;
   setComparisonMode: (enabled: boolean) => void;
   setSelectedMonths: (months: string[]) => void;
@@ -29,6 +31,7 @@ interface DashboardContextType {
   persistAdsData: (data: AdsData[], fileName?: string) => Promise<{ inserted: number; total: number }>;
   persistFollowersData: (data: FollowersData[], fileName?: string) => Promise<{ inserted: number; total: number }>;
   persistMarketingData: (data: MarketingData[], fileName?: string) => Promise<{ inserted: number; total: number }>;
+  persistAudienceData: (data: AudienceData, fileName?: string) => Promise<{ inserted: number; total: number }>;
   deleteUpload: (uploadId: string) => Promise<void>;
   clearPersistedData: () => Promise<void>;
   clearAdsData: () => Promise<void>;
@@ -44,6 +47,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [monthlySummaries, setMonthlySummaries] = useState<AdsMonthSummary[]>([]);
   const [hasHierarchicalFormat, setHasHierarchicalFormat] = useState<boolean>(false);
   const [salesData, setSalesDataState] = useState<ProcessedOrder[]>([]);
+  const [audienceData, setAudienceDataState] = useState<AudienceData | null>(null);
   const [selectedMonth, setSelectedMonthState] = useState<string | null>(null);
   const [comparisonMode, setComparisonModeState] = useState<boolean>(false);
   const [selectedMonths, setSelectedMonthsState] = useState<string[]>([]);
@@ -56,6 +60,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     saveAdsData,
     saveFollowersData,
     saveMarketingData,
+    saveAudienceData,
+    loadAudienceData,
     deleteUpload: deleteUploadFromDb,
     clearAllData,
     clearAdsData: clearAdsDataFromDb,
@@ -66,18 +72,20 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     const loadPersistedData = async () => {
       console.log("🔄 Carregando dados do banco...");
       const { salesData, adsData, followersData, marketingData } = await loadAllData();
+      const audienceDataLoaded = await loadAudienceData();
       
       if (salesData.length > 0) setSalesDataState(salesData);
       if (adsData.length > 0) setAdsDataState(adsData);
       if (followersData.length > 0) setFollowersDataState(followersData);
       if (marketingData.length > 0) setMarketingDataState(marketingData);
+      if (audienceDataLoaded) setAudienceDataState(audienceDataLoaded);
       
       setDataLoaded(true);
       console.log("✅ Dados carregados com sucesso");
     };
 
     loadPersistedData();
-  }, [loadAllData]);
+  }, [loadAllData, loadAudienceData]);
 
   // Calculate available months from all data sources
   const availableMonths = useMemo(() => {
@@ -139,6 +147,10 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setSelectedMonthState(null);
   };
 
+  const setAudienceData = (data: AudienceData | null) => {
+    setAudienceDataState(data);
+  };
+
   const setComparisonMode = (enabled: boolean) => {
     setComparisonModeState(enabled);
     if (!enabled) {
@@ -196,16 +208,24 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     return result;
   }, [saveMarketingData]);
 
+  const persistAudienceData = useCallback(async (data: AudienceData, fileName?: string) => {
+    const result = await saveAudienceData(data, fileName);
+    setAudienceDataState(data);
+    return result;
+  }, [saveAudienceData]);
+
   // Delete upload and refresh data from database
   const deleteUpload = useCallback(async (uploadId: string) => {
     await deleteUploadFromDb(uploadId);
     // Refresh all data from database after deletion
     const { salesData, adsData, followersData, marketingData } = await loadAllData();
+    const audienceDataLoaded = await loadAudienceData();
     setSalesDataState(salesData);
     setAdsDataState(adsData);
     setFollowersDataState(followersData);
     setMarketingDataState(marketingData);
-  }, [deleteUploadFromDb, loadAllData]);
+    setAudienceDataState(audienceDataLoaded);
+  }, [deleteUploadFromDb, loadAllData, loadAudienceData]);
 
   const clearPersistedData = useCallback(async () => {
     await clearAllData();
@@ -214,6 +234,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setFollowersDataState([]);
     setMarketingDataState([]);
     setMonthlySummaries([]);
+    setAudienceDataState(null);
     setSelectedMonthState(null);
   }, [clearAllData]);
 
@@ -226,11 +247,13 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshFromDatabase = useCallback(async () => {
     const { salesData, adsData, followersData, marketingData } = await loadAllData();
+    const audienceDataLoaded = await loadAudienceData();
     setSalesDataState(salesData);
     setAdsDataState(adsData);
     setFollowersDataState(followersData);
     setMarketingDataState(marketingData);
-  }, [loadAllData]);
+    setAudienceDataState(audienceDataLoaded);
+  }, [loadAllData, loadAudienceData]);
 
   const value = {
     marketingData,
@@ -239,6 +262,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     monthlySummaries,
     hasHierarchicalFormat,
     salesData,
+    audienceData,
     selectedMonth,
     availableMonths,
     comparisonMode,
@@ -249,6 +273,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setFollowersData,
     setAdsData,
     setSalesData,
+    setAudienceData,
     setSelectedMonth: setSelectedMonthState,
     setComparisonMode,
     setSelectedMonths: setSelectedMonthsState,
@@ -257,6 +282,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     persistAdsData,
     persistFollowersData,
     persistMarketingData,
+    persistAudienceData,
     deleteUpload,
     clearPersistedData,
     clearAdsData,

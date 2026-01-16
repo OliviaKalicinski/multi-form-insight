@@ -4,6 +4,7 @@ import { CSVUploader } from "@/components/dashboard/CSVUploader";
 import { FollowersUploader } from "@/components/dashboard/FollowersUploader";
 import { AdsUploader } from "@/components/dashboard/AdsUploader";
 import { SalesUploader } from "@/components/dashboard/SalesUploader";
+import { AudienceUploader } from "@/components/dashboard/AudienceUploader";
 import { UploadHistory } from "@/components/dashboard/UploadHistory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,9 @@ export default function Upload() {
     adsData, 
     setAdsData,
     salesData,
-    setSalesData
+    setSalesData,
+    audienceData,
+    setAudienceData
   } = useDashboard();
 
   const hasAnyData = salesData.length > 0 || adsData.length > 0 || followersData.length > 0;
@@ -51,7 +54,7 @@ export default function Upload() {
       </div>
 
       {/* Upload Sections */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center justify-between">
@@ -113,6 +116,22 @@ export default function Upload() {
           </CardHeader>
           <CardContent className="pt-2">
             <CSVUploader onDataLoaded={setMarketingData} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center justify-between">
+              <span>Público</span>
+              {audienceData && (
+                <Badge variant="secondary" className="font-normal text-xs">
+                  ✓
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-2">
+            <AudienceUploader onDataLoaded={setAudienceData} />
           </CardContent>
         </Card>
       </div>

@@ -76,6 +76,7 @@ const navSections: NavSection[] = [
       { title: "Comportamento", url: "/comportamento-cliente", icon: UserCheck },
       { title: "Segmentação", url: "/segmentacao-clientes", icon: PieChart },
       { title: "Análise de Churn", url: "/analise-churn", icon: AlertTriangle },
+      { title: "Público", url: "/publico", icon: Users },
     ],
   },
   {
