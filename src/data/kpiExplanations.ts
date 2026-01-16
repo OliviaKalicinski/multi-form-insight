@@ -229,6 +229,48 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
     description: "Variação percentual no total de seguidores.",
   },
 
+  // === MÉTRICAS INSTAGRAM ORGÂNICO ===
+  visualizacoes_instagram: {
+    formula: "Σ(visualizações diárias de posts/stories)",
+    description: "Total de vezes que posts e stories foram exibidos organicamente.",
+    rules: ["Origem: Instagram orgânico", "Mede atenção recebida"],
+  },
+  alcance_instagram: {
+    formula: "Σ(pessoas únicas atingidas)",
+    description: "Número de pessoas únicas que viram seu conteúdo organicamente.",
+    rules: ["Origem: Instagram orgânico", "Mede audiência orgânica"],
+  },
+  interacoes_instagram: {
+    formula: "Σ(curtidas + comentários + compartilhamentos + salvamentos)",
+    description: "Total de engajamentos orgânicos: curtidas, comentários, compartilhamentos e salvamentos.",
+    rules: ["Origem: Instagram orgânico", "Mede interesse do público"],
+  },
+  visitas_perfil_instagram: {
+    formula: "Σ(visitas ao perfil)",
+    description: "Total de visitas ao perfil vindas do conteúdo orgânico.",
+    rules: ["Origem: Instagram orgânico", "Indica interesse na marca"],
+  },
+  cliques_link_instagram: {
+    formula: "Σ(cliques no link da bio/stories/botões)",
+    description: "Total de cliques em links do perfil, stories ou botões orgânicos.",
+    rules: ["Origem: Instagram orgânico", "Mede intenção de ação"],
+  },
+  taxa_alcance_visita: {
+    formula: "(Visitas ao Perfil ÷ Alcance) × 100",
+    description: "Percentual de pessoas alcançadas que visitaram o perfil.",
+    rules: ["Mede conversão de interesse", "≥1% é considerado bom"],
+  },
+  taxa_engajamento_instagram: {
+    formula: "(Interações ÷ Alcance) × 100",
+    description: "Percentual de engajamento em relação ao alcance orgânico.",
+    rules: ["≥5% = Excelente", "3-5% = Bom", "1-3% = Médio", "<1% = Baixo"],
+  },
+  taxa_visita_clique: {
+    formula: "(Cliques no Link ÷ Visitas ao Perfil) × 100",
+    description: "Percentual de visitantes do perfil que clicaram em links.",
+    rules: ["Mede conversão para ação externa", "≥10% é considerado bom"],
+  },
+
   // === MÉTRICAS DE SAMPLES/BRINDES ===
   total_samples: {
     formula: "COUNT(produtos marcados como sample/brinde)",

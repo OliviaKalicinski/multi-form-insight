@@ -15,6 +15,7 @@ export const calculateMonthlyMetrics = (data: MarketingData[]): MonthlyMetrics =
 
   const taxaAlcanceVisita = alcanceTotal > 0 ? (visitasTotal / alcanceTotal) * 100 : 0;
   const taxaEngajamento = alcanceTotal > 0 ? (interacoesTotal / alcanceTotal) * 100 : 0;
+  const taxaVisitaClique = visitasTotal > 0 ? (clicksTotal / visitasTotal) * 100 : 0;
 
   return {
     visualizacoesTotal,
@@ -24,6 +25,7 @@ export const calculateMonthlyMetrics = (data: MarketingData[]): MonthlyMetrics =
     clicksTotal,
     taxaAlcanceVisita,
     taxaEngajamento,
+    taxaVisitaClique,
   };
 };
 

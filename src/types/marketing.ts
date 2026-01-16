@@ -15,6 +15,7 @@ export interface MonthlyMetrics {
   clicksTotal: number;
   taxaAlcanceVisita: number;
   taxaEngajamento: number;
+  taxaVisitaClique: number;
 }
 
 export interface GrowthMetrics {
