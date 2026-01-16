@@ -17,6 +17,30 @@ export interface InstagramGoals {
   dataBaseline: string;
 }
 
+export interface SectorBenchmarks {
+  // Vendas
+  ticketMedio: number | null;
+  taxaConversao: number | null;
+  // Marketing
+  roasMedio: number | null;
+  roasMinimo: number | null;
+  roasExcelente: number | null;
+  ctr: number | null;
+  cpc: number | null;
+  cac: number | null;
+  // Clientes
+  taxaRecompra: number | null;
+  taxaChurn: number | null;
+  ltv: number | null;
+  // Parâmetros
+  margemLiquida: number | null;
+  // Instagram (sem benchmark do setor)
+  seguidoresMes: number | null;
+  // Metadata
+  dataReferencia: string;
+  fonte: string;
+}
+
 const DEFAULT_FINANCIAL_GOALS: FinancialGoals = {
   receita: 50000,
   pedidos: 350,
@@ -31,9 +55,28 @@ const DEFAULT_INSTAGRAM_GOALS: InstagramGoals = {
   dataBaseline: "2025-01-12",
 };
 
+const DEFAULT_SECTOR_BENCHMARKS: SectorBenchmarks = {
+  ticketMedio: 180,
+  taxaConversao: 1.2,
+  roasMedio: 3.2,
+  roasMinimo: 2.5,
+  roasExcelente: 4.0,
+  ctr: 1.8,
+  cpc: 0.45,
+  cac: 45,
+  taxaRecompra: 38,
+  taxaChurn: 28,
+  ltv: 420,
+  margemLiquida: 22,
+  seguidoresMes: null,
+  dataReferencia: "2024-01",
+  fonte: "Relatório Mercado Pet Brasil 2024 + ABINPET + Shopify Benchmark Reports",
+};
+
 export function useAppSettings() {
   const [financialGoals, setFinancialGoals] = useState<FinancialGoals>(DEFAULT_FINANCIAL_GOALS);
   const [instagramGoals, setInstagramGoals] = useState<InstagramGoals>(DEFAULT_INSTAGRAM_GOALS);
+  const [sectorBenchmarks, setSectorBenchmarks] = useState<SectorBenchmarks>(DEFAULT_SECTOR_BENCHMARKS);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
@@ -47,7 +90,7 @@ export function useAppSettings() {
       const { data, error } = await supabase
         .from("app_settings")
         .select("setting_key, setting_value")
-        .in("setting_key", ["financial_goals", "instagram_goals"]);
+        .in("setting_key", ["financial_goals", "instagram_goals", "sector_benchmarks"]);
 
       if (error) {
         console.error("Error loading settings:", error);
@@ -61,6 +104,9 @@ export function useAppSettings() {
           }
           if (setting.setting_key === "instagram_goals" && setting.setting_value) {
             setInstagramGoals(setting.setting_value as unknown as InstagramGoals);
+          }
+          if (setting.setting_key === "sector_benchmarks" && setting.setting_value) {
+            setSectorBenchmarks({ ...DEFAULT_SECTOR_BENCHMARKS, ...(setting.setting_value as unknown as SectorBenchmarks) });
           }
         });
       }
@@ -150,13 +196,62 @@ export function useAppSettings() {
     }
   };
 
+  const updateSectorBenchmarks = async (newBenchmarks: SectorBenchmarks) => {
+    setIsSaving(true);
+    try {
+      const { error: updateError, count } = await supabase
+        .from("app_settings")
+        .update({ setting_value: JSON.parse(JSON.stringify(newBenchmarks)) as Json })
+        .eq("setting_key", "sector_benchmarks")
+        .select();
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // If no rows updated, insert new setting
+      if (count === 0) {
+        const { error: insertError } = await supabase
+          .from("app_settings")
+          .insert({
+            setting_key: "sector_benchmarks",
+            setting_value: JSON.parse(JSON.stringify(newBenchmarks)) as Json,
+            description: "Benchmarks do setor Pet Food para comparação",
+          });
+
+        if (insertError) {
+          throw insertError;
+        }
+      }
+
+      setSectorBenchmarks(newBenchmarks);
+      toast({
+        title: "Benchmarks atualizados!",
+        description: "Os benchmarks do setor foram salvos com sucesso.",
+      });
+      return { success: true };
+    } catch (error: any) {
+      console.error("Error updating sector benchmarks:", error);
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível atualizar os benchmarks.",
+        variant: "destructive",
+      });
+      return { success: false, error: error.message };
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return {
     financialGoals,
     instagramGoals,
+    sectorBenchmarks,
     isLoading,
     isSaving,
     updateFinancialGoals,
     updateInstagramGoals,
+    updateSectorBenchmarks,
     refetch: loadSettings,
   };
 }
