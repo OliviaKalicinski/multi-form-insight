@@ -373,7 +373,7 @@ export interface NFIssuanceDistribution {
 }
 
 export interface CustomerSegment {
-  segment: 'Iniciante' | 'Ocasional' | 'Fiel' | 'VIP';
+  segment: 'Primeira Compra' | 'Recorrente' | 'Fiel' | 'VIP';
   count: number;
   percentage: number;
   totalRevenue: number;

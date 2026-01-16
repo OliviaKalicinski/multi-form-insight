@@ -9,8 +9,8 @@ interface SegmentRevenueChartProps {
 const SEGMENT_COLORS: Record<string, string> = {
   'VIP': '#8b5cf6',
   'Fiel': '#10b981',
-  'Ocasional': '#3b82f6',
-  'Iniciante': '#fbbf24',
+  'Recorrente': '#3b82f6',
+  'Primeira Compra': '#f97316',
 };
 
 export const SegmentRevenueChart = ({ segments }: SegmentRevenueChartProps) => {
