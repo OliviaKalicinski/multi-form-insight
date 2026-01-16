@@ -163,6 +163,39 @@ export type Database = {
         }
         Relationships: []
       }
+      audience_data: {
+        Row: {
+          cidades: Json
+          created_at: string
+          data_referencia: string
+          faixa_etaria_genero: Json
+          id: string
+          metricas_calculadas: Json
+          paises: Json
+          upload_id: string | null
+        }
+        Insert: {
+          cidades?: Json
+          created_at?: string
+          data_referencia: string
+          faixa_etaria_genero?: Json
+          id?: string
+          metricas_calculadas?: Json
+          paises?: Json
+          upload_id?: string | null
+        }
+        Update: {
+          cidades?: Json
+          created_at?: string
+          data_referencia?: string
+          faixa_etaria_genero?: Json
+          id?: string
+          metricas_calculadas?: Json
+          paises?: Json
+          upload_id?: string | null
+        }
+        Relationships: []
+      }
       followers_data: {
         Row: {
           created_at: string | null

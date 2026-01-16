@@ -507,3 +507,43 @@ export interface CustomerPurchaseHistory {
   hasSample: boolean;
   hasRepurchase: boolean;
 }
+
+// Audience Demographics (Instagram)
+export interface AudienceData {
+  dataReferencia: string;
+  faixaEtariaGenero: AgeGenderData[];
+  cidades: CityData[];
+  paises: CountryData[];
+  metricas: AudienceMetrics;
+}
+
+export interface AgeGenderData {
+  faixa: string;
+  mulheres: number;
+  homens: number;
+  total: number;
+}
+
+export interface CityData {
+  cidade: string;
+  percentual: number;
+}
+
+export interface CountryData {
+  pais: string;
+  percentual: number;
+}
+
+export interface AudienceMetrics {
+  totalMulheres: number;
+  totalHomens: number;
+  genderSkew: number;
+  faixaDominante: string;
+  concentracaoEtaria: number;
+  idadeMediaAproximada: number;
+  cidadeDominante: string;
+  top3Cidades: number;
+  dispersaoUrbana: number;
+  dependenciaBrasil: number;
+  publicoInternacional: number;
+}

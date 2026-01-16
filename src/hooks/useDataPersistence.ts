@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ProcessedOrder, AdsData, FollowersData, MarketingData, AdsMonthSummary } from "@/types/marketing";
+import { ProcessedOrder, AdsData, FollowersData, MarketingData, AdsMonthSummary, AudienceData } from "@/types/marketing";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, parse } from "date-fns";
 
@@ -763,6 +763,69 @@ export const useDataPersistence = () => {
     }
   }, [toast]);
 
+  // Save audience data
+  const saveAudienceData = useCallback(async (data: AudienceData, fileName?: string): Promise<UpsertResult> => {
+    try {
+      const uploadId = await createUploadHistory(
+        "audience",
+        1,
+        fileName || null,
+        data.dataReferencia,
+        data.dataReferencia
+      );
+
+      const row = {
+        data_referencia: data.dataReferencia,
+        faixa_etaria_genero: data.faixaEtariaGenero,
+        cidades: data.cidades,
+        paises: data.paises,
+        metricas_calculadas: data.metricas,
+        upload_id: uploadId,
+      };
+
+      const { error } = await supabase
+        .from("audience_data")
+        .upsert([row], { onConflict: "data_referencia" });
+
+      if (error) throw error;
+
+      return { inserted: 1, updated: 0, total: 1 };
+    } catch (error) {
+      console.error("Erro ao salvar dados de audiência:", error);
+      throw error;
+    }
+  }, []);
+
+  // Load audience data (most recent)
+  const loadAudienceData = useCallback(async (): Promise<AudienceData | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("audience_data")
+        .select("*")
+        .order("data_referencia", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) {
+        if (error.code === "PGRST116") return null; // No rows
+        throw error;
+      }
+
+      if (!data) return null;
+
+      return {
+        dataReferencia: data.data_referencia,
+        faixaEtariaGenero: data.faixa_etaria_genero as any[],
+        cidades: data.cidades as any[],
+        paises: data.paises as any[],
+        metricas: data.metricas_calculadas as any,
+      };
+    } catch (error) {
+      console.error("Erro ao carregar dados de audiência:", error);
+      return null;
+    }
+  }, []);
+
   return {
     isLoading,
     stats,
@@ -771,6 +834,8 @@ export const useDataPersistence = () => {
     saveAdsData,
     saveFollowersData,
     saveMarketingData,
+    saveAudienceData,
+    loadAudienceData,
     deleteUpload,
     clearAllData,
     clearAdsData,
