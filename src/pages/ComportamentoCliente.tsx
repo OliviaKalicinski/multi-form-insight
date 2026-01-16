@@ -54,17 +54,31 @@ export default function ComportamentoCliente() {
     return calculateCustomerBehaviorMetrics(filteredOrders);
   }, [salesData, selectedMonth, availableMonths]);
 
-  // Calcular tendência de volume (últimos 7 dias vs 7 anteriores)
+  // Calcular tendência de volume (período atual vs período anterior)
   const volumeTrend = useMemo(() => {
-    if (!behaviorMetrics?.pedidosPorDia || behaviorMetrics.pedidosPorDia.length < 14) return undefined;
+    if (salesData.length === 0) return undefined;
     
-    const days = behaviorMetrics.pedidosPorDia;
-    const recent7 = days.slice(-7).reduce((sum, d) => sum + d.orders, 0);
-    const previous7 = days.slice(-14, -7).reduce((sum, d) => sum + d.orders, 0);
+    // Se não tem mês selecionado ou é "todos", não calcular tendência
+    if (!selectedMonth || selectedMonth === 'last-12-months') return undefined;
     
-    if (previous7 === 0) return undefined;
-    return ((recent7 - previous7) / previous7) * 100;
-  }, [behaviorMetrics]);
+    // Encontrar índice do mês selecionado
+    const monthIndex = availableMonths.indexOf(selectedMonth);
+    if (monthIndex <= 0) return undefined; // Não tem mês anterior
+    
+    const previousMonth = availableMonths[monthIndex - 1];
+    
+    // Filtrar pedidos do mês atual e anterior
+    const currentOrders = filterOrdersByMonth(salesData, selectedMonth, availableMonths);
+    const previousOrders = filterOrdersByMonth(salesData, previousMonth, availableMonths);
+    
+    // Calcular totais
+    const currentTotal = currentOrders.length;
+    const previousTotal = previousOrders.length;
+    
+    if (previousTotal === 0) return undefined;
+    
+    return ((currentTotal - previousTotal) / previousTotal) * 100;
+  }, [salesData, selectedMonth, availableMonths]);
 
   // Peak e Low day do volume
   const volumeAnalysis = useMemo(() => {
