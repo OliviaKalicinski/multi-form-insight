@@ -23,7 +23,6 @@ interface StatusMetricCardProps {
   invertTrend?: boolean; // For metrics where lower is better (CAC, CPA, etc.)
   tooltipKey?: string;
 }
-}
 
 const statusConfig: Record<StatusType, { color: string; bgColor: string; borderColor: string; badge: string }> = {
   success: {
