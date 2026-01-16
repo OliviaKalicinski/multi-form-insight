@@ -1,11 +1,20 @@
 import { useState } from "react";
-import { Upload, Check, X, Users, FileText } from "lucide-react";
+import { Check, X, Users, FileText, Eye, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { parseAudienceCSV, validateAudienceData } from "@/utils/audienceParser";
 import { AudienceData } from "@/types/marketing";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AudienceUploaderProps {
   onDataLoaded?: (data: AudienceData) => void;
@@ -21,6 +30,9 @@ export function AudienceUploader({
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [previewData, setPreviewData] = useState<AudienceData | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>("");
+  const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
   const { persistAudienceData } = useDashboard();
 
@@ -43,8 +55,6 @@ export function AudienceUploader({
       return;
     }
 
-    setIsSaving(true);
-
     try {
       // Try reading as UTF-8 first
       let text = await file.text();
@@ -66,20 +76,13 @@ export function AudienceUploader({
           description: validation.errors.join(". "),
           variant: "destructive",
         });
-        setIsSaving(false);
         return;
       }
 
-      // Persist to database
-      const result = await persistAudienceData(parsedData, file.name);
-
-      setUploadedFile(file.name);
-      onDataLoaded?.(parsedData);
-
-      toast({
-        title: "✅ Dados carregados!",
-        description: `${parsedData.faixaEtariaGenero.length} faixas etárias, ${parsedData.cidades.length} cidades, ${parsedData.paises.length} países`,
-      });
+      // Show preview instead of saving directly
+      setPreviewData(parsedData);
+      setPreviewFileName(file.name);
+      setShowPreview(true);
     } catch (error) {
       console.error("Erro ao processar arquivo:", error);
       toast({
@@ -87,9 +90,40 @@ export function AudienceUploader({
         description: "Não foi possível processar o arquivo. Verifique o formato.",
         variant: "destructive",
       });
+    }
+  };
+
+  const confirmUpload = async () => {
+    if (!previewData) return;
+    
+    setIsSaving(true);
+    try {
+      await persistAudienceData(previewData, previewFileName);
+      setUploadedFile(previewFileName);
+      onDataLoaded?.(previewData);
+      setShowPreview(false);
+      setPreviewData(null);
+      
+      toast({
+        title: "✅ Dados salvos!",
+        description: `${previewData.faixaEtariaGenero.length} faixas etárias, ${previewData.cidades.length} cidades, ${previewData.paises.length} países`,
+      });
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar os dados. Tente novamente.",
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const cancelPreview = () => {
+    setShowPreview(false);
+    setPreviewData(null);
+    setPreviewFileName("");
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -135,54 +169,182 @@ export function AudienceUploader({
   }
 
   return (
-    <div
-      className={cn(
-        "border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer",
-        isDragging
-          ? "border-primary bg-primary/10"
-          : "border-muted-foreground/25 hover:border-primary/50"
-      )}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragging(true);
-      }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={handleDrop}
-    >
-      <div className="flex flex-col items-center gap-2">
-        <Users className="h-8 w-8 text-muted-foreground" />
-        <div>
-          <p className="text-sm font-medium">{title}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
+    <>
+      <div
+        className={cn(
+          "border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer",
+          isDragging
+            ? "border-primary bg-primary/10"
+            : "border-muted-foreground/25 hover:border-primary/50"
+        )}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+      >
+        <div className="flex flex-col items-center gap-2">
+          <Users className="h-8 w-8 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">{title}</p>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
+          <label>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileInput}
+              className="hidden"
+              disabled={isSaving}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              disabled={isSaving}
+              asChild
+            >
+              <span>
+                <FileText className="h-4 w-4 mr-1" />
+                Selecionar CSV
+              </span>
+            </Button>
+          </label>
         </div>
-        <label>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleFileInput}
-            className="hidden"
-            disabled={isSaving}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-2"
-            disabled={isSaving}
-            asChild
-          >
-            <span>
+      </div>
+
+      {/* Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Preview dos dados
+            </DialogTitle>
+            <DialogDescription>
+              Verifique se os dados foram extraídos corretamente antes de salvar.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewData && (
+            <ScrollArea className="max-h-[60vh] pr-4">
+              <div className="space-y-6">
+                {/* Age/Gender Section */}
+                <div>
+                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-primary"></span>
+                    Faixa Etária e Gênero ({previewData.faixaEtariaGenero.length} faixas)
+                  </h4>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <div className="grid grid-cols-4 gap-2 text-xs font-medium text-muted-foreground mb-2">
+                      <span>Faixa</span>
+                      <span>Mulheres</span>
+                      <span>Homens</span>
+                      <span>Total</span>
+                    </div>
+                    {previewData.faixaEtariaGenero.map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-4 gap-2 text-sm py-1 border-t border-border/50">
+                        <span className="font-medium">{item.faixa}</span>
+                        <span>{item.mulheres.toFixed(1)}%</span>
+                        <span>{item.homens.toFixed(1)}%</span>
+                        <span className="font-medium">{item.total.toFixed(1)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cities Section */}
+                <div>
+                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    Principais Cidades ({previewData.cidades.length})
+                  </h4>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {previewData.cidades.map((city, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 bg-background px-2 py-1 rounded text-xs">
+                          {city.cidade}
+                          <span className="text-muted-foreground">({city.percentual.toFixed(1)}%)</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Countries Section */}
+                <div>
+                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Principais Países ({previewData.paises.length})
+                  </h4>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {previewData.paises.map((country, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 bg-background px-2 py-1 rounded text-xs">
+                          {country.pais}
+                          <span className="text-muted-foreground">({country.percentual.toFixed(1)}%)</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Calculated Metrics */}
+                <div>
+                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Métricas Calculadas
+                  </h4>
+                  <div className="bg-muted/50 rounded-lg p-3 grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Gender Skew:</span>
+                      <span className="ml-2 font-medium">{previewData.metricas.genderSkew.toFixed(2)}x</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Faixa Dominante:</span>
+                      <span className="ml-2 font-medium">{previewData.metricas.faixaDominante}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Idade Média:</span>
+                      <span className="ml-2 font-medium">{previewData.metricas.idadeMediaAproximada.toFixed(1)} anos</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Cidade Dominante:</span>
+                      <span className="ml-2 font-medium">{previewData.metricas.cidadeDominante}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Top 3 Cidades:</span>
+                      <span className="ml-2 font-medium">{previewData.metricas.top3Cidades.toFixed(1)}%</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Dependência Brasil:</span>
+                      <span className="ml-2 font-medium">{previewData.metricas.dependenciaBrasil.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={cancelPreview} disabled={isSaving}>
+              <X className="h-4 w-4 mr-1" />
+              Cancelar
+            </Button>
+            <Button onClick={confirmUpload} disabled={isSaving}>
               {isSaving ? (
                 <>Salvando...</>
               ) : (
                 <>
-                  <FileText className="h-4 w-4 mr-1" />
-                  Selecionar CSV
+                  <Save className="h-4 w-4 mr-1" />
+                  Confirmar e Salvar
                 </>
               )}
-            </span>
-          </Button>
-        </label>
-      </div>
-    </div>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
