@@ -141,11 +141,43 @@ export const AdsUploader = ({
     return validatedData;
   };
 
+  // Process JSON file
+  const processJsonFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const jsonData = JSON.parse(text);
+      
+      // Support direct array or object with data property
+      const dataArray = Array.isArray(jsonData) ? jsonData : jsonData.data || [];
+      
+      if (!Array.isArray(dataArray) || dataArray.length === 0) {
+        toast({
+          title: "Formato inválido",
+          description: "O arquivo JSON deve conter um array de anúncios.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const validData = await validateAndProcessData(dataArray, file.name);
+      
+      if (validData && validData.length > 0) {
+        setUploadedFile(file.name);
+      }
+    } catch (error) {
+      toast({
+        title: "Erro ao processar JSON",
+        description: "O arquivo não é um JSON válido.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const processFile = (file: File) => {
-    if (!file.name.match(/\.(csv|tsv|txt)$/i)) {
+    if (!file.name.match(/\.(csv|tsv|txt|json)$/i)) {
       toast({
         title: "Formato inválido",
-        description: "Por favor, envie um arquivo CSV ou TSV do Meta Ads Manager.",
+        description: "Por favor, envie um arquivo CSV, TSV ou JSON do Meta Ads Manager.",
         variant: "destructive",
       });
       return;
@@ -160,6 +192,13 @@ export const AdsUploader = ({
       return;
     }
 
+    // Route JSON files to processJsonFile
+    if (file.name.match(/\.json$/i)) {
+      processJsonFile(file);
+      return;
+    }
+
+    // CSV/TSV processing
     Papa.parse(file, {
       header: true,
       delimiter: "",
@@ -252,7 +291,7 @@ export const AdsUploader = ({
             <>
               <Upload className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
               <p className="text-sm text-muted-foreground mb-4">
-                Arraste e solte o arquivo TSV do Meta Ads Manager aqui, ou clique para selecionar
+                Arraste e solte o arquivo JSON ou CSV do Meta Ads Manager aqui, ou clique para selecionar
               </p>
               <label htmlFor="ads-file-upload">
                 <Button variant="outline" asChild>
@@ -261,7 +300,7 @@ export const AdsUploader = ({
                 <input
                   id="ads-file-upload"
                   type="file"
-                  accept=".csv,.tsv,.txt"
+                  accept=".csv,.tsv,.txt,.json"
                   onChange={handleFileInput}
                   className="hidden"
                 />

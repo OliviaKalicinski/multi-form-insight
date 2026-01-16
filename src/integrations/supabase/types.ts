@@ -16,64 +16,115 @@ export type Database = {
     Tables: {
       ads_data: {
         Row: {
+          adicoes_carrinho: number | null
           alcance: number | null
           anuncio: string | null
           campanha: string | null
           cliques: number | null
+          cliques_link: number | null
+          cliques_saida: number | null
           conjunto: string | null
           conversoes: number | null
+          cpc: number | null
+          cpm: number | null
           created_at: string | null
+          ctr: number | null
+          ctr_saida: number | null
+          custo_adicao_carrinho: number | null
+          custo_por_compra: number | null
           custo_por_resultado: number | null
+          custo_por_visualizacao: number | null
           data: string
           engajamentos: number | null
+          frequencia: number | null
           gasto: number | null
           id: string
           impressoes: number | null
+          nivel_veiculacao: string | null
+          objetivo: string | null
           receita: number | null
           resultados: number | null
+          roas_resultados: number | null
+          status_veiculacao: string | null
           tipo_resultado: string | null
           upload_id: string | null
           visitas_perfil: number | null
+          visualizacoes: number | null
+          visualizacoes_pagina: number | null
         }
         Insert: {
+          adicoes_carrinho?: number | null
           alcance?: number | null
           anuncio?: string | null
           campanha?: string | null
           cliques?: number | null
+          cliques_link?: number | null
+          cliques_saida?: number | null
           conjunto?: string | null
           conversoes?: number | null
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string | null
+          ctr?: number | null
+          ctr_saida?: number | null
+          custo_adicao_carrinho?: number | null
+          custo_por_compra?: number | null
           custo_por_resultado?: number | null
+          custo_por_visualizacao?: number | null
           data: string
           engajamentos?: number | null
+          frequencia?: number | null
           gasto?: number | null
           id?: string
           impressoes?: number | null
+          nivel_veiculacao?: string | null
+          objetivo?: string | null
           receita?: number | null
           resultados?: number | null
+          roas_resultados?: number | null
+          status_veiculacao?: string | null
           tipo_resultado?: string | null
           upload_id?: string | null
           visitas_perfil?: number | null
+          visualizacoes?: number | null
+          visualizacoes_pagina?: number | null
         }
         Update: {
+          adicoes_carrinho?: number | null
           alcance?: number | null
           anuncio?: string | null
           campanha?: string | null
           cliques?: number | null
+          cliques_link?: number | null
+          cliques_saida?: number | null
           conjunto?: string | null
           conversoes?: number | null
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string | null
+          ctr?: number | null
+          ctr_saida?: number | null
+          custo_adicao_carrinho?: number | null
+          custo_por_compra?: number | null
           custo_por_resultado?: number | null
+          custo_por_visualizacao?: number | null
           data?: string
           engajamentos?: number | null
+          frequencia?: number | null
           gasto?: number | null
           id?: string
           impressoes?: number | null
+          nivel_veiculacao?: string | null
+          objetivo?: string | null
           receita?: number | null
           resultados?: number | null
+          roas_resultados?: number | null
+          status_veiculacao?: string | null
           tipo_resultado?: string | null
           upload_id?: string | null
           visitas_perfil?: number | null
+          visualizacoes?: number | null
+          visualizacoes_pagina?: number | null
         }
         Relationships: [
           {
