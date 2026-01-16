@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChurnFunnelChart } from "@/components/dashboard/ChurnFunnelChart";
 import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
+import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { AlertTriangle, Users, UserMinus, DollarSign, FileWarning, TrendingDown } from "lucide-react";
 
 export default function AnaliseChurn() {
@@ -69,90 +70,100 @@ export default function AnaliseChurn() {
 
       {/* KPI Cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4" />
-              Taxa de Churn
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              {taxaChurn.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Clientes que pararam de comprar
-            </p>
-          </CardContent>
-        </Card>
+        <KPITooltip metricKey="taxa_churn">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <TrendingDown className="h-4 w-4" />
+                Taxa de Churn
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                {taxaChurn.toFixed(1)}%
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Clientes que pararam de comprar
+              </p>
+            </CardContent>
+          </Card>
+        </KPITooltip>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Clientes Ativos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {clientesAtivos.toLocaleString('pt-BR')}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {((clientesAtivos / totalClientes) * 100).toFixed(1)}% da base
-            </p>
-          </CardContent>
-        </Card>
+        <KPITooltip metricKey="clientes_ativos">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Clientes Ativos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {clientesAtivos.toLocaleString('pt-BR')}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {((clientesAtivos / totalClientes) * 100).toFixed(1)}% da base
+              </p>
+            </CardContent>
+          </Card>
+        </KPITooltip>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Em Risco
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">
-              {clientesEmRisco.toLocaleString('pt-BR')}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {((clientesEmRisco / totalClientes) * 100).toFixed(1)}% da base
-            </p>
-          </CardContent>
-        </Card>
+        <KPITooltip metricKey="clientes_em_risco">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Em Risco
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-600">
+                {clientesEmRisco.toLocaleString('pt-BR')}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {((clientesEmRisco / totalClientes) * 100).toFixed(1)}% da base
+              </p>
+            </CardContent>
+          </Card>
+        </KPITooltip>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <UserMinus className="h-4 w-4" />
-              Inativos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {clientesInativos.toLocaleString('pt-BR')}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {((clientesInativos / totalClientes) * 100).toFixed(1)}% da base
-            </p>
-          </CardContent>
-        </Card>
+        <KPITooltip metricKey="clientes_inativos">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <UserMinus className="h-4 w-4" />
+                Inativos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {clientesInativos.toLocaleString('pt-BR')}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {((clientesInativos / totalClientes) * 100).toFixed(1)}% da base
+              </p>
+            </CardContent>
+          </Card>
+        </KPITooltip>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Valor em Risco
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              R$ {valorEmRisco.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Receita potencial perdida
-            </p>
-          </CardContent>
-        </Card>
+        <KPITooltip metricKey="valor_em_risco">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Valor em Risco
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                R$ {valorEmRisco.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Receita potencial perdida
+              </p>
+            </CardContent>
+          </Card>
+        </KPITooltip>
       </div>
 
       {/* Retention Funnel */}

@@ -294,4 +294,16 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
     description: "Taxa de conversão considerando clientes com tempo suficiente para converter.",
     rules: ["Mais confiável que taxa geral", "Exclui clientes muito recentes"]
   },
+
+  // === MÉTRICAS DE CHURN ===
+  taxa_churn: {
+    formula: "(Clientes Churn ÷ Total Clientes) × 100",
+    description: "Percentual de clientes perdidos (sem compras há mais de 90 dias).",
+    rules: ["<10% = Bom", "10-20% = Atenção", ">20% = Crítico"]
+  },
+  valor_em_risco: {
+    formula: "Σ(Valor Total dos clientes em risco de churn)",
+    description: "Receita potencial que pode ser perdida se os clientes em risco não forem reativados.",
+    rules: ["Baseado no histórico de compras", "Indica urgência de reativação"]
+  },
 };
