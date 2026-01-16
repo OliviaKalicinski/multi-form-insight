@@ -144,7 +144,7 @@ export const useDataPersistence = () => {
         dataEmissao: new Date(row.data_venda),
       }));
 
-      // Transform ads data
+      // Transform ads data with all new fields from database
       const adsData: AdsData[] = (adsRaw || []).map((row: any) => ({
         "Nome do anúncio": row.anuncio || "",
         "Nome do conjunto de anúncios": row.conjunto || "",
@@ -155,30 +155,33 @@ export const useDataPersistence = () => {
         "Valor de conversão da compra": String(row.receita || 0),
         "Início dos relatórios": row.data || "",
         "Término dos relatórios": row.data || "",
-        // Metrics from database
+        // Core metrics from database
         "Alcance": String(row.alcance || 0),
         "Resultados": String(row.resultados || 0),
         "Engajamentos com o post": String(row.engajamentos || 0),
         "Tipo de resultado": row.tipo_resultado || "",
         "Custo por resultado": String(row.custo_por_resultado || 0),
         "Visitas ao perfil do Instagram": String(row.visitas_perfil || 0),
-        // Default values for calculated fields
-        "CPM (custo por 1.000 impressões)": "0",
-        "CTR (todos)": "0",
-        "CTR de saída": "0",
-        "Cliques de saída": "0",
-        "Visualizações da página de destino do site": "0",
-        "Custo por visualização da página de destino": "0",
-        "Adições ao carrinho": "0",
-        "Custo por adição ao carrinho": "0",
-        "Custo por compra": "0",
-        "CPC (custo por clique no link)": "0",
-        "Cliques no link": "0",
-        "Frequência": "0",
-        "Visualizações": "0",
+        // New fields from JSON format
+        "Objetivo": row.objetivo || "",
+        "Status de veiculação": row.status_veiculacao || "",
+        "Nível de veiculação": row.nivel_veiculacao || "",
+        "CPM (custo por 1.000 impressões)": String(row.cpm || 0),
+        "CTR (todos)": String(row.ctr || 0),
+        "CTR de saída": String(row.ctr_saida || 0),
+        "Cliques de saída": String(row.cliques_saida || 0),
+        "Visualizações da página de destino do site": String(row.visualizacoes_pagina || 0),
+        "Custo por visualização da página de destino": String(row.custo_por_visualizacao || 0),
+        "Adições ao carrinho": String(row.adicoes_carrinho || 0),
+        "Custo por adição ao carrinho": String(row.custo_adicao_carrinho || 0),
+        "Custo por compra": String(row.custo_por_compra || 0),
+        "CPC (custo por clique no link)": String(row.cpc || 0),
+        "Cliques no link": String(row.cliques_link || 0),
+        "Frequência": String(row.frequencia || 0),
+        "Visualizações": String(row.visualizacoes || 0),
         "Tipo de valor de resultado": "",
-        "ROAS de resultados": "0",
-        "Veiculação da campanha": "",
+        "ROAS de resultados": String(row.roas_resultados || 0),
+        "Veiculação da campanha": row.status_veiculacao || "",
       }));
 
       // Transform followers data
@@ -331,16 +334,24 @@ export const useDataPersistence = () => {
     return parseFloat(cleaned) || 0;
   };
 
-  // Save/upsert ads data with deduplication and upload_id
+  // Helper to extract date from "Mês" field (format: "2025-11-01 - 2025-11-30")
+  const extractDateFromMonth = (monthStr: string): string => {
+    if (!monthStr) return "";
+    // "2025-11-01 - 2025-11-30" -> "2025-11-01"
+    const match = monthStr.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : monthStr;
+  };
+
+  // Save/upsert ads data with deduplication, upload_id, and automatic cleanup
   const saveAdsData = useCallback(async (ads: AdsData[], fileName?: string): Promise<UpsertResult & { duplicatesAggregated: number }> => {
     if (ads.length === 0) return { inserted: 0, updated: 0, total: 0, duplicatesAggregated: 0 };
 
     try {
-      // Calculate date range from ads data
-      const dateStrings = ads.map(ad => ad["Início dos relatórios"]).filter(Boolean);
-      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+      // STEP 1: Clear old ads data and related upload history entries
+      console.log("🧹 Limpando dados antigos de ads...");
+      await supabase.from("ads_data").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("upload_history").delete().eq("data_type", "ads");
+      console.log("✅ Dados antigos limpos");
 
       // Helper to get integer value from various possible column names
       const getIntValue = (ad: AdsData, keys: string[]): number => {
@@ -353,25 +364,48 @@ export const useDataPersistence = () => {
         return 0;
       };
 
-      // Parse all rows first with correct monetary parsing
-      const rawRows = ads.map((ad) => ({
-        data: ad["Início dos relatórios"] || ad["Mês"] || "",
-        campanha: "",
-        conjunto: ad["Nome do conjunto de anúncios"] || "",
-        anuncio: ad["Nome do anúncio"] || "",
-        impressoes: parseInt(ad["Impressões"]?.replace(/\./g, "") || "0"),
-        cliques: parseInt(ad["Cliques (todos)"]?.replace(/\./g, "") || "0"),
-        gasto: parseMonetaryValue(ad["Valor usado (BRL)"] || "0"),
-        conversoes: parseInt(ad["Compras"]?.replace(/\./g, "") || "0"),
-        receita: parseMonetaryValue(ad["Valor de conversão da compra"] || "0"),
-        // New engagement metrics
-        alcance: getIntValue(ad, ["Alcance", "Reach", "Alcance (pessoas)", "Alcance único"]),
-        resultados: getIntValue(ad, ["Resultados", "Results"]),
-        engajamentos: getIntValue(ad, ["Engajamentos com o post", "Post engagements", "Engajamentos", "Engagements"]),
-        tipo_resultado: ad["Tipo de resultado"] || ad["Result type"] || "",
-        custo_por_resultado: parseMonetaryValue(ad["Custo por resultado"] || ad["Cost per result"] || "0"),
-        visitas_perfil: getIntValue(ad, ["Visitas ao perfil do Instagram", "Instagram profile visits", "Profile visits"]),
-      }));
+      // Parse all rows with all new JSON fields
+      const rawRows = ads.map((ad) => {
+        // Extract date: prioritize "Início dos relatórios", then extract from "Mês"
+        const dataValue = ad["Início dos relatórios"] || extractDateFromMonth(ad["Mês"] || "") || "";
+        
+        return {
+          data: dataValue,
+          campanha: "",
+          conjunto: ad["Nome do conjunto de anúncios"] || "",
+          anuncio: ad["Nome do anúncio"] || "",
+          impressoes: getIntValue(ad, ["Impressões", "Impressoes"]),
+          cliques: getIntValue(ad, ["Cliques (todos)"]),
+          gasto: parseMonetaryValue(ad["Valor usado (BRL)"] || "0"),
+          conversoes: getIntValue(ad, ["Compras"]),
+          receita: parseMonetaryValue(ad["Valor de conversão da compra"] || "0"),
+          // Core engagement metrics
+          alcance: getIntValue(ad, ["Alcance", "Reach"]),
+          resultados: getIntValue(ad, ["Resultados", "Results"]),
+          engajamentos: getIntValue(ad, ["Engajamentos com o post", "Engajamentos"]),
+          tipo_resultado: ad["Tipo de resultado"] || "",
+          custo_por_resultado: parseMonetaryValue(ad["Custo por resultado"] || "0"),
+          visitas_perfil: getIntValue(ad, ["Visitas ao perfil do Instagram"]),
+          // NEW JSON FIELDS
+          objetivo: ad["Objetivo"] || "",
+          status_veiculacao: ad["Status de veiculação"] || "",
+          nivel_veiculacao: ad["Nível de veiculação"] || "",
+          frequencia: parseMonetaryValue(ad["Frequência"] || "0"),
+          visualizacoes: getIntValue(ad, ["Visualizações"]),
+          ctr: parseMonetaryValue(ad["CTR (todos)"] || "0"),
+          cpm: parseMonetaryValue(ad["CPM (custo por 1.000 impressões)"] || "0"),
+          ctr_saida: parseMonetaryValue(ad["CTR de saída"] || "0"),
+          cliques_saida: getIntValue(ad, ["Cliques de saída"]),
+          visualizacoes_pagina: getIntValue(ad, ["Visualizações da página de destino do site"]),
+          custo_por_visualizacao: parseMonetaryValue(ad["Custo por visualização da página de destino"] || "0"),
+          adicoes_carrinho: getIntValue(ad, ["Adições ao carrinho"]),
+          custo_adicao_carrinho: parseMonetaryValue(ad["Custo por adição ao carrinho"] || "0"),
+          custo_por_compra: parseMonetaryValue(ad["Custo por compra"] || "0"),
+          cpc: parseMonetaryValue(ad["CPC (custo por clique no link)"] || "0"),
+          cliques_link: getIntValue(ad, ["Cliques no link"]),
+          roas_resultados: parseMonetaryValue(ad["ROAS de resultados"] || "0"),
+        };
+      });
 
       // Deduplicate by aggregating values for identical keys
       const uniqueRowsMap = new Map<string, typeof rawRows[0]>();
@@ -391,6 +425,11 @@ export const useDataPersistence = () => {
           existing.resultados += row.resultados;
           existing.engajamentos += row.engajamentos;
           existing.visitas_perfil += row.visitas_perfil;
+          existing.visualizacoes += row.visualizacoes;
+          existing.cliques_saida += row.cliques_saida;
+          existing.visualizacoes_pagina += row.visualizacoes_pagina;
+          existing.adicoes_carrinho += row.adicoes_carrinho;
+          existing.cliques_link += row.cliques_link;
         } else {
           uniqueRowsMap.set(key, { ...row });
         }
@@ -400,6 +439,12 @@ export const useDataPersistence = () => {
       const duplicatesAggregated = rawRows.length - uniqueRows.length;
 
       console.log(`📊 Deduplicação de anúncios: ${rawRows.length} linhas originais → ${uniqueRows.length} únicas (${duplicatesAggregated} duplicatas agregadas)`);
+
+      // Calculate date range
+      const dateStrings = uniqueRows.map(r => r.data).filter(Boolean);
+      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
 
       // Create upload history FIRST and get the ID
       const uploadId = await createUploadHistory(
@@ -418,7 +463,7 @@ export const useDataPersistence = () => {
 
       const { data, error } = await supabase
         .from("ads_data")
-        .upsert(rowsWithUploadId, { onConflict: "data,campanha,conjunto,anuncio", ignoreDuplicates: false })
+        .insert(rowsWithUploadId)
         .select();
 
       if (error) {
@@ -436,7 +481,7 @@ export const useDataPersistence = () => {
         duplicatesAggregated,
       };
 
-      setStats((prev) => ({ ...prev, adsCount: prev.adsCount + result.inserted, lastUpdated: new Date() }));
+      setStats((prev) => ({ ...prev, adsCount: result.inserted, lastUpdated: new Date() }));
 
       return result;
     } catch (error) {
