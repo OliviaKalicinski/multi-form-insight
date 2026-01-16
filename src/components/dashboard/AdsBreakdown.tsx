@@ -139,8 +139,8 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
             valueB = parseValue(b["Compras"]);
             break;
           case 'roas':
-            valueA = parseValue(a["ROAS de resultados"]);
-            valueB = parseValue(b["ROAS de resultados"]);
+            valueA = calculateRoas(a);
+            valueB = calculateRoas(b);
             break;
         }
 
