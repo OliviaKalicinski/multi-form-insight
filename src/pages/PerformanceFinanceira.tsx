@@ -234,6 +234,7 @@ export default function PerformanceFinanceira() {
               icon={<ShoppingCart className="h-3 w-3" />}
               trend={variations?.orders}
               size="compact"
+              tooltipKey="pedidos"
             />
             <StatusMetricCard
               title="Ticket Médio"
@@ -242,6 +243,7 @@ export default function PerformanceFinanceira() {
               trend={variations?.ticket}
               status={getStatusFromBenchmark(financialMetrics.ticketMedioReal, benchmarksPetFood.ticketMedio)}
               size="compact"
+              tooltipKey="ticket_medio"
             />
             <StatusMetricCard
               title="Margem Bruta"
@@ -249,6 +251,7 @@ export default function PerformanceFinanceira() {
               icon={<DollarSign className="h-3 w-3" />}
               status="success"
               size="compact"
+              tooltipKey="margem_bruta"
             />
 
             {/* Linha 2: Secundários */}
@@ -257,6 +260,7 @@ export default function PerformanceFinanceira() {
               value={`${financialMetrics.produtoMedio.toFixed(1)}`}
               icon={<Package className="h-3 w-3" />}
               size="compact"
+              tooltipKey="itens_pedido"
             />
             <StatusMetricCard
               title="Receita Líq."
@@ -264,6 +268,7 @@ export default function PerformanceFinanceira() {
               icon={<DollarSign className="h-3 w-3" />}
               status="neutral"
               size="compact"
+              tooltipKey="receita_liquida"
             />
             <StatusMetricCard
               title="Crescimento"
@@ -275,6 +280,7 @@ export default function PerformanceFinanceira() {
                 (financialMetrics.growthRate || 0) < 0 ? 'warning' : 'neutral'
               }
               size="compact"
+              tooltipKey="crescimento"
             />
           </div>
         </div>

@@ -238,4 +238,60 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
     formula: "Σ(custo estimado de cada sample)",
     description: "Custo total estimado com brindes e amostras.",
   },
+
+  // === MÉTRICAS DE PERFORMANCE FINANCEIRA ===
+  pedidos: {
+    formula: "COUNT(pedidos únicos no período)",
+    description: "Total de pedidos realizados no período selecionado.",
+    rules: ["Cada número de pedido é contado uma única vez"]
+  },
+  margem_bruta: {
+    formula: "(1 - % Custo Fixo) × 100",
+    description: "Margem bruta percentual configurada nas metas do sistema.",
+    rules: ["Padrão: 60%", "Ajustável em Configurações"]
+  },
+  itens_pedido: {
+    formula: "Total de Produtos ÷ Total de Pedidos",
+    description: "Quantidade média de itens em cada pedido.",
+    rules: ["Maior = mais cross-sell", "Menor = compras focadas"]
+  },
+  receita_liquida: {
+    formula: "Faturamento Total - Frete Total",
+    description: "Receita apenas dos produtos, excluindo custos de frete.",
+  },
+  crescimento: {
+    formula: "((Período Atual - Anterior) ÷ Anterior) × 100",
+    description: "Variação percentual comparado ao período anterior.",
+    rules: [">10% = Excelente", "<-10% = Crítico"]
+  },
+
+  // === MÉTRICAS DE ANÁLISE DE AMOSTRAS ===
+  clientes_qualificados: {
+    formula: "COUNT(clientes cujo 1º pedido foi só amostra)",
+    description: "Clientes que iniciaram relacionamento com pedido exclusivo de amostras.",
+    rules: ["Primeiro pedido deve ser 100% amostras", "Base para análise de conversão"]
+  },
+  converteram_regular: {
+    formula: "COUNT(qualificados que compraram produto regular)",
+    description: "Clientes que após receberem amostra, fizeram pedido com produto pago.",
+    rules: ["Exclui novos pedidos só de amostra"]
+  },
+  ticket_medio_recompra: {
+    formula: "Σ(valor pedidos regulares) ÷ Clientes que recompraram",
+    description: "Valor médio gasto por cliente que converteu após amostra.",
+  },
+  tempo_ate_recompra: {
+    formula: "Média(dias entre amostra e 1º pedido regular)",
+    description: "Tempo médio em dias para conversão após receber amostra.",
+    rules: ["≤45 dias = Bom", ">45 dias = Lento"]
+  },
+  ltv_medio_samples: {
+    formula: "Σ(todas compras do cliente) ÷ Clientes convertidos",
+    description: "Valor total médio que cada cliente convertido gerou.",
+  },
+  conversao_60d: {
+    formula: "(Conversões em 60 dias ÷ Qualificados com 60+ dias) × 100",
+    description: "Taxa de conversão considerando clientes com tempo suficiente para converter.",
+    rules: ["Mais confiável que taxa geral", "Exclui clientes muito recentes"]
+  },
 };
