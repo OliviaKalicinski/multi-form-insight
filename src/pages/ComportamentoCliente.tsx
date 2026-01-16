@@ -30,48 +30,61 @@ export default function ComportamentoCliente() {
 
   const [volumeView, setVolumeView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
-  // Calcular métricas usando TODOS os dados (para análises históricas: churn, recompra, segmentação)
+  // Helper para formatar o label do mês selecionado
+  const formatSelectedPeriod = () => {
+    if (!selectedMonth) return 'todos os períodos';
+    if (selectedMonth === 'last-12-months') return 'últimos 12 meses';
+    try {
+      return format(parse(selectedMonth, "yyyy-MM", new Date()), "MMMM 'de' yyyy", { locale: ptBR });
+    } catch {
+      return selectedMonth;
+    }
+  };
+
+  // Calcular métricas com base no filtro selecionado
   const behaviorMetrics = useMemo(() => {
     if (salesData.length === 0) return null;
-    return calculateCustomerBehaviorMetrics(salesData);
-  }, [salesData]);
-
-  // Calcular métricas filtradas (para análises de período: volume, picos)
-  const filteredMetrics = useMemo(() => {
-    if (salesData.length === 0 || !selectedMonth) return behaviorMetrics;
     
+    // Se nenhum mês selecionado, usar todos os dados
+    if (!selectedMonth) {
+      return calculateCustomerBehaviorMetrics(salesData);
+    }
+    
+    // Filtrar por mês selecionado
     const filteredOrders = selectedMonth === 'last-12-months' 
       ? salesData 
       : filterOrdersByMonth(salesData, selectedMonth, availableMonths);
     
+    if (filteredOrders.length === 0) return null;
+    
     return calculateCustomerBehaviorMetrics(filteredOrders);
-  }, [salesData, selectedMonth, availableMonths, behaviorMetrics]);
+  }, [salesData, selectedMonth, availableMonths]);
 
   // Calcular tendência de volume (últimos 7 dias vs 7 anteriores)
   const volumeTrend = useMemo(() => {
-    if (!filteredMetrics?.pedidosPorDia || filteredMetrics.pedidosPorDia.length < 14) return undefined;
+    if (!behaviorMetrics?.pedidosPorDia || behaviorMetrics.pedidosPorDia.length < 14) return undefined;
     
-    const days = filteredMetrics.pedidosPorDia;
+    const days = behaviorMetrics.pedidosPorDia;
     const recent7 = days.slice(-7).reduce((sum, d) => sum + d.orders, 0);
     const previous7 = days.slice(-14, -7).reduce((sum, d) => sum + d.orders, 0);
     
     if (previous7 === 0) return undefined;
     return ((recent7 - previous7) / previous7) * 100;
-  }, [filteredMetrics]);
+  }, [behaviorMetrics]);
 
   // Peak e Low day do volume
   const volumeAnalysis = useMemo(() => {
-    if (!filteredMetrics?.pedidosPorDia || filteredMetrics.pedidosPorDia.length === 0) {
+    if (!behaviorMetrics?.pedidosPorDia || behaviorMetrics.pedidosPorDia.length === 0) {
       return { peakDay: { date: '', orders: 0 }, lowDay: { date: '', orders: 0 }, averageDaily: 0 };
     }
     
-    const days = filteredMetrics.pedidosPorDia;
+    const days = behaviorMetrics.pedidosPorDia;
     const peakDay = days.reduce((max, curr) => curr.orders > max.orders ? curr : max, days[0]);
     const lowDay = days.reduce((min, curr) => curr.orders < min.orders ? curr : min, days[0]);
     const averageDaily = days.reduce((sum, d) => sum + d.orders, 0) / days.length;
     
     return { peakDay, lowDay, averageDaily };
-  }, [filteredMetrics]);
+  }, [behaviorMetrics]);
 
   // Métricas de comparação multi-mês
   const comparisonMetrics = useMemo(() => {
@@ -217,9 +230,8 @@ export default function ComportamentoCliente() {
         <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
           <CardContent className="py-3">
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              💡 <strong>Nota:</strong> As métricas de <strong>Churn</strong>, <strong>Taxa de Recompra</strong> e <strong>Segmentação</strong> 
-              usam o histórico completo de dados. As análises de <strong>Volume de Pedidos</strong> e <strong>Picos de Vendas</strong> 
-              consideram o período selecionado no filtro global.
+              💡 <strong>Período:</strong> Exibindo dados de <strong>{formatSelectedPeriod()}</strong>.
+              {selectedMonth && ' Use o filtro acima para alterar o período ou ativar comparação entre meses.'}
             </p>
           </CardContent>
         </Card>
@@ -468,9 +480,9 @@ export default function ComportamentoCliente() {
           <CardContent>
             <OrderVolumeChart
               data={
-                volumeView === 'daily' ? filteredMetrics?.pedidosPorDia || [] :
-                volumeView === 'weekly' ? filteredMetrics?.pedidosPorSemana.map(w => ({ date: w.week, orders: w.orders })) || [] :
-                filteredMetrics?.pedidosPorMes.map(m => ({ date: m.month, orders: m.orders })) || []
+                volumeView === 'daily' ? behaviorMetrics?.pedidosPorDia || [] :
+                volumeView === 'weekly' ? behaviorMetrics?.pedidosPorSemana.map(w => ({ date: w.week, orders: w.orders })) || [] :
+                behaviorMetrics?.pedidosPorMes.map(m => ({ date: m.month, orders: m.orders })) || []
               }
               viewMode={volumeView}
             />
@@ -492,7 +504,7 @@ export default function ComportamentoCliente() {
           </CardHeader>
           <CardContent>
             <SalesPeaksChart
-              peaks={filteredMetrics?.picosVendas || []}
+              peaks={behaviorMetrics?.picosVendas || []}
             />
           </CardContent>
         </Card>
