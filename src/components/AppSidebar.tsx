@@ -33,6 +33,7 @@ import {
   Settings,
   LogOut,
   Shield,
+  Truck,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
@@ -83,7 +84,8 @@ const navSections: NavSection[] = [
     title: "Produtos & Ops",
     icon: Package,
     items: [
-      { title: "Análise de Volume", url: "/volume", icon: BarChart3 },
+      { title: "Produtos", url: "/produtos", icon: BarChart3 },
+      { title: "Operações", url: "/operacoes", icon: Truck },
     ],
   },
   {

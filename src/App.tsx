@@ -15,7 +15,8 @@ import Upload from "./pages/Upload";
 import Settings from "./pages/Settings";
 import Metas from "./pages/Metas";
 import Seguidores from "./pages/Seguidores";
-import Volume from "./pages/Volume";
+import Produtos from "./pages/Produtos";
+import Operacoes from "./pages/Operacoes";
 import Ads from "./pages/Ads";
 import PerformanceFinanceira from "./pages/PerformanceFinanceira";
 import ComportamentoCliente from "./pages/ComportamentoCliente";
@@ -106,10 +107,18 @@ const App = () => (
             </ProtectedRoute>
           } />
           
-          <Route path="/volume" element={
+          <Route path="/produtos" element={
             <ProtectedRoute>
               <AuthenticatedLayout>
-                <Volume />
+                <Produtos />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/operacoes" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <Operacoes />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />
