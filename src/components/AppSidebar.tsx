@@ -122,18 +122,12 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b">
-        <div className={cn(
-          "flex items-center gap-2 px-2 py-3",
-          isCollapsed && "justify-center"
-        )}>
+        <div className="flex items-center justify-center px-2 py-4">
           <img 
             src={comidaDragaoLogo} 
             alt="Comida de Dragão" 
-            className="h-8 w-8 object-contain"
+            className="h-12 w-auto object-contain"
           />
-          {!isCollapsed && (
-            <span className="font-bold text-sm">Comida de Dragão</span>
-          )}
         </div>
       </SidebarHeader>
 
