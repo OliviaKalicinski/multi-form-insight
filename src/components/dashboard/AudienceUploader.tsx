@@ -56,16 +56,34 @@ export function AudienceUploader({
     }
 
     try {
-      // Try reading as UTF-8 first
-      let text = await file.text();
+      // Read as ArrayBuffer first to properly detect encoding
+      const buffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(buffer);
       
-      // Detect UTF-16 encoding (null bytes or BOM)
-      if (text.charCodeAt(0) === 0xFFFE || text.charCodeAt(0) === 0xFEFF || text.includes('\x00')) {
-        const buffer = await file.arrayBuffer();
-        // Try UTF-16 LE (most common for Windows/Excel exports)
-        const decoder = new TextDecoder('utf-16le');
-        text = decoder.decode(buffer);
+      let text: string;
+      
+      // Detect UTF-16 LE BOM (0xFF 0xFE) - most common for Instagram/Excel exports
+      if (uint8[0] === 0xFF && uint8[1] === 0xFE) {
+        console.log("Detected UTF-16 LE BOM");
+        text = new TextDecoder('utf-16le').decode(buffer);
+      } 
+      // Detect UTF-16 BE BOM (0xFE 0xFF)
+      else if (uint8[0] === 0xFE && uint8[1] === 0xFF) {
+        console.log("Detected UTF-16 BE BOM");
+        text = new TextDecoder('utf-16be').decode(buffer);
+      } 
+      // Try UTF-8 first
+      else {
+        text = new TextDecoder('utf-8').decode(buffer);
+        // If text contains null bytes, it's likely UTF-16 without BOM
+        if (text.includes('\x00')) {
+          console.log("Null bytes detected, trying UTF-16 LE");
+          text = new TextDecoder('utf-16le').decode(buffer);
+        }
       }
+      
+      console.log("File decoded, length:", text.length);
+      console.log("First 200 chars:", text.substring(0, 200));
       
       const parsedData = parseAudienceCSV(text);
       const validation = validateAudienceData(parsedData);
