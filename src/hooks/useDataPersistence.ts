@@ -362,16 +362,12 @@ export const useDataPersistence = () => {
     return match ? match[1] : monthStr;
   };
 
-  // Save/upsert ads data with deduplication, upload_id, and automatic cleanup
+  // Save/upsert ads data with deduplication and upload_id (accumulates data instead of replacing)
   const saveAdsData = useCallback(async (ads: AdsData[], fileName?: string): Promise<UpsertResult & { duplicatesAggregated: number }> => {
     if (ads.length === 0) return { inserted: 0, updated: 0, total: 0, duplicatesAggregated: 0 };
 
     try {
-      // STEP 1: Clear old ads data and related upload history entries
-      console.log("🧹 Limpando dados antigos de ads...");
-      await supabase.from("ads_data").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      await supabase.from("upload_history").delete().eq("data_type", "ads");
-      console.log("✅ Dados antigos limpos");
+      console.log("📊 Adicionando novos dados de ads (modo acumulativo)...");
 
       // Helper to get integer value from various possible column names
       const getIntValue = (ad: AdsData, keys: string[]): number => {
@@ -481,9 +477,13 @@ export const useDataPersistence = () => {
         upload_id: uploadId,
       }));
 
+      // Use UPSERT to accumulate data - update existing rows, insert new ones
       const { data, error } = await supabase
         .from("ads_data")
-        .insert(rowsWithUploadId)
+        .upsert(rowsWithUploadId, { 
+          onConflict: "data,campanha,conjunto,anuncio",
+          ignoreDuplicates: false 
+        })
         .select();
 
       if (error) {
