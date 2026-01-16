@@ -100,6 +100,26 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
     description: "Retorno sobre cada real investido em anúncios.",
     rules: ["≥3x é considerado bom", "≥4x é excelente", "<2x indica atenção"]
   },
+  cac: {
+    formula: "Investimento Total em Ads ÷ Número de Novos Clientes",
+    description: "Custo médio para adquirir cada novo cliente através de anúncios.",
+    rules: ["Quanto menor, melhor", "Deve ser significativamente menor que o LTV", "Benchmark varia por segmento"]
+  },
+  ltv: {
+    formula: "Receita Média por Cliente × Frequência de Compra",
+    description: "Valor total esperado que um cliente gera ao longo do relacionamento.",
+    rules: ["Simplificado: Receita Total ÷ Total de Clientes", "Quanto maior, melhor", "Deve ser ≥3x o CAC"]
+  },
+  ltv_cac: {
+    formula: "LTV ÷ CAC",
+    description: "Relação entre o valor do cliente e o custo para adquiri-lo.",
+    rules: ["≥4x = Excelente (margem para investir mais)", "3-4x = Bom (negócio saudável)", "<3x = Atenção (risco de prejuízo)"]
+  },
+  margem_estimada: {
+    formula: "((Receita - Custo Estimado) ÷ Receita) × 100",
+    description: "Margem bruta estimada considerando custo médio dos produtos.",
+    rules: ["≥35% = Saudável", "30-35% = Aceitável", "<30% = Atenção"]
+  },
   receita_liquida_ads: {
     formula: "Receita gerada pelos anúncios - Custos de frete",
     description: "Receita líquida atribuída às campanhas de ads.",
