@@ -292,6 +292,7 @@ export default function ExecutiveDashboard() {
               icon={<ShoppingCart className="h-4 w-4" />}
               trend={variations?.pedidos}
               status={getStatusFromBenchmark(currentMetrics.vendas.pedidos, previousMetrics?.vendas.pedidos || 1)}
+              tooltipKey="total_pedidos"
             />
 
             {/* Margem Bruta */}
@@ -305,6 +306,7 @@ export default function ExecutiveDashboard() {
               }
               benchmark={{ value: 30, label: 'Meta: 30%' }}
               interpretation="Margem estimada"
+              tooltipKey="margem_estimada"
             />
 
             {/* ROAS */}
@@ -319,6 +321,7 @@ export default function ExecutiveDashboard() {
                 currentMetrics.marketing.roasAds >= 3 ? 'warning' : 'danger'
               }
               benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+              tooltipKey="roas"
             />
 
             {/* CAC */}
@@ -330,6 +333,7 @@ export default function ExecutiveDashboard() {
               invertTrend={true}
               status={getStatusFromBenchmark(currentMetrics.clientes.cac, 50, { invertComparison: true })}
               interpretation="Custo por Aquisição"
+              tooltipKey="cac"
             />
 
             {/* LTV */}
@@ -340,6 +344,7 @@ export default function ExecutiveDashboard() {
               trend={variations?.ltv}
               status={getStatusFromBenchmark(currentMetrics.clientes.ltv, 200)}
               interpretation="Valor do Cliente"
+              tooltipKey="ltv"
             />
 
             {/* LTV/CAC Ratio */}
@@ -354,6 +359,7 @@ export default function ExecutiveDashboard() {
               }
               benchmark={{ value: 3.0, label: 'Mínimo: 3.0x' }}
               interpretation="Relação LTV/CAC"
+              tooltipKey="ltv_cac"
             />
           </div>
         </div>
