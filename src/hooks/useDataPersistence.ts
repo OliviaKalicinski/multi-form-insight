@@ -776,10 +776,10 @@ export const useDataPersistence = () => {
 
       const row = {
         data_referencia: data.dataReferencia,
-        faixa_etaria_genero: data.faixaEtariaGenero,
-        cidades: data.cidades,
-        paises: data.paises,
-        metricas_calculadas: data.metricas,
+        faixa_etaria_genero: JSON.parse(JSON.stringify(data.faixaEtariaGenero)),
+        cidades: JSON.parse(JSON.stringify(data.cidades)),
+        paises: JSON.parse(JSON.stringify(data.paises)),
+        metricas_calculadas: JSON.parse(JSON.stringify(data.metricas)),
         upload_id: uploadId,
       };
 
