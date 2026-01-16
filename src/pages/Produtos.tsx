@@ -1,17 +1,14 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { Package, ListTree, DollarSign, ShoppingCart, BarChart3, TrendingUp, Trophy, Gift, Link2, Truck } from "lucide-react";
+import { Package, ListTree, DollarSign, ShoppingCart, BarChart3, TrendingUp, Trophy, Gift, Link2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { TopProductsTable } from "@/components/dashboard/TopProductsTable";
 import { SKUAnalysisTable } from "@/components/dashboard/SKUAnalysisTable";
 import { ProductCombinationsTable } from "@/components/dashboard/ProductCombinationsTable";
-import { ShippingMethodsChart } from "@/components/dashboard/ShippingMethodsChart";
-import { NFIssuanceChart } from "@/components/dashboard/NFIssuanceChart";
 import { FreebieProductsList } from "@/components/dashboard/FreebieProductsList";
 import { TopProductsChart } from "@/components/dashboard/TopProductsChart";
-import { LogisticsKPICards } from "@/components/dashboard/LogisticsKPICards";
 import { CrossSellKPICards } from "@/components/dashboard/CrossSellKPICards";
 import { CrossSellBarsChart } from "@/components/dashboard/CrossSellBarsChart";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
@@ -20,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-export default function Volume() {
+export default function Produtos() {
   const {
     salesData,
     selectedMonth,
@@ -136,7 +133,7 @@ export default function Volume() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="w-6 h-6" />
-              📦 Produto & Operações
+              📦 Produtos
             </CardTitle>
             <CardDescription>
               Carregue os dados de vendas na página "Upload" para visualizar as análises de produtos.
@@ -152,14 +149,14 @@ export default function Volume() {
       <div className="flex items-center gap-3">
         <Package className="w-8 h-8 text-primary" />
         <div>
-          <h1 className="text-3xl font-bold">📦 Produto & Operações</h1>
+          <h1 className="text-3xl font-bold">📦 Produtos</h1>
           <p className="text-muted-foreground">
-            Análise de produtos, SKUs, combinações, brindes e operações logísticas
+            Análise de produtos, SKUs, combinações e brindes
           </p>
         </div>
       </div>
 
-      {/* FILTROS GLOBAIS - Logo abaixo do título */}
+      {/* FILTROS GLOBAIS */}
       <Card className="bg-muted/20 border-dashed">
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row md:items-center gap-6">
@@ -220,7 +217,7 @@ export default function Volume() {
       {/* Cards resumo - HERO + SATÉLITES */}
       {!comparisonMode && productMetrics && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* HERO Card - Produto Campeão (sincronizado com toggle) */}
+          {/* HERO Card - Produto Campeão */}
           {(() => {
             const topProduct = productSortBy === 'quantity' 
               ? productMetrics.topProductsByQuantity[0]
@@ -341,18 +338,6 @@ export default function Volume() {
                 </p>
               </CardContent>
             </Card>
-
-            <Card className="bg-muted/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Truck className="h-4 w-4 text-teal-600" />
-                  <span className="text-xs text-muted-foreground">Formas Envio</span>
-                </div>
-                <p className="text-xl font-bold text-teal-600">
-                  {productMetrics.shippingMethodStats.length}
-                </p>
-              </CardContent>
-            </Card>
           </div>
         </div>
       )}
@@ -386,11 +371,10 @@ export default function Volume() {
       )}
 
       <Tabs defaultValue="ranking" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="ranking">📊 Ranking</TabsTrigger>
           <TabsTrigger value="sku">🏷️ SKU</TabsTrigger>
           <TabsTrigger value="crosssell">🔗 Cross-Sell</TabsTrigger>
-          <TabsTrigger value="logistics">📦 Logística</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ranking" className="space-y-6">
@@ -414,7 +398,6 @@ export default function Volume() {
               </div>
             </CardHeader>
             
-            {/* ✅ NOVO: Gráfico Unificado */}
             <CardContent className="pb-6">
               <TopProductsChart
                 products={
@@ -428,7 +411,6 @@ export default function Volume() {
               />
             </CardContent>
 
-            {/* Separador */}
             <div className="px-6 pb-2">
               <div className="border-t pt-6">
                 <h3 className="text-sm font-semibold mb-2">📋 Tabela Detalhada - Top 20 Produtos</h3>
@@ -518,86 +500,6 @@ export default function Volume() {
                   Não há combinações frequentes de produtos no período selecionado
                 </p>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="logistics" className="space-y-6">
-          {/* KPIs de Nota Fiscal */}
-          {productMetrics && productMetrics.nfStats && (
-            <LogisticsKPICards
-              averageDays={productMetrics.nfStats.averageDays}
-              medianDays={productMetrics.nfStats.medianDays}
-              minDays={productMetrics.nfStats.minDays}
-              maxDays={productMetrics.nfStats.maxDays}
-            />
-          )}
-
-          {/* Gráficos lado a lado */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>🚚 Métodos de Envio</CardTitle>
-                <CardDescription>
-                  Distribuição de como os pedidos são entregues
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ShippingMethodsChart
-                  data={productMetrics?.shippingMethodStats || []}
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>⏱️ Tempo de Emissão NF</CardTitle>
-                <CardDescription>
-                  Distribuição do tempo entre venda e emissão de nota fiscal
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <NFIssuanceChart
-                  distribution={productMetrics?.nfIssuanceDistribution || []}
-                  averageDays={productMetrics?.averageNFIssuanceTime || 0}
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Tabela de detalhes por método de envio */}
-          <Card>
-            <CardHeader>
-              <CardTitle>📋 Detalhes por Forma de Envio</CardTitle>
-              <CardDescription>
-                Performance detalhada de cada método de entrega
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-3 font-medium">Método</th>
-                      <th className="text-right p-3 font-medium">Pedidos</th>
-                      <th className="text-right p-3 font-medium">% Total</th>
-                      <th className="text-right p-3 font-medium">Faturamento</th>
-                      <th className="text-right p-3 font-medium">Ticket Médio</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productMetrics?.shippingMethodStats.map((stat, index) => (
-                      <tr key={index} className="border-b hover:bg-muted/50">
-                        <td className="p-3 font-medium">{stat.formaEnvio}</td>
-                        <td className="p-3 text-right">{stat.numeroPedidos.toLocaleString('pt-BR')}</td>
-                        <td className="p-3 text-right">{stat.percentual.toFixed(1)}%</td>
-                        <td className="p-3 text-right font-mono">{formatCurrency(stat.faturamentoTotal)}</td>
-                        <td className="p-3 text-right font-mono">{formatCurrency(stat.ticketMedio)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
