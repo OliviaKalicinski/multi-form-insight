@@ -309,19 +309,32 @@ export default function ExecutiveDashboard() {
               tooltipKey="margem_estimada"
             />
 
-            {/* ROAS */}
+            {/* ROAS Real (Faturamento) */}
             <StatusMetricCard
-              title="ROAS"
-              value={`${currentMetrics.marketing.roasAds.toFixed(2)}x`}
-              icon={<Target className="h-4 w-4" />}
-              trend={variations?.roas}
-              trendLabel="vs mês anterior"
+              title="ROAS Real"
+              value={`${currentMetrics.marketing.roasReal.toFixed(2)}x`}
+              icon={<DollarSign className="h-4 w-4" />}
               status={
-                currentMetrics.marketing.roasAds >= 4 ? 'success' :
-                currentMetrics.marketing.roasAds >= 3 ? 'warning' : 'danger'
+                currentMetrics.marketing.roasReal >= 4 ? 'success' :
+                currentMetrics.marketing.roasReal >= 3 ? 'warning' : 'danger'
               }
               benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
-              tooltipKey="roas"
+              interpretation="Faturamento ÷ Ads"
+              tooltipKey="roas_real"
+            />
+
+            {/* ROAS Meta (Plataforma) */}
+            <StatusMetricCard
+              title="ROAS Meta"
+              value={`${currentMetrics.marketing.roasMeta.toFixed(2)}x`}
+              icon={<Target className="h-4 w-4" />}
+              status={
+                currentMetrics.marketing.roasMeta >= 4 ? 'success' :
+                currentMetrics.marketing.roasMeta >= 3 ? 'warning' : 'danger'
+              }
+              benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+              interpretation="Reportado Meta Ads"
+              tooltipKey="roas_meta"
             />
 
             {/* CAC */}

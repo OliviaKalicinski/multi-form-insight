@@ -11,7 +11,9 @@ export interface VendasMetrics {
 export interface MarketingMetrics {
   investimentoAds: number;
   receitaAds: number;
-  roasAds: number;
+  roasAds: number;      // Mantém por retrocompatibilidade
+  roasReal: number;     // ROAS baseado no faturamento real (ex-frete)
+  roasMeta: number;     // ROAS reportado pelo Meta Ads
   impressoes: number;
   cliques: number;
   ctr: number;

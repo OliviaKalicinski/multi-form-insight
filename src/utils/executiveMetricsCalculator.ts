@@ -48,7 +48,18 @@ export const calculateExecutiveMetrics = (
   // ===== MARKETING =====
   const investimentoAds = adsMetrics?.investimentoTotal || 0;
   const receitaAds = adsMetrics?.valorConversaoTotal || receita;
-  const roasAds = adsMetrics?.roas || (investimentoAds > 0 ? receitaAds / investimentoAds : 0);
+  
+  // ROAS Meta (reportado pela plataforma Meta Ads)
+  const roasMeta = adsMetrics?.roas || 0;
+  
+  // ROAS Real (faturamento ex-frete / investimento)
+  // Calcula faturamento líquido (sem frete)
+  const faturamentoExFrete = orders.reduce((sum, o) => sum + o.valorTotal - (o.valorFrete || 0), 0);
+  const roasReal = investimentoAds > 0 ? faturamentoExFrete / investimentoAds : 0;
+  
+  // roasAds mantém por retrocompatibilidade (usa roasMeta)
+  const roasAds = roasMeta || (investimentoAds > 0 ? receitaAds / investimentoAds : 0);
+  
   const impressoes = adsMetrics?.impressoesTotal || 0;
   const cliquesTotal = adsMetrics?.cliquesTotal || 0;
   const ctr = adsMetrics?.ctrMedio || 0;
@@ -143,6 +154,8 @@ export const calculateExecutiveMetrics = (
       investimentoAds,
       receitaAds,
       roasAds,
+      roasReal,
+      roasMeta,
       impressoes,
       cliques: cliquesTotal,
       ctr,
