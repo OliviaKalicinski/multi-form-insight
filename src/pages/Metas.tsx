@@ -141,8 +141,18 @@ export default function Metas() {
   };
 
   const handleGoalChange = (field: keyof FinancialGoals, value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setGoalsForm(prev => ({ ...prev, [field]: numValue }));
+    // For extended goals that can be null, empty string means null
+    const nullableFields: (keyof FinancialGoals)[] = [
+      'taxaConversao', 'roasMedio', 'roasMinimo', 'roasExcelente',
+      'ctr', 'cpc', 'cac', 'taxaRecompra', 'taxaChurn', 'ltv'
+    ];
+    if (nullableFields.includes(field)) {
+      const numValue = value === "" ? null : parseFloat(value);
+      setGoalsForm(prev => ({ ...prev, [field]: numValue }));
+    } else {
+      const numValue = parseFloat(value) || 0;
+      setGoalsForm(prev => ({ ...prev, [field]: numValue }));
+    }
   };
 
   const handleInstagramChange = (field: keyof InstagramGoals, value: string) => {
@@ -231,7 +241,8 @@ export default function Metas() {
             />
             <KPIRow
               label="Taxa Conversão"
-              myGoalValue={null}
+              myGoalValue={goalsForm.taxaConversao}
+              onMyGoalChange={(v) => handleGoalChange("taxaConversao", v)}
               benchmarkValue={benchmarksForm.taxaConversao}
               onBenchmarkChange={(v) => handleBenchmarkChange("taxaConversao", v)}
               suffix="%"
@@ -252,7 +263,8 @@ export default function Metas() {
           <CardContent className="space-y-1">
             <KPIRow
               label="ROAS Médio"
-              myGoalValue={null}
+              myGoalValue={goalsForm.roasMedio}
+              onMyGoalChange={(v) => handleGoalChange("roasMedio", v)}
               benchmarkValue={benchmarksForm.roasMedio}
               onBenchmarkChange={(v) => handleBenchmarkChange("roasMedio", v)}
               step="0.1"
@@ -260,7 +272,8 @@ export default function Metas() {
             />
             <KPIRow
               label="ROAS Mínimo"
-              myGoalValue={null}
+              myGoalValue={goalsForm.roasMinimo}
+              onMyGoalChange={(v) => handleGoalChange("roasMinimo", v)}
               benchmarkValue={benchmarksForm.roasMinimo}
               onBenchmarkChange={(v) => handleBenchmarkChange("roasMinimo", v)}
               step="0.1"
@@ -268,7 +281,8 @@ export default function Metas() {
             />
             <KPIRow
               label="ROAS Excelente"
-              myGoalValue={null}
+              myGoalValue={goalsForm.roasExcelente}
+              onMyGoalChange={(v) => handleGoalChange("roasExcelente", v)}
               benchmarkValue={benchmarksForm.roasExcelente}
               onBenchmarkChange={(v) => handleBenchmarkChange("roasExcelente", v)}
               step="0.1"
@@ -276,7 +290,8 @@ export default function Metas() {
             />
             <KPIRow
               label="CTR"
-              myGoalValue={null}
+              myGoalValue={goalsForm.ctr}
+              onMyGoalChange={(v) => handleGoalChange("ctr", v)}
               benchmarkValue={benchmarksForm.ctr}
               onBenchmarkChange={(v) => handleBenchmarkChange("ctr", v)}
               suffix="%"
@@ -285,7 +300,8 @@ export default function Metas() {
             />
             <KPIRow
               label="CPC"
-              myGoalValue={null}
+              myGoalValue={goalsForm.cpc}
+              onMyGoalChange={(v) => handleGoalChange("cpc", v)}
               benchmarkValue={benchmarksForm.cpc}
               onBenchmarkChange={(v) => handleBenchmarkChange("cpc", v)}
               prefix="R$"
@@ -294,7 +310,8 @@ export default function Metas() {
             />
             <KPIRow
               label="CAC"
-              myGoalValue={null}
+              myGoalValue={goalsForm.cac}
+              onMyGoalChange={(v) => handleGoalChange("cac", v)}
               benchmarkValue={benchmarksForm.cac}
               onBenchmarkChange={(v) => handleBenchmarkChange("cac", v)}
               prefix="R$"
@@ -314,7 +331,8 @@ export default function Metas() {
           <CardContent className="space-y-1">
             <KPIRow
               label="Taxa Recompra"
-              myGoalValue={null}
+              myGoalValue={goalsForm.taxaRecompra}
+              onMyGoalChange={(v) => handleGoalChange("taxaRecompra", v)}
               benchmarkValue={benchmarksForm.taxaRecompra}
               onBenchmarkChange={(v) => handleBenchmarkChange("taxaRecompra", v)}
               suffix="%"
@@ -322,7 +340,8 @@ export default function Metas() {
             />
             <KPIRow
               label="Taxa Churn"
-              myGoalValue={null}
+              myGoalValue={goalsForm.taxaChurn}
+              onMyGoalChange={(v) => handleGoalChange("taxaChurn", v)}
               benchmarkValue={benchmarksForm.taxaChurn}
               onBenchmarkChange={(v) => handleBenchmarkChange("taxaChurn", v)}
               suffix="%"
@@ -330,7 +349,8 @@ export default function Metas() {
             />
             <KPIRow
               label="LTV"
-              myGoalValue={null}
+              myGoalValue={goalsForm.ltv}
+              onMyGoalChange={(v) => handleGoalChange("ltv", v)}
               benchmarkValue={benchmarksForm.ltv}
               onBenchmarkChange={(v) => handleBenchmarkChange("ltv", v)}
               prefix="R$"
