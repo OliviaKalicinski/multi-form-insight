@@ -6,8 +6,8 @@ interface CustomerSegmentationChartProps {
 }
 
 const COLORS = {
-  'Iniciante': '#fbbf24',
-  'Ocasional': '#3b82f6',
+  'Primeira Compra': '#f97316',
+  'Recorrente': '#3b82f6',
   'Fiel': '#10b981',
   'VIP': '#8b5cf6',
 };

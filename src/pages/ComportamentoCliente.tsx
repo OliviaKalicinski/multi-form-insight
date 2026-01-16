@@ -176,8 +176,8 @@ export default function ComportamentoCliente() {
   // Calcular clientes novos vs recorrentes
   const clienteBreakdown = useMemo(() => {
     if (!behaviorMetrics) return { novos: 0, recorrentes: 0 };
-    const inicianteSegment = behaviorMetrics.customerSegmentation.find(s => s.segment === 'Iniciante');
-    const novos = inicianteSegment?.count || 0;
+    const primeiraCompraSegment = behaviorMetrics.customerSegmentation.find(s => s.segment === 'Primeira Compra');
+    const novos = primeiraCompraSegment?.count || 0;
     return { novos, recorrentes: behaviorMetrics.totalClientes - novos };
   }, [behaviorMetrics]);
 
