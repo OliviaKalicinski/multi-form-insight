@@ -9,6 +9,17 @@ export interface FinancialGoals {
   ticketMedio: number;
   margem: number;
   custoFixo: number;
+  // Extended goals
+  taxaConversao: number | null;
+  roasMedio: number | null;
+  roasMinimo: number | null;
+  roasExcelente: number | null;
+  ctr: number | null;
+  cpc: number | null;
+  cac: number | null;
+  taxaRecompra: number | null;
+  taxaChurn: number | null;
+  ltv: number | null;
 }
 
 export interface InstagramGoals {
@@ -47,6 +58,17 @@ const DEFAULT_FINANCIAL_GOALS: FinancialGoals = {
   ticketMedio: 150,
   margem: 35,
   custoFixo: 0.65,
+  // Extended goals - null means not set
+  taxaConversao: null,
+  roasMedio: null,
+  roasMinimo: null,
+  roasExcelente: null,
+  ctr: null,
+  cpc: null,
+  cac: null,
+  taxaRecompra: null,
+  taxaChurn: null,
+  ltv: null,
 };
 
 const DEFAULT_INSTAGRAM_GOALS: InstagramGoals = {
