@@ -293,6 +293,16 @@ export const useDataPersistence = () => {
     }
   }, []);
 
+  // Helper to limit numeric values to avoid database overflow
+  // maxIntDigits = number of digits before decimal
+  // decimals = number of digits after decimal
+  const limitNumericValue = (value: number, maxIntDigits: number = 11, decimals: number = 4): number => {
+    if (!isFinite(value) || isNaN(value)) return 0;
+    const maxValue = Math.pow(10, maxIntDigits) - Math.pow(10, -decimals);
+    const clamped = Math.min(Math.abs(value), maxValue) * Math.sign(value);
+    return Number(clamped.toFixed(decimals));
+  };
+
   // Helper to parse Brazilian monetary values correctly
   // Formato brasileiro: 1.234,56 → 1234.56
   // Formato americano: 1,234.56 → 1234.56
@@ -332,6 +342,16 @@ export const useDataPersistence = () => {
     
     // Only dot or no separator
     return parseFloat(cleaned) || 0;
+  };
+
+  // Helper to parse and limit monetary values
+  const parseAndLimitMonetary = (value: string): number => {
+    return limitNumericValue(parseMonetaryValue(value), 11, 4);
+  };
+
+  // Helper to parse and limit percentage values (more precision)
+  const parseAndLimitPercentage = (value: string): number => {
+    return limitNumericValue(parseMonetaryValue(value), 9, 6);
   };
 
   // Helper to extract date from "Mês" field (format: "2025-11-01 - 2025-11-30")
@@ -376,34 +396,34 @@ export const useDataPersistence = () => {
           anuncio: ad["Nome do anúncio"] || "",
           impressoes: getIntValue(ad, ["Impressões", "Impressoes"]),
           cliques: getIntValue(ad, ["Cliques (todos)"]),
-          gasto: parseMonetaryValue(ad["Valor usado (BRL)"] || "0"),
+          gasto: parseAndLimitMonetary(ad["Valor usado (BRL)"] || "0"),
           conversoes: getIntValue(ad, ["Compras"]),
-          receita: parseMonetaryValue(ad["Valor de conversão da compra"] || "0"),
+          receita: parseAndLimitMonetary(ad["Valor de conversão da compra"] || "0"),
           // Core engagement metrics
           alcance: getIntValue(ad, ["Alcance", "Reach"]),
           resultados: getIntValue(ad, ["Resultados", "Results"]),
           engajamentos: getIntValue(ad, ["Engajamentos com o post", "Engajamentos"]),
           tipo_resultado: ad["Tipo de resultado"] || "",
-          custo_por_resultado: parseMonetaryValue(ad["Custo por resultado"] || "0"),
+          custo_por_resultado: parseAndLimitMonetary(ad["Custo por resultado"] || "0"),
           visitas_perfil: getIntValue(ad, ["Visitas ao perfil do Instagram"]),
           // NEW JSON FIELDS
           objetivo: ad["Objetivo"] || "",
           status_veiculacao: ad["Status de veiculação"] || "",
           nivel_veiculacao: ad["Nível de veiculação"] || "",
-          frequencia: parseMonetaryValue(ad["Frequência"] || "0"),
+          frequencia: parseAndLimitMonetary(ad["Frequência"] || "0"),
           visualizacoes: getIntValue(ad, ["Visualizações"]),
-          ctr: parseMonetaryValue(ad["CTR (todos)"] || "0"),
-          cpm: parseMonetaryValue(ad["CPM (custo por 1.000 impressões)"] || "0"),
-          ctr_saida: parseMonetaryValue(ad["CTR de saída"] || "0"),
+          ctr: parseAndLimitPercentage(ad["CTR (todos)"] || "0"),
+          cpm: parseAndLimitMonetary(ad["CPM (custo por 1.000 impressões)"] || "0"),
+          ctr_saida: parseAndLimitPercentage(ad["CTR de saída"] || "0"),
           cliques_saida: getIntValue(ad, ["Cliques de saída"]),
           visualizacoes_pagina: getIntValue(ad, ["Visualizações da página de destino do site"]),
-          custo_por_visualizacao: parseMonetaryValue(ad["Custo por visualização da página de destino"] || "0"),
+          custo_por_visualizacao: parseAndLimitMonetary(ad["Custo por visualização da página de destino"] || "0"),
           adicoes_carrinho: getIntValue(ad, ["Adições ao carrinho"]),
-          custo_adicao_carrinho: parseMonetaryValue(ad["Custo por adição ao carrinho"] || "0"),
-          custo_por_compra: parseMonetaryValue(ad["Custo por compra"] || "0"),
-          cpc: parseMonetaryValue(ad["CPC (custo por clique no link)"] || "0"),
+          custo_adicao_carrinho: parseAndLimitMonetary(ad["Custo por adição ao carrinho"] || "0"),
+          custo_por_compra: parseAndLimitMonetary(ad["Custo por compra"] || "0"),
+          cpc: parseAndLimitMonetary(ad["CPC (custo por clique no link)"] || "0"),
           cliques_link: getIntValue(ad, ["Cliques no link"]),
-          roas_resultados: parseMonetaryValue(ad["ROAS de resultados"] || "0"),
+          roas_resultados: parseAndLimitMonetary(ad["ROAS de resultados"] || "0"),
         };
       });
 

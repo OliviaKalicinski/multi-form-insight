@@ -92,14 +92,26 @@ export const AdsUploader = ({
         }
 
         return individualAds;
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erro ao salvar:", error);
+        const errorMessage = error?.message || String(error);
+        
+        if (errorMessage.includes("numeric field overflow")) {
+          toast({
+            variant: "destructive",
+            title: "Erro: Valor numérico muito grande",
+            description: "Alguns valores no CSV excedem o limite do banco. Entre em contato com suporte.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Erro ao salvar no banco",
+            description: errorMessage.substring(0, 150) || "Verifique os logs para mais detalhes.",
+          });
+        }
+        
+        // Fallback: load locally
         setAdsData(individualAds, monthlySummaries, hasHierarchicalFormat);
-        toast({
-          title: "Dados carregados localmente",
-          description: `${individualAds.length} anúncios importados (não foram salvos no banco)`,
-          variant: "destructive",
-        });
         return individualAds;
       } finally {
         setIsSaving(false);
@@ -126,14 +138,26 @@ export const AdsUploader = ({
       if (onDataLoaded) {
         onDataLoaded(validatedData, fileName, [], false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao salvar:", error);
+      const errorMessage = error?.message || String(error);
+      
+      if (errorMessage.includes("numeric field overflow")) {
+        toast({
+          variant: "destructive",
+          title: "Erro: Valor numérico muito grande",
+          description: "Alguns valores no CSV excedem o limite do banco. Entre em contato com suporte.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro ao salvar no banco",
+          description: errorMessage.substring(0, 150) || "Verifique os logs para mais detalhes.",
+        });
+      }
+      
+      // Fallback: load locally
       setAdsData(validatedData, [], false);
-      toast({
-        title: "Dados carregados localmente",
-        description: `${validatedData.length} anúncios importados (não foram salvos no banco)`,
-        variant: "destructive",
-      });
     } finally {
       setIsSaving(false);
     }
