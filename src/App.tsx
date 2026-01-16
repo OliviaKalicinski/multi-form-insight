@@ -69,11 +69,11 @@ const App = () => (
           
           <Route path="/upload" element={
             <ProtectedRoute>
-              <AdminRoute>
-                <AuthenticatedLayout>
+              <AuthenticatedLayout>
+                <AdminRoute>
                   <Upload />
-                </AuthenticatedLayout>
-              </AdminRoute>
+                </AdminRoute>
+              </AuthenticatedLayout>
             </ProtectedRoute>
           } />
           
@@ -87,11 +87,11 @@ const App = () => (
           
           <Route path="/metas" element={
             <ProtectedRoute>
-              <AdminRoute>
-                <AuthenticatedLayout>
+              <AuthenticatedLayout>
+                <AdminRoute>
                   <Metas />
-                </AuthenticatedLayout>
-              </AdminRoute>
+                </AdminRoute>
+              </AuthenticatedLayout>
             </ProtectedRoute>
           } />
           
