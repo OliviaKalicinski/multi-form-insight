@@ -27,7 +27,7 @@ import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { filterAdsByMonth } from "@/utils/adsParserV2";
+import { filterAdsByMonth, filterAdsByObjective, determinePrimaryObjective, getAdObjective } from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { getLast12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
 import { aggregateAdsByMonth } from "@/utils/monthlyAggregator";
@@ -35,19 +35,9 @@ import { calculateAdsMultiMonthMetrics } from "@/utils/comparisonCalculator";
 import { cn } from "@/lib/utils";
 import { AdsData } from "@/types/marketing";
 
-// ===== Helper Functions for Objective Detection =====
-const getObjective = (ad: AdsData): string => {
-  const objetivo = ad["Objetivo"] || "";
-  if (objetivo.includes("OUTCOME_SALES")) return "OUTCOME_SALES";
-  if (objetivo.includes("OUTCOME_ENGAGEMENT")) return "OUTCOME_ENGAGEMENT";
-  if (objetivo.includes("OUTCOME_TRAFFIC")) return "OUTCOME_TRAFFIC";
-  if (objetivo.includes("OUTCOME_AWARENESS")) return "OUTCOME_AWARENESS";
-  if (objetivo.includes("OUTCOME_LEADS")) return "OUTCOME_LEADS";
-  return "UNKNOWN";
-};
-
+// Helper function for objective detection (uses centralized function from adsParserV2)
 const hasObjective = (data: AdsData[], objective: string): boolean => {
-  return data.some(ad => getObjective(ad) === objective);
+  return data.some(ad => getAdObjective(ad) === objective);
 };
 
 const Ads = () => {
@@ -92,14 +82,30 @@ const Ads = () => {
     return filterAdsByMonth(adsData, selectedMonth);
   }, [adsData, selectedMonth, isLast12MonthsView, last12Months]);
 
+  // ===== PRIMARY OBJECTIVE: Determines which dataset feeds Hero and cards =====
+  const primaryObjective = useMemo(() => {
+    return determinePrimaryObjective(currentMonthAdsData);
+  }, [currentMonthAdsData]);
+
+  // ===== ACTIVE ADS DATA: Filtered by primary objective (Sales-only when exists) =====
+  const activeAdsData = useMemo(() => {
+    if (primaryObjective === "OUTCOME_SALES") {
+      return filterAdsByObjective(currentMonthAdsData, "OUTCOME_SALES");
+    }
+    if (primaryObjective === "OUTCOME_ENGAGEMENT") {
+      return filterAdsByObjective(currentMonthAdsData, "OUTCOME_ENGAGEMENT");
+    }
+    return currentMonthAdsData;
+  }, [currentMonthAdsData, primaryObjective]);
+
   // ===== Objective Detection for Current Data =====
   const objectivesSummary = useMemo(() => {
-    const salesCount = currentMonthAdsData.filter(ad => getObjective(ad) === "OUTCOME_SALES").length;
-    const engagementCount = currentMonthAdsData.filter(ad => getObjective(ad) === "OUTCOME_ENGAGEMENT").length;
-    const trafficCount = currentMonthAdsData.filter(ad => getObjective(ad) === "OUTCOME_TRAFFIC").length;
-    const awarenessCount = currentMonthAdsData.filter(ad => getObjective(ad) === "OUTCOME_AWARENESS").length;
-    const leadsCount = currentMonthAdsData.filter(ad => getObjective(ad) === "OUTCOME_LEADS").length;
-    const unknownCount = currentMonthAdsData.filter(ad => getObjective(ad) === "UNKNOWN").length;
+    const salesCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_SALES").length;
+    const engagementCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_ENGAGEMENT").length;
+    const trafficCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_TRAFFIC").length;
+    const awarenessCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_AWARENESS").length;
+    const leadsCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_LEADS").length;
+    const unknownCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "UNKNOWN").length;
     
     return {
       hasSales: salesCount > 0,
@@ -114,25 +120,20 @@ const Ads = () => {
       leadsCount,
       unknownCount,
       total: currentMonthAdsData.length,
+      // Flags that sync with activeAdsData
+      primaryObjective,
+      isSalesView: primaryObjective === "OUTCOME_SALES",
+      isEngagementView: primaryObjective === "OUTCOME_ENGAGEMENT",
     };
-  }, [currentMonthAdsData]);
+  }, [currentMonthAdsData, primaryObjective]);
 
-  // Calculate current metrics
+  // Calculate current metrics (ALWAYS from activeAdsData, never from generic summaries)
+  // This ensures metrics are pure per objective (Sales-only when Sales exists)
   const metrics = useMemo(() => {
-    if (isLast12MonthsView) {
-      return calculateAdsMetrics(currentMonthAdsData);
-    }
-    
-    if (hasHierarchicalFormat && monthlySummaries.length > 0) {
-      const summary = monthlySummaries.find(s => s.month === selectedMonth);
-      if (summary) {
-        return summary.data;
-      }
-    }
-    return calculateAdsMetrics(currentMonthAdsData);
-  }, [hasHierarchicalFormat, monthlySummaries, selectedMonth, currentMonthAdsData, isLast12MonthsView]);
+    return calculateAdsMetrics(activeAdsData);
+  }, [activeAdsData]);
 
-  // Calculate trends vs previous month
+  // Calculate trends vs previous month (using same objective filter)
   const trends = useMemo(() => {
     if (!selectedMonth || isLast12MonthsView) return null;
     
@@ -141,7 +142,15 @@ const Ads = () => {
     if (currentIndex <= 0) return null;
 
     const previousMonth = sortedMonths[currentIndex - 1];
-    const previousData = filterAdsByMonth(adsData, previousMonth);
+    let previousData = filterAdsByMonth(adsData, previousMonth);
+    
+    // IMPORTANT: Apply same objective filter to previous month for consistent comparison
+    if (primaryObjective === "OUTCOME_SALES") {
+      previousData = filterAdsByObjective(previousData, "OUTCOME_SALES");
+    } else if (primaryObjective === "OUTCOME_ENGAGEMENT") {
+      previousData = filterAdsByObjective(previousData, "OUTCOME_ENGAGEMENT");
+    }
+    
     const previousMetrics = calculateAdsMetrics(previousData);
 
     const calculateTrend = (current: number, previous: number) => {
@@ -161,7 +170,7 @@ const Ads = () => {
       cpeTrend: calculateTrend(metrics.custoPorResultadoMedio, previousMetrics.custoPorResultadoMedio),
       engagementRateTrend: calculateTrend(metrics.taxaEngajamento, previousMetrics.taxaEngajamento),
     };
-  }, [selectedMonth, availableMonths, adsData, metrics, isLast12MonthsView]);
+  }, [selectedMonth, availableMonths, adsData, metrics, isLast12MonthsView, primaryObjective]);
 
   // Derived metrics
   const netProfit = metrics.valorConversaoTotal - metrics.investimentoTotal;
@@ -360,7 +369,7 @@ const Ads = () => {
           ) : (
             <>
               {/* ===== ADAPTIVE UI BASED ON OBJECTIVE ===== */}
-              {objectivesSummary.hasSales ? (
+              {objectivesSummary.isSalesView ? (
                 // ===== SALES VIEW =====
                 <>
                   {/* ===== ROW 1: ROAS Compact (40%) + Satellite Cards (60%) ===== */}
@@ -891,8 +900,8 @@ const Ads = () => {
                 </CardContent>
               </Card>
 
-              {/* ===== ROW 4: Breakdown by Ad ===== */}
-              <AdsBreakdown ads={currentMonthAdsData} selectedMonth={selectedMonth || ""} />
+              {/* ===== ROW 4: Breakdown by Ad (uses activeAdsData for objective-filtered view) ===== */}
+              <AdsBreakdown ads={activeAdsData} selectedMonth={selectedMonth || ""} />
             </>
           )}
         </div>
