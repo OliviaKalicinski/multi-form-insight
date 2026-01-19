@@ -103,12 +103,12 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
   roas_real: {
     formula: "Faturamento Total (ex-frete) ÷ Investimento em Ads",
     description: "Retorno real baseado no dinheiro que entrou no caixa, excluindo frete. Mostra o retorno efetivo do investimento em anúncios.",
-    rules: ["≥4x = Excelente", "≥3x = Bom", "<3x = Atenção", "Baseado em vendas reais"]
+    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Baseado em vendas reais"]
   },
   roas_meta: {
     formula: "Valor de Conversão (Meta) ÷ Investimento em Ads",
     description: "ROAS reportado pela plataforma Meta Ads. Baseado na atribuição de conversão do Facebook/Instagram, que pode diferir do faturamento real.",
-    rules: ["≥4x = Excelente", "≥3x = Bom", "<3x = Atenção", "Pode diferir do real devido à atribuição"]
+    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Pode diferir do real devido à atribuição"]
   },
   cac: {
     formula: "Investimento Total em Ads ÷ Número de Novos Clientes",
