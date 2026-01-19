@@ -49,16 +49,24 @@ export const calculateExecutiveMetrics = (
   const investimentoAds = adsMetrics?.investimentoTotal || 0;
   const receitaAds = adsMetrics?.valorConversaoTotal || receita;
   
-  // ROAS Meta (reportado pela plataforma Meta Ads)
-  const roasMeta = adsMetrics?.roas || 0;
+  // Calcular faturamento e frete dos pedidos reais
+  const faturamentoTotal = orders.reduce((sum, o) => sum + o.valorTotal, 0);
+  const freteTotal = orders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
+  const percentualFrete = faturamentoTotal > 0 ? freteTotal / faturamentoTotal : 0;
   
-  // ROAS Real (faturamento ex-frete / investimento)
-  // Calcula faturamento líquido (sem frete)
-  const faturamentoExFrete = orders.reduce((sum, o) => sum + o.valorTotal - (o.valorFrete || 0), 0);
+  // ROAS Meta: valor conversão Meta - frete estimado (proporcional) / investimento
+  // Usamos o percentual de frete dos pedidos reais para estimar o frete do Meta
+  const valorConversaoMeta = adsMetrics?.valorConversaoTotal || 0;
+  const freteEstimadoMeta = valorConversaoMeta * percentualFrete;
+  const faturamentoMetaExFrete = valorConversaoMeta - freteEstimadoMeta;
+  const roasMeta = investimentoAds > 0 ? faturamentoMetaExFrete / investimentoAds : 0;
+  
+  // ROAS Real: faturamento real - frete real / investimento
+  const faturamentoExFrete = faturamentoTotal - freteTotal;
   const roasReal = investimentoAds > 0 ? faturamentoExFrete / investimentoAds : 0;
   
   // roasAds mantém por retrocompatibilidade (usa roasMeta)
-  const roasAds = roasMeta || (investimentoAds > 0 ? receitaAds / investimentoAds : 0);
+  const roasAds = roasMeta;
   
   const impressoes = adsMetrics?.impressoesTotal || 0;
   const cliquesTotal = adsMetrics?.cliquesTotal || 0;
