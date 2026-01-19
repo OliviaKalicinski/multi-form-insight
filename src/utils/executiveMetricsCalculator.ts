@@ -31,13 +31,17 @@ export const calculateExecutiveMetrics = (
   const pedidos = salesMetrics?.totalPedidos || 0;
   const ticketMedio = pedidos > 0 ? receita / pedidos : 0;
   
-  // Ticket médio sem samples
-  const pedidosSemSamples = orders.filter(o => 
-    !o.produtos.some(p => p.descricaoAjustada === 'Kit de Amostras')
-  );
-  const receitaSemSamples = pedidosSemSamples.reduce((sum, o) => sum + o.valorTotal, 0);
-  const ticketMedioReal = pedidosSemSamples.length > 0 
-    ? receitaSemSamples / pedidosSemSamples.length 
+  // Ticket médio real - exclui apenas pedidos de SOMENTE amostra
+  // (pedidos que têm amostra + produto regular são mantidos)
+  const pedidosReais = orders.filter(order => {
+    const hasRealProduct = order.produtos.some(
+      p => p.descricaoAjustada !== 'Kit de Amostras'
+    );
+    return hasRealProduct;
+  });
+  const receitaReal = pedidosReais.reduce((sum, o) => sum + o.valorTotal, 0);
+  const ticketMedioReal = pedidosReais.length > 0 
+    ? receitaReal / pedidosReais.length 
     : ticketMedio;
 
   // Taxa de conversão (compras / cliques)
