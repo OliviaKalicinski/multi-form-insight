@@ -58,12 +58,10 @@ export const calculateExecutiveMetrics = (
   const freteTotal = orders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
   const percentualFrete = faturamentoTotal > 0 ? freteTotal / faturamentoTotal : 0;
   
-  // ROAS Meta: valor conversão Meta - frete estimado (proporcional) / investimento
-  // Usamos o percentual de frete dos pedidos reais para estimar o frete do Meta
+  // ROAS Meta: valor exato reportado pelo Meta Ads (inclui frete)
+  // Mantemos o valor original para consistência com o painel do Meta
   const valorConversaoMeta = adsMetrics?.valorConversaoTotal || 0;
-  const freteEstimadoMeta = valorConversaoMeta * percentualFrete;
-  const faturamentoMetaExFrete = valorConversaoMeta - freteEstimadoMeta;
-  const roasMeta = investimentoAds > 0 ? faturamentoMetaExFrete / investimentoAds : 0;
+  const roasMeta = investimentoAds > 0 ? valorConversaoMeta / investimentoAds : 0;
   
   // ROAS Real: faturamento real - frete real / investimento
   const faturamentoExFrete = faturamentoTotal - freteTotal;

@@ -107,8 +107,8 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
   },
   roas_meta: {
     formula: "Valor de Conversão (Meta) ÷ Investimento em Ads",
-    description: "ROAS reportado pela plataforma Meta Ads. Baseado na atribuição de conversão do Facebook/Instagram, que pode diferir do faturamento real.",
-    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Pode diferir do real devido à atribuição"]
+    description: "ROAS reportado pela plataforma Meta Ads (inclui frete). Baseado na atribuição de conversão do Facebook/Instagram, que pode diferir do faturamento real.",
+    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Inclui frete no valor", "Pode diferir do real"]
   },
   cac: {
     formula: "Investimento Total em Ads ÷ Número de Novos Clientes",
