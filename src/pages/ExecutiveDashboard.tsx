@@ -20,7 +20,8 @@ import {
   Percent,
   BarChart3,
   Zap,
-  Package
+  Package,
+  Receipt
 } from "lucide-react";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { calculateExecutiveMetrics, filterOrdersByMonth, filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
@@ -293,6 +294,26 @@ export default function ExecutiveDashboard() {
               trend={variations?.pedidos}
               status={getStatusFromBenchmark(currentMetrics.vendas.pedidos, previousMetrics?.vendas.pedidos || 1)}
               tooltipKey="total_pedidos"
+            />
+
+            {/* Ticket Médio Geral */}
+            <StatusMetricCard
+              title="Ticket Médio"
+              value={formatCurrency(currentMetrics.vendas.ticketMedio)}
+              icon={<Receipt className="h-4 w-4" />}
+              interpretation="Todos os pedidos"
+              tooltipKey="ticket_medio"
+            />
+
+            {/* Ticket Médio Real */}
+            <StatusMetricCard
+              title="Ticket Real"
+              value={formatCurrency(currentMetrics.vendas.ticketMedioReal)}
+              icon={<TrendingUp className="h-4 w-4" />}
+              trend={variations?.ticket}
+              status={getStatusFromBenchmark(currentMetrics.vendas.ticketMedioReal, previousMetrics?.vendas.ticketMedioReal || 1)}
+              interpretation="Sem amostras"
+              tooltipKey="ticket_medio_real"
             />
 
             {/* Margem Bruta */}
