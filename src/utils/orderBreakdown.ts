@@ -23,12 +23,14 @@ export const breakdownOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => {
         
         kitComponents.forEach(component => {
           // Adicionar cada componente (já está padronizado)
+          // preco deve ser o preço UNITÁRIO do componente para evitar duplicação
+          // quando financialMetrics.ts multiplicar por quantidade
           newProducts.push({
             sku: `${produto.sku}-${component.product.replace(/\s+/g, '-')}`,
             descricao: component.product,
             descricaoAjustada: component.product,
             quantidade: produto.quantidade * component.quantity,
-            preco: pricePerComponent * component.quantity * produto.quantidade,
+            preco: pricePerComponent,
           });
         });
       } else {
