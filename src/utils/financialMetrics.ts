@@ -327,7 +327,7 @@ export const calculateAccumulatedRevenueByProduct = (
   ordersToProcess.forEach(order => {
     order.produtos.forEach(produto => {
       const productName = produto.descricaoAjustada;
-      const revenue = produto.preco * produto.quantidade;
+      const revenue = produto.preco;
       
       // Acumular faturamento
       productMap.set(
