@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
-import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2 } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2, Receipt } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
@@ -238,12 +238,19 @@ export default function PerformanceFinanceira() {
             />
             <StatusMetricCard
               title="Ticket Médio"
+              value={formatCurrency(financialMetrics.ticketMedio)}
+              icon={<Receipt className="h-3 w-3" />}
+              size="compact"
+              tooltipKey="ticket_medio"
+            />
+            <StatusMetricCard
+              title="Ticket Real"
               value={formatCurrency(financialMetrics.ticketMedioReal)}
               icon={<TrendingUp className="h-3 w-3" />}
               trend={variations?.ticket}
               status={getStatusFromBenchmark(financialMetrics.ticketMedioReal, benchmarksPetFood.ticketMedio)}
               size="compact"
-              tooltipKey="ticket_medio"
+              tooltipKey="ticket_medio_real"
             />
             <StatusMetricCard
               title="Margem Bruta"

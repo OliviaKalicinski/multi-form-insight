@@ -204,7 +204,13 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
   },
   ticket_medio: {
     formula: "Faturamento Total ÷ Total de Pedidos",
-    description: "Valor médio de cada pedido realizado.",
+    description: "Valor médio de cada pedido realizado, incluindo todos os pedidos.",
+    rules: ["Inclui pedidos de amostra"]
+  },
+  ticket_medio_real: {
+    formula: "Faturamento Real ÷ Pedidos Reais",
+    description: "Valor médio de pedidos com produtos regulares. Exclui pedidos contendo apenas amostras.",
+    rules: ["Exclui pedidos 100% amostra", "Pedidos com amostra + produto são incluídos"]
   },
   itens_por_pedido: {
     formula: "Total de Produtos ÷ Total de Pedidos",
