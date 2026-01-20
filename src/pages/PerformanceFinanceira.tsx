@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
-import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2, Receipt } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2, Receipt, Target } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
@@ -17,6 +17,8 @@ import { TicketDistributionCompact } from "@/components/dashboard/TicketDistribu
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
 import { calculateFinancialMetrics, analyzeSeasonality } from "@/utils/financialMetrics";
 import { filterOrdersByMonth } from "@/utils/salesCalculator";
+import { filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
+import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
 import { benchmarksPetFood } from "@/data/executiveData";
 import { format, parse } from "date-fns";
@@ -29,6 +31,7 @@ const formatCurrency = (value: number) =>
 export default function PerformanceFinanceira() {
   const {
     salesData,
+    adsData,
     selectedMonth,
     availableMonths,
     comparisonMode,
@@ -99,6 +102,48 @@ export default function PerformanceFinanceira() {
     if (salesData.length === 0) return null;
     return analyzeSeasonality(salesData);
   }, [salesData]);
+
+  // === ROAS METRICS ===
+  const roasMetrics = useMemo(() => {
+    if (salesData.length === 0) return null;
+    
+    // Filtrar pedidos do período
+    const filteredOrders = selectedMonth
+      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
+      : salesData;
+    
+    // Filtrar ads do período
+    const filteredAds = selectedMonth && selectedMonth !== 'last-12-months'
+      ? filterAdsByMonth(adsData, selectedMonth)
+      : adsData;
+    
+    // Calcular métricas de ads
+    const adsMetrics = filteredAds.length > 0 ? calculateAdsMetrics(filteredAds) : null;
+    const investimentoAds = adsMetrics?.investimentoTotal || 0;
+    const valorConversaoMeta = adsMetrics?.valorConversaoTotal || 0;
+    
+    // Calcular faturamento e frete
+    const faturamentoTotal = filteredOrders.reduce((sum, o) => sum + o.valorTotal, 0);
+    const freteTotal = filteredOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
+    const percentualFrete = faturamentoTotal > 0 ? freteTotal / faturamentoTotal : 0;
+    const faturamentoExFrete = faturamentoTotal - freteTotal;
+    
+    // 4 ROAS
+    const roasBruto = investimentoAds > 0 ? faturamentoTotal / investimentoAds : 0;
+    const roasReal = investimentoAds > 0 ? faturamentoExFrete / investimentoAds : 0;
+    const roasMeta = investimentoAds > 0 ? valorConversaoMeta / investimentoAds : 0;
+    const valorMetaExFrete = valorConversaoMeta * (1 - percentualFrete);
+    const roasMetaReal = investimentoAds > 0 ? valorMetaExFrete / investimentoAds : 0;
+    
+    return {
+      roasBruto,
+      roasReal,
+      roasMeta,
+      roasMetaReal,
+      investimentoAds,
+      hasAdsData: filteredAds.length > 0
+    };
+  }, [salesData, adsData, selectedMonth, availableSalesMonths]);
 
   // Goals data para o card de metas
   const goalsData = useMemo(() => {
@@ -292,6 +337,85 @@ export default function PerformanceFinanceira() {
           </div>
         </div>
       )}
+
+      {/* ===== BLOCO ROAS (4 Cards) ===== */}
+      {!comparisonMode && roasMetrics && roasMetrics.hasAdsData && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              📈 ROAS - Retorno sobre Investimento em Ads
+            </CardTitle>
+            <CardDescription>
+              Comparação de 4 métricas de ROAS: bruto, real, Meta e Meta real
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* 1. ROAS Bruto */}
+              <StatusMetricCard
+                title="ROAS Bruto"
+                value={`${roasMetrics.roasBruto.toFixed(2)}x`}
+                icon={<DollarSign className="h-3 w-3" />}
+                status={
+                  roasMetrics.roasBruto >= 4 ? 'success' :
+                  roasMetrics.roasBruto >= 3 ? 'warning' : 'danger'
+                }
+                benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+                interpretation="Receita Total ÷ Ads"
+                size="compact"
+                tooltipKey="roas_bruto"
+              />
+
+              {/* 2. ROAS Real */}
+              <StatusMetricCard
+                title="ROAS Real"
+                value={`${roasMetrics.roasReal.toFixed(2)}x`}
+                icon={<DollarSign className="h-3 w-3" />}
+                status={
+                  roasMetrics.roasReal >= 4 ? 'success' :
+                  roasMetrics.roasReal >= 3 ? 'warning' : 'danger'
+                }
+                benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+                interpretation="Receita ex-frete ÷ Ads"
+                size="compact"
+                tooltipKey="roas_real"
+              />
+
+              {/* 3. ROAS Meta */}
+              <StatusMetricCard
+                title="ROAS Meta"
+                value={`${roasMetrics.roasMeta.toFixed(2)}x`}
+                icon={<Target className="h-3 w-3" />}
+                status={
+                  roasMetrics.roasMeta >= 4 ? 'success' :
+                  roasMetrics.roasMeta >= 3 ? 'warning' : 'danger'
+                }
+                benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+                interpretation="Valor Meta ÷ Ads"
+                size="compact"
+                tooltipKey="roas_meta"
+              />
+
+              {/* 4. ROAS Meta Real */}
+              <StatusMetricCard
+                title="ROAS Meta Real"
+                value={`${roasMetrics.roasMetaReal.toFixed(2)}x`}
+                icon={<Target className="h-3 w-3" />}
+                status={
+                  roasMetrics.roasMetaReal >= 4 ? 'success' :
+                  roasMetrics.roasMetaReal >= 3 ? 'warning' : 'danger'
+                }
+                benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+                interpretation="Meta ex-frete ÷ Ads"
+                size="compact"
+                tooltipKey="roas_meta_real"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* Cards de comparação */}
       {comparisonMode && comparisonMetrics && (

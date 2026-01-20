@@ -330,7 +330,21 @@ export default function ExecutiveDashboard() {
               tooltipKey="margem_estimada"
             />
 
-            {/* ROAS Real (Faturamento) */}
+            {/* 1. ROAS Bruto (Receita Total / Investimento) */}
+            <StatusMetricCard
+              title="ROAS Bruto"
+              value={`${currentMetrics.marketing.roasBruto.toFixed(2)}x`}
+              icon={<DollarSign className="h-4 w-4" />}
+              status={
+                currentMetrics.marketing.roasBruto >= 4 ? 'success' :
+                currentMetrics.marketing.roasBruto >= 3 ? 'warning' : 'danger'
+              }
+              benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+              interpretation="Receita Total ÷ Ads"
+              tooltipKey="roas_bruto"
+            />
+
+            {/* 2. ROAS Real (Receita ex-frete / Investimento) */}
             <StatusMetricCard
               title="ROAS Real"
               value={`${currentMetrics.marketing.roasReal.toFixed(2)}x`}
@@ -340,11 +354,11 @@ export default function ExecutiveDashboard() {
                 currentMetrics.marketing.roasReal >= 3 ? 'warning' : 'danger'
               }
               benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
-              interpretation="Faturamento ÷ Ads"
+              interpretation="Receita ex-frete ÷ Ads"
               tooltipKey="roas_real"
             />
 
-            {/* ROAS Meta (Plataforma) */}
+            {/* 3. ROAS Meta (Valor Meta / Investimento) */}
             <StatusMetricCard
               title="ROAS Meta"
               value={`${currentMetrics.marketing.roasMeta.toFixed(2)}x`}
@@ -354,8 +368,22 @@ export default function ExecutiveDashboard() {
                 currentMetrics.marketing.roasMeta >= 3 ? 'warning' : 'danger'
               }
               benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
-              interpretation="Reportado Meta Ads"
+              interpretation="Valor Meta ÷ Ads"
               tooltipKey="roas_meta"
+            />
+
+            {/* 4. ROAS Meta Real (Valor Meta ex-frete / Investimento) */}
+            <StatusMetricCard
+              title="ROAS Meta Real"
+              value={`${currentMetrics.marketing.roasMetaReal.toFixed(2)}x`}
+              icon={<Target className="h-4 w-4" />}
+              status={
+                currentMetrics.marketing.roasMetaReal >= 4 ? 'success' :
+                currentMetrics.marketing.roasMetaReal >= 3 ? 'warning' : 'danger'
+              }
+              benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+              interpretation="Meta ex-frete ÷ Ads"
+              tooltipKey="roas_meta_real"
             />
 
             {/* CAC */}
