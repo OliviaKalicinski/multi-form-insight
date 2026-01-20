@@ -14,8 +14,7 @@ export interface MarketingMetrics {
   roasAds: number;      // Mantém por retrocompatibilidade
   roasBruto: number;    // ROAS Bruto: Receita Total (com frete) / Investimento
   roasReal: number;     // ROAS Real: Receita ex-frete / Investimento
-  roasMeta: number;     // ROAS Meta: Valor de conversão Meta / Investimento
-  roasMetaReal: number; // ROAS Meta Real: Valor Meta ex-frete estimado / Investimento
+  roasMeta: number;     // ROAS Meta: Valor de conversão Meta / Investimento (já ex-frete)
   impressoes: number;
   cliques: number;
   ctr: number;
