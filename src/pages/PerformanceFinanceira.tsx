@@ -125,21 +125,17 @@ export default function PerformanceFinanceira() {
     // Calcular faturamento e frete
     const faturamentoTotal = filteredOrders.reduce((sum, o) => sum + o.valorTotal, 0);
     const freteTotal = filteredOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
-    const percentualFrete = faturamentoTotal > 0 ? freteTotal / faturamentoTotal : 0;
     const faturamentoExFrete = faturamentoTotal - freteTotal;
     
-    // 4 ROAS
+    // 3 ROAS (ROAS Meta já é ex-frete pelo pixel)
     const roasBruto = investimentoAds > 0 ? faturamentoTotal / investimentoAds : 0;
     const roasReal = investimentoAds > 0 ? faturamentoExFrete / investimentoAds : 0;
     const roasMeta = investimentoAds > 0 ? valorConversaoMeta / investimentoAds : 0;
-    const valorMetaExFrete = valorConversaoMeta * (1 - percentualFrete);
-    const roasMetaReal = investimentoAds > 0 ? valorMetaExFrete / investimentoAds : 0;
     
     return {
       roasBruto,
       roasReal,
       roasMeta,
-      roasMetaReal,
       investimentoAds,
       hasAdsData: filteredAds.length > 0
     };
@@ -298,22 +294,14 @@ export default function PerformanceFinanceira() {
               tooltipKey="ticket_medio_real"
             />
             <StatusMetricCard
-              title="Margem Bruta"
-              value={`${((1 - financialGoals.custoFixo) * 100).toFixed(0)}%`}
-              icon={<DollarSign className="h-3 w-3" />}
-              status="success"
-              size="compact"
-              tooltipKey="margem_bruta"
-            />
-
-            {/* Linha 2: Secundários */}
-            <StatusMetricCard
               title="Itens/Pedido"
               value={`${financialMetrics.produtoMedio.toFixed(1)}`}
               icon={<Package className="h-3 w-3" />}
               size="compact"
               tooltipKey="itens_pedido"
             />
+
+            {/* Linha 2: Secundários */}
             <StatusMetricCard
               title="Receita Líq."
               value={formatCurrency(financialMetrics.faturamentoLiquido)}
@@ -338,7 +326,7 @@ export default function PerformanceFinanceira() {
         </div>
       )}
 
-      {/* ===== BLOCO ROAS (4 Cards) ===== */}
+      {/* ===== BLOCO ROAS (3 Cards) ===== */}
       {!comparisonMode && roasMetrics && roasMetrics.hasAdsData && (
         <Card>
           <CardHeader className="pb-2">
@@ -347,11 +335,11 @@ export default function PerformanceFinanceira() {
               📈 ROAS - Retorno sobre Investimento em Ads
             </CardTitle>
             <CardDescription>
-              Comparação de 4 métricas de ROAS: bruto, real, Meta e Meta real
+              Comparação de 3 métricas de ROAS: bruto, real e Meta (já ex-frete)
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {/* 1. ROAS Bruto */}
               <StatusMetricCard
                 title="ROAS Bruto"
@@ -382,7 +370,7 @@ export default function PerformanceFinanceira() {
                 tooltipKey="roas_real"
               />
 
-              {/* 3. ROAS Meta */}
+              {/* 3. ROAS Meta (já ex-frete pelo pixel) */}
               <StatusMetricCard
                 title="ROAS Meta"
                 value={`${roasMetrics.roasMeta.toFixed(2)}x`}
@@ -392,24 +380,9 @@ export default function PerformanceFinanceira() {
                   roasMetrics.roasMeta >= 3 ? 'warning' : 'danger'
                 }
                 benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
-                interpretation="Valor Meta ÷ Ads"
+                interpretation="Valor Meta ÷ Ads (ex-frete)"
                 size="compact"
                 tooltipKey="roas_meta"
-              />
-
-              {/* 4. ROAS Meta Real */}
-              <StatusMetricCard
-                title="ROAS Meta Real"
-                value={`${roasMetrics.roasMetaReal.toFixed(2)}x`}
-                icon={<Target className="h-3 w-3" />}
-                status={
-                  roasMetrics.roasMetaReal >= 4 ? 'success' :
-                  roasMetrics.roasMetaReal >= 3 ? 'warning' : 'danger'
-                }
-                benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
-                interpretation="Meta ex-frete ÷ Ads"
-                size="compact"
-                tooltipKey="roas_meta_real"
               />
             </div>
           </CardContent>

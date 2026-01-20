@@ -316,20 +316,6 @@ export default function ExecutiveDashboard() {
               tooltipKey="ticket_medio_real"
             />
 
-            {/* Margem Bruta */}
-            <StatusMetricCard
-              title="Margem Est."
-              value={`${currentMetrics.produtos.margemMedia}%`}
-              icon={<Percent className="h-4 w-4" />}
-              status={
-                currentMetrics.produtos.margemMedia >= 35 ? 'success' :
-                currentMetrics.produtos.margemMedia >= 30 ? 'warning' : 'danger'
-              }
-              benchmark={{ value: 30, label: 'Meta: 30%' }}
-              interpretation="Margem estimada"
-              tooltipKey="margem_estimada"
-            />
-
             {/* 1. ROAS Bruto (Receita Total / Investimento) */}
             <StatusMetricCard
               title="ROAS Bruto"
@@ -358,7 +344,7 @@ export default function ExecutiveDashboard() {
               tooltipKey="roas_real"
             />
 
-            {/* 3. ROAS Meta (Valor Meta / Investimento) */}
+            {/* 3. ROAS Meta (Valor Meta / Investimento - já ex-frete) */}
             <StatusMetricCard
               title="ROAS Meta"
               value={`${currentMetrics.marketing.roasMeta.toFixed(2)}x`}
@@ -368,22 +354,8 @@ export default function ExecutiveDashboard() {
                 currentMetrics.marketing.roasMeta >= 3 ? 'warning' : 'danger'
               }
               benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
-              interpretation="Valor Meta ÷ Ads"
+              interpretation="Valor Meta ÷ Ads (ex-frete)"
               tooltipKey="roas_meta"
-            />
-
-            {/* 4. ROAS Meta Real (Valor Meta ex-frete / Investimento) */}
-            <StatusMetricCard
-              title="ROAS Meta Real"
-              value={`${currentMetrics.marketing.roasMetaReal.toFixed(2)}x`}
-              icon={<Target className="h-4 w-4" />}
-              status={
-                currentMetrics.marketing.roasMetaReal >= 4 ? 'success' :
-                currentMetrics.marketing.roasMetaReal >= 3 ? 'warning' : 'danger'
-              }
-              benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
-              interpretation="Meta ex-frete ÷ Ads"
-              tooltipKey="roas_meta_real"
             />
 
             {/* CAC */}

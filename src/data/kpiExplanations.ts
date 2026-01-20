@@ -112,13 +112,8 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
   },
   roas_meta: {
     formula: "Valor de Conversão (Meta) ÷ Investimento em Ads",
-    description: "ROAS reportado pela plataforma Meta Ads (inclui frete). Baseado na atribuição de conversão do Facebook/Instagram, que pode diferir do faturamento real.",
-    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Inclui frete no valor", "Pode diferir do real"]
-  },
-  roas_meta_real: {
-    formula: "(Valor Meta - Frete Estimado) ÷ Investimento em Ads",
-    description: "ROAS Meta descontando frete estimado. Combina atribuição Meta com receita líquida estimada.",
-    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Estimativa baseada no % de frete real", "Mais conservador que ROAS Meta"]
+    description: "ROAS reportado pelo Meta Ads. O valor de conversão já exclui frete (capturado pelo pixel no evento Purchase).",
+    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Valor do carrinho (produtos)", "Atribuição Meta"]
   },
   cac: {
     formula: "Investimento Total em Ads ÷ Número de Novos Clientes",
