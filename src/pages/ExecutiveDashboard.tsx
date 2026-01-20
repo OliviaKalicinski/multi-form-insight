@@ -496,7 +496,7 @@ export default function ExecutiveDashboard() {
                   variant="ghost" 
                   size="sm" 
                   className="w-full mt-2"
-                  onClick={() => navigate('/volume')}
+                  onClick={() => navigate('/produtos')}
                 >
                   Ver todos os produtos
                   <ArrowRight className="h-4 w-4 ml-1" />
@@ -652,7 +652,7 @@ export default function ExecutiveDashboard() {
             <Button 
               variant="outline" 
               className="h-auto py-4 flex flex-col gap-2"
-              onClick={() => navigate('/volume')}
+              onClick={() => navigate('/produtos')}
             >
               <Package className="h-5 w-5" />
               <span className="text-xs font-medium">Produtos</span>

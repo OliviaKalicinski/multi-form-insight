@@ -87,7 +87,7 @@ const Index = () => {
                   Ver Análise de Anúncios
                 </Button>
               </Link>
-              <Link to="/volume">
+              <Link to="/produtos">
                 <Button className="w-full" variant="outline">
                   <ShoppingCart className="mr-2 h-4 w-4" />
                   Ver Análise de Volume
