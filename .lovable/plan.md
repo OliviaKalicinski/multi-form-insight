@@ -1,172 +1,98 @@
 
-# Mudança de Formato: CSVs Separados por Métrica
 
-## Situacao Atual
+# Diagnóstico: Métrica de Crescimento de Seguidores
 
-O sistema atualmente espera:
-- **Seguidores**: CSV com colunas `Data, Seguidores`
-- **Marketing**: CSV unico com colunas `Data, Visualizacoes, Visitas, Interacoes, Clicks no Link, Alcance`
+## Problema Encontrado
 
-## Novo Formato (Instagram Export)
+A métrica de crescimento pode estar sendo calculada de forma incorreta dependendo de como os dados do Instagram são interpretados.
 
-Voce agora vai enviar **6 arquivos separados**, cada um contendo uma metrica:
+## Dados Atuais no Banco
 
-| Arquivo | Metrica |
-|---------|---------|
-| `Seguidores.csv` | Seguidores no Instagram |
-| `Visitas_1.csv` | Visitas ao perfil |
-| `Cliques_no_link_1.csv` | Cliques no link |
-| `Interacoes_1.csv` | Interacoes com conteudo |
-| `Alcance.csv` | Alcance |
-| `Visualizacoes_1.csv` | Visualizacoes |
+| Mês | Novos Seguidores | Dias |
+|-----|------------------|------|
+| Jan/2026 | 520 | 24 |
+| Dez/2025 | 650 | 31 |
+| Nov/2025 | 1.688 | 30 |
 
-**Estrutura de cada arquivo:**
+### Calculo Atual de Crescimento (Jan vs Dez)
+
 ```text
-sep=,
-"Nome da Metrica"
-"Data","Primary"
-"2026-01-16T01:00:00","139"
-"2026-01-17T01:00:00","245"
-...
+Crescimento Absoluto = 520 - 650 = -130
+Crescimento Percentual = -130 / 650 = -20%
 ```
+
+Este calculo esta correto SE os valores no banco representam **novos seguidores ganhos por dia**.
+
+---
+
+## Possivel Causa do Problema
+
+O CSV do Instagram exporta o **total de seguidores do perfil naquele dia**, nao a variacao diaria.
+
+**Exemplo do que o Instagram exporta:**
+```text
+Data, Seguidores (total do perfil)
+2026-01-16, 156.013
+2026-01-17, 156.038  (ganhou 25)
+2026-01-18, 156.061  (ganhou 23)
+```
+
+**O que o sistema atual faz:**
+Salva o valor "bruto" como se fosse delta diario:
+```text
+2026-01-16 -> 13  (deveria ser 156.013)
+2026-01-17 -> 25  (deveria ser 156.038)
+```
+
+Parece que os valores estao sendo salvos incorretamente, capturando apenas os ultimos digitos ou interpretando errado.
 
 ---
 
 ## Solucao Proposta
 
-### Parte 1: Criar Novo Uploader Inteligente de Metricas
+### Opcao 1: Interpretar como Delta (atual)
 
-Criar um componente `InstagramMetricsUploader` que:
+Se o CSV do Instagram traz a **variacao diaria** (ex: +13, +25):
+- O sistema esta correto
+- O crescimento de Janeiro esta realmente negativo (-20% vs Dezembro)
+- Nao ha bug, apenas Janeiro teve menos novos seguidores
 
-1. Detecta automaticamente o tipo de metrica pelo titulo na linha 2 do arquivo
-2. Faz parse do novo formato (pula `sep=,` e linha de titulo)
-3. Converte a data de ISO (`2026-01-16T01:00:00`) para formato padrao (`2026-01-16`)
-4. Salva no banco de dados correto:
-   - **Seguidores** -> tabela `followers_data`
-   - **Demais metricas** -> tabela `marketing_data`
+### Opcao 2: Interpretar como Total Acumulado
 
-### Parte 2: Mapeamento de Metricas
-
-O parser vai identificar cada arquivo pelo titulo:
-
-| Titulo no Arquivo | Metrica no Banco | Tabela |
-|-------------------|------------------|--------|
-| "Seguidores no Instagram" | total_seguidores | followers_data |
-| "Visitas ao perfil do Instagram" | visitas | marketing_data |
-| "Cliques no link do Instagram" | clicks | marketing_data |
-| "Interacoes com o conteudo" | interacoes | marketing_data |
-| "Alcance" | alcance | marketing_data |
-| "Visualizacoes" | visualizacoes | marketing_data |
-
-### Parte 3: Interface do Usuario
-
-Duas opcoes de implementacao:
-
-**Opcao A - Upload Multiplo Unificado (Recomendada)**
-- Um unico componente onde voce arrasta/seleciona todos os 6 arquivos de uma vez
-- O sistema processa cada arquivo automaticamente
-- Mostra resumo de quantos registros foram importados por metrica
-
-**Opcao B - Upload Individual por Metrica**
-- Manter 6 uploaders separados (um para cada metrica)
-- Cada um aceita apenas seu tipo de arquivo
-
-### Parte 4: Manter Compatibilidade Retroativa
-
-Os uploaders antigos continuam funcionando para:
-- Formato antigo de seguidores (`Data, Seguidores`)
-- Formato antigo de marketing (CSV unico com todas as metricas)
-
-O novo parser detecta automaticamente qual formato esta sendo usado baseado na primeira linha do arquivo.
+Se o CSV do Instagram traz o **total do perfil** (ex: 156.013, 156.038):
+- Precisamos modificar o parser para calcular o delta entre dias consecutivos
+- A formula seria: `novos_dia = total_hoje - total_ontem`
 
 ---
 
-## Detalhes Tecnicos
+## Arquivos a Modificar
 
-### Novo Parser para Formato Instagram
+1. **`src/utils/instagramMetricsParser.ts`**
+   - Adicionar logica para detectar se valores sao totais acumulados ou deltas
+   - Se forem totais, calcular a diferenca entre dias consecutivos
 
-```text
-Entrada:
-  sep=,
-  "Seguidores no Instagram"
-  "Data","Primary"
-  "2026-01-16T01:00:00","13"
-  "2026-01-17T01:00:00","25"
+2. **`src/hooks/useDataPersistence.ts`**
+   - Atualizar `saveInstagramMetrics` para processar corretamente seguidores
 
-Saida:
-  [
-    { data: "2026-01-16", metrica: "seguidores", valor: 13 },
-    { data: "2026-01-17", metrica: "seguidores", valor: 25 }
-  ]
-```
-
-### Funcao de Deteccao de Formato
-
-```text
-function detectFormat(lines: string[]):
-  if lines[0] starts with "sep=" or lines[0] is empty:
-    return "instagram_export"
-  else if first row has headers "Data,Seguidores":
-    return "legacy_followers"
-  else if first row has headers "Data,Visualizacoes,Visitas,...":
-    return "legacy_marketing"
-```
-
-### Arquivos a Modificar
-
-1. **Novo arquivo**: `src/utils/instagramMetricsParser.ts`
-   - Funcao para parse do novo formato
-   - Funcao para detectar tipo de metrica pelo titulo
-   - Conversao de data ISO para YYYY-MM-DD
-
-2. **Modificar**: `src/components/dashboard/FollowersUploader.tsx`
-   - Adicionar suporte ao novo formato mantendo compatibilidade
-
-3. **Novo arquivo**: `src/components/dashboard/InstagramMetricsUploader.tsx`
-   - Componente para upload multiplo de metricas do Instagram
-
-4. **Modificar**: `src/pages/Upload.tsx`
-   - Adicionar o novo uploader (ou substituir os existentes)
-
-5. **Modificar**: `src/hooks/useDataPersistence.ts`
-   - Adicionar funcao `saveInstagramMetrics` para salvar metricas individuais
+3. **`src/components/dashboard/InstagramMetricsUploader.tsx`**
+   - Adicionar preview dos dados para o usuario confirmar se estao corretos
 
 ---
 
-## Fluxo de Upload
+## Verificacao Necessaria
 
-```text
-Usuario seleciona 6 arquivos CSV
-            |
-            v
-Para cada arquivo:
-  1. Le primeira linha (sep=,)
-  2. Le segunda linha (titulo da metrica)
-  3. Identifica tipo: seguidores/visitas/cliques/etc
-  4. Parse das linhas de dados
-  5. Converte data ISO -> YYYY-MM-DD
-            |
-            v
-Agrupa dados por tipo:
-  - Seguidores -> followers_data
-  - Demais -> marketing_data
-            |
-            v
-Salva no banco com upsert
-            |
-            v
-Mostra resumo:
-  "Importados: 10 dias de seguidores,
-   10 dias de visitas, 10 dias de cliques..."
-```
+Antes de implementar, preciso que voce confirme:
+
+**Como sao os valores no CSV de Seguidores do Instagram?**
+
+- Se os valores sao pequenos (ex: 13, 25, 18) = delta diario = sistema OK
+- Se os valores sao grandes (ex: 156.000) = total acumulado = precisa correcao
 
 ---
 
-## Beneficios
+## Resumo
 
-1. Compativel com export direto do Instagram/Meta Business Suite
-2. Nao precisa combinar arquivos manualmente
-3. Upload de multiplos arquivos de uma vez
-4. Mantém compatibilidade com formato antigo
-5. Deteccao automatica do tipo de metrica
+O crescimento de **-20%** que voce esta vendo pode estar correto (Janeiro realmente teve menos novos seguidores que Dezembro) OU pode ser um bug no parser que esta salvando valores incorretos.
+
+Preciso da sua confirmacao sobre o formato do CSV para determinar a correcao exata.
 
