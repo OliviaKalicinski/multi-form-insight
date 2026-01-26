@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
-import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2, Receipt, Target } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2, Receipt, Target, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
@@ -15,11 +15,13 @@ import { ChannelDonutChart } from "@/components/dashboard/ChannelDonutChart";
 import { TopProductsCompact } from "@/components/dashboard/TopProductsCompact";
 import { TicketDistributionCompact } from "@/components/dashboard/TicketDistributionCompact";
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
+import { IncompleteMonthBadge } from "@/components/dashboard/IncompleteMonthBadge";
 import { calculateFinancialMetrics, analyzeSeasonality, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes } from "@/utils/financialMetrics";
-import { filterOrdersByMonth } from "@/utils/salesCalculator";
+import { filterOrdersByMonth, filterOrdersByDateRange, extractDailyRevenue } from "@/utils/salesCalculator";
 import { filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
+import { detectIncompleteMonth, getEqualIntervalComparison, calculateProjection } from "@/utils/incompleteMonthDetector";
 import { benchmarksPetFood } from "@/data/executiveData";
 import { SectorBenchmarks } from "@/hooks/useAppSettings";
 import { format, parse } from "date-fns";
@@ -52,6 +54,16 @@ export default function PerformanceFinanceira() {
     return Array.from(months).sort();
   }, [salesData]);
 
+  // Detectar mês incompleto e calcular intervalos de comparação
+  const { monthInfo, comparison } = useMemo(() => {
+    if (!selectedMonth || selectedMonth === 'last-12-months') {
+      return { monthInfo: null, comparison: null };
+    }
+    const monthInfo = detectIncompleteMonth(selectedMonth);
+    const comparison = getEqualIntervalComparison(selectedMonth);
+    return { monthInfo, comparison };
+  }, [selectedMonth]);
+
   // Calcular métricas do mês selecionado
   const financialMetrics = useMemo(() => {
     if (salesData.length === 0) return null;
@@ -61,7 +73,7 @@ export default function PerformanceFinanceira() {
     return calculateFinancialMetrics(filteredOrders, selectedMonth || 'all');
   }, [salesData, selectedMonth, availableSalesMonths]);
 
-  // Calcular métricas do mês anterior para comparação
+  // Calcular métricas do mês anterior para comparação (com intervalos iguais para meses incompletos)
   const previousMonthMetrics = useMemo(() => {
     if (salesData.length === 0 || !selectedMonth || selectedMonth === 'last-12-months') return null;
     
@@ -72,23 +84,67 @@ export default function PerformanceFinanceira() {
     
     if (!availableSalesMonths.includes(prevMonthStr)) return null;
     
+    // Se mês incompleto, usar intervalo igual
+    if (comparison?.isIncomplete) {
+      const filteredOrders = filterOrdersByDateRange(
+        salesData,
+        comparison.comparisonPeriod.start,
+        comparison.comparisonPeriod.end
+      );
+      return calculateFinancialMetrics(filteredOrders, prevMonthStr);
+    }
+    
+    // Mês completo: usar filtro normal
     const filteredOrders = filterOrdersByMonth(salesData, prevMonthStr, availableSalesMonths);
     return calculateFinancialMetrics(filteredOrders, prevMonthStr);
-  }, [salesData, selectedMonth, availableSalesMonths]);
+  }, [salesData, selectedMonth, availableSalesMonths, comparison]);
 
-  // Calcular variações
-  const variations = useMemo((): { revenue: number | null; ticket: number | null; orders: number | null } | null => {
-    if (!financialMetrics || !previousMonthMetrics) return null;
+  // Para mês incompleto, recalcular métricas do período atual também
+  const currentPeriodMetrics = useMemo(() => {
+    if (!comparison?.isIncomplete || salesData.length === 0) return null;
     
-    const calc = (current: number, previous: number): number | null =>
-      previous > 0 ? ((current - previous) / previous) * 100 : null;
+    const filteredOrders = filterOrdersByDateRange(
+      salesData,
+      comparison.currentPeriod.start,
+      comparison.currentPeriod.end
+    );
+    return calculateFinancialMetrics(filteredOrders, selectedMonth || '');
+  }, [salesData, comparison, selectedMonth]);
+
+  // Usar métricas do período atual para meses incompletos
+  const displayMetrics = comparison?.isIncomplete ? currentPeriodMetrics : financialMetrics;
+
+  // Calcular projeção para meses incompletos
+  const projection = useMemo(() => {
+    if (!monthInfo?.isIncomplete || !financialMetrics || !previousMonthMetrics) return null;
+    
+    const dailyRevenue = extractDailyRevenue(
+      filterOrdersByMonth(salesData, selectedMonth!, availableSalesMonths)
+    );
+    
+    return calculateProjection(
+      financialMetrics.faturamentoTotal,
+      previousMonthMetrics.faturamentoTotal,
+      monthInfo,
+      dailyRevenue,
+      (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
+    );
+  }, [monthInfo, financialMetrics, previousMonthMetrics, salesData, selectedMonth, availableSalesMonths]);
+
+  // Calcular variações (agora usando métricas de intervalos iguais para meses incompletos)
+  const variations = useMemo((): { revenue: number | null; ticket: number | null; orders: number | null } | null => {
+    const current = comparison?.isIncomplete ? currentPeriodMetrics : financialMetrics;
+    if (!current || !previousMonthMetrics) return null;
+    
+    const calc = (currentVal: number, previous: number): number | null =>
+      previous > 0 ? ((currentVal - previous) / previous) * 100 : null;
     
     return {
-      revenue: calc(financialMetrics.faturamentoTotal, previousMonthMetrics.faturamentoTotal),
-      ticket: calc(financialMetrics.ticketMedioReal, previousMonthMetrics.ticketMedioReal),
-      orders: calc(financialMetrics.totalPedidos, previousMonthMetrics.totalPedidos),
+      revenue: calc(current.faturamentoTotal, previousMonthMetrics.faturamentoTotal),
+      ticket: calc(current.ticketMedioReal, previousMonthMetrics.ticketMedioReal),
+      orders: calc(current.totalPedidos, previousMonthMetrics.totalPedidos),
     };
-  }, [financialMetrics, previousMonthMetrics]);
+  }, [financialMetrics, currentPeriodMetrics, previousMonthMetrics, comparison]);
 
   // Métricas de comparação (quando comparisonMode ativo)
   const comparisonMetrics = useMemo(() => {
@@ -254,6 +310,28 @@ export default function PerformanceFinanceira() {
         </Card>
       )}
 
+      {/* Indicator for incomplete month */}
+      {monthInfo?.isIncomplete && !comparisonMode && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-amber-500" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-foreground">
+                    🕐 Mês em andamento - {comparison?.label}
+                  </p>
+                  <IncompleteMonthBadge monthInfo={monthInfo} comparison={comparison} size="sm" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {comparison?.tooltipText}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ===== BLOCO 1: HERO METRICS ===== */}
       {!comparisonMode && financialMetrics && (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -265,6 +343,9 @@ export default function PerformanceFinanceira() {
             variation={variations?.revenue}
             revenueGoal={financialGoals.receita}
             costPercentage={financialGoals.custoFixo}
+            monthInfo={monthInfo || undefined}
+            comparison={comparison || undefined}
+            projection={projection}
           />
 
           {/* Cards Satélites (Grid 2x3) */}

@@ -1,9 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, TrendingDown, DollarSign, Target } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Target, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KPITooltip } from "./KPITooltip";
+import { IncompleteMonthBadge } from "./IncompleteMonthBadge";
+import { IncompleteMonthInfo, EqualIntervalComparison, ProjectionData } from "@/utils/incompleteMonthDetector";
 
 interface RevenueHeroCardProps {
   totalRevenue: number;
@@ -13,6 +15,9 @@ interface RevenueHeroCardProps {
   revenueGoal?: number;
   profitMargin?: number;
   costPercentage?: number;
+  monthInfo?: IncompleteMonthInfo;
+  comparison?: EqualIntervalComparison;
+  projection?: ProjectionData | null;
 }
 
 const formatCurrency = (value: number) =>
@@ -36,12 +41,17 @@ export const RevenueHeroCard = ({
   revenueGoal,
   profitMargin = 0.35,
   costPercentage = 0.65,
+  monthInfo,
+  comparison,
+  projection,
 }: RevenueHeroCardProps) => {
   // Check if goal is defined (not 0 or undefined)
   const hasGoalDefined = revenueGoal !== undefined && revenueGoal > 0;
   const goalProgress = hasGoalDefined ? Math.min((totalRevenue / revenueGoal!) * 100, 150) : 0;
   const estimatedProfit = netRevenue * (1 - costPercentage);
   const remainingToGoal = hasGoalDefined ? Math.max(revenueGoal! - totalRevenue, 0) : 0;
+  
+  const isIncomplete = monthInfo?.isIncomplete || false;
   
   const getStatus = () => {
     if (!hasGoalDefined) return { label: "⚙️ Meta não definida", color: "bg-muted" };
@@ -76,9 +86,18 @@ export const RevenueHeroCard = ({
                 Receita vs Meta
               </span>
             </div>
-            <Badge className={cn("text-xs", status.color)}>
-              {status.label}
-            </Badge>
+            <div className="flex items-center gap-2">
+              {monthInfo && (
+                <IncompleteMonthBadge 
+                  monthInfo={monthInfo} 
+                  comparison={comparison}
+                  size="sm"
+                />
+              )}
+              <Badge className={cn("text-xs", status.color)}>
+                {status.label}
+              </Badge>
+            </div>
           </div>
 
           {/* Main Value */}
@@ -88,7 +107,7 @@ export const RevenueHeroCard = ({
                 {formatCurrency(totalRevenue)}
               </p>
               
-              {/* Variation trend */}
+              {/* Variation trend - with interval indicator for incomplete months */}
               {variation !== null && variation !== undefined && (
                 <div className={cn(
                   "flex items-center gap-1 mt-1 text-sm font-medium",
@@ -99,8 +118,21 @@ export const RevenueHeroCard = ({
                   ) : (
                     <TrendingDown className="h-4 w-4" />
                   )}
-                  <span>{variation >= 0 ? '+' : ''}{variation.toFixed(1)}% vs mês anterior</span>
+                  <span>{variation >= 0 ? '+' : ''}{variation.toFixed(1)}%</span>
+                  <span className="text-muted-foreground font-normal">
+                    {isIncomplete 
+                      ? `vs ${comparison?.label || 'período igual'} do mês anterior` 
+                      : 'vs mês anterior'}
+                  </span>
                 </div>
+              )}
+              
+              {/* Projection for incomplete months */}
+              {projection && isIncomplete && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {projection.projectionLabel}
+                </p>
               )}
             </div>
           </KPITooltip>

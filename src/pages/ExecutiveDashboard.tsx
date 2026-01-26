@@ -22,13 +22,17 @@ import {
   BarChart3,
   Zap,
   Package,
-  Receipt
+  Receipt,
+  Clock
 } from "lucide-react";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
-import { calculateExecutiveMetrics, filterOrdersByMonth, filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
+import { IncompleteMonthBadge } from "@/components/dashboard/IncompleteMonthBadge";
+import { calculateExecutiveMetrics, filterOrdersByMonth as filterExecOrders, filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
+import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { gerarAlertas } from "@/utils/alertSystem";
 import { gerarRecomendacoes } from "@/utils/recommendationEngine";
 import { getPlatformPerformance } from "@/utils/financialMetrics";
+import { detectIncompleteMonth, getEqualIntervalComparison } from "@/utils/incompleteMonthDetector";
 import { format, subMonths, parse } from "date-fns";
 import { ProcessedOrder } from "@/types/marketing";
 
@@ -61,6 +65,15 @@ export default function ExecutiveDashboard() {
     return Array.from(months).sort();
   }, [processedOrders]);
 
+  // Detectar mês incompleto e calcular intervalos de comparação
+  const { monthInfo, comparison } = useMemo(() => {
+    if (!selectedMonth) {
+      return { monthInfo: null, comparison: null };
+    }
+    const monthInfo = detectIncompleteMonth(selectedMonth);
+    const comparison = getEqualIntervalComparison(selectedMonth);
+    return { monthInfo, comparison };
+  }, [selectedMonth]);
   // Get current and previous month data - suporta "Todos" (selectedMonth = null)
   const { currentMetrics, previousMetrics, platformData, topProducts } = useMemo(() => {
     if (processedOrders.length === 0) {
@@ -71,7 +84,7 @@ export default function ExecutiveDashboard() {
     const isAllMonths = !selectedMonth;
     const monthOrders = isAllMonths 
       ? processedOrders 
-      : filterOrdersByMonth(processedOrders, selectedMonth);
+      : filterExecOrders(processedOrders, selectedMonth);
     
     const monthAds = isAllMonths 
       ? adsData 
@@ -91,7 +104,18 @@ export default function ExecutiveDashboard() {
       const prevDate = subMonths(currentDate, 1);
       const prevMonth = format(prevDate, "yyyy-MM");
       
-      const prevMonthOrders = filterOrdersByMonth(processedOrders, prevMonth);
+      // Se mês incompleto, usar intervalo igual
+      let prevMonthOrders;
+      if (comparison?.isIncomplete) {
+        prevMonthOrders = filterOrdersByDateRange(
+          processedOrders,
+          comparison.comparisonPeriod.start,
+          comparison.comparisonPeriod.end
+        );
+      } else {
+        prevMonthOrders = filterExecOrders(processedOrders, prevMonth);
+      }
+      
       const prevMonthAds = filterAdsByMonth(adsData, prevMonth);
       
       previousMetrics = calculateExecutiveMetrics(prevMonthOrders, prevMonthAds, prevMonth);
@@ -124,7 +148,7 @@ export default function ExecutiveDashboard() {
       .slice(0, 5);
 
     return { currentMetrics, previousMetrics, platformData, topProducts };
-  }, [processedOrders, adsData, selectedMonth]);
+  }, [processedOrders, adsData, selectedMonth, comparison]);
 
   // Calculate variations - null quando não há mês anterior (período "Todos")
   const variations = useMemo(() => {
@@ -203,12 +227,36 @@ export default function ExecutiveDashboard() {
   return (
     <div className="container mx-auto px-6 py-8 space-y-6">
       {/* ========== HEADER SIMPLIFICADO - SEM FILTRO LOCAL ========== */}
-      <div>
-        <h1 className="text-3xl font-bold">🐉 Dashboard Executivo</h1>
-        <p className="text-muted-foreground">
-          Visão consolidada do desempenho do negócio
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">🐉 Dashboard Executivo</h1>
+          <p className="text-muted-foreground">
+            Visão consolidada do desempenho do negócio
+          </p>
+        </div>
+        {monthInfo?.isIncomplete && (
+          <IncompleteMonthBadge monthInfo={monthInfo} comparison={comparison} />
+        )}
       </div>
+
+      {/* Indicator for incomplete month comparison */}
+      {monthInfo?.isIncomplete && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-amber-500" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  🕐 {comparison?.label} - Comparação com intervalo igual
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {comparison?.tooltipText}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ========== LINHA 1 - KPI PRINCIPAL + SATÉLITES ========== */}
       {currentMetrics && (
@@ -277,7 +325,13 @@ export default function ExecutiveDashboard() {
                   )}>
                     {formatPercent(variations.receita)}
                   </span>
-                  {selectedMonth && <span className="text-sm text-muted-foreground">vs mês anterior</span>}
+                  <span className="text-sm text-muted-foreground">
+                    {monthInfo?.isIncomplete 
+                      ? `vs ${comparison?.label || 'período igual'} do mês anterior` 
+                      : selectedMonth 
+                      ? 'vs mês anterior'
+                      : ''}
+                  </span>
                 </div>
               )}
 
