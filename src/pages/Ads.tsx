@@ -27,6 +27,7 @@ import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { useDashboard } from "@/contexts/DashboardContext";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { filterAdsByMonth, filterAdsByObjective, determinePrimaryObjective, getAdObjective } from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { getLast12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
@@ -51,6 +52,9 @@ const Ads = () => {
     comparisonMode,
     selectedMonths,
   } = useDashboard();
+  
+  // Get goals from database
+  const { sectorBenchmarks } = useAppSettings();
 
   // Detect 12-month view
   const isLast12MonthsView = selectedMonth === "last-12-months";
@@ -172,9 +176,11 @@ const Ads = () => {
     };
   }, [selectedMonth, availableMonths, adsData, metrics, isLast12MonthsView, primaryObjective]);
 
-  // Derived metrics
+  // Derived metrics - use ROAS thresholds from database
   const netProfit = metrics.valorConversaoTotal - metrics.investimentoTotal;
-  const roasGoal = 3.0;
+  const roasGoal = sectorBenchmarks.roasMedio || 3.0;
+  const roasExcelente = sectorBenchmarks.roasExcelente || 4.0;
+  const roasMinimo = sectorBenchmarks.roasMinimo || 2.5;
   const roasProgress = Math.min((metrics.roas / roasGoal) * 100, 150);
 
   const formatCurrency = (value: number) => {
@@ -193,18 +199,18 @@ const Ads = () => {
     return `${value.toFixed(2)}x`;
   };
 
-  // ROAS status and interpretation
+  // ROAS status and interpretation - use dynamic thresholds
   const getRoasStatus = (roas: number) => {
-    if (roas >= 4) return { status: 'success' as const, badge: '🏆 Premium', color: 'text-green-600', bgColor: 'bg-green-50 border-green-200' };
-    if (roas >= 3) return { status: 'success' as const, badge: '✓ Meta', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200' };
-    if (roas >= 2) return { status: 'warning' as const, badge: '⚠️ Baixo', color: 'text-yellow-600', bgColor: 'bg-yellow-50 border-yellow-200' };
+    if (roas >= roasExcelente) return { status: 'success' as const, badge: '🏆 Premium', color: 'text-green-600', bgColor: 'bg-green-50 border-green-200' };
+    if (roas >= roasGoal) return { status: 'success' as const, badge: '✓ Meta', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200' };
+    if (roas >= roasMinimo) return { status: 'warning' as const, badge: '⚠️ Baixo', color: 'text-yellow-600', bgColor: 'bg-yellow-50 border-yellow-200' };
     return { status: 'danger' as const, badge: '🚨 Crítico', color: 'text-red-600', bgColor: 'bg-red-50 border-red-200' };
   };
 
   const getRoasInterpretation = (roas: number) => {
-    if (roas >= 4) return "🎯 Excelente! Campanhas muito rentáveis.";
-    if (roas >= 3) return "✅ Bom desempenho, dentro da meta.";
-    if (roas >= 2) return "⚠️ Abaixo da meta, revisar campanhas.";
+    if (roas >= roasExcelente) return "🎯 Excelente! Campanhas muito rentáveis.";
+    if (roas >= roasGoal) return "✅ Bom desempenho, dentro da meta.";
+    if (roas >= roasMinimo) return "⚠️ Abaixo da meta, revisar campanhas.";
     return "🚨 ROAS crítico, ação urgente necessária.";
   };
 
