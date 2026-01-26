@@ -21,6 +21,7 @@ import { filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
 import { benchmarksPetFood } from "@/data/executiveData";
+import { SectorBenchmarks } from "@/hooks/useAppSettings";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -38,7 +39,7 @@ export default function PerformanceFinanceira() {
     selectedMonths,
   } = useDashboard();
 
-  const { financialGoals, isLoading: goalsLoading } = useAppSettings();
+  const { financialGoals, sectorBenchmarks, isLoading: goalsLoading } = useAppSettings();
 
   const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
   const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('daily');
@@ -346,10 +347,10 @@ export default function PerformanceFinanceira() {
                 value={`${roasMetrics.roasBruto.toFixed(2)}x`}
                 icon={<DollarSign className="h-3 w-3" />}
                 status={
-                  roasMetrics.roasBruto >= 4 ? 'success' :
-                  roasMetrics.roasBruto >= 3 ? 'warning' : 'danger'
+                  roasMetrics.roasBruto >= (sectorBenchmarks.roasExcelente || 4) ? 'success' :
+                  roasMetrics.roasBruto >= (sectorBenchmarks.roasMedio || 3) ? 'warning' : 'danger'
                 }
-                benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+                benchmark={{ value: sectorBenchmarks.roasMedio || 3.0, label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x` }}
                 interpretation="Receita Total ÷ Ads"
                 size="compact"
                 tooltipKey="roas_bruto"
@@ -361,10 +362,10 @@ export default function PerformanceFinanceira() {
                 value={`${roasMetrics.roasReal.toFixed(2)}x`}
                 icon={<DollarSign className="h-3 w-3" />}
                 status={
-                  roasMetrics.roasReal >= 4 ? 'success' :
-                  roasMetrics.roasReal >= 3 ? 'warning' : 'danger'
+                  roasMetrics.roasReal >= (sectorBenchmarks.roasExcelente || 4) ? 'success' :
+                  roasMetrics.roasReal >= (sectorBenchmarks.roasMedio || 3) ? 'warning' : 'danger'
                 }
-                benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+                benchmark={{ value: sectorBenchmarks.roasMedio || 3.0, label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x` }}
                 interpretation="Receita ex-frete ÷ Ads"
                 size="compact"
                 tooltipKey="roas_real"
@@ -376,10 +377,10 @@ export default function PerformanceFinanceira() {
                 value={`${roasMetrics.roasMeta.toFixed(2)}x`}
                 icon={<Target className="h-3 w-3" />}
                 status={
-                  roasMetrics.roasMeta >= 4 ? 'success' :
-                  roasMetrics.roasMeta >= 3 ? 'warning' : 'danger'
+                  roasMetrics.roasMeta >= (sectorBenchmarks.roasExcelente || 4) ? 'success' :
+                  roasMetrics.roasMeta >= (sectorBenchmarks.roasMedio || 3) ? 'warning' : 'danger'
                 }
-                benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+                benchmark={{ value: sectorBenchmarks.roasMedio || 3.0, label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x` }}
                 interpretation="Valor Meta ÷ Ads (ex-frete)"
                 size="compact"
                 tooltipKey="roas_meta"

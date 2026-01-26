@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDashboard } from "@/contexts/DashboardContext";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,13 @@ const formatPercent = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixe
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
   const { salesData, adsData, selectedMonth } = useDashboard();
+  
+  // Get goals from database
+  const { financialGoals, sectorBenchmarks } = useAppSettings();
+  
+  // ROAS thresholds from sectorBenchmarks
+  const roasExcelente = sectorBenchmarks.roasExcelente || 4.0;
+  const roasGoal = sectorBenchmarks.roasMedio || 3.0;
 
   // salesData in context is already ProcessedOrder[]
   const processedOrders = useMemo(() => {
@@ -159,17 +167,14 @@ export default function ExecutiveDashboard() {
     return { alerts, opportunities };
   }, [currentMetrics, previousMetrics]);
 
-  // Calculate goal progress (mock goal = +20% vs previous)
+  // Calculate goal progress - use financialGoals.receita from database
+  const hasRevenueGoal = financialGoals.receita > 0;
+  const revenueGoal = hasRevenueGoal ? financialGoals.receita : 0;
+  
   const goalProgress = useMemo(() => {
-    if (!currentMetrics || !previousMetrics) return 0;
-    const goal = previousMetrics.vendas.receita * 1.2;
-    return (currentMetrics.vendas.receita / goal) * 100;
-  }, [currentMetrics, previousMetrics]);
-
-  const revenueGoal = useMemo(() => {
-    if (!previousMetrics) return 0;
-    return previousMetrics.vendas.receita * 1.2;
-  }, [previousMetrics]);
+    if (!currentMetrics || !hasRevenueGoal) return 0;
+    return (currentMetrics.vendas.receita / revenueGoal) * 100;
+  }, [currentMetrics, hasRevenueGoal, revenueGoal]);
 
   // LTV/CAC ratio
   const ltvCacRatio = useMemo(() => {
@@ -231,8 +236,8 @@ export default function ExecutiveDashboard() {
                 </p>
               </div>
 
-              {/* Progress Goal - ocultar quando em "Todos" */}
-              {selectedMonth && revenueGoal > 0 && (
+              {/* Progress Goal - hide when no goal set OR in "Todos" mode */}
+              {selectedMonth && hasRevenueGoal && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
@@ -248,6 +253,14 @@ export default function ExecutiveDashboard() {
                   </div>
                   <Progress value={Math.min(goalProgress, 100)} className="h-2" />
                 </div>
+              )}
+              
+              {/* Goal not defined message */}
+              {selectedMonth && !hasRevenueGoal && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Target className="h-3 w-3" />
+                  Defina sua meta mensal na página Metas
+                </p>
               )}
 
               {/* Trend */}
@@ -270,11 +283,13 @@ export default function ExecutiveDashboard() {
 
               {/* Status Badge */}
               <Badge 
-                variant={selectedMonth && goalProgress >= 100 ? "default" : "secondary"}
+                variant={selectedMonth && hasRevenueGoal && goalProgress >= 100 ? "default" : "secondary"}
                 className="text-xs"
               >
                 {!selectedMonth 
                   ? '📊 Visão Consolidada'
+                  : !hasRevenueGoal
+                  ? '⚙️ Meta não definida'
                   : goalProgress >= 100 
                   ? '🎯 Meta Atingida' 
                   : goalProgress >= 80 
@@ -322,10 +337,10 @@ export default function ExecutiveDashboard() {
               value={`${currentMetrics.marketing.roasBruto.toFixed(2)}x`}
               icon={<DollarSign className="h-4 w-4" />}
               status={
-                currentMetrics.marketing.roasBruto >= 4 ? 'success' :
-                currentMetrics.marketing.roasBruto >= 3 ? 'warning' : 'danger'
+                currentMetrics.marketing.roasBruto >= roasExcelente ? 'success' :
+                currentMetrics.marketing.roasBruto >= roasGoal ? 'warning' : 'danger'
               }
-              benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+              benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
               interpretation="Receita Total ÷ Ads"
               tooltipKey="roas_bruto"
             />
@@ -336,10 +351,10 @@ export default function ExecutiveDashboard() {
               value={`${currentMetrics.marketing.roasReal.toFixed(2)}x`}
               icon={<DollarSign className="h-4 w-4" />}
               status={
-                currentMetrics.marketing.roasReal >= 4 ? 'success' :
-                currentMetrics.marketing.roasReal >= 3 ? 'warning' : 'danger'
+                currentMetrics.marketing.roasReal >= roasExcelente ? 'success' :
+                currentMetrics.marketing.roasReal >= roasGoal ? 'warning' : 'danger'
               }
-              benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+              benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
               interpretation="Receita ex-frete ÷ Ads"
               tooltipKey="roas_real"
             />
@@ -350,10 +365,10 @@ export default function ExecutiveDashboard() {
               value={`${currentMetrics.marketing.roasMeta.toFixed(2)}x`}
               icon={<Target className="h-4 w-4" />}
               status={
-                currentMetrics.marketing.roasMeta >= 4 ? 'success' :
-                currentMetrics.marketing.roasMeta >= 3 ? 'warning' : 'danger'
+                currentMetrics.marketing.roasMeta >= roasExcelente ? 'success' :
+                currentMetrics.marketing.roasMeta >= roasGoal ? 'warning' : 'danger'
               }
-              benchmark={{ value: 3.0, label: 'Meta: 3.0x' }}
+              benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
               interpretation="Valor Meta ÷ Ads (ex-frete)"
               tooltipKey="roas_meta"
             />

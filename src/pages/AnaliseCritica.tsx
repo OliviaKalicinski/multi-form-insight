@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { HealthScoreCard } from "@/components/executive/HealthScoreCard";
 import { CriticalAlertCard } from "@/components/executive/CriticalAlertCard";
 import { RecommendationCard } from "@/components/executive/RecommendationCard";
 import { ComparativeMetricCard } from "@/components/executive/ComparativeMetricCard";
 import { TrendInsightCard } from "@/components/executive/TrendInsightCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { benchmarksPetFood } from "@/data/executiveData";
 import { calcularHealthScore, gerarComparacaoMoM, gerarAnaliseTrimestral, gerarInsights } from "@/utils/criticalAnalysis";
 import { gerarAlertas } from "@/utils/alertSystem";
 import { gerarRecomendacoes } from "@/utils/recommendationEngine";
@@ -16,6 +16,7 @@ import { ExecutiveMetrics } from "@/types/executive";
 
 export default function AnaliseCritica() {
   const { selectedMonth, availableMonths, salesData, adsData } = useDashboard();
+  const { sectorBenchmarks } = useAppSettings();
   
   // Calcular dados do mês atual a partir dos dados reais
   const dadosAtual = useMemo(() => {
@@ -252,23 +253,23 @@ export default function AnaliseCritica() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div className="bg-gray-50 rounded p-3">
               <div className="text-muted-foreground text-xs">ROAS Ideal</div>
-              <div className="font-bold text-lg">{benchmarksPetFood.roasMedio}x</div>
+              <div className="font-bold text-lg">{sectorBenchmarks.roasMedio || 3.2}x</div>
             </div>
             <div className="bg-gray-50 rounded p-3">
               <div className="text-muted-foreground text-xs">Taxa Recompra</div>
-              <div className="font-bold text-lg">{benchmarksPetFood.taxaRecompra}%</div>
+              <div className="font-bold text-lg">{sectorBenchmarks.taxaRecompra || 38}%</div>
             </div>
             <div className="bg-gray-50 rounded p-3">
               <div className="text-muted-foreground text-xs">LTV Médio</div>
-              <div className="font-bold text-lg">R$ {benchmarksPetFood.ltv}</div>
+              <div className="font-bold text-lg">R$ {sectorBenchmarks.ltv || 420}</div>
             </div>
             <div className="bg-gray-50 rounded p-3">
               <div className="text-muted-foreground text-xs">CAC Ideal</div>
-              <div className="font-bold text-lg">R$ {benchmarksPetFood.cac}</div>
+              <div className="font-bold text-lg">R$ {sectorBenchmarks.cac || 45}</div>
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            Fonte: {benchmarksPetFood.fonte}
+            Fonte: {sectorBenchmarks.fonte || "Relatório Mercado Pet Brasil 2024"}
           </p>
         </CardContent>
       </Card>

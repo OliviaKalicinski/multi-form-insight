@@ -33,15 +33,18 @@ export const RevenueHeroCard = ({
   netRevenue,
   shippingTotal,
   variation,
-  revenueGoal = 50000,
+  revenueGoal,
   profitMargin = 0.35,
   costPercentage = 0.65,
 }: RevenueHeroCardProps) => {
-  const goalProgress = Math.min((totalRevenue / revenueGoal) * 100, 150);
+  // Check if goal is defined (not 0 or undefined)
+  const hasGoalDefined = revenueGoal !== undefined && revenueGoal > 0;
+  const goalProgress = hasGoalDefined ? Math.min((totalRevenue / revenueGoal!) * 100, 150) : 0;
   const estimatedProfit = netRevenue * (1 - costPercentage);
-  const remainingToGoal = Math.max(revenueGoal - totalRevenue, 0);
+  const remainingToGoal = hasGoalDefined ? Math.max(revenueGoal! - totalRevenue, 0) : 0;
   
   const getStatus = () => {
+    if (!hasGoalDefined) return { label: "⚙️ Meta não definida", color: "bg-muted" };
     if (goalProgress >= 100) return { label: "🎯 Meta Atingida", color: "bg-green-500" };
     if (goalProgress >= 80) return { label: "⚡ Em Progresso", color: "bg-yellow-500" };
     return { label: "📊 Em Construção", color: "bg-blue-500" };
@@ -50,6 +53,7 @@ export const RevenueHeroCard = ({
   const status = getStatus();
   
   const getCardStyle = () => {
+    if (!hasGoalDefined) return "border-muted bg-muted/5";
     if (goalProgress >= 100) return "border-green-500/50 bg-green-500/5";
     if (goalProgress >= 80) return "border-yellow-500/50 bg-yellow-500/5";
     return "border-primary/50 bg-primary/5";
@@ -104,24 +108,33 @@ export const RevenueHeroCard = ({
           {/* Progress bar */}
           <KPITooltip metricKey="receita_meta">
             <div className="space-y-2 cursor-help">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1">
+              {hasGoalDefined ? (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <Target className="h-3 w-3" />
+                      Meta: {formatCurrencyCompact(revenueGoal!)}
+                    </span>
+                    <span className={cn(
+                      "font-semibold",
+                      goalProgress >= 100 ? "text-green-600" : 
+                      goalProgress >= 80 ? "text-yellow-600" : "text-foreground"
+                    )}>
+                      {goalProgress.toFixed(0)}%
+                    </span>
+                  </div>
+                  <Progress value={Math.min(goalProgress, 100)} className="h-2" />
+                  {remainingToGoal > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Faltam {formatCurrencyCompact(remainingToGoal)} para a meta
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Target className="h-3 w-3" />
-                  Meta: {formatCurrencyCompact(revenueGoal)}
-                </span>
-                <span className={cn(
-                  "font-semibold",
-                  goalProgress >= 100 ? "text-green-600" : 
-                  goalProgress >= 80 ? "text-yellow-600" : "text-foreground"
-                )}>
-                  {goalProgress.toFixed(0)}%
-                </span>
-              </div>
-              <Progress value={Math.min(goalProgress, 100)} className="h-2" />
-              {remainingToGoal > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Faltam {formatCurrencyCompact(remainingToGoal)} para a meta
-                </p>
+                  <span>Defina sua meta mensal na página Metas</span>
+                </div>
               )}
             </div>
           </KPITooltip>
