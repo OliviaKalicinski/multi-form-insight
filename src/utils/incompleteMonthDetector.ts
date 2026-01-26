@@ -1,4 +1,4 @@
-import { format, parse, getDaysInMonth } from 'date-fns';
+import { format, parse, getDaysInMonth, subMonths, startOfMonth, endOfMonth, setDate, min } from 'date-fns';
 
 export interface IncompleteMonthInfo {
   isIncomplete: boolean;
@@ -16,6 +16,15 @@ export interface ProjectionData {
   projectedTotal: number;
   minExpectedGrowth: number;
   projectionLabel: string;
+}
+
+export interface EqualIntervalComparison {
+  isIncomplete: boolean;
+  currentDay: number;
+  currentPeriod: { start: Date; end: Date };
+  comparisonPeriod: { start: Date; end: Date };
+  label: string;
+  tooltipText: string;
 }
 
 /**
@@ -65,6 +74,69 @@ export const detectIncompleteMonth = (month: string): IncompleteMonthInfo => {
     completionPercentage,
     month,
     monthLabel: formatMonthLabel(month),
+  };
+};
+
+/**
+ * Retorna os intervalos de datas para comparação justa de meses incompletos
+ * Para mês incompleto: compara D1-DX do mês atual com D1-DX do mês anterior
+ */
+export const getEqualIntervalComparison = (selectedMonth: string): EqualIntervalComparison => {
+  // Se não for um mês válido, retornar intervalo vazio
+  if (!selectedMonth || selectedMonth === 'last-12-months' || !selectedMonth.match(/^\d{4}-\d{2}$/)) {
+    const today = new Date();
+    return {
+      isIncomplete: false,
+      currentDay: 0,
+      currentPeriod: { start: today, end: today },
+      comparisonPeriod: { start: today, end: today },
+      label: '',
+      tooltipText: '',
+    };
+  }
+
+  const today = new Date();
+  const currentMonthStr = format(today, 'yyyy-MM');
+  const isIncomplete = selectedMonth === currentMonthStr;
+
+  const selectedDate = parse(selectedMonth, 'yyyy-MM', new Date());
+  const previousMonthDate = subMonths(selectedDate, 1);
+
+  if (!isIncomplete) {
+    // Mês completo: usar intervalos completos
+    const currentStart = startOfMonth(selectedDate);
+    const currentEnd = endOfMonth(selectedDate);
+    const prevStart = startOfMonth(previousMonthDate);
+    const prevEnd = endOfMonth(previousMonthDate);
+
+    return {
+      isIncomplete: false,
+      currentDay: getDaysInMonth(selectedDate),
+      currentPeriod: { start: currentStart, end: currentEnd },
+      comparisonPeriod: { start: prevStart, end: prevEnd },
+      label: '',
+      tooltipText: '',
+    };
+  }
+
+  // Mês incompleto: usar intervalos espelhados
+  const currentDay = today.getDate();
+  const currentStart = startOfMonth(selectedDate);
+  const currentEnd = today;
+
+  const prevStart = startOfMonth(previousMonthDate);
+  // Usar min() para não exceder o último dia do mês anterior
+  const prevMonthLastDay = getDaysInMonth(previousMonthDate);
+  const prevEndDay = Math.min(currentDay, prevMonthLastDay);
+  const prevEnd = setDate(previousMonthDate, prevEndDay);
+
+  return {
+    isIncomplete: true,
+    currentDay,
+    currentPeriod: { start: currentStart, end: currentEnd },
+    comparisonPeriod: { start: prevStart, end: prevEnd },
+    label: `Primeiros ${currentDay} dias`,
+    tooltipText: `Comparando D1-D${currentDay} de cada mês para análise justa`,
   };
 };
 

@@ -292,3 +292,18 @@ export const extractDailyOrders = (orders: ProcessedOrder[]): { date: string; va
   
   return Array.from(dailyMap.entries()).map(([date, value]) => ({ date, value }));
 };
+
+/**
+ * Filtra pedidos por intervalo de datas específico
+ * Usado para comparação de intervalos iguais em meses incompletos
+ */
+export const filterOrdersByDateRange = (
+  orders: ProcessedOrder[],
+  startDate: Date,
+  endDate: Date
+): ProcessedOrder[] => {
+  return orders.filter(order => {
+    const orderDate = order.dataVenda;
+    return orderDate >= startDate && orderDate <= endDate;
+  });
+};
