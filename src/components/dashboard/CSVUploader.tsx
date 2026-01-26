@@ -9,7 +9,7 @@ import { z } from "zod";
 import { useDashboard } from "@/contexts/DashboardContext";
 
 interface CSVUploaderProps {
-  onDataLoaded?: (data: MarketingData[], fileName: string) => void;
+  onDataLoaded?: (data?: MarketingData[], fileName?: string) => void | Promise<void>;
   title?: string;
   description?: string;
 }

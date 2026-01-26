@@ -18,16 +18,19 @@ export default function Upload() {
   const navigate = useNavigate();
   const { 
     marketingData, 
-    setMarketingData, 
     followersData, 
-    setFollowersData, 
     adsData, 
-    setAdsData,
     salesData,
-    setSalesData,
     audienceData,
-    setAudienceData
+    setAudienceData,
+    refreshFromDatabase
   } = useDashboard();
+
+  // Os uploaders já usam persist* internamente e fazem merge.
+  // Após o upload, sincronizamos o estado local com o banco.
+  const handleUploadComplete = async () => {
+    await refreshFromDatabase();
+  };
 
   const hasAnyData = salesData.length > 0 || adsData.length > 0 || followersData.length > 0;
 
@@ -67,7 +70,7 @@ export default function Upload() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2">
-            <SalesUploader onDataLoaded={setSalesData} />
+            <SalesUploader onDataLoaded={handleUploadComplete} />
           </CardContent>
         </Card>
 
@@ -83,7 +86,7 @@ export default function Upload() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2">
-            <AdsUploader onDataLoaded={(data, _fileName, summaries, isHierarchical) => setAdsData(data, summaries, isHierarchical)} />
+            <AdsUploader onDataLoaded={handleUploadComplete} />
           </CardContent>
         </Card>
 
@@ -99,7 +102,7 @@ export default function Upload() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2">
-            <FollowersUploader onDataLoaded={setFollowersData} />
+            <FollowersUploader onDataLoaded={handleUploadComplete} />
           </CardContent>
         </Card>
 
@@ -115,7 +118,7 @@ export default function Upload() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2">
-            <CSVUploader onDataLoaded={setMarketingData} />
+            <CSVUploader onDataLoaded={handleUploadComplete} />
           </CardContent>
         </Card>
 

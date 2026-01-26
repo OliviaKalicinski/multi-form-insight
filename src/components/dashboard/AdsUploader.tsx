@@ -10,7 +10,7 @@ import { parseHierarchicalAds, validateAdsConsistency } from "@/utils/adsParserV
 import { useDashboard } from "@/contexts/DashboardContext";
 
 interface AdsUploaderProps {
-  onDataLoaded?: (data: AdsData[], fileName: string, summaries?: any[], isHierarchical?: boolean) => void;
+  onDataLoaded?: (data?: AdsData[], fileName?: string, summaries?: any[], isHierarchical?: boolean) => void | Promise<void>;
   title?: string;
   description?: string;
 }
