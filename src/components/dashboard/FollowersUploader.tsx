@@ -9,7 +9,7 @@ import { z } from "zod";
 import { useDashboard } from "@/contexts/DashboardContext";
 
 interface FollowersUploaderProps {
-  onDataLoaded?: (data: FollowersData[], fileName: string) => void;
+  onDataLoaded?: (data?: FollowersData[], fileName?: string) => void | Promise<void>;
   title?: string;
   description?: string;
 }

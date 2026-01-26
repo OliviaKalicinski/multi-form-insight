@@ -9,27 +9,12 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Index = () => {
-  const {
-    setMarketingData,
-    setFollowersData,
-    setAdsData,
-    setSalesData,
-  } = useDashboard();
+  const { refreshFromDatabase } = useDashboard();
 
-  const handleMarketingDataLoaded = (data: any[], fileName: string) => {
-    setMarketingData(data);
-  };
-
-  const handleFollowersDataLoaded = (data: any[], fileName: string) => {
-    setFollowersData(data);
-  };
-
-  const handleAdsDataLoaded = (data: any[], fileName: string, summaries?: any[], isHierarchical?: boolean) => {
-    setAdsData(data, summaries, isHierarchical);
-  };
-
-  const handleSalesDataLoaded = (data: any[], fileName: string) => {
-    setSalesData(data);
+  // Os uploaders já usam persist* internamente e fazem merge.
+  // Após o upload, sincronizamos o estado local com o banco.
+  const handleUploadComplete = async () => {
+    await refreshFromDatabase();
   };
 
   return (
@@ -44,25 +29,25 @@ const Index = () => {
         {/* Uploaders Section */}
         <div className="grid gap-4 md:grid-cols-2">
           <CSVUploader 
-            onDataLoaded={handleMarketingDataLoaded}
+            onDataLoaded={handleUploadComplete}
             title="📊 Dados de Marketing"
             description="Faça upload do relatório CSV do Instagram"
           />
           
           <FollowersUploader 
-            onDataLoaded={handleFollowersDataLoaded}
+            onDataLoaded={handleUploadComplete}
             title="👥 Dados de Seguidores"
             description="Faça upload do CSV de crescimento de seguidores"
           />
           
           <AdsUploader 
-            onDataLoaded={handleAdsDataLoaded}
+            onDataLoaded={handleUploadComplete}
             title="💰 Dados de Anúncios"
             description="Faça upload dos dados de campanhas publicitárias"
           />
           
           <SalesUploader 
-            onDataLoaded={handleSalesDataLoaded}
+            onDataLoaded={handleUploadComplete}
             title="🛍️ Dados de Vendas"
             description="Faça upload dos dados de vendas do e-commerce"
           />

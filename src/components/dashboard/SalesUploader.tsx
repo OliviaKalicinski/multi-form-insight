@@ -10,7 +10,7 @@ import { SalesData, ProcessedOrder } from "@/types/marketing";
 import { useDashboard } from "@/contexts/DashboardContext";
 
 interface SalesUploaderProps {
-  onDataLoaded?: (data: ProcessedOrder[], fileName: string) => void;
+  onDataLoaded?: (data?: ProcessedOrder[], fileName?: string) => void | Promise<void>;
   title?: string;
   description?: string;
 }
