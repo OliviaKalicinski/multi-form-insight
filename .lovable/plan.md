@@ -1,190 +1,196 @@
 
-# Auditoria e Correção: Sincronização de Metas
+# Plano: Comparação de Períodos Iguais para Meses Incompletos
 
-## Diagnóstico Completo
+## Problema Identificado
 
-### Problema Principal Identificado
+Atualmente, quando você está no dia 25 de Janeiro e visualiza esse mês, o sistema:
+- Soma 25 dias de Janeiro
+- Compara com 31 dias completos de Dezembro
+- Resultado: variações distorcidas (ex: -30% quando na verdade pode estar crescendo)
 
-Os valores de metas definidos na página **Metas Financeiras** estão salvando corretamente no banco de dados, mas **vários componentes e páginas não estão consumindo esses valores** da forma correta. Há uma mistura de:
-
-1. **Valores hardcoded** (ex: `roasGoal = 3.0`)
-2. **Valores default** que sobrescrevem quando a meta é 0 (ex: `revenueGoal = 50000`)
-3. **Lógica mock** que ignora completamente as metas do usuário (ex: ExecutiveDashboard)
-
-### Dados Atuais no Banco de Dados
-
-| Campo | Valor Salvo | Observação |
-|-------|-------------|------------|
-| receita | 0 | Meta zerada - precisa ser definida |
-| pedidos | 80 | Meta definida |
-| ticketMedio | 150 | Meta definida |
-| custoFixo | 0.08 (8%) | Definido |
-| margem | 65 | Meta definida |
+**Exemplo concreto:**
+- Janeiro (25 dias): R$ 10.000 de faturamento
+- Dezembro (31 dias): R$ 15.000 de faturamento
+- Cálculo atual: -33% (errado!)
+- Cálculo correto (25 dias de cada): Janeiro R$ 10.000 vs Dezembro D1-D25 R$ 12.000 = -17%
 
 ---
 
-## Problemas Identificados por Componente
+## Solução Proposta
 
-### 1. DailyVolumeChart (Gráfico Volume de Pedidos)
+### Lógica de Comparação "Espelho"
 
-**Arquivo:** `src/components/dashboard/DailyVolumeChart.tsx`
+Para meses incompletos, o período de comparação deve "espelhar" o intervalo de dias:
 
-**Problema:** Quando `dailyGoal` é 0 ou undefined, usa a média como fallback
 ```text
-if (!dailyGoal) return Math.round(averageOrders);
+Exemplo 1: Hoje é 25 de Janeiro
+├── Período atual: 01/Jan - 25/Jan (25 dias)
+└── Período comparação: 01/Dez - 25/Dez (25 dias)
+
+Exemplo 2: Hoje é 15 de Fevereiro
+├── Período atual: 01/Fev - 15/Fev (15 dias)
+└── Período comparação: 01/Jan - 15/Jan (15 dias)
 ```
 
-**Solução:** O comportamento de fallback para média está correto quando a meta não está definida. No entanto, no seu caso a meta de **80 pedidos/mês** está definida, então:
-- `dailyGoal = Math.round(80 / 30) = 3 pedidos/dia`
+### Indicador Visual
 
-Isso parece muito baixo. Se você tem ~350 pedidos reais por mês, a meta deveria ser algo como 350-400.
-
-### 2. RevenueHeroCard (Card de Receita)
-
-**Arquivo:** `src/components/dashboard/RevenueHeroCard.tsx`
-
-**Problema:** Usa valor default de R$ 50.000 quando `revenueGoal` não é passado ou é 0
-```text
-revenueGoal = 50000
-```
-
-**Solução:** Quando a meta de receita é 0, deveria mostrar indicador de "meta não definida" em vez de usar default.
-
-### 3. Executive Dashboard
-
-**Arquivo:** `src/pages/ExecutiveDashboard.tsx`
-
-**Problema Crítico:** Ignora completamente as metas do usuário e usa lógica mock
-```text
-const goal = previousMetrics.vendas.receita * 1.2; // Mock: +20% vs mês anterior
-```
-
-**Solução:** Importar `useAppSettings` e usar `financialGoals.receita` em vez de calcular meta arbitrária.
-
-### 4. Página Ads
-
-**Arquivo:** `src/pages/Ads.tsx`
-
-**Problema:** ROAS goal está hardcoded
-```text
-const roasGoal = 3.0;
-```
-
-**Solução:** Usar `financialGoals.roasMedio` da página de Metas.
-
-### 5. Cards de ROAS (múltiplas páginas)
-
-**Arquivos:** `PerformanceFinanceira.tsx`, `ExecutiveDashboard.tsx`, `Ads.tsx`
-
-**Problema:** Thresholds de status hardcoded
-```text
-status={
-  roasMetrics.roasBruto >= 4 ? 'success' :
-  roasMetrics.roasBruto >= 3 ? 'warning' : 'danger'
-}
-```
-
-**Solução:** Usar `financialGoals.roasExcelente` e `financialGoals.roasMinimo` do banco.
-
-### 6. Análise Crítica
-
-**Arquivo:** `src/pages/AnaliseCritica.tsx`
-
-**Problema:** Usa objeto estático `benchmarksPetFood` em vez dos benchmarks editáveis do banco.
-
-**Solução:** Importar `sectorBenchmarks` de `useAppSettings`.
-
----
-
-## Plano de Implementação
-
-### Etapa 1: Corrigir Hook de Atualização
-
-O hook `useAppSettings` já está funcionando corretamente. O problema está nos componentes que não o consomem.
-
-### Etapa 2: Atualizar Componentes que Exibem Metas
-
-#### 2.1 DailyVolumeChart
-- Adicionar prop `showGoalNotSet` para exibir mensagem quando meta = 0
-- Manter fallback para média, mas mostrar label "Média" em vez de "Meta"
-
-#### 2.2 RevenueHeroCard
-- Remover default de R$ 50.000
-- Quando `revenueGoal = 0`, mostrar "Meta não definida"
-- Adicionar link para página de Metas
-
-### Etapa 3: Conectar Páginas ao Hook de Metas
-
-#### 3.1 ExecutiveDashboard
-- Importar `useAppSettings`
-- Substituir lógica mock por `financialGoals.receita`
-- Usar `financialGoals.roasMedio/Minimo/Excelente` para thresholds ROAS
-
-#### 3.2 Ads
-- Importar `useAppSettings`
-- Substituir `roasGoal = 3.0` por `financialGoals.roasMedio || 3.0`
-
-#### 3.3 AnaliseCritica
-- Importar `useAppSettings`
-- Substituir `benchmarksPetFood` por `sectorBenchmarks`
-
-### Etapa 4: Padronizar Thresholds de ROAS
-
-Criar constantes derivadas das metas do usuário:
-```text
-roasExcelente = financialGoals.roasExcelente || 4.0
-roasBom = financialGoals.roasMedio || 3.0
-roasMinimo = financialGoals.roasMinimo || 2.5
-```
-
-Usar essas constantes em todos os cards de ROAS.
-
-### Etapa 5: Adicionar Indicadores Visuais
-
-Quando uma meta está zerada ou não definida:
-- Mostrar badge "Meta não definida"
-- Mostrar link para configurar na página Metas
-- Usar cor neutra (azul/cinza) em vez de verde/vermelho
+O mês incompleto deve ter uma sinalização visual clara:
+- Badge "Em andamento" ou ícone de relógio
+- Tooltip explicando que a comparação usa intervalos iguais
+- Projeção do valor esperado ao final do mês
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Mudanças |
-|---------|----------|
-| `src/components/dashboard/DailyVolumeChart.tsx` | Melhorar label quando meta = 0 |
-| `src/components/dashboard/RevenueHeroCard.tsx` | Remover default, tratar meta = 0 |
-| `src/pages/ExecutiveDashboard.tsx` | Importar useAppSettings, usar metas reais |
-| `src/pages/Ads.tsx` | Importar useAppSettings, usar roasMedio |
-| `src/pages/PerformanceFinanceira.tsx` | Usar thresholds dinâmicos de ROAS |
-| `src/pages/AnaliseCritica.tsx` | Usar sectorBenchmarks do banco |
+### 1. `src/utils/incompleteMonthDetector.ts` (expandir)
+Adicionar novas funções:
+- `getEqualIntervalDates()` - retorna as datas de início e fim para comparação justa
+- `filterDataByEqualInterval()` - filtra dados usando intervalo espelhado
+
+### 2. `src/utils/salesCalculator.ts`
+Criar nova função:
+- `filterOrdersByEqualInterval()` - filtra pedidos considerando intervalo igual para meses incompletos
+
+### 3. `src/utils/comparisonCalculator.ts`
+Atualizar funções de comparação para usar intervalos iguais quando mês incompleto
+
+### 4. `src/pages/PerformanceFinanceira.tsx`
+- Modificar cálculo de `previousMonthMetrics` para usar intervalo igual
+- Adicionar indicador visual de mês incompleto
+- Adicionar tooltip explicativo
+
+### 5. `src/pages/ExecutiveDashboard.tsx`
+- Aplicar mesma lógica de intervalos iguais
+- Adicionar indicadores visuais
+
+### 6. `src/components/dashboard/RevenueHeroCard.tsx`
+- Exibir badge "Mês em andamento" quando aplicável
+- Mostrar projeção do valor final
+
+### 7. `src/utils/financialMetrics.ts`
+- Atualizar `calculateGrowthRate()` para considerar intervalos iguais
 
 ---
 
-## Ação Imediata Necessária
+## Implementação Detalhada
 
-Antes de implementar as mudanças no código, você precisa **definir as metas corretas** na página Metas:
+### Fase 1: Lógica Central de Intervalos Iguais
 
-1. Vá para a página **Metas**
-2. Defina valores realistas:
-   - **Receita Mensal**: Ex: R$ 50.000 (atualmente está zerada)
-   - **Pedidos/Mês**: Ex: 350 (atualmente está 80, que parece baixo)
-   - **ROAS Médio**: Ex: 3.0 (para coloração dos cards)
-   - **ROAS Mínimo**: Ex: 2.5
-   - **ROAS Excelente**: Ex: 4.0
+```text
+Nova função em incompleteMonthDetector.ts:
 
-3. Clique em **Salvar Alterações**
+getEqualIntervalComparison(selectedMonth: string) -> {
+  isIncomplete: boolean,
+  currentDayOfMonth: number,
+  currentPeriod: { start: Date, end: Date },
+  comparisonPeriod: { start: Date, end: Date },
+  label: string // ex: "Comparando primeiros 25 dias"
+}
+```
 
-Após isso, a implementação garantirá que todos os gráficos e cards usem esses valores corretamente.
+### Fase 2: Filtro de Dados por Intervalo
+
+```text
+Nova função em salesCalculator.ts:
+
+filterOrdersByDateRange(
+  orders: ProcessedOrder[],
+  startDate: Date,
+  endDate: Date
+) -> ProcessedOrder[]
+```
+
+### Fase 3: Atualização das Páginas
+
+1. **PerformanceFinanceira.tsx:**
+   - Detectar mês incompleto
+   - Usar `filterOrdersByDateRange` para ambos os períodos
+   - Exibir badge visual
+
+2. **ExecutiveDashboard.tsx:**
+   - Mesma lógica
+   - Cards de comparação usam intervalos iguais
+
+### Fase 4: Indicadores Visuais
+
+Adicionar nos cards e gráficos:
+- Badge "Em andamento" com ícone Clock
+- Tooltip: "Comparando os primeiros X dias de cada mês"
+- Texto auxiliar: "Período parcial: D1-D25"
 
 ---
 
-## Resumo das Correções
+## Fluxo de Dados
 
-1. **Volume de Pedidos**: Já funciona corretamente com a meta do banco, só precisa de meta realista definida
-2. **RevenueHeroCard**: Remover default hardcoded, tratar meta zerada
-3. **ExecutiveDashboard**: Substituir lógica mock por metas reais
-4. **Ads**: Usar ROAS meta do banco em vez de hardcoded
-5. **Todos os ROAS cards**: Usar thresholds dinâmicos
-6. **AnaliseCritica**: Usar benchmarks editáveis do banco
+```text
+Usuário seleciona Janeiro/2026 (dia atual: 25)
+         │
+         ▼
+detectIncompleteMonth("2026-01")
+         │
+         ├── isIncomplete: true
+         ├── currentDay: 25
+         └── Calcular intervalo espelho
+                    │
+                    ▼
+getEqualIntervalComparison("2026-01")
+         │
+         ├── currentPeriod: 01/Jan - 25/Jan
+         └── comparisonPeriod: 01/Dez - 25/Dez
+                    │
+                    ▼
+filterOrdersByDateRange(orders, startDate, endDate)
+         │
+         ▼
+Métricas calculadas com intervalos iguais
+         │
+         ▼
+Exibição com badge "Mês em andamento"
+```
 
+---
+
+## Casos Especiais
+
+1. **Primeiro mês com dados**: Não há período anterior para comparar
+   - Exibir "N/A" ou "Sem dados anteriores"
+
+2. **Mês anterior também incompleto**: Improvável, mas se ocorrer
+   - Usar o intervalo do mês mais recente como base
+
+3. **Seleção de múltiplos meses**: Modo comparação
+   - Aplicar lógica apenas para meses detectados como incompletos
+
+4. **Visualização "Todos os períodos"**: 
+   - Não aplicar a lógica de intervalos (não há comparação MoM)
+
+---
+
+## Resumo das Mudanças
+
+| Arquivo | Mudança |
+|---------|---------|
+| `incompleteMonthDetector.ts` | + `getEqualIntervalComparison()` |
+| `salesCalculator.ts` | + `filterOrdersByDateRange()` |
+| `comparisonCalculator.ts` | Usar intervalos iguais para meses incompletos |
+| `financialMetrics.ts` | Atualizar `calculateGrowthRate()` |
+| `PerformanceFinanceira.tsx` | Badge + lógica de intervalos iguais |
+| `ExecutiveDashboard.tsx` | Badge + lógica de intervalos iguais |
+| `RevenueHeroCard.tsx` | Badge "Mês em andamento" + projeção |
+
+---
+
+## Resultado Esperado
+
+Antes:
+```text
+Janeiro (25 dias) vs Dezembro (31 dias) = -33%
+```
+
+Depois:
+```text
+Janeiro (D1-D25) vs Dezembro (D1-D25) = -17%
++ Badge: "🕐 Mês em andamento"
++ Tooltip: "Comparando os primeiros 25 dias de cada mês"
+```
