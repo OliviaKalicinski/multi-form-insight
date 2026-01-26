@@ -1,112 +1,172 @@
 
+# Mudança de Formato: CSVs Separados por Métrica
 
-# Correção: Upload Substitui Dados Locais ao Invés de Acumular
+## Situacao Atual
 
-## Problema Identificado
+O sistema atualmente espera:
+- **Seguidores**: CSV com colunas `Data, Seguidores`
+- **Marketing**: CSV unico com colunas `Data, Visualizacoes, Visitas, Interacoes, Clicks no Link, Alcance`
 
-Quando você faz upload de novas planilhas pelo dashboard, os dados dos meses anteriores ficam "em branco" na visualização, mesmo que estejam salvos corretamente no banco de dados.
+## Novo Formato (Instagram Export)
 
-**Causa raiz:** As funções de upload estão usando `setSalesData()` que **substitui** todo o estado local ao invés de usar `persistSalesData()` que faz o **merge** (junção) corretamente.
+Voce agora vai enviar **6 arquivos separados**, cada um contendo uma metrica:
 
-### Verificação no Banco de Dados
+| Arquivo | Metrica |
+|---------|---------|
+| `Seguidores.csv` | Seguidores no Instagram |
+| `Visitas_1.csv` | Visitas ao perfil |
+| `Cliques_no_link_1.csv` | Cliques no link |
+| `Interacoes_1.csv` | Interacoes com conteudo |
+| `Alcance.csv` | Alcance |
+| `Visualizacoes_1.csv` | Visualizacoes |
 
-Os dados estão salvos corretamente:
-- **Vendas:** 2.539 registros (Jan/2025 a Jan/2026)
-- **Anúncios:** 464 registros (Fev/2025 a Jan/2026)
-- Todos os meses possuem dados no banco
+**Estrutura de cada arquivo:**
+```text
+sep=,
+"Nome da Metrica"
+"Data","Primary"
+"2026-01-16T01:00:00","139"
+"2026-01-17T01:00:00","245"
+...
+```
 
 ---
 
-## Solução
+## Solucao Proposta
 
-### Parte 1: Corrigir a Página Index.tsx
+### Parte 1: Criar Novo Uploader Inteligente de Metricas
 
-Atualizar os handlers de upload para usar as funções `persist*` que:
-1. Salvam no banco de dados
-2. Fazem merge com os dados existentes no estado local
+Criar um componente `InstagramMetricsUploader` que:
 
-**Arquivo:** `src/pages/Index.tsx`
+1. Detecta automaticamente o tipo de metrica pelo titulo na linha 2 do arquivo
+2. Faz parse do novo formato (pula `sep=,` e linha de titulo)
+3. Converte a data de ISO (`2026-01-16T01:00:00`) para formato padrao (`2026-01-16`)
+4. Salva no banco de dados correto:
+   - **Seguidores** -> tabela `followers_data`
+   - **Demais metricas** -> tabela `marketing_data`
 
-**Mudanças:**
-- Importar `persistSalesData`, `persistAdsData`, `persistFollowersData`, `persistMarketingData` do contexto
-- Substituir as chamadas `setSalesData(data)` por `persistSalesData(data, fileName)`
-- Aplicar o mesmo padrão para os demais uploaders
+### Parte 2: Mapeamento de Metricas
 
-### Parte 2: Corrigir CSVUploader, SalesUploader, AdsUploader
+O parser vai identificar cada arquivo pelo titulo:
 
-Verificar que todos os uploaders estão usando as funções de persistência corretamente e não chamando as funções `set*` que substituem os dados.
+| Titulo no Arquivo | Metrica no Banco | Tabela |
+|-------------------|------------------|--------|
+| "Seguidores no Instagram" | total_seguidores | followers_data |
+| "Visitas ao perfil do Instagram" | visitas | marketing_data |
+| "Cliques no link do Instagram" | clicks | marketing_data |
+| "Interacoes com o conteudo" | interacoes | marketing_data |
+| "Alcance" | alcance | marketing_data |
+| "Visualizacoes" | visualizacoes | marketing_data |
 
-**Arquivos afetados:**
-- `src/components/dashboard/CSVUploader.tsx`
-- `src/components/dashboard/SalesUploader.tsx`
-- `src/components/dashboard/AdsUploader.tsx`
-- `src/components/dashboard/FollowersUploader.tsx`
+### Parte 3: Interface do Usuario
 
-### Parte 3: Adicionar Refresh Automático
+Duas opcoes de implementacao:
 
-Após cada upload bem-sucedido, chamar `refreshFromDatabase()` para garantir que o estado local está sincronizado com o banco.
+**Opcao A - Upload Multiplo Unificado (Recomendada)**
+- Um unico componente onde voce arrasta/seleciona todos os 6 arquivos de uma vez
+- O sistema processa cada arquivo automaticamente
+- Mostra resumo de quantos registros foram importados por metrica
+
+**Opcao B - Upload Individual por Metrica**
+- Manter 6 uploaders separados (um para cada metrica)
+- Cada um aceita apenas seu tipo de arquivo
+
+### Parte 4: Manter Compatibilidade Retroativa
+
+Os uploaders antigos continuam funcionando para:
+- Formato antigo de seguidores (`Data, Seguidores`)
+- Formato antigo de marketing (CSV unico com todas as metricas)
+
+O novo parser detecta automaticamente qual formato esta sendo usado baseado na primeira linha do arquivo.
 
 ---
 
 ## Detalhes Tecnicos
 
-### Fluxo Atual (Com Bug)
+### Novo Parser para Formato Instagram
+
 ```text
-Upload CSV --> Parser --> setSalesData(novos_dados)
-                                   |
-                                   v
-                    Estado local = APENAS novos dados
-                                   |
-                                   v
-                    Visualização mostra apenas ultimo upload
+Entrada:
+  sep=,
+  "Seguidores no Instagram"
+  "Data","Primary"
+  "2026-01-16T01:00:00","13"
+  "2026-01-17T01:00:00","25"
+
+Saida:
+  [
+    { data: "2026-01-16", metrica: "seguidores", valor: 13 },
+    { data: "2026-01-17", metrica: "seguidores", valor: 25 }
+  ]
 ```
 
-### Fluxo Corrigido
+### Funcao de Deteccao de Formato
+
 ```text
-Upload CSV --> Parser --> persistSalesData(novos_dados)
-                                   |
-                                   +--> Salva no banco (UPSERT)
-                                   |
-                                   +--> Merge: estado_anterior + novos_dados
-                                   |
-                                   v
-                    Visualização mostra TODOS os dados
+function detectFormat(lines: string[]):
+  if lines[0] starts with "sep=" or lines[0] is empty:
+    return "instagram_export"
+  else if first row has headers "Data,Seguidores":
+    return "legacy_followers"
+  else if first row has headers "Data,Visualizacoes,Visitas,...":
+    return "legacy_marketing"
 ```
 
-### Mudancas no Index.tsx
+### Arquivos a Modificar
 
-**Antes:**
-```typescript
-const handleSalesDataLoaded = (data: any[], fileName: string) => {
-  setSalesData(data);  // SUBSTITUI tudo
-};
-```
+1. **Novo arquivo**: `src/utils/instagramMetricsParser.ts`
+   - Funcao para parse do novo formato
+   - Funcao para detectar tipo de metrica pelo titulo
+   - Conversao de data ISO para YYYY-MM-DD
 
-**Depois:**
-```typescript
-const handleSalesDataLoaded = async (data: any[], fileName: string) => {
-  await persistSalesData(data, fileName);  // Salva e faz MERGE
-};
-```
+2. **Modificar**: `src/components/dashboard/FollowersUploader.tsx`
+   - Adicionar suporte ao novo formato mantendo compatibilidade
 
-### Mudancas nos Uploaders
+3. **Novo arquivo**: `src/components/dashboard/InstagramMetricsUploader.tsx`
+   - Componente para upload multiplo de metricas do Instagram
 
-Os componentes CSVUploader.tsx, SalesUploader.tsx, AdsUploader.tsx, e FollowersUploader.tsx ja utilizam as funcoes persist internamente, mas tambem chamam `onDataLoaded` que pode estar sobrescrevendo.
+4. **Modificar**: `src/pages/Upload.tsx`
+   - Adicionar o novo uploader (ou substituir os existentes)
 
-A solucao e remover a chamada redundante ao callback `onDataLoaded` ou garantir que o callback nao substitua os dados.
+5. **Modificar**: `src/hooks/useDataPersistence.ts`
+   - Adicionar funcao `saveInstagramMetrics` para salvar metricas individuais
 
 ---
 
-## Benefícios
+## Fluxo de Upload
 
-1. Uploads incrementais funcionam corretamente
-2. Novos dados sao acumulados aos existentes
-3. Nenhuma perda de visualizacao de meses anteriores
-4. Estado local sempre sincronizado com banco de dados
+```text
+Usuario seleciona 6 arquivos CSV
+            |
+            v
+Para cada arquivo:
+  1. Le primeira linha (sep=,)
+  2. Le segunda linha (titulo da metrica)
+  3. Identifica tipo: seguidores/visitas/cliques/etc
+  4. Parse das linhas de dados
+  5. Converte data ISO -> YYYY-MM-DD
+            |
+            v
+Agrupa dados por tipo:
+  - Seguidores -> followers_data
+  - Demais -> marketing_data
+            |
+            v
+Salva no banco com upsert
+            |
+            v
+Mostra resumo:
+  "Importados: 10 dias de seguidores,
+   10 dias de visitas, 10 dias de cliques..."
+```
 
 ---
 
-## Solução Temporária Imediata
+## Beneficios
 
-Enquanto a correção não é aplicada, você pode recarregar a página (F5) após o upload para forçar o carregamento de todos os dados do banco.
+1. Compativel com export direto do Instagram/Meta Business Suite
+2. Nao precisa combinar arquivos manualmente
+3. Upload de multiplos arquivos de uma vez
+4. Mantém compatibilidade com formato antigo
+5. Deteccao automatica do tipo de metrica
 
