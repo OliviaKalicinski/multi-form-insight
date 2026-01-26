@@ -1,98 +1,120 @@
 
+# Barras Empilhadas por Tipo de Pedido no Grafico de Volume
 
-# Diagnóstico: Métrica de Crescimento de Seguidores
+## Objetivo
 
-## Problema Encontrado
-
-A métrica de crescimento pode estar sendo calculada de forma incorreta dependendo de como os dados do Instagram são interpretados.
-
-## Dados Atuais no Banco
-
-| Mês | Novos Seguidores | Dias |
-|-----|------------------|------|
-| Jan/2026 | 520 | 24 |
-| Dez/2025 | 650 | 31 |
-| Nov/2025 | 1.688 | 30 |
-
-### Calculo Atual de Crescimento (Jan vs Dez)
-
-```text
-Crescimento Absoluto = 520 - 650 = -130
-Crescimento Percentual = -130 / 650 = -20%
-```
-
-Este calculo esta correto SE os valores no banco representam **novos seguidores ganhos por dia**.
+Modificar o grafico de Volume de Pedidos para:
+1. Dividir cada barra em duas partes: **pedidos "So Amostras"** vs **pedidos "Produtos"** (produtos ou produtos + amostras)
+2. Usar cores diferentes baseadas na meta:
+   - **Acima da meta**: tons de verde (verde escuro = produtos, verde claro = so amostras)
+   - **Abaixo da meta**: tons de amarelo (amarelo escuro = produtos, amarelo claro = so amostras)
+3. Usar a meta de pedidos da pagina Metas (atualmente zerada - `financialGoals.pedidos = 0`)
 
 ---
 
-## Possivel Causa do Problema
+## Situacao Atual
 
-O CSV do Instagram exporta o **total de seguidores do perfil naquele dia**, nao a variacao diaria.
+### Grafico
+- Mostra barras solidas com cor verde (acima da meta) ou amarelo (abaixo)
+- Nao diferencia tipos de pedido
 
-**Exemplo do que o Instagram exporta:**
-```text
-Data, Seguidores (total do perfil)
-2026-01-16, 156.013
-2026-01-17, 156.038  (ganhou 25)
-2026-01-18, 156.061  (ganhou 23)
-```
-
-**O que o sistema atual faz:**
-Salva o valor "bruto" como se fosse delta diario:
-```text
-2026-01-16 -> 13  (deveria ser 156.013)
-2026-01-17 -> 25  (deveria ser 156.038)
-```
-
-Parece que os valores estao sendo salvos incorretamente, capturando apenas os ultimos digitos ou interpretando errado.
+### Meta
+- O grafico recebe `dailyGoal={Math.round(financialGoals.pedidos / 30)}`
+- A meta de pedidos esta zerada (`pedidos: 0`)
+- Quando `dailyGoal = 0`, o grafico usa a media como referencia
 
 ---
 
 ## Solucao Proposta
 
-### Opcao 1: Interpretar como Delta (atual)
+### Parte 1: Modificar Estrutura de Dados
 
-Se o CSV do Instagram traz a **variacao diaria** (ex: +13, +25):
-- O sistema esta correto
-- O crescimento de Janeiro esta realmente negativo (-20% vs Dezembro)
-- Nao ha bug, apenas Janeiro teve menos novos seguidores
+O componente `DailyVolumeChart` precisa receber dados detalhados por tipo:
 
-### Opcao 2: Interpretar como Total Acumulado
+**Estrutura atual:**
+```text
+{ date: string, orders: number }
+```
 
-Se o CSV do Instagram traz o **total do perfil** (ex: 156.013, 156.038):
-- Precisamos modificar o parser para calcular o delta entre dias consecutivos
-- A formula seria: `novos_dia = total_hoje - total_ontem`
+**Nova estrutura:**
+```text
+{ date: string, orders: number, sampleOnlyOrders: number, productOrders: number }
+```
+
+### Parte 2: Calcular Dados por Tipo
+
+Criar funcoes em `financialMetrics.ts` para calcular pedidos diarios/semanais/mensais separados por tipo:
+
+1. `calculateOrdersByDayWithTypes()` - pedidos diarios separados
+2. `calculateOrdersByWeekWithTypes()` - pedidos semanais separados
+3. `calculateOrdersByMonthWithTypes()` - pedidos mensais separados
+
+A logica usara `isOnlySampleOrder()` de `samplesAnalyzer.ts` para classificar cada pedido.
+
+### Parte 3: Atualizar o Grafico
+
+Modificar `DailyVolumeChart.tsx` para:
+
+1. Usar `StackedBarChart` com 2 barras empilhadas
+2. Aplicar cores dinamicas baseadas na meta:
+   - **Acima da meta (verde)**:
+     - Produtos: `#10b981` (verde esmeralda)
+     - So Amostras: `#6ee7b7` (verde claro)
+   - **Abaixo da meta (amarelo)**:
+     - Produtos: `#f59e0b` (amarelo)
+     - So Amostras: `#fcd34d` (amarelo claro)
+
+3. Atualizar a legenda para mostrar as 4 categorias
+
+### Parte 4: Corrigir Meta Zero
+
+Quando `dailyGoal = 0` (meta zerada):
+- Usar a media calculada como linha de referencia
+- Mostrar label "Media" ao inves de "Meta"
+
+Este comportamento ja existe, mas precisa ser confirmado visualmente.
 
 ---
 
 ## Arquivos a Modificar
 
-1. **`src/utils/instagramMetricsParser.ts`**
-   - Adicionar logica para detectar se valores sao totais acumulados ou deltas
-   - Se forem totais, calcular a diferenca entre dias consecutivos
+### 1. `src/utils/financialMetrics.ts`
+- Adicionar funcoes `calculateOrdersByDayWithTypes`, `calculateOrdersByWeekWithTypes`, `calculateOrdersByMonthWithTypes`
+- Retornar contagem separada de `sampleOnlyOrders` e `productOrders`
 
-2. **`src/hooks/useDataPersistence.ts`**
-   - Atualizar `saveInstagramMetrics` para processar corretamente seguidores
+### 2. `src/components/dashboard/DailyVolumeChart.tsx`
+- Atualizar interface para receber dados com tipos separados
+- Trocar `Bar` simples por 2 `Bar` empilhadas
+- Implementar logica de cores dinamicas (verde/amarelo escuro/claro)
+- Atualizar tooltip para mostrar breakdown
+- Atualizar legenda
 
-3. **`src/components/dashboard/InstagramMetricsUploader.tsx`**
-   - Adicionar preview dos dados para o usuario confirmar se estao corretos
-
----
-
-## Verificacao Necessaria
-
-Antes de implementar, preciso que voce confirme:
-
-**Como sao os valores no CSV de Seguidores do Instagram?**
-
-- Se os valores sao pequenos (ex: 13, 25, 18) = delta diario = sistema OK
-- Se os valores sao grandes (ex: 156.000) = total acumulado = precisa correcao
+### 3. `src/pages/PerformanceFinanceira.tsx`
+- Atualizar chamada para usar os novos dados com tipos
 
 ---
 
-## Resumo
+## Paleta de Cores
 
-O crescimento de **-20%** que voce esta vendo pode estar correto (Janeiro realmente teve menos novos seguidores que Dezembro) OU pode ser um bug no parser que esta salvando valores incorretos.
+| Situacao | Tipo | Cor | Hex |
+|----------|------|-----|-----|
+| Acima da meta | Produtos | Verde escuro | #10b981 |
+| Acima da meta | So Amostras | Verde claro | #6ee7b7 |
+| Abaixo da meta | Produtos | Amarelo escuro | #f59e0b |
+| Abaixo da meta | So Amostras | Amarelo claro | #fcd34d |
 
-Preciso da sua confirmacao sobre o formato do CSV para determinar a correcao exata.
+---
+
+## Visualizacao Final
+
+Cada barra tera:
+- **Parte inferior**: pedidos com produtos (cor mais escura)
+- **Parte superior**: pedidos so amostras (cor mais clara)
+- A cor muda entre verde (acima) e amarelo (abaixo) baseado na soma total vs meta
+
+---
+
+## Nota sobre a Meta Zerada
+
+A meta de pedidos esta atualmente em **zero** no banco de dados. Apos implementar as mudancas, voce precisara ir na pagina **Metas** e definir um valor para "Pedidos/Mes" (ex: 350) para que a linha de meta apareca corretamente no grafico.
 
