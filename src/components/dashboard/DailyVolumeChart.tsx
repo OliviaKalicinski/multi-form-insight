@@ -4,8 +4,18 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { ChartViewMode } from "./DailyRevenueChart";
 
+// Types for order data with breakdown
+interface OrderDataWithTypes {
+  date?: string;
+  week?: string;
+  month?: string;
+  orders: number;
+  sampleOnlyOrders?: number;
+  productOrders?: number;
+}
+
 interface DailyVolumeChartProps {
-  data: { date: string; orders: number }[] | { week: string; orders: number }[] | { month: string; orders: number }[];
+  data: OrderDataWithTypes[];
   viewMode: ChartViewMode;
   onViewModeChange?: (mode: ChartViewMode) => void;
   dailyGoal?: number;
@@ -20,20 +30,65 @@ const formatWeekLabel = (week: string): string => {
   return week;
 };
 
+// Cores para as barras empilhadas
+const COLORS = {
+  aboveMeta: {
+    products: '#10b981', // verde esmeralda (escuro)
+    samplesOnly: '#6ee7b7', // verde claro
+  },
+  belowMeta: {
+    products: '#f59e0b', // amarelo (escuro)
+    samplesOnly: '#fcd34d', // amarelo claro
+  },
+};
+
+// Custom shape para as barras com cores dinâmicas
+const CustomBar = (props: any) => {
+  const { x, y, width, height, payload, dataKey, targetLine } = props;
+  
+  if (height <= 0) return null;
+  
+  const isAboveMeta = payload.orders >= targetLine;
+  const colors = isAboveMeta ? COLORS.aboveMeta : COLORS.belowMeta;
+  const fill = dataKey === 'productOrders' ? colors.products : colors.samplesOnly;
+  
+  return (
+    <rect
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      fill={fill}
+      rx={dataKey === 'sampleOnlyOrders' ? 4 : 0}
+      ry={dataKey === 'sampleOnlyOrders' ? 4 : 0}
+    />
+  );
+};
+
 export const DailyVolumeChart = ({ 
   data, 
   viewMode,
   onViewModeChange,
   dailyGoal 
 }: DailyVolumeChartProps) => {
-  // Preparar dados com a chave correta
+  // Preparar dados com a chave correta e garantir breakdown
   const chartData = useMemo(() => {
     return data.map(item => {
       let label = '';
-      if ('date' in item) label = item.date;
-      else if ('week' in item) label = formatWeekLabel(item.week);
-      else if ('month' in item) label = item.month;
-      return { label, orders: item.orders };
+      if ('date' in item && item.date) label = item.date;
+      else if ('week' in item && item.week) label = formatWeekLabel(item.week);
+      else if ('month' in item && item.month) label = item.month;
+      
+      // Se não tiver breakdown, considerar todos como produtos
+      const sampleOnlyOrders = item.sampleOnlyOrders ?? 0;
+      const productOrders = item.productOrders ?? item.orders;
+      
+      return { 
+        label, 
+        orders: item.orders,
+        sampleOnlyOrders,
+        productOrders,
+      };
     });
   }, [data]);
 
@@ -58,7 +113,40 @@ export const DailyVolumeChart = ({
   };
 
   const isCompact = viewMode === 'monthly' || viewMode === 'weekly';
-  const hasGoal = dailyGoal !== undefined;
+  const hasGoal = dailyGoal !== undefined && dailyGoal > 0;
+
+  // Custom tooltip
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+    
+    const data = payload[0]?.payload;
+    if (!data) return null;
+    
+    const isAbove = data.orders >= targetLine;
+    
+    return (
+      <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+        <p className="font-medium text-foreground mb-2">{label}</p>
+        <div className="space-y-1 text-sm">
+          <p className="text-muted-foreground">
+            Total: <span className="font-semibold text-foreground">{data.orders} pedidos</span>
+          </p>
+          <p className="text-muted-foreground">
+            Produtos: <span className="font-medium">{data.productOrders}</span>
+          </p>
+          <p className="text-muted-foreground">
+            Só Amostras: <span className="font-medium">{data.sampleOnlyOrders}</span>
+          </p>
+          <p className={cn(
+            "mt-1 pt-1 border-t text-xs",
+            isAbove ? "text-emerald-600" : "text-amber-600"
+          )}>
+            {isAbove ? "✅ Acima da " : "⚠️ Abaixo da "}{hasGoal ? 'meta' : 'média'}
+          </p>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Card>
@@ -107,15 +195,7 @@ export const DailyVolumeChart = ({
               tickFormatter={(value) => Math.round(value).toString()}
               width={40}
             />
-            <Tooltip 
-              formatter={(value: number) => [`${Math.round(value)} pedidos`, 'Volume']}
-              labelStyle={{ color: 'hsl(var(--foreground))' }}
-              contentStyle={{ 
-                backgroundColor: 'hsl(var(--background))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '8px'
-              }}
-            />
+            <Tooltip content={<CustomTooltip />} />
             
             <ReferenceLine 
               y={targetLine} 
@@ -129,33 +209,58 @@ export const DailyVolumeChart = ({
               }}
             />
             
+            {/* Barra de Produtos (base) */}
             <Bar 
-              dataKey="orders" 
+              dataKey="productOrders" 
+              stackId="orders"
+              name="Produtos"
+              shape={(props: any) => (
+                <CustomBar {...props} dataKey="productOrders" targetLine={targetLine} />
+              )}
+            />
+            
+            {/* Barra de Só Amostras (topo) */}
+            <Bar 
+              dataKey="sampleOnlyOrders" 
+              stackId="orders"
+              name="Só Amostras"
               radius={[4, 4, 0, 0]}
-              name="Pedidos"
-            >
-              {chartData.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={entry.orders >= targetLine 
-                    ? 'hsl(var(--chart-2))' 
-                    : 'hsl(var(--chart-3))'
-                  }
-                />
-              ))}
-            </Bar>
+              shape={(props: any) => (
+                <CustomBar {...props} dataKey="sampleOnlyOrders" targetLine={targetLine} />
+              )}
+            />
           </BarChart>
         </ResponsiveContainer>
         
-        <div className="flex items-center justify-center gap-4 mt-2 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: 'hsl(var(--chart-2))' }} />
-            <span>Acima</span>
+        {/* Legenda customizada */}
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-3 text-xs text-muted-foreground">
+          {/* Acima da meta */}
+          <div className="flex items-center gap-4">
+            <span className="font-medium text-emerald-600">Acima:</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.products }} />
+              <span>Produtos</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.samplesOnly }} />
+              <span>Só Amostras</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: 'hsl(var(--chart-3))' }} />
-            <span>Abaixo</span>
+          
+          {/* Abaixo da meta */}
+          <div className="flex items-center gap-4">
+            <span className="font-medium text-amber-600">Abaixo:</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.products }} />
+              <span>Produtos</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.samplesOnly }} />
+              <span>Só Amostras</span>
+            </div>
           </div>
+          
+          {/* Linha de referência */}
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-0.5" style={{ backgroundColor: 'hsl(var(--chart-4))' }} />
             <span>{hasGoal ? `Meta: ${targetLine}` : `Média: ${Math.round(averageOrders)}`}</span>

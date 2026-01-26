@@ -15,7 +15,7 @@ import { ChannelDonutChart } from "@/components/dashboard/ChannelDonutChart";
 import { TopProductsCompact } from "@/components/dashboard/TopProductsCompact";
 import { TicketDistributionCompact } from "@/components/dashboard/TicketDistributionCompact";
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
-import { calculateFinancialMetrics, analyzeSeasonality } from "@/utils/financialMetrics";
+import { calculateFinancialMetrics, analyzeSeasonality, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes } from "@/utils/financialMetrics";
 import { filterOrdersByMonth } from "@/utils/salesCalculator";
 import { filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
@@ -445,10 +445,22 @@ export default function PerformanceFinanceira() {
           <DailyVolumeChart
             data={
               chartViewMode === 'daily'
-                ? financialMetrics.ordersByDay
+                ? calculateOrdersByDayWithTypes(
+                    selectedMonth
+                      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
+                      : salesData
+                  )
                 : chartViewMode === 'weekly'
-                ? financialMetrics.ordersByWeek
-                : financialMetrics.ordersByMonth
+                ? calculateOrdersByWeekWithTypes(
+                    selectedMonth
+                      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
+                      : salesData
+                  )
+                : calculateOrdersByMonthWithTypes(
+                    selectedMonth
+                      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
+                      : salesData
+                  )
             }
             viewMode={chartViewMode}
             onViewModeChange={setChartViewMode}
