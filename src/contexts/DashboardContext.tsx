@@ -31,6 +31,7 @@ interface DashboardContextType {
   persistAdsData: (data: AdsData[], fileName?: string) => Promise<{ inserted: number; total: number }>;
   persistFollowersData: (data: FollowersData[], fileName?: string) => Promise<{ inserted: number; total: number }>;
   persistMarketingData: (data: MarketingData[], fileName?: string) => Promise<{ inserted: number; total: number }>;
+  persistInstagramMetrics: (data: { data: string; metrica: string; valor: number }[], fileName?: string) => Promise<{ inserted: number; total: number }>;
   persistAudienceData: (data: AudienceData, fileName?: string) => Promise<{ inserted: number; total: number }>;
   deleteUpload: (uploadId: string) => Promise<void>;
   clearPersistedData: () => Promise<void>;
@@ -60,6 +61,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     saveAdsData,
     saveFollowersData,
     saveMarketingData,
+    saveInstagramMetrics,
     saveAudienceData,
     loadAudienceData,
     deleteUpload: deleteUploadFromDb,
@@ -214,6 +216,17 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     return result;
   }, [saveAudienceData]);
 
+  const persistInstagramMetrics = useCallback(async (
+    data: { data: string; metrica: string; valor: number }[], 
+    fileName?: string
+  ) => {
+    const result = await saveInstagramMetrics(data, fileName);
+    // Refresh marketing data from database to get updated values
+    const { marketingData } = await loadAllData();
+    setMarketingDataState(marketingData);
+    return result;
+  }, [saveInstagramMetrics, loadAllData]);
+
   // Delete upload and refresh data from database
   const deleteUpload = useCallback(async (uploadId: string) => {
     await deleteUploadFromDb(uploadId);
@@ -282,6 +295,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     persistAdsData,
     persistFollowersData,
     persistMarketingData,
+    persistInstagramMetrics,
     persistAudienceData,
     deleteUpload,
     clearPersistedData,

@@ -783,6 +783,64 @@ export const useDataPersistence = () => {
     }
   }, [toast]);
 
+  // Save Instagram individual metrics (from new format)
+  const saveInstagramMetrics = useCallback(async (
+    metrics: { data: string; metrica: string; valor: number }[],
+    fileName?: string
+  ): Promise<UpsertResult> => {
+    if (metrics.length === 0) return { inserted: 0, updated: 0, total: 0 };
+
+    try {
+      // Calculate date range
+      const dateStrings = metrics.map(m => m.data).filter(Boolean);
+      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+
+      // Create upload history
+      const uploadId = await createUploadHistory(
+        "marketing",
+        metrics.length,
+        fileName || "Instagram Metrics",
+        minDate ? format(minDate, "yyyy-MM-dd") : null,
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+      );
+
+      // Prepare rows for insertion
+      const rows = metrics.map(m => ({
+        data: m.data,
+        metrica: m.metrica,
+        valor: m.valor,
+        upload_id: uploadId,
+      }));
+
+      const { data, error } = await supabase
+        .from("marketing_data")
+        .upsert(rows, { onConflict: "data,metrica", ignoreDuplicates: false })
+        .select();
+
+      if (error) {
+        if (uploadId) {
+          await supabase.from("upload_history").delete().eq("id", uploadId);
+        }
+        throw error;
+      }
+
+      const result = {
+        inserted: data?.length || 0,
+        updated: 0,
+        total: metrics.length,
+      };
+
+      setStats((prev) => ({ ...prev, marketingCount: prev.marketingCount + result.inserted, lastUpdated: new Date() }));
+
+      return result;
+    } catch (error) {
+      console.error("Erro ao salvar métricas do Instagram:", error);
+      throw error;
+    }
+  }, []);
+
   // Save audience data
   const saveAudienceData = useCallback(async (data: AudienceData, fileName?: string): Promise<UpsertResult> => {
     try {
@@ -854,6 +912,7 @@ export const useDataPersistence = () => {
     saveAdsData,
     saveFollowersData,
     saveMarketingData,
+    saveInstagramMetrics,
     saveAudienceData,
     loadAudienceData,
     deleteUpload,
