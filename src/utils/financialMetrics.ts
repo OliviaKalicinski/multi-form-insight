@@ -3,7 +3,114 @@ import { ptBR } from "date-fns/locale";
 import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance, ProductRevenueData } from "@/types/marketing";
 import { extractDailyOrders } from './salesCalculator';
 import { breakdownOrders } from './orderBreakdown';
+import { isOnlySampleOrder } from './samplesAnalyzer';
 
+// ======= TYPES =======
+
+export interface OrderDataWithTypes {
+  date?: string;
+  week?: string;
+  month?: string;
+  orders: number;
+  sampleOnlyOrders: number;
+  productOrders: number;
+}
+
+// ======= ORDER BREAKDOWN BY TYPE =======
+
+/**
+ * Calcula pedidos diários separados por tipo (só amostras vs produtos)
+ */
+export const calculateOrdersByDayWithTypes = (
+  orders: ProcessedOrder[]
+): OrderDataWithTypes[] => {
+  const dailyMap = new Map<string, { sampleOnly: number; product: number }>();
+  
+  orders.forEach(order => {
+    const dateKey = format(order.dataVenda, "yyyy-MM-dd");
+    const current = dailyMap.get(dateKey) || { sampleOnly: 0, product: 0 };
+    
+    if (isOnlySampleOrder(order)) {
+      current.sampleOnly++;
+    } else {
+      current.product++;
+    }
+    
+    dailyMap.set(dateKey, current);
+  });
+  
+  return Array.from(dailyMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, counts]) => ({
+      date,
+      orders: counts.sampleOnly + counts.product,
+      sampleOnlyOrders: counts.sampleOnly,
+      productOrders: counts.product,
+    }));
+};
+
+/**
+ * Calcula pedidos semanais separados por tipo (só amostras vs produtos)
+ */
+export const calculateOrdersByWeekWithTypes = (
+  orders: ProcessedOrder[]
+): OrderDataWithTypes[] => {
+  const weeklyMap = new Map<string, { sampleOnly: number; product: number }>();
+  
+  orders.forEach(order => {
+    const weekStart = startOfWeek(order.dataVenda, { weekStartsOn: 0 });
+    const weekKey = format(weekStart, "yyyy-'W'ww");
+    const current = weeklyMap.get(weekKey) || { sampleOnly: 0, product: 0 };
+    
+    if (isOnlySampleOrder(order)) {
+      current.sampleOnly++;
+    } else {
+      current.product++;
+    }
+    
+    weeklyMap.set(weekKey, current);
+  });
+  
+  return Array.from(weeklyMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([week, counts]) => ({
+      week,
+      orders: counts.sampleOnly + counts.product,
+      sampleOnlyOrders: counts.sampleOnly,
+      productOrders: counts.product,
+    }));
+};
+
+/**
+ * Calcula pedidos mensais separados por tipo (só amostras vs produtos)
+ */
+export const calculateOrdersByMonthWithTypes = (
+  orders: ProcessedOrder[]
+): OrderDataWithTypes[] => {
+  const monthlyMap = new Map<string, { sampleOnly: number; product: number }>();
+  
+  orders.forEach(order => {
+    const monthKey = format(order.dataVenda, "yyyy-MM");
+    const current = monthlyMap.get(monthKey) || { sampleOnly: 0, product: 0 };
+    
+    if (isOnlySampleOrder(order)) {
+      current.sampleOnly++;
+    } else {
+      current.product++;
+    }
+    
+    monthlyMap.set(monthKey, current);
+  });
+  
+  return Array.from(monthlyMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([month, counts]) => ({
+      month: format(parse(month, "yyyy-MM", new Date()), "MMM/yy", { locale: ptBR }),
+      orders: counts.sampleOnly + counts.product,
+      sampleOnlyOrders: counts.sampleOnly,
+      productOrders: counts.product,
+    }));
+};
 /**
  * Filtra pedidos que contêm APENAS Kit de Amostras
  * Retorna apenas pedidos com produtos reais (não apenas R$ 0,01)
