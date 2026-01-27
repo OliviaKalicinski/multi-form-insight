@@ -115,7 +115,7 @@ export const calculateOrdersByMonthWithTypes = (
  * Filtra pedidos que contêm APENAS Kit de Amostras
  * Retorna apenas pedidos com produtos reais (não apenas R$ 0,01)
  */
-const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => {
+export const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => {
   return orders.filter(order => {
     // Verificar se o pedido tem outros produtos além de Kit de Amostras
     const nonSampleProducts = order.produtos.filter(
