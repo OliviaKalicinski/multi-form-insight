@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
-import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2, Receipt, Target, Clock, FlaskConical } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2, Receipt, Target, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { TopProductsCompact } from "@/components/dashboard/TopProductsCompact";
 import { TicketDistributionCompact } from "@/components/dashboard/TicketDistributionCompact";
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
 import { IncompleteMonthBadge } from "@/components/dashboard/IncompleteMonthBadge";
-import { calculateFinancialMetrics, analyzeSeasonality, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes, filterRealOrders } from "@/utils/financialMetrics";
+import { calculateFinancialMetrics, analyzeSeasonality, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes } from "@/utils/financialMetrics";
 import { filterOrdersByMonth, filterOrdersByDateRange, extractDailyRevenue } from "@/utils/salesCalculator";
 import { filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
@@ -46,7 +46,6 @@ export default function PerformanceFinanceira() {
 
   const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
   const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('daily');
-  const [includeSamples, setIncludeSamples] = useState(true);
 
   const isLast12MonthsView = selectedMonth === "last-12-months";
 
@@ -231,40 +230,12 @@ export default function PerformanceFinanceira() {
     ];
   }, [financialMetrics, financialGoals]);
 
-  // Dados filtrados para gráficos (sem amostras quando toggle desativado)
-  // IMPORTANTE: Este hook deve estar ANTES dos early returns
-  const filteredFinancialMetrics = useMemo(() => {
-    if (!financialMetrics || includeSamples) return financialMetrics;
-    
-    // Obter pedidos filtrados do período atual
-    const periodOrders = selectedMonth
+  // Obter pedidos do período atual para passar aos componentes
+  const periodOrders = useMemo(() => {
+    return selectedMonth
       ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
       : salesData;
-    
-    // Filtrar apenas pedidos com produtos reais
-    const realOrders = filterRealOrders(periodOrders);
-    
-    // Recalcular métricas sem amostras
-    return calculateFinancialMetrics(realOrders, selectedMonth || 'all');
-  }, [financialMetrics, includeSamples, salesData, selectedMonth, availableSalesMonths]);
-
-  // Dados de volume filtrados para o gráfico de pedidos
-  // IMPORTANTE: Este hook deve estar ANTES dos early returns
-  const filteredVolumeData = useMemo(() => {
-    const periodOrders = selectedMonth
-      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
-      : salesData;
-    
-    const ordersToUse = includeSamples ? periodOrders : filterRealOrders(periodOrders);
-    
-    if (chartViewMode === 'daily') {
-      return calculateOrdersByDayWithTypes(ordersToUse);
-    } else if (chartViewMode === 'weekly') {
-      return calculateOrdersByWeekWithTypes(ordersToUse);
-    } else {
-      return calculateOrdersByMonthWithTypes(ordersToUse);
-    }
-  }, [salesData, selectedMonth, availableSalesMonths, includeSamples, chartViewMode]);
+  }, [salesData, selectedMonth, availableSalesMonths]);
 
   if (salesData.length === 0) {
     return (
@@ -311,16 +282,6 @@ export default function PerformanceFinanceira() {
           </div>
         </div>
         
-        {/* Toggle de Amostras Global */}
-        <Button
-          variant={includeSamples ? "default" : "outline"}
-          size="sm"
-          onClick={() => setIncludeSamples(!includeSamples)}
-          className="gap-2"
-        >
-          <FlaskConical className="h-4 w-4" />
-          {includeSamples ? "Com Amostras" : "Só Produtos"}
-        </Button>
       </div>
 
       {/* Period indicator for multi-month views */}
@@ -557,46 +518,38 @@ export default function PerformanceFinanceira() {
       )}
 
       {/* ===== BLOCO 2: EVOLUÇÃO TEMPORAL ===== */}
-      {!comparisonMode && filteredFinancialMetrics && (
+      {!comparisonMode && financialMetrics && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <DailyRevenueChart
-            data={
-              chartViewMode === 'daily' 
-                ? filteredFinancialMetrics.revenueByDay.map(d => ({ date: d.date, revenue: d.revenue }))
-                : chartViewMode === 'weekly'
-                ? filteredFinancialMetrics.revenueByWeek
-                : filteredFinancialMetrics.revenueByMonth.map(d => ({
-                    month: format(parse(d.month, "yyyy-MM", new Date()), "MMM/yy", { locale: ptBR }),
-                    revenue: d.revenue
-                  }))
-            }
+            rawOrders={periodOrders}
             viewMode={chartViewMode}
             onViewModeChange={setChartViewMode}
-            showMovingAverage={true}
           />
           <DailyVolumeChart
-            data={filteredVolumeData}
+            rawOrders={periodOrders}
             viewMode={chartViewMode}
             onViewModeChange={setChartViewMode}
-            dailyGoal={Math.round(financialGoals.pedidos / 30)}
-            includeSamples={includeSamples}
           />
         </div>
       )}
 
       {/* ===== BLOCO 3: ANÁLISE POR DIMENSÃO ===== */}
-      {!comparisonMode && filteredFinancialMetrics && (
+      {!comparisonMode && financialMetrics && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Por Canal (Donut) */}
-          <ChannelDonutChart data={filteredFinancialMetrics.platformPerformance} />
+          <ChannelDonutChart 
+            data={financialMetrics.platformPerformance} 
+            rawOrders={periodOrders}
+          />
           
           {/* Top Produtos (Barras Horizontais) */}
-          <TopProductsCompact data={filteredFinancialMetrics.revenueByProduct} limit={8} />
+          <TopProductsCompact data={financialMetrics.revenueByProduct} limit={8} />
           
           {/* Distribuição de Ticket (Histograma) */}
           <TicketDistributionCompact 
-            data={filteredFinancialMetrics.orderDistribution}
-            averageTicket={filteredFinancialMetrics.ticketMedioReal}
+            data={financialMetrics.orderDistribution}
+            averageTicket={financialMetrics.ticketMedioReal}
+            rawOrders={periodOrders}
           />
         </div>
       )}

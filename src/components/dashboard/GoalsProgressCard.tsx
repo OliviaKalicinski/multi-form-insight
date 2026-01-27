@@ -1,7 +1,15 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Target, Check, AlertTriangle, X } from "lucide-react";
+import { Target, Check, AlertTriangle, X, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface GoalItem {
   label: string;
@@ -12,6 +20,7 @@ interface GoalItem {
 
 interface GoalsProgressCardProps {
   goals: GoalItem[];
+  alternativeGoals?: GoalItem[];
 }
 
 const formatValue = (value: number, format: 'currency' | 'number' | 'percent') => {
@@ -52,17 +61,48 @@ const getProgressBarColor = (progress: number) => {
   return "[&>div]:bg-red-500";
 };
 
-export const GoalsProgressCard = ({ goals }: GoalsProgressCardProps) => {
+export const GoalsProgressCard = ({ goals, alternativeGoals }: GoalsProgressCardProps) => {
+  const [includeSamples, setIncludeSamples] = useState(true);
+
+  const displayGoals = includeSamples || !alternativeGoals ? goals : alternativeGoals;
+  const canToggle = !!alternativeGoals;
+
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Target className="h-5 w-5 text-primary" />
-          Status das Metas
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Target className="h-5 w-5 text-primary" />
+            Status das Metas
+          </CardTitle>
+          
+          {canToggle && (
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={includeSamples ? "default" : "outline"}
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setIncludeSamples(!includeSamples)}
+                  >
+                    <FlaskConical className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{includeSamples ? "Incluindo amostras" : "Apenas produtos reais"}</p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          )}
+        </div>
+        
+        {!includeSamples && canToggle && (
+          <p className="text-xs text-amber-600 mt-1">Comparando com pedidos reais (sem amostras)</p>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {goals.map((goal, index) => {
+        {displayGoals.map((goal, index) => {
           const progress = goal.goal > 0 ? (goal.current / goal.goal) * 100 : 0;
           const remaining = goal.goal - goal.current;
           
