@@ -63,9 +63,11 @@ export const DailyRevenueChart = ({
     } else if (viewMode === 'weekly') {
       const weeklyRevenue = calculateWeeklyRevenue(ordersToUse);
       return weeklyRevenue.map(item => {
-        const weekDate = parse(item.week, "yyyy-'W'ww", new Date());
+        // Extract week number from format "yyyy-Www" directly
+        const match = item.week.match(/\d{4}-W(\d{2})/);
+        const weekLabel = match ? `S${match[1]}` : item.week;
         return {
-          label: format(weekDate, "'S'w", { locale: ptBR }),
+          label: weekLabel,
           revenue: item.revenue
         };
       });
