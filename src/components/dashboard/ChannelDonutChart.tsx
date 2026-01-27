@@ -1,10 +1,20 @@
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Store } from "lucide-react";
-import { PlatformPerformance } from "@/types/marketing";
+import { Store, FlaskConical } from "lucide-react";
+import { PlatformPerformance, ProcessedOrder } from "@/types/marketing";
+import { filterRealOrders, getPlatformPerformance } from "@/utils/financialMetrics";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ChannelDonutChartProps {
   data: PlatformPerformance[];
+  rawOrders?: ProcessedOrder[];
 }
 
 const COLORS = [
@@ -23,23 +33,62 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0
   }).format(value);
 
-export const ChannelDonutChart = ({ data }: ChannelDonutChartProps) => {
-  const totalRevenue = data.reduce((sum, item) => sum + item.revenue, 0);
+export const ChannelDonutChart = ({ data, rawOrders }: ChannelDonutChartProps) => {
+  const [includeSamples, setIncludeSamples] = useState(true);
 
-  const chartData = data.map((item, index) => ({
+  // Recalcular dados quando toggle está desativado
+  const displayData = useMemo(() => {
+    if (includeSamples || !rawOrders) return data;
+    
+    // Filtrar pedidos e recalcular performance por plataforma
+    const realOrders = filterRealOrders(rawOrders);
+    return getPlatformPerformance(realOrders);
+  }, [data, rawOrders, includeSamples]);
+
+  const totalRevenue = displayData.reduce((sum, item) => sum + item.revenue, 0);
+
+  const chartData = displayData.map((item, index) => ({
     name: item.platform,
     value: item.revenue,
     percentage: item.marketShare,
     color: COLORS[index % COLORS.length],
   }));
 
+  const canToggle = !!rawOrders;
+
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Store className="h-4 w-4 text-primary" />
-          Receita por Canal
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Store className="h-4 w-4 text-primary" />
+            Receita por Canal
+          </CardTitle>
+          
+          {canToggle && (
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={includeSamples ? "default" : "outline"}
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setIncludeSamples(!includeSamples)}
+                  >
+                    <FlaskConical className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{includeSamples ? "Incluindo amostras" : "Apenas produtos reais"}</p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          )}
+        </div>
+        
+        {!includeSamples && canToggle && (
+          <p className="text-xs text-amber-600 mt-1">Sem amostras</p>
+        )}
       </CardHeader>
       <CardContent className="pt-0">
         <div className="flex flex-col items-center">
