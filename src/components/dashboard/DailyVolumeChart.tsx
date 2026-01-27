@@ -106,6 +106,19 @@ export const DailyVolumeChart = ({
     return dailyGoal * 30; // monthly
   }, [dailyGoal, viewMode, averageOrders]);
 
+  // Detectar quais categorias de cores estão visíveis no gráfico
+  const { hasAbove, hasBelow } = useMemo(() => {
+    let above = false;
+    let below = false;
+    
+    chartData.forEach(item => {
+      if (item.orders >= targetLine) above = true;
+      else below = true;
+    });
+    
+    return { hasAbove: above, hasBelow: below };
+  }, [chartData, targetLine]);
+
   const titles = {
     daily: { title: "📦 Volume de Pedidos", description: "Número de pedidos por dia" },
     weekly: { title: "📦 Volume Semanal", description: "Pedidos agregados por semana" },
@@ -232,35 +245,39 @@ export const DailyVolumeChart = ({
           </BarChart>
         </ResponsiveContainer>
         
-        {/* Legenda customizada */}
+        {/* Legenda customizada - dinâmica baseada nos dados */}
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-3 text-xs text-muted-foreground">
-          {/* Acima da meta */}
-          <div className="flex items-center gap-4">
-            <span className="font-medium text-emerald-600">Acima:</span>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.products }} />
-              <span>Produtos</span>
+          {/* Mostrar cores verdes apenas se houver barras acima da meta */}
+          {hasAbove && (
+            <div className="flex items-center gap-4">
+              {hasBelow && <span className="font-medium text-emerald-600">Acima:</span>}
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.products }} />
+                <span>Produtos</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.samplesOnly }} />
+                <span>Só Amostras</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.samplesOnly }} />
-              <span>Só Amostras</span>
-            </div>
-          </div>
+          )}
           
-          {/* Abaixo da meta */}
-          <div className="flex items-center gap-4">
-            <span className="font-medium text-amber-600">Abaixo:</span>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.products }} />
-              <span>Produtos</span>
+          {/* Mostrar cores amarelas apenas se houver barras abaixo da meta */}
+          {hasBelow && (
+            <div className="flex items-center gap-4">
+              {hasAbove && <span className="font-medium text-amber-600">Abaixo:</span>}
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.products }} />
+                <span>Produtos</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.samplesOnly }} />
+                <span>Só Amostras</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.samplesOnly }} />
-              <span>Só Amostras</span>
-            </div>
-          </div>
+          )}
           
-          {/* Linha de referência */}
+          {/* Linha de referência - sempre visível */}
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-0.5" style={{ backgroundColor: 'hsl(var(--chart-4))' }} />
             <span>{hasGoal ? `Meta: ${targetLine}` : `Média: ${Math.round(averageOrders)}`}</span>
