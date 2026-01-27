@@ -1,36 +1,32 @@
 
 
-# Toggle de Amostras nos Gráficos Financeiros
+# Botões de Toggle Individuais por Gráfico
 
 ## Objetivo
 
-Adicionar o mesmo botão toggle "Com Amostras / Só Produtos" implementado no `DailyVolumeChart` a outros 4 gráficos da página Performance Financeira.
+Reverter a abordagem de toggle global na página e implementar botões individuais **dentro de cada gráfico**, permitindo ao usuário alternar "Com Amostras / Só Produtos" independentemente para cada visualização.
+
+---
+
+## Por que Isso é Melhor
+
+| Abordagem Atual (Global) | Nova Abordagem (Individual) |
+|-------------------------|---------------------------|
+| Um botão no header controla todos | Cada gráfico tem seu próprio botão |
+| Todos os gráficos sincronizados | Usuário pode comparar visões diferentes |
+| Menos flexível para análise | Mais intuitivo e user-friendly |
 
 ---
 
 ## Gráficos Afetados
 
-| Gráfico | Arquivo | Impacto do Toggle |
-|---------|---------|-------------------|
-| Faturamento Diário | `DailyRevenueChart.tsx` | Excluir receita de pedidos só-amostras |
-| Receita por Canal | `ChannelDonutChart.tsx` | Recalcular % por canal sem amostras |
-| Distribuição de Ticket | `TicketDistributionCompact.tsx` | Remover pedidos R$0,01 da faixa 0-50 |
-| Status das Metas | `GoalsProgressCard.tsx` | Comparar metas com pedidos reais |
-
----
-
-## Arquitetura da Solução
-
-### Opção Escolhida: Toggle Centralizado na Página
-
-Em vez de adicionar toggles individuais em cada componente, criar um **toggle global** na página `PerformanceFinanceira.tsx` que controla todos os gráficos simultaneamente.
-
-**Vantagens:**
-- UX consistente (todos os gráficos sincronizados)
-- Menos código duplicado
-- Fácil de entender para o usuário
-
-**Localização do toggle:** No header da página, próximo ao título.
+| Componente | Localização do Toggle | Dados Afetados |
+|------------|----------------------|----------------|
+| **DailyVolumeChart** | Já tem toggle ✅ | Volume de pedidos |
+| **DailyRevenueChart** | Adicionar ao header | Faturamento diário |
+| **ChannelDonutChart** | Adicionar ao header | Receita por canal |
+| **TicketDistributionCompact** | Adicionar ao header | Distribuição de ticket |
+| **GoalsProgressCard** | Adicionar ao header | Status das metas |
 
 ---
 
@@ -38,147 +34,147 @@ Em vez de adicionar toggles individuais em cada componente, criar um **toggle gl
 
 ### 1. `src/pages/PerformanceFinanceira.tsx`
 
+**Remover:**
+- Estado global `includeSamples`
+- Botão toggle do header da página
+- `useMemo` de `filteredFinancialMetrics` e `filteredVolumeData`
+
+**Modificar:**
+- Passar dados brutos (`salesData`, métricas completas) para os componentes
+- Cada componente fará sua própria filtragem internamente
+
+### 2. `src/components/dashboard/DailyVolumeChart.tsx`
+
+**Já implementado!** O toggle existe e funciona com estado interno quando `onIncludeSamplesChange` não é fornecido.
+
+**Modificar:**
+- Adicionar estado interno `useState(true)` quando a prop `includeSamples` não for passada
+- Remover dependência da prop `includeSamples` vinda do parent
+
+### 3. `src/components/dashboard/DailyRevenueChart.tsx`
+
 **Adicionar:**
-- Estado `includeSamples` para controlar filtro global
-- Botão toggle no header da página
-- Cálculo de métricas filtradas (sem amostras) usando `filterRealOrders`
-- Passar dados filtrados ou completos conforme o toggle
+- Nova prop `rawOrders: ProcessedOrder[]` para dados brutos
+- Estado interno `const [includeSamples, setIncludeSamples] = useState(true)`
+- Botão toggle com ícone `FlaskConical` no header
+- `useMemo` para filtrar e recalcular dados de faturamento
 
+**Lógica:**
 ```text
-// Novo estado
-const [includeSamples, setIncludeSamples] = useState(true);
-
-// Métricas filtradas (sem amostras)
-const filteredFinancialMetrics = useMemo(() => {
-  if (!includeSamples) {
-    // Filtrar pedidos sem-amostra e recalcular
-    const realOrders = salesData.filter(order => !isOnlySampleOrder(order));
-    return calculateFinancialMetrics(realOrders, selectedMonth);
-  }
-  return financialMetrics;
-}, [salesData, selectedMonth, includeSamples, financialMetrics]);
+// Quando includeSamples = false, recalcular:
+const filteredOrders = filterRealOrders(rawOrders);
+const revenueData = calculateRevenueByDay/Week/Month(filteredOrders);
 ```
 
-### 2. `src/components/dashboard/DailyRevenueChart.tsx`
+### 4. `src/components/dashboard/ChannelDonutChart.tsx`
 
 **Adicionar:**
-- Nova prop `includeSamples?: boolean`
-- Dados de faturamento separados (com/sem amostras)
-- Lógica para filtrar dados quando `includeSamples = false`
+- Nova prop `rawOrders?: ProcessedOrder[]`
+- Estado interno `includeSamples`
+- Botão toggle compacto no header (ícone pequeno)
+- `useMemo` para recalcular `platformPerformance` quando toggle off
 
-**Nota:** O gráfico de faturamento precisa receber dados já filtrados da página pai OU calcular internamente baseado em dados brutos.
+**Lógica:**
+```text
+// Recalcular agregação por canal sem amostras
+const dataToUse = includeSamples ? data : recalculatedFromRawOrders;
+```
 
-### 3. `src/components/dashboard/ChannelDonutChart.tsx`
-
-**Adicionar:**
-- Nova prop `includeSamples?: boolean`
-- Badge indicando modo atual (opcional)
-- Receber dados já filtrados do componente pai
-
-### 4. `src/components/dashboard/TicketDistributionCompact.tsx`
+### 5. `src/components/dashboard/TicketDistributionCompact.tsx`
 
 **Adicionar:**
-- Nova prop `includeSamples?: boolean`
-- Receber dados já filtrados
-- A faixa R$0-50 terá contagem significativamente menor sem amostras
+- Nova prop `rawOrders?: ProcessedOrder[]`
+- Estado interno `includeSamples`
+- Botão toggle compacto no header
+- `useMemo` para recalcular distribuição de ticket
 
-### 5. `src/components/dashboard/GoalsProgressCard.tsx`
+**Impacto esperado:**
+- Faixa R$0-50 terá muito menos pedidos (remove R$0,01)
+- Ticket médio aumenta significativamente
+
+### 6. `src/components/dashboard/GoalsProgressCard.tsx`
 
 **Adicionar:**
-- Nova prop `includeSamples?: boolean`
-- Indicador visual mostrando qual base está sendo usada
-- Receber dados `totalPedidosReais` ou `totalPedidos` conforme toggle
+- Nova prop opcional `alternativeGoals?: GoalItem[]` (para quando sem amostras)
+- Estado interno `includeSamples`
+- Botão toggle no header
+- Alternar entre `goals` e `alternativeGoals`
 
 ---
 
-## UI do Toggle Global
+## Design do Botão Toggle
 
-### Localização
-
-Será adicionado no header da página, alinhado à direita:
+Cada componente terá um botão compacto no header:
 
 ```text
-💰 Performance Financeira
-Análise completa de receita, margem e tendências    [🧪 Com Amostras ▼]
+┌─────────────────────────────────────────────────────┐
+│ 📈 Faturamento Diário      [Diário] [Semanal] [🧪] │
+│                                                      │
+│      (gráfico)                                       │
+└─────────────────────────────────────────────────────┘
 ```
 
-### Estilos
-
-- Mesma aparência do toggle implementado em `DailyVolumeChart`
-- Ícone `FlaskConical` do lucide-react
-- Variantes: `default` (incluindo) / `outline` (excluindo)
+**Estilo do botão:**
+- Tamanho: `sm` ou `icon` (compacto)
+- Variante: `default` quando incluindo amostras, `outline` quando só produtos
+- Tooltip explicativo em hover
+- Ícone: `FlaskConical` do lucide-react
 
 ---
 
-## Lógica de Filtragem
-
-### Dados que precisam ser recalculados quando `includeSamples = false`:
-
-| Métrica | Cálculo Original | Cálculo Filtrado |
-|---------|------------------|------------------|
-| `faturamentoTotal` | Soma todos pedidos | Soma pedidos com produto real |
-| `platformPerformance` | Agrupa todos | Agrupa só pedidos reais |
-| `orderDistribution` | Conta todos tickets | Conta só tickets reais |
-| `totalPedidos` | Count total | Count pedidos reais |
-
-### Função existente para filtrar
-
-O código já possui `filterRealOrders()` em `financialMetrics.ts` que pode ser reutilizado:
-
-```text
-const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => {
-  return orders.filter(order => {
-    const nonSampleProducts = order.produtos.filter(
-      p => p.descricaoAjustada !== 'Kit de Amostras'
-    );
-    return nonSampleProducts.length > 0;
-  });
-};
-```
-
----
-
-## Fluxo de Dados
+## Fluxo de Dados Atualizado
 
 ```text
 PerformanceFinanceira.tsx
-├── includeSamples (estado)
-├── salesData → filteredOrders (se !includeSamples)
-├── calculateFinancialMetrics(filteredOrders)
+├── salesData (dados brutos)
+├── financialMetrics (métricas completas)
 │
-├─→ DailyRevenueChart (recebe dados filtrados)
-├─→ ChannelDonutChart (recebe platformPerformance filtrado)
-├─→ TicketDistributionCompact (recebe orderDistribution filtrado)
-└─→ GoalsProgressCard (recebe totalPedidos/totalPedidosReais)
+├─→ DailyRevenueChart
+│   ├── rawOrders (para filtragem interna)
+│   └── includeSamples (estado local)
+│
+├─→ DailyVolumeChart  
+│   ├── rawOrders (para filtragem interna)
+│   └── includeSamples (estado local) ✅ já existe
+│
+├─→ ChannelDonutChart
+│   ├── data (métricas pré-calculadas)
+│   ├── rawOrders (para recálculo)
+│   └── includeSamples (estado local)
+│
+├─→ TicketDistributionCompact
+│   ├── data (métricas pré-calculadas)
+│   ├── rawOrders (para recálculo)
+│   └── includeSamples (estado local)
+│
+└─→ GoalsProgressCard
+    ├── goals (com amostras)
+    ├── alternativeGoals (sem amostras)
+    └── includeSamples (estado local)
 ```
 
 ---
 
-## Resumo das Alterações
+## Resumo de Alterações
 
-| Arquivo | Tipo | Descrição |
-|---------|------|-----------|
-| `PerformanceFinanceira.tsx` | Modificar | Estado global + toggle + filtragem |
-| `DailyRevenueChart.tsx` | Modificar | Aceitar dados filtrados |
-| `ChannelDonutChart.tsx` | Sem mudança | Apenas recebe dados já filtrados |
-| `TicketDistributionCompact.tsx` | Sem mudança | Apenas recebe dados já filtrados |
-| `GoalsProgressCard.tsx` | Sem mudança | Apenas recebe dados já filtrados |
-| `financialMetrics.ts` | Modificar | Exportar `filterRealOrders` |
+| Arquivo | Ação | Complexidade |
+|---------|------|--------------|
+| `PerformanceFinanceira.tsx` | Remover toggle global, passar dados brutos | Média |
+| `DailyVolumeChart.tsx` | Ajustar para usar estado local | Baixa |
+| `DailyRevenueChart.tsx` | Adicionar toggle + filtragem | Alta |
+| `ChannelDonutChart.tsx` | Adicionar toggle + recálculo | Média |
+| `TicketDistributionCompact.tsx` | Adicionar toggle + recálculo | Média |
+| `GoalsProgressCard.tsx` | Adicionar toggle + dados alternativos | Média |
 
 ---
 
 ## Resultado Esperado
 
-**Com Amostras (padrão):**
-- Todos os gráficos mostram dados completos
-- Pedidos de R$0,01 aparecem na faixa 0-50
-- Meta de pedidos compara com total
+O usuário poderá:
+1. Ver o gráfico de **Volume de Pedidos** incluindo amostras
+2. Ao mesmo tempo, ver **Faturamento** sem amostras
+3. Comparar lado a lado o impacto das amostras em cada métrica
+4. Alternar independentemente cada visualização conforme necessidade
 
-**Só Produtos:**
-- Gráficos mostram apenas pedidos com produtos reais
-- Faixa R$0-50 muito menor
-- Meta compara com pedidos reais
-- Ticket médio mais realista
-
-O usuário poderá alternar entre visualizações para entender o impacto real das amostras nas métricas financeiras.
+Isso proporciona uma experiência muito mais flexível e intuitiva para análise de dados.
 
