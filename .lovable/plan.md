@@ -1,91 +1,46 @@
 
-# Correção: Legenda Dinâmica no Gráfico de Volume
+# Correção: Linha de Meta Mais Visível
 
-## Problema Identificado
+## Problema
 
-A legenda do gráfico de Volume de Pedidos mostra sempre 4 categorias:
-- **Acima:** Produtos, Só Amostras (verde escuro, verde claro)
-- **Abaixo:** Produtos, Só Amostras (amarelo escuro, amarelo claro)
+A linha "Meta" está sendo renderizada **por baixo** das barras no gráfico, tornando-a pouco visível. Em Recharts, a ordem de renderização segue a ordem dos componentes no JSX.
 
-Porém, quando **todas as barras estão acima da meta** (como no seu caso), as cores amarelas não aparecem no gráfico, mas a legenda continua exibindo-as - causando confusão.
+## Solução
 
----
-
-## Solução Proposta
-
-Tornar a legenda **dinâmica**, mostrando apenas as categorias que realmente aparecem no gráfico:
-
-### Lógica:
-1. Calcular quais cores estão presentes no gráfico
-2. Verificar se existem barras acima E/OU abaixo da meta
-3. Mostrar na legenda apenas as categorias que têm dados visíveis
-
-### Exemplo:
-- Se **todas** as barras estão acima da meta: mostrar apenas "Produtos" e "Só Amostras" em verde
-- Se **todas** estão abaixo: mostrar apenas em amarelo
-- Se **misturado**: mostrar ambas as categorias
-
----
+Mover o `ReferenceLine` para **depois** dos componentes `Bar`, e também aumentar a espessura e opacidade da linha para melhor visibilidade.
 
 ## Arquivo a Modificar
 
 `src/components/dashboard/DailyVolumeChart.tsx`
 
----
+## Mudanças
 
-## Mudanças Técnicas
+1. **Mover ReferenceLine para depois das Bars** - Isso faz a linha ser renderizada por cima das barras
+2. **Aumentar strokeWidth** - De 1 (default) para 2
+3. **Usar cor sólida mais forte** - Garantir contraste adequado
 
-### 1. Calcular categorias visíveis (novo useMemo)
-
-Adicionar lógica para detectar se existem barras acima e/ou abaixo da meta:
-
+## Ordem Atual (errada):
 ```text
-const { hasAbove, hasBelow } = useMemo(() => {
-  let hasAbove = false;
-  let hasBelow = false;
-  
-  chartData.forEach(item => {
-    if (item.orders >= targetLine) hasAbove = true;
-    else hasBelow = true;
-  });
-  
-  return { hasAbove, hasBelow };
-}, [chartData, targetLine]);
+<CartesianGrid />
+<XAxis />
+<YAxis />
+<Tooltip />
+<ReferenceLine />  ← Renderiza primeiro (fica por baixo)
+<Bar productOrders />
+<Bar sampleOnlyOrders />
 ```
 
-### 2. Renderizar legenda condicional
-
-Modificar a seção de legenda para mostrar apenas categorias relevantes:
-
-- Se `hasAbove === true`: mostrar seção "Acima:" com cores verdes
-- Se `hasBelow === true`: mostrar seção "Abaixo:" com cores amarelas
-- Se ambos `true`: mostrar ambas as seções
-- Sempre mostrar a linha de referência (Meta/Média)
-
----
+## Ordem Corrigida:
+```text
+<CartesianGrid />
+<XAxis />
+<YAxis />
+<Tooltip />
+<Bar productOrders />
+<Bar sampleOnlyOrders />
+<ReferenceLine />  ← Renderiza por último (fica por cima)
+```
 
 ## Resultado Esperado
 
-**Antes (seu caso atual):**
-```text
-Acima: ● Produtos ● Só Amostras
-Abaixo: ● Produtos ● Só Amostras  ← Confuso, não aparece no gráfico!
-```
-
-**Depois:**
-```text
-● Produtos ● Só Amostras — Meta: 350  ← Simples e claro
-```
-
-Ou se houver barras mistas:
-```text
-Acima: ● Produtos ● Só Amostras
-Abaixo: ● Produtos ● Só Amostras
-— Meta: 350
-```
-
----
-
-## Resumo
-
-Uma pequena correção que adiciona um `useMemo` para detectar quais cores estão em uso e renderiza a legenda condicionalmente, eliminando a confusão de mostrar categorias que não existem no gráfico.
+A linha de Meta/Média aparecerá **sobre** as barras, claramente visível mesmo quando as barras a ultrapassam.
