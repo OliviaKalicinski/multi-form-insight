@@ -1,6 +1,6 @@
 import { format, parse, startOfMonth, differenceInMonths, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance, ProductRevenueData } from "@/types/marketing";
+import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance, ProductRevenueData, PlatformWithProducts, ProductContribution } from "@/types/marketing";
 import { extractDailyOrders } from './salesCalculator';
 import { breakdownOrders } from './orderBreakdown';
 import { isOnlySampleOrder } from './samplesAnalyzer';
@@ -365,6 +365,81 @@ export const getPlatformPerformance = (orders: ProcessedOrder[]): PlatformPerfor
     .sort((a, b) => b.revenue - a.revenue);
 
   return performance;
+};
+
+/**
+ * Calcula performance por plataforma com breakdown por produto (Canal → Produtos)
+ * @param orders Lista de pedidos processados
+ * @param maxProductsPerChannel Número máximo de produtos por canal (default: 5)
+ * @returns Array de plataformas com seus produtos
+ */
+export const getPlatformPerformanceWithProducts = (
+  orders: ProcessedOrder[],
+  maxProductsPerChannel: number = 5
+): PlatformWithProducts[] => {
+  // Desmembrar kits em produtos individuais
+  const ordersWithBreakdown = breakdownOrders(orders);
+  
+  // Map: canal → Map<produto, revenue>
+  const platformProductMap = new Map<string, Map<string, number>>();
+  const platformRevenueMap = new Map<string, number>();
+  
+  ordersWithBreakdown.forEach((order) => {
+    const platform = order.ecommerce;
+    
+    // Inicializar maps para a plataforma se necessário
+    if (!platformProductMap.has(platform)) {
+      platformProductMap.set(platform, new Map<string, number>());
+      platformRevenueMap.set(platform, 0);
+    }
+    
+    const productMap = platformProductMap.get(platform)!;
+    
+    order.produtos.forEach((produto) => {
+      // Excluir Kit de Amostras (R$ 0,01)
+      if (produto.descricaoAjustada === 'Kit de Amostras') {
+        return;
+      }
+      
+      const productName = produto.descricaoAjustada;
+      const revenue = produto.preco;
+      
+      // Acumular revenue do produto
+      productMap.set(productName, (productMap.get(productName) || 0) + revenue);
+      
+      // Acumular revenue total da plataforma
+      platformRevenueMap.set(platform, (platformRevenueMap.get(platform) || 0) + revenue);
+    });
+  });
+  
+  // Calcular receita líquida total (para calcular marketShare)
+  const totalNetRevenue = Array.from(platformRevenueMap.values()).reduce((sum, r) => sum + r, 0);
+  
+  // Converter para estrutura hierárquica
+  const result: PlatformWithProducts[] = Array.from(platformProductMap.entries())
+    .map(([platform, productMap]) => {
+      const platformRevenue = platformRevenueMap.get(platform) || 0;
+      
+      // Converter produtos para array e ordenar por revenue
+      const products: ProductContribution[] = Array.from(productMap.entries())
+        .map(([productName, revenue]) => ({
+          productName,
+          revenue,
+          percentage: platformRevenue > 0 ? (revenue / platformRevenue) * 100 : 0
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, maxProductsPerChannel);
+      
+      return {
+        platform,
+        revenue: platformRevenue,
+        marketShare: totalNetRevenue > 0 ? (platformRevenue / totalNetRevenue) * 100 : 0,
+        products
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+  
+  return result;
 };
 
 /**
