@@ -1,107 +1,184 @@
 
-# Toggle de Amostras no Gráfico de Volume
 
-## O que será implementado
+# Toggle de Amostras nos Gráficos Financeiros
 
-Um botão de toggle no gráfico de Volume de Pedidos que permite:
-- **Toggle ON (padrão)**: Mostra barras empilhadas (Produtos + Só Amostras) - comportamento atual
-- **Toggle OFF**: Mostra apenas "Produtos", sem considerar pedidos de amostras
+## Objetivo
+
+Adicionar o mesmo botão toggle "Com Amostras / Só Produtos" implementado no `DailyVolumeChart` a outros 4 gráficos da página Performance Financeira.
 
 ---
 
-## Mudanças Visuais
+## Gráficos Afetados
 
-O toggle será posicionado ao lado dos botões de período (Diário/Semanal/Mensal):
+| Gráfico | Arquivo | Impacto do Toggle |
+|---------|---------|-------------------|
+| Faturamento Diário | `DailyRevenueChart.tsx` | Excluir receita de pedidos só-amostras |
+| Receita por Canal | `ChannelDonutChart.tsx` | Recalcular % por canal sem amostras |
+| Distribuição de Ticket | `TicketDistributionCompact.tsx` | Remover pedidos R$0,01 da faixa 0-50 |
+| Status das Metas | `GoalsProgressCard.tsx` | Comparar metas com pedidos reais |
+
+---
+
+## Arquitetura da Solução
+
+### Opção Escolhida: Toggle Centralizado na Página
+
+Em vez de adicionar toggles individuais em cada componente, criar um **toggle global** na página `PerformanceFinanceira.tsx` que controla todos os gráficos simultaneamente.
+
+**Vantagens:**
+- UX consistente (todos os gráficos sincronizados)
+- Menos código duplicado
+- Fácil de entender para o usuário
+
+**Localização do toggle:** No header da página, próximo ao título.
+
+---
+
+## Mudanças por Arquivo
+
+### 1. `src/pages/PerformanceFinanceira.tsx`
+
+**Adicionar:**
+- Estado `includeSamples` para controlar filtro global
+- Botão toggle no header da página
+- Cálculo de métricas filtradas (sem amostras) usando `filterRealOrders`
+- Passar dados filtrados ou completos conforme o toggle
 
 ```text
-📦 Volume de Pedidos                    [Diário] [Semanal] [Mensal]  [🧪 Incluir Amostras]
-```
-
-### Estados do Toggle:
-- **Ativo**: Ícone preenchido + texto "Incluir Amostras" 
-- **Inativo**: Ícone outline + texto "Só Produtos"
-
----
-
-## Comportamento
-
-| Toggle | Barras exibidas | Meta/Média baseada em |
-|--------|-----------------|----------------------|
-| ON | Produtos + Só Amostras (empilhadas) | Total de pedidos |
-| OFF | Apenas Produtos | Apenas pedidos com produtos |
-
-Quando "Amostras" está desativado:
-- Barras mostram apenas `productOrders`
-- Linha de referência (Meta/Média) recalcula baseada apenas em produtos
-- Tooltip mostra apenas dados de produtos
-- Legenda simplificada (sem menção a amostras)
-
----
-
-## Arquivo a Modificar
-
-`src/components/dashboard/DailyVolumeChart.tsx`
-
----
-
-## Detalhes Técnicos
-
-### 1. Novo estado interno
-
-Adicionar estado local para controlar o toggle:
-
-```text
+// Novo estado
 const [includeSamples, setIncludeSamples] = useState(true);
+
+// Métricas filtradas (sem amostras)
+const filteredFinancialMetrics = useMemo(() => {
+  if (!includeSamples) {
+    // Filtrar pedidos sem-amostra e recalcular
+    const realOrders = salesData.filter(order => !isOnlySampleOrder(order));
+    return calculateFinancialMetrics(realOrders, selectedMonth);
+  }
+  return financialMetrics;
+}, [salesData, selectedMonth, includeSamples, financialMetrics]);
 ```
 
-### 2. Dados filtrados
+### 2. `src/components/dashboard/DailyRevenueChart.tsx`
 
-Criar um novo `useMemo` que ajusta os dados baseado no toggle:
+**Adicionar:**
+- Nova prop `includeSamples?: boolean`
+- Dados de faturamento separados (com/sem amostras)
+- Lógica para filtrar dados quando `includeSamples = false`
 
-- Quando `includeSamples = true`: usar dados completos (comportamento atual)
-- Quando `includeSamples = false`: usar apenas `productOrders` como valor total
+**Nota:** O gráfico de faturamento precisa receber dados já filtrados da página pai OU calcular internamente baseado em dados brutos.
 
-### 3. Recalcular média/meta
+### 3. `src/components/dashboard/ChannelDonutChart.tsx`
 
-A linha de referência deve considerar apenas produtos quando amostras estão excluídas.
+**Adicionar:**
+- Nova prop `includeSamples?: boolean`
+- Badge indicando modo atual (opcional)
+- Receber dados já filtrados do componente pai
 
-### 4. Botão toggle no header
+### 4. `src/components/dashboard/TicketDistributionCompact.tsx`
 
-Adicionar botão com ícone (Flask/Beaker) ao lado dos botões de período:
+**Adicionar:**
+- Nova prop `includeSamples?: boolean`
+- Receber dados já filtrados
+- A faixa R$0-50 terá contagem significativamente menor sem amostras
+
+### 5. `src/components/dashboard/GoalsProgressCard.tsx`
+
+**Adicionar:**
+- Nova prop `includeSamples?: boolean`
+- Indicador visual mostrando qual base está sendo usada
+- Receber dados `totalPedidosReais` ou `totalPedidos` conforme toggle
+
+---
+
+## UI do Toggle Global
+
+### Localização
+
+Será adicionado no header da página, alinhado à direita:
 
 ```text
-<Button variant={includeSamples ? "default" : "outline"} size="sm">
-  <FlaskConical /> {includeSamples ? "Incluir Amostras" : "Só Produtos"}
-</Button>
+💰 Performance Financeira
+Análise completa de receita, margem e tendências    [🧪 Com Amostras ▼]
 ```
 
-### 5. Ajustar gráfico
+### Estilos
 
-Quando `includeSamples = false`:
-- Ocultar a barra de `sampleOnlyOrders`
-- Usar cor única para produtos (sem empilhamento)
-- Simplificar legenda
+- Mesma aparência do toggle implementado em `DailyVolumeChart`
+- Ícone `FlaskConical` do lucide-react
+- Variantes: `default` (incluindo) / `outline` (excluindo)
 
-### 6. Ajustar tooltip
+---
 
-Quando `includeSamples = false`:
-- Não mostrar linha de "Só Amostras"
-- Comparação com meta baseada apenas em produtos
+## Lógica de Filtragem
+
+### Dados que precisam ser recalculados quando `includeSamples = false`:
+
+| Métrica | Cálculo Original | Cálculo Filtrado |
+|---------|------------------|------------------|
+| `faturamentoTotal` | Soma todos pedidos | Soma pedidos com produto real |
+| `platformPerformance` | Agrupa todos | Agrupa só pedidos reais |
+| `orderDistribution` | Conta todos tickets | Conta só tickets reais |
+| `totalPedidos` | Count total | Count pedidos reais |
+
+### Função existente para filtrar
+
+O código já possui `filterRealOrders()` em `financialMetrics.ts` que pode ser reutilizado:
+
+```text
+const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => {
+  return orders.filter(order => {
+    const nonSampleProducts = order.produtos.filter(
+      p => p.descricaoAjustada !== 'Kit de Amostras'
+    );
+    return nonSampleProducts.length > 0;
+  });
+};
+```
+
+---
+
+## Fluxo de Dados
+
+```text
+PerformanceFinanceira.tsx
+├── includeSamples (estado)
+├── salesData → filteredOrders (se !includeSamples)
+├── calculateFinancialMetrics(filteredOrders)
+│
+├─→ DailyRevenueChart (recebe dados filtrados)
+├─→ ChannelDonutChart (recebe platformPerformance filtrado)
+├─→ TicketDistributionCompact (recebe orderDistribution filtrado)
+└─→ GoalsProgressCard (recebe totalPedidos/totalPedidosReais)
+```
+
+---
+
+## Resumo das Alterações
+
+| Arquivo | Tipo | Descrição |
+|---------|------|-----------|
+| `PerformanceFinanceira.tsx` | Modificar | Estado global + toggle + filtragem |
+| `DailyRevenueChart.tsx` | Modificar | Aceitar dados filtrados |
+| `ChannelDonutChart.tsx` | Sem mudança | Apenas recebe dados já filtrados |
+| `TicketDistributionCompact.tsx` | Sem mudança | Apenas recebe dados já filtrados |
+| `GoalsProgressCard.tsx` | Sem mudança | Apenas recebe dados já filtrados |
+| `financialMetrics.ts` | Modificar | Exportar `filterRealOrders` |
 
 ---
 
 ## Resultado Esperado
 
-### Com Amostras (toggle ON):
-```text
-[Barra verde escuro: Produtos] + [Barra verde claro: Só Amostras]
-```
+**Com Amostras (padrão):**
+- Todos os gráficos mostram dados completos
+- Pedidos de R$0,01 aparecem na faixa 0-50
+- Meta de pedidos compara com total
 
-### Sem Amostras (toggle OFF):
-```text
-[Barra verde: apenas Produtos]
-```
+**Só Produtos:**
+- Gráficos mostram apenas pedidos com produtos reais
+- Faixa R$0-50 muito menor
+- Meta compara com pedidos reais
+- Ticket médio mais realista
 
-O usuário poderá alternar facilmente entre as duas visualizações para entender:
-1. Volume total de pedidos (com amostras)
-2. Volume real de produtos vendidos (sem amostras)
+O usuário poderá alternar entre visualizações para entender o impacto real das amostras nas métricas financeiras.
+
