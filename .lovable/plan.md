@@ -1,46 +1,107 @@
 
-# Correção: Linha de Meta Mais Visível
+# Toggle de Amostras no Gráfico de Volume
 
-## Problema
+## O que será implementado
 
-A linha "Meta" está sendo renderizada **por baixo** das barras no gráfico, tornando-a pouco visível. Em Recharts, a ordem de renderização segue a ordem dos componentes no JSX.
+Um botão de toggle no gráfico de Volume de Pedidos que permite:
+- **Toggle ON (padrão)**: Mostra barras empilhadas (Produtos + Só Amostras) - comportamento atual
+- **Toggle OFF**: Mostra apenas "Produtos", sem considerar pedidos de amostras
 
-## Solução
+---
 
-Mover o `ReferenceLine` para **depois** dos componentes `Bar`, e também aumentar a espessura e opacidade da linha para melhor visibilidade.
+## Mudanças Visuais
+
+O toggle será posicionado ao lado dos botões de período (Diário/Semanal/Mensal):
+
+```text
+📦 Volume de Pedidos                    [Diário] [Semanal] [Mensal]  [🧪 Incluir Amostras]
+```
+
+### Estados do Toggle:
+- **Ativo**: Ícone preenchido + texto "Incluir Amostras" 
+- **Inativo**: Ícone outline + texto "Só Produtos"
+
+---
+
+## Comportamento
+
+| Toggle | Barras exibidas | Meta/Média baseada em |
+|--------|-----------------|----------------------|
+| ON | Produtos + Só Amostras (empilhadas) | Total de pedidos |
+| OFF | Apenas Produtos | Apenas pedidos com produtos |
+
+Quando "Amostras" está desativado:
+- Barras mostram apenas `productOrders`
+- Linha de referência (Meta/Média) recalcula baseada apenas em produtos
+- Tooltip mostra apenas dados de produtos
+- Legenda simplificada (sem menção a amostras)
+
+---
 
 ## Arquivo a Modificar
 
 `src/components/dashboard/DailyVolumeChart.tsx`
 
-## Mudanças
+---
 
-1. **Mover ReferenceLine para depois das Bars** - Isso faz a linha ser renderizada por cima das barras
-2. **Aumentar strokeWidth** - De 1 (default) para 2
-3. **Usar cor sólida mais forte** - Garantir contraste adequado
+## Detalhes Técnicos
 
-## Ordem Atual (errada):
+### 1. Novo estado interno
+
+Adicionar estado local para controlar o toggle:
+
 ```text
-<CartesianGrid />
-<XAxis />
-<YAxis />
-<Tooltip />
-<ReferenceLine />  ← Renderiza primeiro (fica por baixo)
-<Bar productOrders />
-<Bar sampleOnlyOrders />
+const [includeSamples, setIncludeSamples] = useState(true);
 ```
 
-## Ordem Corrigida:
+### 2. Dados filtrados
+
+Criar um novo `useMemo` que ajusta os dados baseado no toggle:
+
+- Quando `includeSamples = true`: usar dados completos (comportamento atual)
+- Quando `includeSamples = false`: usar apenas `productOrders` como valor total
+
+### 3. Recalcular média/meta
+
+A linha de referência deve considerar apenas produtos quando amostras estão excluídas.
+
+### 4. Botão toggle no header
+
+Adicionar botão com ícone (Flask/Beaker) ao lado dos botões de período:
+
 ```text
-<CartesianGrid />
-<XAxis />
-<YAxis />
-<Tooltip />
-<Bar productOrders />
-<Bar sampleOnlyOrders />
-<ReferenceLine />  ← Renderiza por último (fica por cima)
+<Button variant={includeSamples ? "default" : "outline"} size="sm">
+  <FlaskConical /> {includeSamples ? "Incluir Amostras" : "Só Produtos"}
+</Button>
 ```
+
+### 5. Ajustar gráfico
+
+Quando `includeSamples = false`:
+- Ocultar a barra de `sampleOnlyOrders`
+- Usar cor única para produtos (sem empilhamento)
+- Simplificar legenda
+
+### 6. Ajustar tooltip
+
+Quando `includeSamples = false`:
+- Não mostrar linha de "Só Amostras"
+- Comparação com meta baseada apenas em produtos
+
+---
 
 ## Resultado Esperado
 
-A linha de Meta/Média aparecerá **sobre** as barras, claramente visível mesmo quando as barras a ultrapassam.
+### Com Amostras (toggle ON):
+```text
+[Barra verde escuro: Produtos] + [Barra verde claro: Só Amostras]
+```
+
+### Sem Amostras (toggle OFF):
+```text
+[Barra verde: apenas Produtos]
+```
+
+O usuário poderá alternar facilmente entre as duas visualizações para entender:
+1. Volume total de pedidos (com amostras)
+2. Volume real de produtos vendidos (sem amostras)
