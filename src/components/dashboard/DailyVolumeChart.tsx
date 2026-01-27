@@ -1,8 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
-import { useMemo } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChartViewMode } from "./DailyRevenueChart";
+import { Button } from "@/components/ui/button";
+import { FlaskConical } from "lucide-react";
 
 // Types for order data with breakdown
 interface OrderDataWithTypes {
@@ -71,6 +73,9 @@ export const DailyVolumeChart = ({
   onViewModeChange,
   dailyGoal 
 }: DailyVolumeChartProps) => {
+  // Estado para controlar inclusão de amostras
+  const [includeSamples, setIncludeSamples] = useState(true);
+
   // Preparar dados com a chave correta e garantir breakdown
   const chartData = useMemo(() => {
     return data.map(item => {
@@ -83,19 +88,23 @@ export const DailyVolumeChart = ({
       const sampleOnlyOrders = item.sampleOnlyOrders ?? 0;
       const productOrders = item.productOrders ?? item.orders;
       
+      // Quando não inclui amostras, usar apenas productOrders como total
+      const displayOrders = includeSamples ? item.orders : productOrders;
+      
       return { 
         label, 
         orders: item.orders,
-        sampleOnlyOrders,
+        displayOrders,
+        sampleOnlyOrders: includeSamples ? sampleOnlyOrders : 0,
         productOrders,
       };
     });
-  }, [data]);
+  }, [data, includeSamples]);
 
-  // Calcular média para linha de referência
+  // Calcular média para linha de referência (baseada em displayOrders)
   const averageOrders = useMemo(() => {
     if (chartData.length === 0) return 0;
-    return chartData.reduce((sum, d) => sum + d.orders, 0) / chartData.length;
+    return chartData.reduce((sum, d) => sum + d.displayOrders, 0) / chartData.length;
   }, [chartData]);
 
   // Calcular meta baseada no viewMode
@@ -112,7 +121,7 @@ export const DailyVolumeChart = ({
     let below = false;
     
     chartData.forEach(item => {
-      if (item.orders >= targetLine) above = true;
+      if (item.displayOrders >= targetLine) above = true;
       else below = true;
     });
     
@@ -135,21 +144,29 @@ export const DailyVolumeChart = ({
     const data = payload[0]?.payload;
     if (!data) return null;
     
-    const isAbove = data.orders >= targetLine;
+    const isAbove = data.displayOrders >= targetLine;
     
     return (
       <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
         <p className="font-medium text-foreground mb-2">{label}</p>
         <div className="space-y-1 text-sm">
-          <p className="text-muted-foreground">
-            Total: <span className="font-semibold text-foreground">{data.orders} pedidos</span>
-          </p>
-          <p className="text-muted-foreground">
-            Produtos: <span className="font-medium">{data.productOrders}</span>
-          </p>
-          <p className="text-muted-foreground">
-            Só Amostras: <span className="font-medium">{data.sampleOnlyOrders}</span>
-          </p>
+          {includeSamples ? (
+            <>
+              <p className="text-muted-foreground">
+                Total: <span className="font-semibold text-foreground">{data.orders} pedidos</span>
+              </p>
+              <p className="text-muted-foreground">
+                Produtos: <span className="font-medium">{data.productOrders}</span>
+              </p>
+              <p className="text-muted-foreground">
+                Só Amostras: <span className="font-medium">{data.sampleOnlyOrders}</span>
+              </p>
+            </>
+          ) : (
+            <p className="text-muted-foreground">
+              Produtos: <span className="font-semibold text-foreground">{data.productOrders} pedidos</span>
+            </p>
+          )}
           <p className={cn(
             "mt-1 pt-1 border-t text-xs",
             isAbove ? "text-emerald-600" : "text-amber-600"
@@ -169,24 +186,35 @@ export const DailyVolumeChart = ({
             <CardTitle className="text-base">{titles[viewMode].title}</CardTitle>
             <CardDescription className="text-xs">{titles[viewMode].description}</CardDescription>
           </div>
-          {onViewModeChange && (
-            <div className="flex gap-1">
-              {(['daily', 'weekly', 'monthly'] as ChartViewMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => onViewModeChange(mode)}
-                  className={cn(
-                    "px-2 py-1 text-xs rounded-md font-medium transition-colors",
-                    viewMode === mode
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                  )}
-                >
-                  {mode === 'daily' ? 'Diário' : mode === 'weekly' ? 'Semanal' : 'Mensal'}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {onViewModeChange && (
+              <div className="flex gap-1">
+                {(['daily', 'weekly', 'monthly'] as ChartViewMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => onViewModeChange(mode)}
+                    className={cn(
+                      "px-2 py-1 text-xs rounded-md font-medium transition-colors",
+                      viewMode === mode
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                    )}
+                  >
+                    {mode === 'daily' ? 'Diário' : mode === 'weekly' ? 'Semanal' : 'Mensal'}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Button
+              variant={includeSamples ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIncludeSamples(!includeSamples)}
+              className="h-7 text-xs gap-1.5"
+            >
+              <FlaskConical className="h-3.5 w-3.5" />
+              {includeSamples ? "Com Amostras" : "Só Produtos"}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -215,21 +243,24 @@ export const DailyVolumeChart = ({
               dataKey="productOrders" 
               stackId="orders"
               name="Produtos"
+              radius={includeSamples ? [0, 0, 0, 0] : [4, 4, 0, 0]}
               shape={(props: any) => (
                 <CustomBar {...props} dataKey="productOrders" targetLine={targetLine} />
               )}
             />
             
-            {/* Barra de Só Amostras (topo) */}
-            <Bar 
-              dataKey="sampleOnlyOrders" 
-              stackId="orders"
-              name="Só Amostras"
-              radius={[4, 4, 0, 0]}
-              shape={(props: any) => (
-                <CustomBar {...props} dataKey="sampleOnlyOrders" targetLine={targetLine} />
-              )}
-            />
+            {/* Barra de Só Amostras (topo) - apenas se includeSamples */}
+            {includeSamples && (
+              <Bar 
+                dataKey="sampleOnlyOrders" 
+                stackId="orders"
+                name="Só Amostras"
+                radius={[4, 4, 0, 0]}
+                shape={(props: any) => (
+                  <CustomBar {...props} dataKey="sampleOnlyOrders" targetLine={targetLine} />
+                )}
+              />
+            )}
             
             {/* ReferenceLine rendered AFTER bars to appear on top */}
             <ReferenceLine 
@@ -250,34 +281,54 @@ export const DailyVolumeChart = ({
         
         {/* Legenda customizada - dinâmica baseada nos dados */}
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-3 text-xs text-muted-foreground">
-          {/* Mostrar cores verdes apenas se houver barras acima da meta */}
-          {hasAbove && (
-            <div className="flex items-center gap-4">
-              {hasBelow && <span className="font-medium text-emerald-600">Acima:</span>}
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.products }} />
-                <span>Produtos</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.samplesOnly }} />
-                <span>Só Amostras</span>
-              </div>
-            </div>
-          )}
-          
-          {/* Mostrar cores amarelas apenas se houver barras abaixo da meta */}
-          {hasBelow && (
-            <div className="flex items-center gap-4">
-              {hasAbove && <span className="font-medium text-amber-600">Abaixo:</span>}
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.products }} />
-                <span>Produtos</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.samplesOnly }} />
-                <span>Só Amostras</span>
-              </div>
-            </div>
+          {includeSamples ? (
+            <>
+              {/* Mostrar cores verdes apenas se houver barras acima da meta */}
+              {hasAbove && (
+                <div className="flex items-center gap-4">
+                  {hasBelow && <span className="font-medium text-emerald-600">Acima:</span>}
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.products }} />
+                    <span>Produtos</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.samplesOnly }} />
+                    <span>Só Amostras</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Mostrar cores amarelas apenas se houver barras abaixo da meta */}
+              {hasBelow && (
+                <div className="flex items-center gap-4">
+                  {hasAbove && <span className="font-medium text-amber-600">Abaixo:</span>}
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.products }} />
+                    <span>Produtos</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.samplesOnly }} />
+                    <span>Só Amostras</span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Legenda simplificada quando só mostra produtos */}
+              {hasAbove && (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.aboveMeta.products }} />
+                  <span className="text-emerald-600">Acima da {hasGoal ? 'meta' : 'média'}</span>
+                </div>
+              )}
+              {hasBelow && (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.belowMeta.products }} />
+                  <span className="text-amber-600">Abaixo da {hasGoal ? 'meta' : 'média'}</span>
+                </div>
+              )}
+            </>
           )}
           
           {/* Linha de referência - sempre visível */}
