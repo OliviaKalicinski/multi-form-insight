@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { ChartViewMode } from "./DailyRevenueChart";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ interface DailyVolumeChartProps {
   viewMode: ChartViewMode;
   onViewModeChange?: (mode: ChartViewMode) => void;
   dailyGoal?: number;
+  includeSamples?: boolean;
+  onIncludeSamplesChange?: (include: boolean) => void;
 }
 
 // Formatar label de semana
@@ -71,10 +73,10 @@ export const DailyVolumeChart = ({
   data, 
   viewMode,
   onViewModeChange,
-  dailyGoal 
+  dailyGoal,
+  includeSamples = true,
+  onIncludeSamplesChange
 }: DailyVolumeChartProps) => {
-  // Estado para controlar inclusão de amostras
-  const [includeSamples, setIncludeSamples] = useState(true);
 
   // Preparar dados com a chave correta e garantir breakdown
   const chartData = useMemo(() => {
@@ -205,15 +207,17 @@ export const DailyVolumeChart = ({
                 ))}
               </div>
             )}
-            <Button
-              variant={includeSamples ? "default" : "outline"}
-              size="sm"
-              onClick={() => setIncludeSamples(!includeSamples)}
-              className="h-7 text-xs gap-1.5"
-            >
-              <FlaskConical className="h-3.5 w-3.5" />
-              {includeSamples ? "Com Amostras" : "Só Produtos"}
-            </Button>
+            {onIncludeSamplesChange && (
+              <Button
+                variant={includeSamples ? "default" : "outline"}
+                size="sm"
+                onClick={() => onIncludeSamplesChange(!includeSamples)}
+                className="h-7 text-xs gap-1.5"
+              >
+                <FlaskConical className="h-3.5 w-3.5" />
+                {includeSamples ? "Com Amostras" : "Só Produtos"}
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>
