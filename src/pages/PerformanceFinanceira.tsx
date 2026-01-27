@@ -17,7 +17,7 @@ import { TopProductsCompact } from "@/components/dashboard/TopProductsCompact";
 import { TicketDistributionCompact } from "@/components/dashboard/TicketDistributionCompact";
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
 import { IncompleteMonthBadge } from "@/components/dashboard/IncompleteMonthBadge";
-import { calculateFinancialMetrics, analyzeSeasonality, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes } from "@/utils/financialMetrics";
+import { calculateFinancialMetrics, analyzeSeasonality, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes, getPlatformPerformanceWithProducts } from "@/utils/financialMetrics";
 import { filterOrdersByMonth, filterOrdersByDateRange, extractDailyRevenue } from "@/utils/salesCalculator";
 import { filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
@@ -236,6 +236,11 @@ export default function PerformanceFinanceira() {
       ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
       : salesData;
   }, [salesData, selectedMonth, availableSalesMonths]);
+
+  // Calcular breakdown hierárquico por canal → produtos
+  const platformWithProducts = useMemo(() => {
+    return getPlatformPerformanceWithProducts(periodOrders, 5);
+  }, [periodOrders]);
 
   if (salesData.length === 0) {
     return (
@@ -598,6 +603,8 @@ export default function PerformanceFinanceira() {
               grossRevenue={financialMetrics.faturamentoBruto}
               shippingCost={financialMetrics.freteTotal}
               costPercentage={financialGoals.custoFixo}
+              platformBreakdown={platformWithProducts}
+              maxProductsPerChannel={5}
             />
           </div>
         </div>

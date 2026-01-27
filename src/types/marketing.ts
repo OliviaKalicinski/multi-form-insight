@@ -273,6 +273,20 @@ export interface PlatformPerformance {
   marketShare: number;
 }
 
+// Hierarchical breakdown: Channel → Products
+export interface ProductContribution {
+  productName: string;
+  revenue: number;
+  percentage: number; // % within the channel
+}
+
+export interface PlatformWithProducts {
+  platform: string;
+  revenue: number;
+  marketShare: number; // % of total net revenue
+  products: ProductContribution[];
+}
+
 // Customer Behavior Metrics
 export interface CustomerBehaviorMetrics {
   totalClientes: number;
