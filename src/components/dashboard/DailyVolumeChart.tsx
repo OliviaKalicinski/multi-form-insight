@@ -210,18 +210,6 @@ export const DailyVolumeChart = ({
             />
             <Tooltip content={<CustomTooltip />} />
             
-            <ReferenceLine 
-              y={targetLine} 
-              stroke="hsl(var(--chart-4))" 
-              strokeDasharray="5 5"
-              label={{ 
-                value: hasGoal ? 'Meta' : 'Média', 
-                position: 'right',
-                fill: 'hsl(var(--chart-4))',
-                fontSize: 10
-              }}
-            />
-            
             {/* Barra de Produtos (base) */}
             <Bar 
               dataKey="productOrders" 
@@ -241,6 +229,21 @@ export const DailyVolumeChart = ({
               shape={(props: any) => (
                 <CustomBar {...props} dataKey="sampleOnlyOrders" targetLine={targetLine} />
               )}
+            />
+            
+            {/* ReferenceLine rendered AFTER bars to appear on top */}
+            <ReferenceLine 
+              y={targetLine} 
+              stroke="hsl(var(--chart-4))" 
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              label={{ 
+                value: hasGoal ? 'Meta' : 'Média', 
+                position: 'right',
+                fill: 'hsl(var(--chart-4))',
+                fontSize: 10,
+                fontWeight: 600
+              }}
             />
           </BarChart>
         </ResponsiveContainer>
