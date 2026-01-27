@@ -231,6 +231,41 @@ export default function PerformanceFinanceira() {
     ];
   }, [financialMetrics, financialGoals]);
 
+  // Dados filtrados para gráficos (sem amostras quando toggle desativado)
+  // IMPORTANTE: Este hook deve estar ANTES dos early returns
+  const filteredFinancialMetrics = useMemo(() => {
+    if (!financialMetrics || includeSamples) return financialMetrics;
+    
+    // Obter pedidos filtrados do período atual
+    const periodOrders = selectedMonth
+      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
+      : salesData;
+    
+    // Filtrar apenas pedidos com produtos reais
+    const realOrders = filterRealOrders(periodOrders);
+    
+    // Recalcular métricas sem amostras
+    return calculateFinancialMetrics(realOrders, selectedMonth || 'all');
+  }, [financialMetrics, includeSamples, salesData, selectedMonth, availableSalesMonths]);
+
+  // Dados de volume filtrados para o gráfico de pedidos
+  // IMPORTANTE: Este hook deve estar ANTES dos early returns
+  const filteredVolumeData = useMemo(() => {
+    const periodOrders = selectedMonth
+      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
+      : salesData;
+    
+    const ordersToUse = includeSamples ? periodOrders : filterRealOrders(periodOrders);
+    
+    if (chartViewMode === 'daily') {
+      return calculateOrdersByDayWithTypes(ordersToUse);
+    } else if (chartViewMode === 'weekly') {
+      return calculateOrdersByWeekWithTypes(ordersToUse);
+    } else {
+      return calculateOrdersByMonthWithTypes(ordersToUse);
+    }
+  }, [salesData, selectedMonth, availableSalesMonths, includeSamples, chartViewMode]);
+
   if (salesData.length === 0) {
     return (
       <div className="container mx-auto px-6 py-8">
@@ -261,39 +296,6 @@ export default function PerformanceFinanceira() {
       </div>
     );
   }
-
-  // Dados filtrados para gráficos (sem amostras quando toggle desativado)
-  const filteredFinancialMetrics = useMemo(() => {
-    if (!financialMetrics || includeSamples) return financialMetrics;
-    
-    // Obter pedidos filtrados do período atual
-    const periodOrders = selectedMonth
-      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
-      : salesData;
-    
-    // Filtrar apenas pedidos com produtos reais
-    const realOrders = filterRealOrders(periodOrders);
-    
-    // Recalcular métricas sem amostras
-    return calculateFinancialMetrics(realOrders, selectedMonth || 'all');
-  }, [financialMetrics, includeSamples, salesData, selectedMonth, availableSalesMonths]);
-
-  // Dados de volume filtrados para o gráfico de pedidos
-  const filteredVolumeData = useMemo(() => {
-    const periodOrders = selectedMonth
-      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
-      : salesData;
-    
-    const ordersToUse = includeSamples ? periodOrders : filterRealOrders(periodOrders);
-    
-    if (chartViewMode === 'daily') {
-      return calculateOrdersByDayWithTypes(ordersToUse);
-    } else if (chartViewMode === 'weekly') {
-      return calculateOrdersByWeekWithTypes(ordersToUse);
-    } else {
-      return calculateOrdersByMonthWithTypes(ordersToUse);
-    }
-  }, [salesData, selectedMonth, availableSalesMonths, includeSamples, chartViewMode]);
 
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
