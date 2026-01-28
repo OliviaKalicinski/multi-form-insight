@@ -22,7 +22,7 @@ export default function ComportamentoCliente() {
     selectedMonths,
   } = useDashboard();
 
-  const [volumeView, setVolumeView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [volumeView, setVolumeView] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('daily');
 
   // Helper para formatar o label do mês selecionado
   const formatSelectedPeriod = () => {
@@ -429,6 +429,12 @@ export default function ComportamentoCliente() {
                 >
                   Mensal
                 </button>
+                <button
+                  className={`px-4 py-2 rounded text-sm ${volumeView === 'quarterly' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                  onClick={() => setVolumeView('quarterly')}
+                >
+                  Trimestre
+                </button>
               </div>
             </div>
           </CardHeader>
@@ -437,6 +443,7 @@ export default function ComportamentoCliente() {
               data={
                 volumeView === 'daily' ? behaviorMetrics?.pedidosPorDia || [] :
                 volumeView === 'weekly' ? behaviorMetrics?.pedidosPorSemana.map(w => ({ date: w.week, orders: w.orders })) || [] :
+                volumeView === 'quarterly' ? behaviorMetrics?.pedidosPorTrimestre.map(q => ({ date: q.quarter, orders: q.orders })) || [] :
                 behaviorMetrics?.pedidosPorMes.map(m => ({ date: m.month, orders: m.orders })) || []
               }
               viewMode={volumeView}

@@ -4,7 +4,7 @@ import { ptBR } from "date-fns/locale";
 
 interface OrderVolumeChartProps {
   data: { date: string; orders: number }[];
-  viewMode: 'daily' | 'weekly' | 'monthly';
+  viewMode: 'daily' | 'weekly' | 'monthly' | 'quarterly';
 }
 
 export const OrderVolumeChart = ({ data, viewMode }: OrderVolumeChartProps) => {
@@ -20,6 +20,8 @@ export const OrderVolumeChart = ({ data, viewMode }: OrderVolumeChartProps) => {
       } else if (viewMode === 'monthly') {
         const date = parse(value, 'yyyy-MM', new Date());
         return format(date, 'MMM/yy', { locale: ptBR });
+      } else if (viewMode === 'quarterly') {
+        return value; // Already formatted as 2024-Q1
       }
       return value;
     } catch {

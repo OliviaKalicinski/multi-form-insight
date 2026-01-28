@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { DollarSign, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProcessedOrder } from "@/types/marketing";
-import { filterRealOrders, calculateRevenueByPeriod, calculateWeeklyRevenue } from "@/utils/financialMetrics";
+import { filterRealOrders, calculateRevenueByPeriod, calculateWeeklyRevenue, calculateQuarterlyRevenue } from "@/utils/financialMetrics";
 import { format, parse, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -15,7 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export type ChartViewMode = 'daily' | 'weekly' | 'monthly';
+export type ChartViewMode = 'daily' | 'weekly' | 'monthly' | 'quarterly';
 
 interface DailyRevenueChartProps {
   rawOrders: ProcessedOrder[];
@@ -71,6 +71,12 @@ export const DailyRevenueChart = ({
           revenue: item.revenue
         };
       });
+    } else if (viewMode === 'quarterly') {
+      const quarterlyRevenue = calculateQuarterlyRevenue(ordersToUse);
+      return quarterlyRevenue.map(item => ({
+        label: item.quarter,
+        revenue: item.revenue
+      }));
     } else {
       const monthlyRevenue = calculateRevenueByPeriod(ordersToUse, 'month');
       return monthlyRevenue.map(item => ({
@@ -85,7 +91,7 @@ export const DailyRevenueChart = ({
     return ordersToUse.reduce((sum, o) => sum + o.valorTotal, 0);
   }, [ordersToUse]);
 
-  const viewModeLabel = viewMode === 'daily' ? 'Diário' : viewMode === 'weekly' ? 'Semanal' : 'Mensal';
+  const viewModeLabel = viewMode === 'daily' ? 'Diário' : viewMode === 'weekly' ? 'Semanal' : viewMode === 'quarterly' ? 'Trimestral' : 'Mensal';
 
   return (
     <Card className="h-full">
@@ -100,7 +106,7 @@ export const DailyRevenueChart = ({
             {/* View Mode Toggle */}
             {showViewModeToggle && onViewModeChange && (
               <div className="flex gap-1">
-                {(['daily', 'weekly', 'monthly'] as ChartViewMode[]).map((mode) => (
+                {(['daily', 'weekly', 'monthly', 'quarterly'] as ChartViewMode[]).map((mode) => (
                   <Button
                     key={mode}
                     variant={viewMode === mode ? "default" : "outline"}
@@ -108,7 +114,7 @@ export const DailyRevenueChart = ({
                     className="h-7 px-2 text-xs"
                     onClick={() => onViewModeChange(mode)}
                   >
-                    {mode === 'daily' ? 'Dia' : mode === 'weekly' ? 'Sem' : 'Mês'}
+                    {mode === 'daily' ? 'Dia' : mode === 'weekly' ? 'Sem' : mode === 'quarterly' ? 'Tri' : 'Mês'}
                   </Button>
                 ))}
               </div>

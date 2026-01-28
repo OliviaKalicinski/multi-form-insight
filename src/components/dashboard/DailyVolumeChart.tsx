@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { ShoppingCart, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProcessedOrder } from "@/types/marketing";
-import { filterRealOrders, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes, OrderDataWithTypes } from "@/utils/financialMetrics";
+import { filterRealOrders, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes, calculateOrdersByQuarterWithTypes, OrderDataWithTypes } from "@/utils/financialMetrics";
 import {
   Tooltip as UITooltip,
   TooltipContent,
@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export type ChartViewMode = 'daily' | 'weekly' | 'monthly';
+export type ChartViewMode = 'daily' | 'weekly' | 'monthly' | 'quarterly';
 
 interface DailyVolumeChartProps {
   rawOrders: ProcessedOrder[];
@@ -38,6 +38,8 @@ export const DailyVolumeChart = ({
       return calculateOrdersByDayWithTypes(ordersToUse);
     } else if (viewMode === 'weekly') {
       return calculateOrdersByWeekWithTypes(ordersToUse);
+    } else if (viewMode === 'quarterly') {
+      return calculateOrdersByQuarterWithTypes(ordersToUse);
     } else {
       return calculateOrdersByMonthWithTypes(ordersToUse);
     }
@@ -47,7 +49,7 @@ export const DailyVolumeChart = ({
   const formattedData = useMemo(() => {
     return chartData.map(item => ({
       ...item,
-      label: item.date || item.week || item.month || '',
+      label: item.date || item.week || item.month || (item as any).quarter || '',
     }));
   }, [chartData]);
 
@@ -56,7 +58,7 @@ export const DailyVolumeChart = ({
     return includeSamples ? rawOrders.length : filterRealOrders(rawOrders).length;
   }, [rawOrders, includeSamples]);
 
-  const viewModeLabel = viewMode === 'daily' ? 'Diário' : viewMode === 'weekly' ? 'Semanal' : 'Mensal';
+  const viewModeLabel = viewMode === 'daily' ? 'Diário' : viewMode === 'weekly' ? 'Semanal' : viewMode === 'quarterly' ? 'Trimestral' : 'Mensal';
 
   return (
     <Card className="h-full">
@@ -71,7 +73,7 @@ export const DailyVolumeChart = ({
             {/* View Mode Toggle */}
             {showViewModeToggle && onViewModeChange && (
               <div className="flex gap-1">
-                {(['daily', 'weekly', 'monthly'] as ChartViewMode[]).map((mode) => (
+                {(['daily', 'weekly', 'monthly', 'quarterly'] as ChartViewMode[]).map((mode) => (
                   <Button
                     key={mode}
                     variant={viewMode === mode ? "default" : "outline"}
@@ -79,7 +81,7 @@ export const DailyVolumeChart = ({
                     className="h-7 px-2 text-xs"
                     onClick={() => onViewModeChange(mode)}
                   >
-                    {mode === 'daily' ? 'Dia' : mode === 'weekly' ? 'Sem' : 'Mês'}
+                    {mode === 'daily' ? 'Dia' : mode === 'weekly' ? 'Sem' : mode === 'quarterly' ? 'Tri' : 'Mês'}
                   </Button>
                 ))}
               </div>

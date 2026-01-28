@@ -126,6 +126,63 @@ export const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => 
     return nonSampleProducts.length > 0;
   });
 };
+/**
+ * Calcula pedidos trimestrais separados por tipo (só amostras vs produtos)
+ */
+export const calculateOrdersByQuarterWithTypes = (
+  orders: ProcessedOrder[]
+): OrderDataWithTypes[] => {
+  const quarterlyMap = new Map<string, { sampleOnly: number; product: number }>();
+  
+  orders.forEach(order => {
+    const date = order.dataVenda;
+    const year = date.getFullYear();
+    const quarter = Math.floor(date.getMonth() / 3) + 1;
+    const quarterKey = `${year}-Q${quarter}`;
+    const current = quarterlyMap.get(quarterKey) || { sampleOnly: 0, product: 0 };
+    
+    if (isOnlySampleOrder(order)) {
+      current.sampleOnly++;
+    } else {
+      current.product++;
+    }
+    
+    quarterlyMap.set(quarterKey, current);
+  });
+  
+  return Array.from(quarterlyMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([quarter, counts]) => ({
+      quarter,
+      orders: counts.sampleOnly + counts.product,
+      sampleOnlyOrders: counts.sampleOnly,
+      productOrders: counts.product,
+    }));
+};
+
+/**
+ * Calcula faturamento agregado por trimestre
+ */
+export const calculateQuarterlyRevenue = (
+  orders: ProcessedOrder[]
+): { quarter: string; revenue: number }[] => {
+  const quarterlyMap = new Map<string, number>();
+  
+  orders.forEach(order => {
+    const date = order.dataVenda;
+    const year = date.getFullYear();
+    const quarter = Math.floor(date.getMonth() / 3) + 1;
+    const quarterKey = `${year}-Q${quarter}`;
+    quarterlyMap.set(quarterKey, (quarterlyMap.get(quarterKey) || 0) + order.valorTotal);
+  });
+  
+  return Array.from(quarterlyMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([quarter, revenue]) => ({
+      quarter,
+      revenue
+    }));
+};
 
 /**
  * Calcula faturamento total por período (dia/mês/ano)

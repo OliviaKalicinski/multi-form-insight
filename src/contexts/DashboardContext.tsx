@@ -18,6 +18,7 @@ interface DashboardContextType {
   selectedMonths: string[];
   isLoadingData: boolean;
   dataLoaded: boolean;
+  lastDataUpdate: Date | null;
   setMarketingData: (data: MarketingData[]) => void;
   setFollowersData: (data: FollowersData[]) => void;
   setAdsData: (data: AdsData[], summaries?: AdsMonthSummary[], isHierarchical?: boolean) => void;
@@ -53,6 +54,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [comparisonMode, setComparisonModeState] = useState<boolean>(false);
   const [selectedMonths, setSelectedMonthsState] = useState<string[]>([]);
   const [dataLoaded, setDataLoaded] = useState<boolean>(false);
+  const [lastDataUpdate, setLastDataUpdate] = useState<Date | null>(null);
 
   const {
     isLoading: isLoadingData,
@@ -73,7 +75,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const loadPersistedData = async () => {
       console.log("🔄 Carregando dados do banco...");
-      const { salesData, adsData, followersData, marketingData } = await loadAllData();
+      const { salesData, adsData, followersData, marketingData, lastUpdated } = await loadAllData();
       const audienceDataLoaded = await loadAudienceData();
       
       if (salesData.length > 0) setSalesDataState(salesData);
@@ -81,6 +83,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       if (followersData.length > 0) setFollowersDataState(followersData);
       if (marketingData.length > 0) setMarketingDataState(marketingData);
       if (audienceDataLoaded) setAudienceDataState(audienceDataLoaded);
+      if (lastUpdated) setLastDataUpdate(lastUpdated);
       
       setDataLoaded(true);
       console.log("✅ Dados carregados com sucesso");
@@ -259,13 +262,14 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   }, [clearAdsDataFromDb]);
 
   const refreshFromDatabase = useCallback(async () => {
-    const { salesData, adsData, followersData, marketingData } = await loadAllData();
+    const { salesData, adsData, followersData, marketingData, lastUpdated } = await loadAllData();
     const audienceDataLoaded = await loadAudienceData();
     setSalesDataState(salesData);
     setAdsDataState(adsData);
     setFollowersDataState(followersData);
     setMarketingDataState(marketingData);
     setAudienceDataState(audienceDataLoaded);
+    if (lastUpdated) setLastDataUpdate(lastUpdated);
   }, [loadAllData, loadAudienceData]);
 
   const value = {
@@ -282,6 +286,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     selectedMonths,
     isLoadingData,
     dataLoaded,
+    lastDataUpdate,
     setMarketingData,
     setFollowersData,
     setAdsData,
