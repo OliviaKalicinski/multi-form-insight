@@ -118,15 +118,26 @@ export const useDataPersistence = () => {
     adsData: AdsData[];
     followersData: FollowersData[];
     marketingData: MarketingData[];
+    lastUpdated: Date | null;
   }> => {
     setIsLoading(true);
     try {
-      const [salesRaw, adsRaw, followersRaw, marketingRaw] = await Promise.all([
+      const [salesRaw, adsRaw, followersRaw, marketingRaw, latestUploadRaw] = await Promise.all([
         fetchAllRows("sales_data", "data_venda"),
         fetchAllRows("ads_data", "data"),
         fetchAllRows("followers_data", "data"),
         fetchAllRows("marketing_data", "data"),
+        supabase
+          .from("upload_history")
+          .select("created_at")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
+
+      const lastUpdated = latestUploadRaw.data?.created_at 
+        ? new Date(latestUploadRaw.data.created_at) 
+        : null;
 
       // Transform sales data back to ProcessedOrder format
       const salesData: ProcessedOrder[] = (salesRaw || []).map((row: any) => ({
@@ -215,7 +226,7 @@ export const useDataPersistence = () => {
         marketing: marketingData.length,
       });
 
-      return { salesData, adsData, followersData, marketingData };
+      return { salesData, adsData, followersData, marketingData, lastUpdated };
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       toast({
@@ -223,7 +234,7 @@ export const useDataPersistence = () => {
         description: "Não foi possível carregar os dados salvos.",
         variant: "destructive",
       });
-      return { salesData: [], adsData: [], followersData: [], marketingData: [] };
+      return { salesData: [], adsData: [], followersData: [], marketingData: [], lastUpdated: null };
     } finally {
       setIsLoading(false);
     }

@@ -300,6 +300,7 @@ export interface CustomerBehaviorMetrics {
   pedidosPorDia: { date: string; orders: number }[];
   pedidosPorSemana: { week: string; orders: number }[];
   pedidosPorMes: { month: string; orders: number }[];
+  pedidosPorTrimestre: { quarter: string; orders: number }[];
   picosVendas: SalesPeak[];
   customerSegmentation: CustomerSegment[];
   churnRiskCustomers: ChurnRiskCustomer[];
@@ -419,9 +420,11 @@ export interface OrderVolumeAnalysis {
   daily: { date: string; orders: number; revenue: number }[];
   weekly: { week: string; startDate: string; endDate: string; orders: number; revenue: number }[];
   monthly: { month: string; orders: number; revenue: number }[];
+  quarterly: { quarter: string; orders: number; revenue: number }[];
   averageDaily: number;
   averageWeekly: number;
   averageMonthly: number;
+  averageQuarterly: number;
   peakDay: { date: string; orders: number };
   lowDay: { date: string; orders: number };
 }

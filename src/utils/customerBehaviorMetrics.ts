@@ -152,10 +152,29 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     .map(([month, data]) => ({ month, ...data }))
     .sort((a, b) => a.month.localeCompare(b.month));
 
+  // Pedidos por trimestre
+  const quarterlyMap = new Map<string, { orders: number; revenue: number }>();
+  orders.forEach(order => {
+    const date = order.dataVenda;
+    const year = date.getFullYear();
+    const quarter = Math.floor(date.getMonth() / 3) + 1;
+    const quarterKey = `${year}-Q${quarter}`;
+    const existing = quarterlyMap.get(quarterKey) || { orders: 0, revenue: 0 };
+    quarterlyMap.set(quarterKey, {
+      orders: existing.orders + 1,
+      revenue: existing.revenue + order.valorTotal
+    });
+  });
+
+  const quarterly = Array.from(quarterlyMap.entries())
+    .map(([quarter, data]) => ({ quarter, ...data }))
+    .sort((a, b) => a.quarter.localeCompare(b.quarter));
+
   // Calcular médias
   const averageDaily = daily.reduce((sum, d) => sum + d.orders, 0) / (daily.length || 1);
   const averageWeekly = weekly.reduce((sum, w) => sum + w.orders, 0) / (weekly.length || 1);
   const averageMonthly = monthly.reduce((sum, m) => sum + m.orders, 0) / (monthly.length || 1);
+  const averageQuarterly = quarterly.reduce((sum, q) => sum + q.orders, 0) / (quarterly.length || 1);
 
   // Encontrar pico e vale
   const peakDay = daily.reduce((max, curr) => curr.orders > max.orders ? curr : max, daily[0] || { date: '', orders: 0 });
@@ -165,9 +184,11 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     daily,
     weekly,
     monthly,
+    quarterly,
     averageDaily,
     averageWeekly,
     averageMonthly,
+    averageQuarterly,
     peakDay: { date: peakDay.date, orders: peakDay.orders },
     lowDay: { date: lowDay.date, orders: lowDay.orders }
   };
@@ -360,6 +381,7 @@ export const calculateCustomerBehaviorMetrics = (orders: ProcessedOrder[]): Cust
     pedidosPorDia: volumeAnalysis.daily,
     pedidosPorSemana: volumeAnalysis.weekly,
     pedidosPorMes: volumeAnalysis.monthly,
+    pedidosPorTrimestre: volumeAnalysis.quarterly,
     picosVendas: peaks.filter(p => p.isPeak),
     customerSegmentation: segments,
     churnRiskCustomers: churnAnalysis.churnRiskCustomers,
