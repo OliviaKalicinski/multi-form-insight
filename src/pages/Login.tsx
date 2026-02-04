@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, LogIn, UserPlus, AlertCircle } from "lucide-react";
+import { isValidDomain, getDomainValidationError } from "@/utils/domainValidation";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -48,6 +49,12 @@ export default function Login() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Validate domain
+    if (!isValidDomain(email)) {
+      setError(getDomainValidationError());
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("As senhas não coincidem");
@@ -206,7 +213,7 @@ export default function Login() {
                 </div>
                 
                 <p className="text-xs text-muted-foreground">
-                  O primeiro usuário a se cadastrar receberá automaticamente permissões de administrador.
+                  Apenas emails @letsfly.com.br são permitidos. O primeiro usuário a se cadastrar receberá automaticamente permissões de administrador.
                 </p>
               </CardContent>
               

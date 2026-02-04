@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { UserManagement } from "@/components/settings/UserManagement";
+import { isValidDomain, getDomainValidationError } from "@/utils/domainValidation";
 import { 
   Settings as SettingsIcon, 
   Key, 
@@ -106,6 +108,12 @@ export default function Settings() {
 
     if (!inviteEmail || !invitePassword) {
       setInviteError("Preencha todos os campos");
+      return;
+    }
+
+    // Validate domain
+    if (!isValidDomain(inviteEmail)) {
+      setInviteError(getDomainValidationError());
       return;
     }
 
@@ -342,6 +350,9 @@ export default function Settings() {
         </form>
       </Card>
 
+      {/* User Management (Admin only) */}
+      {isAdmin && <UserManagement />}
+
       {/* Invite User (Admin only) */}
       {isAdmin && (
         <Card>
@@ -351,7 +362,7 @@ export default function Settings() {
               Convidar Usuário
             </CardTitle>
             <CardDescription>
-              Convide novos visualizadores para acessar o dashboard
+              Convide novos visualizadores para acessar o dashboard (apenas @letsfly.com.br)
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleInviteUser}>
@@ -374,7 +385,7 @@ export default function Settings() {
                 <Input
                   id="invite-email"
                   type="email"
-                  placeholder="novo@usuario.com"
+                  placeholder="novo@letsfly.com.br"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   required

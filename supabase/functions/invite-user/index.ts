@@ -5,6 +5,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ALLOWED_DOMAIN = "@letsfly.com.br";
+
+function isValidDomain(email: string): boolean {
+  if (!email || typeof email !== "string") {
+    return false;
+  }
+  return email.toLowerCase().trim().endsWith(ALLOWED_DOMAIN.toLowerCase());
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -66,6 +75,14 @@ Deno.serve(async (req) => {
     if (!email || !password) {
       return new Response(
         JSON.stringify({ error: "Email e senha são obrigatórios" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate domain
+    if (!isValidDomain(email)) {
+      return new Response(
+        JSON.stringify({ error: `Apenas emails ${ALLOWED_DOMAIN} são permitidos` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
