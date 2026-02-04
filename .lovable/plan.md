@@ -1,156 +1,171 @@
 
-# Plano: Adicionar Botão "Trimestre" e Indicador de Atualização dos Dados
+# Plano: Restringir Cadastro ao Domínio @letsfly.com.br + Gerenciamento de Usuários
 
-## Visao Geral
-
-Este plano implementa duas funcionalidades:
-1. Botao "Trimestre" nos graficos de volume/faturamento para visualizar dados agregados por trimestre
-2. Indicador da data de atualizacao dos dados no header global, visivel durante a navegacao
+## Resumo Executivo
+Implementar restrição de domínio de email para novos cadastros e criar interface administrativa para gerenciar usuários existentes.
 
 ---
 
-## 1. Botao Trimestre nos Graficos
+## Situacao Atual dos Usuarios
 
-### Arquivos a Modificar
+| Email | Role | Dominio Valido |
+|-------|------|----------------|
+| somos@letsfly.com.br | admin | Sim |
+| olivia.kali@letsfly.com.br | viewer | Sim |
+| bruno.multedo@letsfly.com.br | viewer | Sim |
+| bianca.mello@letsfly.com.br | viewer | Sim |
+| beatrizdrsa@gmail.com | viewer | **NAO** |
+| luana.may@letsfly.com.br | viewer | Sim |
+| rodrigo.timm@letsfly.com.br | viewer | Sim |
+| breno.barros@letsfly.com.br | viewer | Sim |
+| olivier.rodrigues@letsfly.com.br | viewer | Sim |
+| olivia.kalicinski@gmail.com | viewer | **NAO** |
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/dashboard/DailyRevenueChart.tsx` | Adicionar 'quarterly' ao `ChartViewMode` e botao "Tri" |
-| `src/components/dashboard/DailyVolumeChart.tsx` | Adicionar 'quarterly' ao `ChartViewMode` e botao "Tri" |
-| `src/utils/financialMetrics.ts` | Criar funcoes `calculateQuarterlyRevenue()` e `calculateOrdersByQuarterWithTypes()` |
-| `src/pages/ComportamentoCliente.tsx` | Atualizar tipo do estado `volumeView` e adicionar botao |
-
-### Detalhes Tecnicos
-
-**Novo tipo ChartViewMode:**
-```typescript
-export type ChartViewMode = 'daily' | 'weekly' | 'monthly' | 'quarterly';
-```
-
-**Novas funcoes em financialMetrics.ts:**
-```typescript
-// Agrupa pedidos por trimestre (Q1=Jan-Mar, Q2=Abr-Jun, etc.)
-export const calculateQuarterlyRevenue = (orders: ProcessedOrder[]) => {
-  // Agrupa por "yyyy-Q1", "yyyy-Q2", etc.
-  // Retorna { quarter: string; revenue: number }[]
-};
-
-export const calculateOrdersByQuarterWithTypes = (orders: ProcessedOrder[]) => {
-  // Similar ao mensal, mas agrupado por trimestre
-  // Retorna { quarter: string; orders: number; sampleOnlyOrders: number; productOrders: number }[]
-};
-```
-
-**UI do botao:**
-- Label: "Tri" (abreviacao de Trimestre)
-- Posicao: Apos o botao "Mes" nos toggles existentes
+**2 usuarios precisam ser removidos ou terao acesso bloqueado.**
 
 ---
 
-## 2. Indicador de Data de Atualizacao no Header
+## Etapas de Implementacao
 
-### Arquivos a Modificar
+### Etapa 1: Validacao de Dominio no Cadastro Publico
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/contexts/DashboardContext.tsx` | Adicionar `lastDataUpdate: Date | null` ao contexto |
-| `src/hooks/useDataPersistence.ts` | Buscar data do ultimo upload do banco |
-| `src/App.tsx` | Exibir indicador no header global |
+**Arquivo:** `src/pages/Login.tsx`
 
-### Estrutura Visual Proposta
+- Adicionar validacao no formulario de signup
+- Verificar se email termina com `@letsfly.com.br`
+- Exibir mensagem de erro clara se dominio invalido
+- Impedir envio do formulario
 
-O indicador aparecera no header global (sticky), ao lado do titulo "Dashboard de Marketing":
+### Etapa 2: Validacao de Dominio no Convite de Usuarios
+
+**Arquivo:** `supabase/functions/invite-user/index.ts`
+
+- Adicionar validacao de dominio na edge function
+- Retornar erro 400 se email nao for @letsfly.com.br
+- Garantir seguranca server-side (nao depender apenas do frontend)
+
+### Etapa 3: Edge Function para Gerenciamento de Usuarios
+
+**Novo arquivo:** `supabase/functions/manage-users/index.ts`
+
+Funcionalidades:
+- **GET:** Listar todos os usuarios com roles (requer admin)
+- **DELETE:** Remover usuario por ID (requer admin)
+- **PATCH:** Alterar role de usuario (admin/viewer)
+
+Seguranca:
+- Verificar se chamador e admin via user_roles
+- Usar service_role_key para operacoes admin
+- Impedir admin de deletar a si mesmo
+
+### Etapa 4: Componente de Gerenciamento de Usuarios
+
+**Novo arquivo:** `src/components/settings/UserManagement.tsx`
+
+Interface com:
+- Tabela listando todos usuarios (email, role, data cadastro)
+- Badge indicando dominio valido/invalido
+- Botao para deletar usuario (com confirmacao)
+- Botao para alternar role (admin/viewer)
+- Indicador visual para emails fora do dominio
+
+### Etapa 5: Integracao na Pagina Settings
+
+**Arquivo:** `src/pages/Settings.tsx`
+
+- Importar componente UserManagement
+- Adicionar nova Card "Gerenciar Usuarios" (visivel apenas para admins)
+- Posicionar acima do card "Convidar Usuario"
+
+---
+
+## Detalhes Tecnicos
+
+### Validacao de Dominio (Funcao Utilitaria)
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ [≡]  📊 Dashboard de Marketing          Dados: 26/01 22:40 │
-└─────────────────────────────────────────────────────────────┘
+Criar funcao isValidDomain(email: string): boolean
+- Extrair dominio do email
+- Comparar com "@letsfly.com.br" (case insensitive)
+- Retornar true/false
 ```
 
-### Detalhes Tecnicos
-
-**DashboardContext - nova propriedade:**
-```typescript
-interface DashboardContextType {
-  // ... existentes
-  lastDataUpdate: Date | null;
-}
-```
-
-**useDataPersistence - buscar ultima atualizacao:**
-```typescript
-// Dentro de loadAllData(), buscar:
-const { data: latestUpload } = await supabase
-  .from("upload_history")
-  .select("created_at")
-  .order("created_at", { ascending: false })
-  .limit(1)
-  .single();
-
-// Retornar junto com os dados
-return { salesData, adsData, followersData, marketingData, lastUpdated: latestUpload?.created_at };
-```
-
-**App.tsx - exibir no header:**
-```tsx
-<header className="flex h-12 items-center border-b px-4 bg-background/95 backdrop-blur">
-  <SidebarTrigger className="-ml-1" />
-  <div className="ml-4 font-semibold text-sm">📊 Dashboard de Marketing</div>
-  
-  {/* Spacer */}
-  <div className="flex-1" />
-  
-  {/* Indicador de atualizacao */}
-  <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-    <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-    <span>Dados: {formatLastUpdate()}</span>
-  </div>
-</header>
-```
-
-### Formato da Data
-
-- Se hoje: "Dados: 22:40"
-- Se ontem: "Dados: Ontem 22:40"
-- Se mais antigo: "Dados: 26/01 22:40"
-
----
-
-## Resumo de Alteracoes
-
-| Arquivo | Tipo | Complexidade |
-|---------|------|--------------|
-| `src/utils/financialMetrics.ts` | Adicionar funcoes trimestrais | Media |
-| `src/components/dashboard/DailyRevenueChart.tsx` | Tipo + Botao + Logica | Media |
-| `src/components/dashboard/DailyVolumeChart.tsx` | Tipo + Botao + Logica | Media |
-| `src/pages/ComportamentoCliente.tsx` | Tipo + Botao | Baixa |
-| `src/contexts/DashboardContext.tsx` | Nova prop `lastDataUpdate` | Baixa |
-| `src/hooks/useDataPersistence.ts` | Buscar data do ultimo upload | Baixa |
-| `src/App.tsx` | Exibir indicador no header | Baixa |
-
----
-
-## Consideracoes de UX
-
-1. **Trimestre**: O botao usa "Tri" como abreviacao para manter consistencia com "Dia", "Sem", "Mes"
-2. **Data de atualizacao**: Usa um dot verde para indicar status saudavel + formato minimalista
-3. **Responsividade**: O indicador de data oculta o horario em telas muito pequenas, mantendo apenas a data
-
----
-
-## Fluxo de Dados - Indicador de Atualizacao
+### Estrutura da Tabela de Usuarios na UI
 
 ```text
-upload_history (DB)
-       ↓
-useDataPersistence.loadAllData()
-       ↓
-DashboardContext.lastDataUpdate
-       ↓
-App.tsx (header) → Exibe formatado
+| Email                      | Role   | Cadastro   | Dominio  | Acoes       |
+|----------------------------|--------|------------|----------|-------------|
+| somos@letsfly.com.br       | Admin  | 09/01/2026 | Valido   | (protegido) |
+| beatrizdrsa@gmail.com      | Viewer | 12/01/2026 | INVALIDO | [Deletar]   |
+| olivia.kalicinski@gmail.com| Viewer | 04/02/2026 | INVALIDO | [Deletar]   |
 ```
+
+### Edge Function manage-users - Endpoints
+
+```text
+POST /manage-users
+Body: { action: "list" }
+Response: { users: [...] }
+
+POST /manage-users  
+Body: { action: "delete", userId: "uuid" }
+Response: { success: true }
+
+POST /manage-users
+Body: { action: "update-role", userId: "uuid", role: "admin" | "viewer" }
+Response: { success: true }
+```
+
+---
+
+## Fluxo de Seguranca
+
+```text
+1. Usuario tenta cadastrar com gmail.com
+   -> Frontend bloqueia antes de enviar
+   -> Mensagem: "Apenas emails @letsfly.com.br sao permitidos"
+
+2. Admin tenta convidar usuario com gmail.com
+   -> Frontend valida antes de enviar
+   -> Edge function valida novamente (defesa em profundidade)
+   -> Erro retornado se dominio invalido
+
+3. Admin acessa gerenciamento de usuarios
+   -> Lista carregada via edge function
+   -> Usuarios com dominio invalido destacados em vermelho
+   -> Acao de deletar disponivel
+```
+
+---
+
+## Arquivos a Criar/Modificar
+
+| Arquivo | Acao |
+|---------|------|
+| `src/pages/Login.tsx` | Modificar - adicionar validacao de dominio |
+| `src/pages/Settings.tsx` | Modificar - adicionar secao de gerenciamento |
+| `src/components/settings/UserManagement.tsx` | Criar - componente de gerenciamento |
+| `supabase/functions/invite-user/index.ts` | Modificar - adicionar validacao de dominio |
+| `supabase/functions/manage-users/index.ts` | Criar - nova edge function |
+
+---
+
+## Consideracoes de Seguranca
+
+1. **Validacao dupla**: Frontend + Backend (edge function)
+2. **Protecao do admin**: Nao permitir que admin delete a si mesmo
+3. **Apenas admins**: Todas operacoes de gerenciamento requerem role admin
+4. **Service role key**: Usada apenas no backend para operacoes privilegiadas
+5. **Sem exposicao de dados sensiveis**: Nao retornar hashes ou tokens
+
+---
 
 ## Resultado Esperado
 
-1. Graficos de faturamento e volume terao um novo botao "Tri" que agrupa os dados por trimestre
-2. Todas as paginas do dashboard exibirao a data/hora da ultima atualizacao dos dados no canto superior direito do header
+Apos implementacao:
+- Novos cadastros bloqueados para emails fora do dominio
+- Convites bloqueados para emails fora do dominio  
+- Admin pode ver todos usuarios e seus dominios
+- Admin pode deletar usuarios com dominios invalidos
+- Admin pode gerenciar roles de qualquer usuario
+- 2 usuarios atuais com gmail.com podem ser removidos pela interface
