@@ -18,6 +18,7 @@ import {
   getRoleMeta,
   type AdFunnelEntry,
   type FunnelRole,
+  type FunnelMapResult,
 } from "@/utils/adFormatClassifier";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +54,8 @@ const formatPercent = (v: number) => `${v.toFixed(2)}%`;
 const formatRoas = (v: number) => `${v.toFixed(2)}x`;
 
 export const AdFunnelMap = ({ adsData }: AdFunnelMapProps) => {
-  const entries = useMemo(() => buildAdFunnelMap(adsData), [adsData]);
+  const result = useMemo(() => buildAdFunnelMap(adsData), [adsData]);
+  const { entries, diagnostics } = result;
 
   const grouped = useMemo(() => {
     const map = new Map<FunnelRole, AdFunnelEntry[]>();
@@ -66,6 +68,8 @@ export const AdFunnelMap = ({ adsData }: AdFunnelMapProps) => {
   const totalSpend = useMemo(() => entries.reduce((s, e) => s + e.spend, 0), [entries]);
 
   if (entries.length === 0) return null;
+
+  const showDiagBanner = diagnostics.excludedBySpend > 0 || diagnostics.uniqueAds < diagnostics.totalRows;
 
   return (
     <Card>
@@ -82,6 +86,22 @@ export const AdFunnelMap = ({ adsData }: AdFunnelMapProps) => {
             essencial para o desempenho geral, mesmo com ROAS baixo.
           </p>
         </div>
+
+        {/* Banner de transparência */}
+        {showDiagBanner && (
+          <p className="text-xs text-slate-500">
+            Exibindo {entries.length} anúncio{entries.length !== 1 ? "s" : ""}
+            {diagnostics.uniqueAds < diagnostics.totalRows && (
+              <span> ({diagnostics.totalRows} linhas agrupadas por nome)</span>
+            )}
+            {diagnostics.excludedBySpend > 0 && (
+              <span>
+                . {diagnostics.excludedBySpend} não exibido{diagnostics.excludedBySpend > 1 ? "s" : ""} por gasto {"<"} R$10
+                {" "}(total: {formatCurrency(diagnostics.excludedSpendTotal)})
+              </span>
+            )}
+          </p>
+        )}
 
         {/* Resumo por quadrante */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

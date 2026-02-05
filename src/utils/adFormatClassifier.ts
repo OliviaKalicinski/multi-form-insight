@@ -95,7 +95,21 @@ const ROLE_META: Record<FunnelRole, RoleMeta> = {
  * Agrupa ads por nome, calcula CTR e ROAS agregados,
  * e classifica cada um por função no funil.
  */
-export const buildAdFunnelMap = (ads: AdsData[]): AdFunnelEntry[] => {
+export interface FunnelMapDiagnostics {
+  totalRows: number;
+  uniqueAds: number;
+  excludedBySpend: number;
+  excludedSpendTotal: number;
+}
+
+export interface FunnelMapResult {
+  entries: AdFunnelEntry[];
+  diagnostics: FunnelMapDiagnostics;
+}
+
+export const buildAdFunnelMap = (ads: AdsData[]): FunnelMapResult => {
+  const totalRows = ads.length;
+
   // Agrupar por nome do anúncio
   const grouped = new Map<string, AdsData[]>();
   for (const ad of ads) {
@@ -104,6 +118,9 @@ export const buildAdFunnelMap = (ads: AdsData[]): AdFunnelEntry[] => {
     grouped.get(name)!.push(ad);
   }
 
+  const uniqueAds = grouped.size;
+  let excludedBySpend = 0;
+  let excludedSpendTotal = 0;
   const entries: AdFunnelEntry[] = [];
 
   for (const [adName, rows] of grouped) {
@@ -112,11 +129,13 @@ export const buildAdFunnelMap = (ads: AdsData[]): AdFunnelEntry[] => {
     const revenue = rows.reduce((s, r) => s + parseAdsValue(r["Valor de conversão da compra"]), 0);
     const purchases = rows.reduce((s, r) => s + parseAdsValue(r["Compras"]), 0);
 
-    // Filtrar anúncios com gasto mínimo
-    if (spend < 10) continue;
+    if (spend < 10) {
+      excludedBySpend++;
+      excludedSpendTotal += spend;
+      continue;
+    }
 
     const ctr = impressions > 0 ? (rows.reduce((s, r) => {
-      // Usar cliques de saída > link > todos (consistente com adsCalculator)
       const clicks = parseAdsValue(r["Cliques de saída"]) || parseAdsValue(r["Cliques no link"]) || parseAdsValue(r["Cliques (todos)"]);
       return s + clicks;
     }, 0) / impressions) * 100 : 0;
@@ -127,24 +146,19 @@ export const buildAdFunnelMap = (ads: AdsData[]): AdFunnelEntry[] => {
     const meta = ROLE_META[role];
 
     entries.push({
-      adName,
-      format,
-      formatLabel: FORMAT_LABELS[format],
-      ctr,
-      roas,
-      spend,
-      purchases,
-      revenue,
-      impressions,
-      funnelRole: role,
-      roleLabel: meta.label,
-      roleColor: meta.color,
-      roleDescription: meta.description,
+      adName, format, formatLabel: FORMAT_LABELS[format],
+      ctr, roas, spend, purchases, revenue, impressions,
+      funnelRole: role, roleLabel: meta.label, roleColor: meta.color, roleDescription: meta.description,
     });
   }
 
-  // Ordenar por gasto (maior primeiro)
-  return entries.sort((a, b) => b.spend - a.spend);
+  const diagnostics = { totalRows, uniqueAds, excludedBySpend, excludedSpendTotal };
+  console.debug('[AdFunnelMap]', { ...diagnostics, displayed: entries.length });
+
+  return {
+    entries: entries.sort((a, b) => b.spend - a.spend),
+    diagnostics,
+  };
 };
 
 export const FUNNEL_ROLE_ORDER: FunnelRole[] = [
