@@ -1,12 +1,42 @@
 // ============================================
-// ETAPA 4: SISTEMA DE RESPONSABILIDADE E MEMÓRIA DE DECISÃO
+// DECISION EVENT TYPES - Etapa 4
 // ============================================
-// Este módulo define a infraestrutura para rastrear decisões
-// tomadas em relação às recomendações do sistema.
+// Sistema de rastreamento de decisões para recomendações.
+// Permite registrar aceites, rejeições e expirações.
+// ============================================
+
+// ============================================
+// PRINCÍPIO EPISTÊMICO DA ETAPA 4
+// ============================================
+// A pergunta que o sistema faz NÃO é:
+//   "O usuário aceitou?"
 //
-// Princípio: Recomendação sem responsabilidade vira ruído.
-// O sistema não mede apenas métricas - mede decisões tomadas.
+// A pergunta correta é:
+//   "O sistema estava certo para aquele contexto?"
+//
+// Isso evita:
+//   - Sistema subserviente (busca aprovação)
+//   - Sistema punitivo (julga rejeição)
+//   - Sistema manipulador (otimiza aceitação)
+//
+// O sistema registra realidade, não julga.
 // ============================================
+
+// ============================================
+// TIPOS FUTUROS (preparação - não implementados)
+// ============================================
+// ExpirationReason permitirá diferenciar:
+// - TIMEOUT: 30 dias sem ação
+// - SUPERSEDED: nova recomendação substituiu
+// - CONTEXT_CHANGED: contexto de negócios mudou
+//
+// TODO (Etapa 5+): Migrar EXPIRED para usar este tipo
+// Por enquanto, EXPIRED = TIMEOUT implicitamente.
+// ============================================
+export type ExpirationReason = 
+  | 'TIMEOUT'          // Passou 30 dias sem ação
+  | 'SUPERSEDED'       // Substituída por recomendação mais recente
+  | 'CONTEXT_CHANGED'; // Condições de negócios mudaram
 
 // Estados possíveis de uma decisão
 export type DecisionStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
@@ -33,12 +63,18 @@ export interface DecisionEvent {
   // Contexto de quando foi gerada
   generatedAt: Date;
   periodReference: string;
-  metricValueAtGeneration: number;
+  metricValueAtGeneration: number | null;
   benchmarkAtGeneration: number | null;
+  
+  // Snapshot legível da métrica no momento da geração
+  // Ex: "ROAS Ads = 0.74x" ou "Churn = 12.3%"
+  metricSnapshotLabel?: string;
   
   // Estado atual
   status: DecisionStatus;
   statusChangedAt: Date | null;
+  
+  // expirationReason?: ExpirationReason; // TODO: Implementar na Etapa 5+
   
   // Feedback opcional (nunca obrigatório)
   rejectionReason?: RejectionReasonKey;
@@ -84,6 +120,15 @@ export interface DecisionMemory {
       accepted: number;
       rejected: number;
       expired: number;
+      // ============================================
+      // ATENÇÃO: acceptanceRate é informativo apenas.
+      // NÃO usar para:
+      //   - Reordenar recomendações
+      //   - Filtrar recomendações
+      //   - Reduzir frequência
+      // 
+      // O uso deste dado será definido na Etapa 5.
+      // ============================================
       acceptanceRate: number;
     };
   };

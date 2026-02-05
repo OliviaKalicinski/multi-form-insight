@@ -103,18 +103,27 @@ export default function AnaliseCritica() {
         const authority = dadosAtual._authority;
         const temporal = dadosAtual._temporal;
         
-        if (!authority || !temporal) continue;
+        if (!authority || !temporal) {
+          console.debug('[Decision skipped]', rec.id, 'reason:', 'no authority or temporal metadata');
+          continue;
+        }
         
         // Verificar autoridade da métrica base
         const metricKey = rec.basedOnMetric;
-        if (!metricKey) continue;
+        if (!metricKey) {
+          console.debug('[Decision skipped]', rec.id, 'reason:', 'no basedOnMetric');
+          continue;
+        }
         
         // Obter categoria da métrica
         const category = rec.category as 'marketing' | 'vendas' | 'clientes' | 'produtos' | 'operacoes';
         const temporalConfidence = temporal[category]?.confidence || 'STABLE';
         
         // Só registrar se temporal é STABLE
-        if (!canGenerateTemporalRecommendation(temporalConfidence)) continue;
+        if (!canGenerateTemporalRecommendation(temporalConfidence)) {
+          console.debug('[Decision skipped]', rec.id, 'reason:', 'temporal not stable', temporalConfidence);
+          continue;
+        }
         
         // Registrar o evento
         await registerRecommendation({
@@ -122,6 +131,7 @@ export default function AnaliseCritica() {
           periodReference: selectedMonth,
           metricValue: 0, // Valor seria calculado baseado na métrica
           benchmark: null,
+          metricSnapshotLabel: rec.basedOnMetric ? `${rec.basedOnMetric}` : undefined,
         });
       }
     };

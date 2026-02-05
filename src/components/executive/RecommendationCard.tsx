@@ -50,8 +50,9 @@ export const RecommendationCard = ({
   
   const badge = getRankBadge(rank);
   const status = recommendation.decisionStatus;
-  const previousRejections = recommendation.previousRejections || 0;
-  const hasDecisionHistory = previousRejections > 0;
+  // Usar semântica neutra: priorRejectionCount (apenas REJECTED, não EXPIRED)
+  const priorRejectionCount = recommendation.previousRejections || 0;
+  const hasRejectionHistory = priorRejectionCount > 0;
 
   // Handler para aceitar
   const handleAccept = async () => {
@@ -155,12 +156,12 @@ export const RecommendationCard = ({
             </ul>
           </div>
 
-          {/* Aviso de histórico de rejeições */}
-          {hasDecisionHistory && (!status || status === 'PENDING') && (
+          {/* Aviso de histórico de rejeições (apenas REJECTED, não EXPIRED) */}
+          {hasRejectionHistory && (!status || status === 'PENDING') && (
             <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
               <span>
-                Ignorada {previousRejections}x nos últimos 60 dias
+                Ignorada {priorRejectionCount}x nos últimos 60 dias
               </span>
             </div>
           )}
@@ -196,8 +197,12 @@ export const RecommendationCard = ({
                       Aceitar
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Marcar como ação aceita</p>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="font-medium">Aceitar recomendação</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Registra que esta recomendação foi considerada válida neste contexto.
+                      Não executa nenhuma ação automaticamente.
+                    </p>
                   </TooltipContent>
                 </Tooltip>
 

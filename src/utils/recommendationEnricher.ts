@@ -14,8 +14,9 @@ export interface EnrichedRecommendation extends Recommendation {
   decisionEventId?: string;
   decisionStatus?: DecisionStatus;
   
-  // Histórico de rejeições
-  previousRejections: number;
+  // Histórico de rejeições (apenas REJECTED, não EXPIRED)
+  // Semântica neutra: contagem de rejeições prévias
+  priorRejectionCount: number;
   lastRejectedAt: Date | null;
   
   // Flag para UI
@@ -48,7 +49,8 @@ export const enrichRecommendationsWithDecisionState = (
       e => e.status === 'PENDING' && e.periodReference === currentPeriod
     );
     
-    // Contar rejeições na janela de tempo
+    // Contar APENAS rejeições explícitas na janela de tempo
+    // (não contar EXPIRED como rejeição para manter neutralidade semântica)
     const rejections = relatedEvents.filter(
       e => e.status === 'REJECTED' &&
            e.statusChangedAt &&
@@ -66,7 +68,7 @@ export const enrichRecommendationsWithDecisionState = (
       ...rec,
       decisionEventId: pendingEvent?.id,
       decisionStatus: pendingEvent?.status,
-      previousRejections: rejections.length,
+      priorRejectionCount: rejections.length,
       lastRejectedAt,
       hasDecisionHistory: relatedEvents.length > 0,
     };
@@ -118,12 +120,12 @@ export const getHistoryMessage = (
   recommendation: EnrichedRecommendation,
   daysWindow: number = 60
 ): string | null => {
-  if (recommendation.previousRejections === 0) {
+  if (recommendation.priorRejectionCount === 0) {
     return null;
   }
 
-  const times = recommendation.previousRejections === 1 ? 'vez' : 'vezes';
-  return `Ignorada ${recommendation.previousRejections} ${times} nos últimos ${daysWindow} dias`;
+  const times = recommendation.priorRejectionCount === 1 ? 'vez' : 'vezes';
+  return `Ignorada ${recommendation.priorRejectionCount} ${times} nos últimos ${daysWindow} dias`;
 };
 
 /**
@@ -134,5 +136,5 @@ export const shouldShowHistoryWarning = (
   recommendation: EnrichedRecommendation,
   threshold: number = 1
 ): boolean => {
-  return recommendation.previousRejections >= threshold;
+  return recommendation.priorRejectionCount >= threshold;
 };
