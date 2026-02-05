@@ -104,6 +104,24 @@ export interface Recommendation {
   prioridade: number;
   facilidade: 'baixa' | 'media' | 'alta';
   basedOnMetric?: string; // Métrica que fundamenta a recomendação (DECISIONAL)
+  
+  // ============================================
+  // ETAPA 4: CAMPOS DE ESTADO DE DECISÃO
+  // ============================================
+  // Estes campos são opcionais e preenchidos quando a recomendação
+  // é enriquecida com dados do sistema de decisão.
+  
+  // ID do evento de decisão vinculado (quando existir)
+  decisionEventId?: string;
+  
+  // Status atual da decisão
+  decisionStatus?: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+  
+  // Quantas vezes esta recomendação foi rejeitada anteriormente
+  previousRejections?: number;
+  
+  // Data da última rejeição
+  lastRejectedAt?: Date | null;
 }
 
 // Classificação de insights separando sinal de decisão

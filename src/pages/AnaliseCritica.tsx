@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useCallback } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
+import { useDecisionEvents } from "@/hooks/useDecisionEvents";
 import { HealthScoreCard } from "@/components/executive/HealthScoreCard";
 import { CriticalAlertCard } from "@/components/executive/CriticalAlertCard";
 import { RecommendationCard } from "@/components/executive/RecommendationCard";
@@ -10,13 +11,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { calcularHealthScore, gerarComparacaoMoM, gerarAnaliseTrimestral, gerarInsights } from "@/utils/criticalAnalysis";
 import { gerarAlertas } from "@/utils/alertSystem";
 import { gerarRecomendacoes } from "@/utils/recommendationEngine";
+import { enrichRecommendationsWithDecisionState, EnrichedRecommendation } from "@/utils/recommendationEnricher";
 import { calculateExecutiveMetrics, filterOrdersByMonth, filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
 import { FileText, TrendingUp, AlertTriangle, Target, BarChart3 } from "lucide-react";
-import { ExecutiveMetrics } from "@/types/executive";
+import { ExecutiveMetrics, Recommendation } from "@/types/executive";
+import { RejectionReasonKey } from "@/types/decisions";
+import { canGenerateFullRecommendation, canGenerateTemporalRecommendation } from "@/types/metricNature";
 
 export default function AnaliseCritica() {
   const { selectedMonth, availableMonths, salesData, adsData } = useDashboard();
   const { sectorBenchmarks } = useAppSettings();
+  const { 
+    events, 
+    registerRecommendation, 
+    accept, 
+    reject,
+    expireOldEvents,
+    loading: loadingDecisions 
+  } = useDecisionEvents();
+  
+  // Expirar eventos antigos ao carregar
+  useEffect(() => {
+    if (!loadingDecisions) {
+      expireOldEvents();
+    }
+  }, [loadingDecisions, expireOldEvents]);
   
   // Calcular dados do mês atual a partir dos dados reais
   const dadosAtual = useMemo(() => {
@@ -55,10 +74,60 @@ export default function AnaliseCritica() {
     [dadosAtual, dadosAnterior, sectorBenchmarks]
   );
   
-  const recomendacoes = useMemo(() => 
-    dadosAtual && dadosAnterior ? gerarRecomendacoes(dadosAtual, dadosAnterior, sectorBenchmarks) : [], 
-    [dadosAtual, dadosAnterior, sectorBenchmarks]
-  );
+  // Gerar e enriquecer recomendações com estado de decisão
+  const recomendacoesEnriquecidas = useMemo(() => {
+    if (!dadosAtual || !dadosAnterior) return [];
+    
+    const recsRaw = gerarRecomendacoes(dadosAtual, dadosAnterior, sectorBenchmarks);
+    
+    // Enriquecer com histórico de decisões
+    return enrichRecommendationsWithDecisionState(
+      recsRaw,
+      events,
+      selectedMonth,
+      60 // janela de 60 dias para histórico
+    );
+  }, [dadosAtual, dadosAnterior, sectorBenchmarks, events, selectedMonth]);
+  
+  // Registrar novas recomendações como PENDING
+  useEffect(() => {
+    if (loadingDecisions || !dadosAtual) return;
+    
+    const registerNewRecommendations = async () => {
+      for (const rec of recomendacoesEnriquecidas) {
+        // Só registrar se ainda não tem evento PENDING
+        if (rec.decisionEventId) continue;
+        
+        // Verificar se a recomendação atende aos critérios de rastreamento
+        // (DECISIONAL + REAL + BENCHMARK + STABLE)
+        const authority = dadosAtual._authority;
+        const temporal = dadosAtual._temporal;
+        
+        if (!authority || !temporal) continue;
+        
+        // Verificar autoridade da métrica base
+        const metricKey = rec.basedOnMetric;
+        if (!metricKey) continue;
+        
+        // Obter categoria da métrica
+        const category = rec.category as 'marketing' | 'vendas' | 'clientes' | 'produtos' | 'operacoes';
+        const temporalConfidence = temporal[category]?.confidence || 'STABLE';
+        
+        // Só registrar se temporal é STABLE
+        if (!canGenerateTemporalRecommendation(temporalConfidence)) continue;
+        
+        // Registrar o evento
+        await registerRecommendation({
+          recommendation: rec as Recommendation,
+          periodReference: selectedMonth,
+          metricValue: 0, // Valor seria calculado baseado na métrica
+          benchmark: null,
+        });
+      }
+    };
+    
+    registerNewRecommendations();
+  }, [recomendacoesEnriquecidas, loadingDecisions, dadosAtual, selectedMonth, registerRecommendation]);
   
   const insights = useMemo(() => 
     dadosAtual && dadosAnterior && healthScore ? gerarInsights(dadosAtual, dadosAnterior, healthScore, sectorBenchmarks) : [], 
@@ -84,6 +153,15 @@ export default function AnaliseCritica() {
     
     return gerarAnaliseTrimestral(ultimos3Meses, dadosMensaisCalculados);
   }, [selectedMonth, availableMonths, salesData, adsData]);
+  
+  // Handlers para aceitar/rejeitar recomendações
+  const handleAccept = useCallback(async (eventId: string) => {
+    await accept(eventId);
+  }, [accept]);
+  
+  const handleReject = useCallback(async (eventId: string, reason?: RejectionReasonKey, notes?: string) => {
+    await reject(eventId, reason, notes);
+  }, [reject]);
   
   if (!dadosAtual) {
     return (
@@ -184,7 +262,7 @@ export default function AnaliseCritica() {
       )}
       
       {/* RECOMENDAÇÕES PRIORITÁRIAS */}
-      {recomendacoes.length > 0 && (
+      {recomendacoesEnriquecidas.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Target className="h-6 w-6 text-green-600" />
@@ -192,8 +270,15 @@ export default function AnaliseCritica() {
             <span className="text-sm text-muted-foreground">(Top 5 por ROI)</span>
           </div>
           <div className="grid grid-cols-1 gap-4">
-            {recomendacoes.slice(0, 5).map((rec, index) => (
-              <RecommendationCard key={rec.id} recommendation={rec} rank={index + 1} />
+            {recomendacoesEnriquecidas.slice(0, 5).map((rec, index) => (
+              <RecommendationCard 
+                key={rec.id} 
+                recommendation={rec as Recommendation} 
+                rank={index + 1}
+                onAccept={handleAccept}
+                onReject={handleReject}
+                showDecisionControls={!!rec.decisionEventId}
+              />
             ))}
           </div>
         </div>
