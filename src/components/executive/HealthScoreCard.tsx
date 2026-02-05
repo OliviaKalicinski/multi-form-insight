@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HealthScore } from "@/types/executive";
-import { TrendingUp, TrendingDown, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface HealthScoreCardProps {
@@ -14,6 +14,7 @@ export const HealthScoreCard = ({ healthScore }: HealthScoreCardProps) => {
       case 'good': return 'from-blue-50 to-blue-100 border-blue-500';
       case 'warning': return 'from-yellow-50 to-orange-50 border-yellow-500';
       case 'critical': return 'from-red-50 to-red-100 border-red-500';
+      case 'partial': return 'from-gray-50 to-gray-100 border-gray-400';
     }
   };
   
@@ -26,6 +27,8 @@ export const HealthScoreCard = ({ healthScore }: HealthScoreCardProps) => {
         return <Activity className="h-8 w-8 text-yellow-600" />;
       case 'critical':
         return <TrendingDown className="h-8 w-8 text-red-600" />;
+      case 'partial':
+        return <AlertCircle className="h-8 w-8 text-gray-500" />;
     }
   };
   
@@ -35,6 +38,7 @@ export const HealthScoreCard = ({ healthScore }: HealthScoreCardProps) => {
       case 'good': return 'Bom';
       case 'warning': return 'Atenção';
       case 'critical': return 'Crítico';
+      case 'partial': return 'Parcial';
     }
   };
   
@@ -58,18 +62,35 @@ export const HealthScoreCard = ({ healthScore }: HealthScoreCardProps) => {
             <div className="text-xs text-muted-foreground mb-2">Escala 0-100</div>
             <div className={cn(
               "inline-block px-3 py-1 rounded-full text-xs font-semibold",
+              healthScore.status === 'partial' ? "bg-gray-100 text-gray-800" :
               healthScore.overall >= 80 ? "bg-green-100 text-green-800" :
               healthScore.overall >= 60 ? "bg-blue-100 text-blue-800" :
               healthScore.overall >= 40 ? "bg-yellow-100 text-yellow-800" :
               "bg-red-100 text-red-800"
             )}>
-              {healthScore.overall >= 80 ? "🌟 Top Performer" :
+              {healthScore.status === 'partial' ? "⚠️ Dados Incompletos" :
+               healthScore.overall >= 80 ? "🌟 Top Performer" :
                healthScore.overall >= 60 ? "✅ Saudável" :
                healthScore.overall >= 40 ? "⚠️ Precisa Melhorar" :
                "🔴 Ação Urgente"}
             </div>
           </div>
         </div>
+
+        {/* Aviso de parcialidade */}
+        {healthScore.isPartial && healthScore.partialReasons.length > 0 && (
+          <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200 dark:bg-amber-950 dark:border-amber-800">
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Score baseado em dados incompletos
+            </p>
+            <ul className="text-xs text-amber-700 dark:text-amber-400 mt-1 list-disc list-inside">
+              {healthScore.partialReasons.map((reason, i) => (
+                <li key={i}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         
         <div className="space-y-3">
           <div className="text-xs font-semibold text-muted-foreground mb-2">BREAKDOWN POR ÁREA</div>

@@ -1,9 +1,16 @@
 import { Recommendation, ExecutiveMetrics } from "@/types/executive";
-import { benchmarksPetFood } from "@/data/executiveData";
+import { SectorBenchmarks } from "@/hooks/useAppSettings";
 
+/**
+ * Gera recomendações baseadas nas métricas executivas
+ * @param atual - Métricas do período atual
+ * @param anterior - Métricas do período anterior
+ * @param benchmarks - Benchmarks do setor (de app_settings)
+ */
 export const gerarRecomendacoes = (
   atual: ExecutiveMetrics,
-  anterior: ExecutiveMetrics
+  anterior: ExecutiveMetrics,
+  benchmarks: SectorBenchmarks
 ): Recommendation[] => {
   const recomendacoes: Recommendation[] = [];
   
@@ -33,8 +40,9 @@ export const gerarRecomendacoes = (
   }
   
   // Rec 2: Programa de Retenção
-  if (atual.clientes.taxaRecompra < benchmarksPetFood.taxaRecompra) {
-    const gap = benchmarksPetFood.taxaRecompra - atual.clientes.taxaRecompra;
+  const recompraBenchmark = benchmarks.taxaRecompra || 38;
+  if (atual.clientes.taxaRecompra < recompraBenchmark) {
+    const gap = recompraBenchmark - atual.clientes.taxaRecompra;
     const potencial = (atual.vendas.receita / atual.clientes.taxaRecompra) * gap;
     
     recomendacoes.push({
@@ -58,8 +66,9 @@ export const gerarRecomendacoes = (
   }
   
   // Rec 3: Estratégia de Upsell
-  if (atual.vendas.ticketMedioReal < benchmarksPetFood.ticketMedio) {
-    const incremento = benchmarksPetFood.ticketMedio - atual.vendas.ticketMedioReal;
+  const ticketBenchmark = benchmarks.ticketMedio || 180;
+  if (atual.vendas.ticketMedioReal < ticketBenchmark) {
+    const incremento = ticketBenchmark - atual.vendas.ticketMedioReal;
     const impacto = incremento * atual.vendas.pedidos;
     
     recomendacoes.push({

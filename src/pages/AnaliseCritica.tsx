@@ -41,8 +41,8 @@ export default function AnaliseCritica() {
   
   // Cálculos
   const healthScore = useMemo(() => 
-    dadosAtual ? calcularHealthScore(dadosAtual) : null, 
-    [dadosAtual]
+    dadosAtual ? calcularHealthScore(dadosAtual, sectorBenchmarks) : null, 
+    [dadosAtual, sectorBenchmarks]
   );
   
   const comparacaoMoM = useMemo(() => 
@@ -51,18 +51,18 @@ export default function AnaliseCritica() {
   );
   
   const alertas = useMemo(() => 
-    dadosAtual && dadosAnterior ? gerarAlertas(dadosAtual, dadosAnterior) : [], 
-    [dadosAtual, dadosAnterior]
+    dadosAtual && dadosAnterior ? gerarAlertas(dadosAtual, dadosAnterior, sectorBenchmarks) : [], 
+    [dadosAtual, dadosAnterior, sectorBenchmarks]
   );
   
   const recomendacoes = useMemo(() => 
-    dadosAtual && dadosAnterior ? gerarRecomendacoes(dadosAtual, dadosAnterior) : [], 
-    [dadosAtual, dadosAnterior]
+    dadosAtual && dadosAnterior ? gerarRecomendacoes(dadosAtual, dadosAnterior, sectorBenchmarks) : [], 
+    [dadosAtual, dadosAnterior, sectorBenchmarks]
   );
   
   const insights = useMemo(() => 
-    dadosAtual && dadosAnterior && healthScore ? gerarInsights(dadosAtual, dadosAnterior, healthScore) : [], 
-    [dadosAtual, dadosAnterior, healthScore]
+    dadosAtual && dadosAnterior && healthScore ? gerarInsights(dadosAtual, dadosAnterior, healthScore, sectorBenchmarks) : [], 
+    [dadosAtual, dadosAnterior, healthScore, sectorBenchmarks]
   );
   
   // Calcular análise trimestral

@@ -1,30 +1,66 @@
 import { CriticalAlert, ExecutiveMetrics } from "@/types/executive";
-import { benchmarksPetFood } from "@/data/executiveData";
+import { SectorBenchmarks } from "@/hooks/useAppSettings";
+import { MetricNature } from "@/types/metricNature";
 import { addDays } from "date-fns";
 
+/**
+ * Verifica se pode gerar alerta crítico
+ * - Benchmark deve existir
+ * - Métrica deve ser REAL (não estimada)
+ */
+const canGenerateCriticalAlert = (
+  benchmarks: SectorBenchmarks,
+  benchmarkKey: keyof SectorBenchmarks,
+  metricNature?: MetricNature
+): boolean => {
+  const benchmarkValue = benchmarks[benchmarkKey];
+  
+  // Benchmark deve existir e não ser null/undefined/0
+  if (benchmarkValue === null || benchmarkValue === undefined || benchmarkValue === 0) {
+    return false;
+  }
+  
+  // Se natureza da métrica informada, deve ser REAL para alerta crítico
+  if (metricNature && metricNature !== 'REAL') {
+    return false;
+  }
+  
+  return true;
+};
+
+/**
+ * Gera alertas baseados nas métricas executivas
+ * @param atual - Métricas do período atual
+ * @param anterior - Métricas do período anterior
+ * @param benchmarks - Benchmarks do setor (de app_settings)
+ */
 export const gerarAlertas = (
   atual: ExecutiveMetrics,
-  anterior: ExecutiveMetrics
+  anterior: ExecutiveMetrics,
+  benchmarks: SectorBenchmarks
 ): CriticalAlert[] => {
   const alertas: CriticalAlert[] = [];
+  const meta = atual._meta;
   
   // 🔴 CRÍTICO: ROAS < 0.8x
   if (atual.marketing.roasAds < 0.8) {
+    const canAlert = canGenerateCriticalAlert(benchmarks, 'roasMedio', meta?.roasAds);
+    const roasBenchmark = benchmarks.roasMedio || 3.2;
     const prejuizo = atual.marketing.investimentoAds - atual.marketing.receitaAds;
-    const gap = ((atual.marketing.roasAds / benchmarksPetFood.roasMedio) - 1) * 100;
+    const gap = ((atual.marketing.roasAds / roasBenchmark) - 1) * 100;
     
     alertas.push({
       id: 'roas-critico',
-      severity: 'critical',
+      severity: canAlert ? 'critical' : 'info',
       category: 'marketing',
-      title: 'ROAS de Anúncios Abaixo do Crítico',
+      title: canAlert ? 'ROAS de Anúncios Abaixo do Crítico' : 'ROAS de Anúncios Abaixo do Crítico (ref. incompleta)',
       metric: 'ROAS',
       current: atual.marketing.roasAds,
-      benchmark: benchmarksPetFood.roasMedio,
+      benchmark: roasBenchmark,
       gap,
       impact: `Prejuízo de R$ ${(prejuizo / 1000).toFixed(1)}K no mês`,
       action: 'Pausar 60% das campanhas com ROAS < 0.8x e realocar budget para top performers',
-      priority: 'urgent',
+      priority: canAlert ? 'urgent' : 'medium',
       estimatedFix: '+R$ 12K/mês',
       deadline: addDays(new Date(), 7),
     });
@@ -32,18 +68,21 @@ export const gerarAlertas = (
   
   // 🔴 CRÍTICO: Churn > 40%
   if (atual.clientes.taxaChurn > 40) {
+    const canAlert = canGenerateCriticalAlert(benchmarks, 'taxaChurn', meta?.taxaChurn);
+    const churnBenchmark = benchmarks.taxaChurn || 28;
+    
     alertas.push({
       id: 'churn-critico',
-      severity: 'critical',
+      severity: canAlert ? 'critical' : 'info',
       category: 'clientes',
-      title: 'Taxa de Churn em Nível Crítico',
+      title: canAlert ? 'Taxa de Churn em Nível Crítico' : 'Taxa de Churn Alta (ref. incompleta)',
       metric: 'Churn',
       current: atual.clientes.taxaChurn,
-      benchmark: benchmarksPetFood.taxaChurn,
-      gap: ((atual.clientes.taxaChurn - benchmarksPetFood.taxaChurn) / benchmarksPetFood.taxaChurn) * 100,
+      benchmark: churnBenchmark,
+      gap: ((atual.clientes.taxaChurn - churnBenchmark) / churnBenchmark) * 100,
       impact: `Perda de ${Math.round(atual.clientes.clientesAtivos * (atual.clientes.taxaChurn / 100))} clientes/mês`,
       action: 'Implementar programa de retenção + email marketing personalizado',
-      priority: 'urgent',
+      priority: canAlert ? 'urgent' : 'medium',
       estimatedFix: '-15pp de churn em 60 dias',
       deadline: addDays(new Date(), 14),
     });
@@ -71,18 +110,21 @@ export const gerarAlertas = (
   
   // 🟡 ATENÇÃO: CAC > R$ 400
   if (atual.clientes.cac > 400) {
+    const canAlert = canGenerateCriticalAlert(benchmarks, 'cac', meta?.cac);
+    const cacBenchmark = benchmarks.cac || 45;
+    
     alertas.push({
       id: 'cac-alto',
-      severity: 'warning',
+      severity: canAlert ? 'warning' : 'info',
       category: 'marketing',
-      title: 'Custo de Aquisição Elevado',
+      title: canAlert ? 'Custo de Aquisição Elevado' : 'Custo de Aquisição Elevado (ref. incompleta)',
       metric: 'CAC',
       current: atual.clientes.cac,
-      benchmark: benchmarksPetFood.cac,
-      gap: ((atual.clientes.cac - benchmarksPetFood.cac) / benchmarksPetFood.cac) * 100,
-      impact: `R$ ${(atual.clientes.cac - benchmarksPetFood.cac).toFixed(0)} acima do ideal por cliente`,
+      benchmark: cacBenchmark,
+      gap: ((atual.clientes.cac - cacBenchmark) / cacBenchmark) * 100,
+      impact: `R$ ${(atual.clientes.cac - cacBenchmark).toFixed(0)} acima do ideal por cliente`,
       action: 'Otimizar segmentação de audiência e testar canais de baixo custo',
-      priority: 'high',
+      priority: canAlert ? 'high' : 'medium',
       estimatedFix: '-R$ 150 de CAC',
       deadline: addDays(new Date(), 30),
     });
