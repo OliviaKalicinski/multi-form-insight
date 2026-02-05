@@ -5,7 +5,7 @@ import { addDays } from "date-fns";
 
 /**
  * Verifica se pode gerar alerta crítico
- * - Benchmark deve existir
+ * - Benchmark deve existir e ser > 0
  * - Métrica deve ser REAL (não estimada)
  */
 const canGenerateCriticalAlert = (
@@ -30,6 +30,7 @@ const canGenerateCriticalAlert = (
 
 /**
  * Gera alertas baseados nas métricas executivas
+ * REGRA: Se benchmark === null/undefined → NÃO gerar alerta
  * @param atual - Métricas do período atual
  * @param anterior - Métricas do período anterior
  * @param benchmarks - Benchmarks do setor (de app_settings)
@@ -43,9 +44,10 @@ export const gerarAlertas = (
   const meta = atual._meta;
   
   // 🔴 CRÍTICO: ROAS < 0.8x
-  if (atual.marketing.roasAds < 0.8) {
+  // REGRA: Só gera se benchmark.roasMedio existir
+  if (atual.marketing.roasAds < 0.8 && benchmarks.roasMedio) {
     const canAlert = canGenerateCriticalAlert(benchmarks, 'roasMedio', meta?.roasAds);
-    const roasBenchmark = benchmarks.roasMedio || 3.2;
+    const roasBenchmark = benchmarks.roasMedio;
     const prejuizo = atual.marketing.investimentoAds - atual.marketing.receitaAds;
     const gap = ((atual.marketing.roasAds / roasBenchmark) - 1) * 100;
     
@@ -53,6 +55,7 @@ export const gerarAlertas = (
       id: 'roas-critico',
       severity: canAlert ? 'critical' : 'info',
       category: 'marketing',
+      alertType: 'benchmark',
       title: canAlert ? 'ROAS de Anúncios Abaixo do Crítico' : 'ROAS de Anúncios Abaixo do Crítico (ref. incompleta)',
       metric: 'ROAS',
       current: atual.marketing.roasAds,
@@ -67,14 +70,16 @@ export const gerarAlertas = (
   }
   
   // 🔴 CRÍTICO: Churn > 40%
-  if (atual.clientes.taxaChurn > 40) {
+  // REGRA: Só gera se benchmark.taxaChurn existir
+  if (atual.clientes.taxaChurn > 40 && benchmarks.taxaChurn) {
     const canAlert = canGenerateCriticalAlert(benchmarks, 'taxaChurn', meta?.taxaChurn);
-    const churnBenchmark = benchmarks.taxaChurn || 28;
+    const churnBenchmark = benchmarks.taxaChurn;
     
     alertas.push({
       id: 'churn-critico',
       severity: canAlert ? 'critical' : 'info',
       category: 'clientes',
+      alertType: 'benchmark',
       title: canAlert ? 'Taxa de Churn em Nível Crítico' : 'Taxa de Churn Alta (ref. incompleta)',
       metric: 'Churn',
       current: atual.clientes.taxaChurn,
@@ -88,17 +93,18 @@ export const gerarAlertas = (
     });
   }
   
-  // 🟡 ATENÇÃO: Queda de receita > 10%
+  // 🟡 ATENÇÃO: Queda de receita > 10% (TEMPORAL - vs mês anterior)
   const quedaReceita = ((atual.vendas.receita - anterior.vendas.receita) / anterior.vendas.receita) * 100;
-  if (quedaReceita < -10) {
+  if (quedaReceita < -10 && anterior.vendas.receita > 0) {
     alertas.push({
       id: 'queda-receita',
       severity: 'warning',
       category: 'vendas',
+      alertType: 'temporal', // Comparação temporal, não benchmark
       title: 'Queda Significativa na Receita',
       metric: 'Receita',
       current: atual.vendas.receita,
-      benchmark: anterior.vendas.receita,
+      benchmark: anterior.vendas.receita, // Benchmark é o mês anterior
       gap: quedaReceita,
       impact: `Perda de R$ ${((anterior.vendas.receita - atual.vendas.receita) / 1000).toFixed(1)}K vs mês anterior`,
       action: 'Revisar estratégia de precificação e campanhas promocionais',
@@ -109,14 +115,16 @@ export const gerarAlertas = (
   }
   
   // 🟡 ATENÇÃO: CAC > R$ 400
-  if (atual.clientes.cac > 400) {
+  // REGRA: Só gera se benchmark.cac existir
+  if (atual.clientes.cac > 400 && benchmarks.cac) {
     const canAlert = canGenerateCriticalAlert(benchmarks, 'cac', meta?.cac);
-    const cacBenchmark = benchmarks.cac || 45;
+    const cacBenchmark = benchmarks.cac;
     
     alertas.push({
       id: 'cac-alto',
       severity: canAlert ? 'warning' : 'info',
       category: 'marketing',
+      alertType: 'benchmark',
       title: canAlert ? 'Custo de Aquisição Elevado' : 'Custo de Aquisição Elevado (ref. incompleta)',
       metric: 'CAC',
       current: atual.clientes.cac,
@@ -130,17 +138,18 @@ export const gerarAlertas = (
     });
   }
   
-  // 🟡 ATENÇÃO: Ticket médio caindo
+  // 🟡 ATENÇÃO: Ticket médio caindo (TEMPORAL - vs mês anterior)
   const quedaTicket = ((atual.vendas.ticketMedioReal - anterior.vendas.ticketMedioReal) / anterior.vendas.ticketMedioReal) * 100;
-  if (quedaTicket < -15) {
+  if (quedaTicket < -15 && anterior.vendas.ticketMedioReal > 0) {
     alertas.push({
       id: 'ticket-queda',
       severity: 'warning',
       category: 'vendas',
+      alertType: 'temporal', // Comparação temporal, não benchmark
       title: 'Ticket Médio em Queda',
       metric: 'Ticket Médio',
       current: atual.vendas.ticketMedioReal,
-      benchmark: anterior.vendas.ticketMedioReal,
+      benchmark: anterior.vendas.ticketMedioReal, // Benchmark é o mês anterior
       gap: quedaTicket,
       impact: `R$ ${(anterior.vendas.ticketMedioReal - atual.vendas.ticketMedioReal).toFixed(2)} a menos por pedido`,
       action: 'Implementar estratégia de upsell/cross-sell e combos',

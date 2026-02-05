@@ -4,7 +4,7 @@ import { calculateSalesMetrics } from "./salesCalculator";
 import { calculateAdsMetrics } from "./adsCalculator";
 import { analyzeChurn } from "./customerBehaviorMetrics";
 import { differenceInDays, parse } from "date-fns";
-import { createDefaultMeta, ExecutiveMetricsMeta } from "@/types/metricNature";
+import { createDefaultMeta, createDefaultSource, ExecutiveMetricsMeta, ExecutiveMetricsSource } from "@/types/metricNature";
 
 /**
  * Calcula ExecutiveMetrics a partir dos dados reais do dashboard
@@ -18,7 +18,8 @@ export const calculateExecutiveMetrics = (
     return null;
   }
 
-  // Inicializar metadados de natureza
+  // Inicializar metadados de natureza e origem
+  const _source = createDefaultSource();
   const _meta = createDefaultMeta();
 
   // Calcular métricas de vendas
@@ -211,6 +212,7 @@ export const calculateExecutiveMetrics = (
       pedidosCancelados,
     },
     _meta,
+    _source,
   };
 };
 

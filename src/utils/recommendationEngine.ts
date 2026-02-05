@@ -3,6 +3,7 @@ import { SectorBenchmarks } from "@/hooks/useAppSettings";
 
 /**
  * Gera recomendações baseadas nas métricas executivas
+ * REGRA: Se benchmark necessário === null → NÃO gerar recomendação
  * @param atual - Métricas do período atual
  * @param anterior - Métricas do período anterior
  * @param benchmarks - Benchmarks do setor (de app_settings)
@@ -14,7 +15,7 @@ export const gerarRecomendacoes = (
 ): Recommendation[] => {
   const recomendacoes: Recommendation[] = [];
   
-  // Rec 1: Otimizar ROAS
+  // Rec 1: Otimizar ROAS (não depende de benchmark específico - threshold fixo 1.5)
   if (atual.marketing.roasAds < 1.5) {
     const campanhasBaixas = Math.round(atual.marketing.investimentoAds * 0.6 / 100);
     const economia = campanhasBaixas * 100 * 0.4;
@@ -40,9 +41,9 @@ export const gerarRecomendacoes = (
   }
   
   // Rec 2: Programa de Retenção
-  const recompraBenchmark = benchmarks.taxaRecompra || 38;
-  if (atual.clientes.taxaRecompra < recompraBenchmark) {
-    const gap = recompraBenchmark - atual.clientes.taxaRecompra;
+  // REGRA: Só gera se benchmark.taxaRecompra existir
+  if (benchmarks.taxaRecompra && atual.clientes.taxaRecompra < benchmarks.taxaRecompra) {
+    const gap = benchmarks.taxaRecompra - atual.clientes.taxaRecompra;
     const potencial = (atual.vendas.receita / atual.clientes.taxaRecompra) * gap;
     
     recomendacoes.push({
@@ -66,9 +67,9 @@ export const gerarRecomendacoes = (
   }
   
   // Rec 3: Estratégia de Upsell
-  const ticketBenchmark = benchmarks.ticketMedio || 180;
-  if (atual.vendas.ticketMedioReal < ticketBenchmark) {
-    const incremento = ticketBenchmark - atual.vendas.ticketMedioReal;
+  // REGRA: Só gera se benchmark.ticketMedio existir
+  if (benchmarks.ticketMedio && atual.vendas.ticketMedioReal < benchmarks.ticketMedio) {
+    const incremento = benchmarks.ticketMedio - atual.vendas.ticketMedioReal;
     const impacto = incremento * atual.vendas.pedidos;
     
     recomendacoes.push({
@@ -91,7 +92,7 @@ export const gerarRecomendacoes = (
     });
   }
   
-  // Rec 4: Otimizar Operações
+  // Rec 4: Otimizar Operações (não depende de benchmark - threshold fixo 3.0 dias)
   if (atual.operacoes.tempoEmissaoNF > 3.0) {
     recomendacoes.push({
       id: 'otimizar-operacoes',
@@ -113,7 +114,7 @@ export const gerarRecomendacoes = (
     });
   }
   
-  // Rec 5: Testar Novos Canais
+  // Rec 5: Testar Novos Canais (não depende de benchmark - threshold fixo CAC > 350)
   if (atual.clientes.cac > 350) {
     recomendacoes.push({
       id: 'novos-canais',

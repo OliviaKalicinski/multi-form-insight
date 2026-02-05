@@ -1,6 +1,6 @@
 // Interfaces para análise executiva
 
-import { ExecutiveMetricsMeta } from './metricNature';
+import { ExecutiveMetricsMeta, ExecutiveMetricsSource } from './metricNature';
 
 export interface VendasMetrics {
   receita: number;
@@ -54,7 +54,8 @@ export interface ExecutiveMetrics {
   clientes: ClientesMetrics;
   produtos: ProdutosMetrics;
   operacoes: OperacoesMetrics;
-  _meta?: ExecutiveMetricsMeta; // Metadados sobre natureza das métricas
+  _meta?: ExecutiveMetricsMeta;
+  _source?: ExecutiveMetricsSource; // Origem de cada métrica
 }
 
 export interface HealthScore {
@@ -75,6 +76,7 @@ export interface CriticalAlert {
   id: string;
   severity: 'critical' | 'warning' | 'info';
   category: 'marketing' | 'vendas' | 'clientes' | 'produtos' | 'operacoes';
+  alertType: 'benchmark' | 'temporal'; // benchmark = vs setor, temporal = vs período anterior
   title: string;
   metric: string;
   current: number;
