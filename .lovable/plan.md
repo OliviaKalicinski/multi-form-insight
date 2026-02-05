@@ -1,326 +1,104 @@
 
 
-# Plano: Etapa 7 — Reflexao Opt-in (Consciencia sem Intervencao)
+# Plano: Ajustes Semanticos no Mapa CTR x ROAS x Intencao de Criativo
 
 ## Objetivo
-Permitir que o usuario acesse um espelho observacional de seu proprio historico de decisoes, de forma completamente voluntaria, sem que o sistema ofereca sugestoes, comparacoes ou induza qualquer acao.
+Aplicar 4 ajustes ao plano do Mapa de Funil antes da implementacao, garantindo linguagem nao-normativa, contrato semantico explicito, escopo fechado e transparencia sobre inferencia.
 
 ---
 
-## Principio-Guia
+## Ajuste 1 — Renomear Thresholds para References
 
-> "O sistema pode revelar o que observa — apenas quando o usuario pede — e nunca como orientacao."
+Trocar a nomenclatura de "threshold" (que implica limite/regra) para "reference" (que implica ponto de observacao).
 
-Esta etapa NAO fecha um loop.
-Ela abre um espelho.
+No arquivo `src/utils/adFormatClassifier.ts`, as constantes serao:
+
+```
+const CTR_REFERENCE = 2.0;   // referencia operacional, nao normativa
+const ROAS_REFERENCE = 1.5;  // referencia operacional, nao normativa
+```
+
+Todas as funcoes internas usarao `CTR_REFERENCE` e `ROAS_REFERENCE`.
 
 ---
 
-## 7.1 — Contrato Etico (Obrigatorio)
+## Ajuste 2 — Contrato Semantico Explicito
 
-Antes de qualquer codigo, o arquivo principal tera o contrato:
+No componente `AdFunnelMap.tsx`, exibir um bloco informativo no topo do card, antes da tabela:
 
-```text
+```
+Este mapa classifica anuncios por funcao estrategica no funil,
+nao por qualidade, sucesso ou fracasso.
+Um anuncio classificado como "Isca de Atencao" pode ser essencial
+para o desempenho geral, mesmo com ROAS baixo.
+```
+
+Visualmente: fundo `slate-50`, borda `slate-200`, texto `slate-600`, icone `Info`.
+
+---
+
+## Ajuste 3 — Escopo Fechado (Proibicoes Explicitas)
+
+No codigo-fonte de `adFormatClassifier.ts`, adicionar contrato no topo:
+
+```
 // ============================================
-// ETAPA 7 — CONTRATO DE REFLEXAO OPT-IN
+// MAPA CTR x ROAS — CONTRATO DE ESCOPO
 // ============================================
 //
-// Esta etapa e:
-//   - EXPLICITA (so aparece se o usuario pedir)
-//   - DESCRITIVA (mostra observacoes)
-//   - NAO OPERACIONAL (nao muda o sistema)
+// FORA DO ESCOPO DESTA VERSAO:
+//   - Pausar anuncios automaticamente
+//   - Reordenar anuncios por quadrante
+//   - Sugerir redistribuicao de orcamento
+//   - Gerar alertas baseados em quadrante
+//   - Criar recomendacoes automaticas
 //
-// PROIBIDO:
-//   - Sugerir acoes
-//   - Recomendar mudancas
-//   - Comparar com "ideal"
-//   - Avaliar comportamento
-//   - Induzir reflexao direcionada
-//
-// O sistema mostra.
-// O usuario interpreta.
+// Este modulo CLASSIFICA. Nao OPERA.
 //
 // ============================================
 ```
 
----
-
-## 7.2 — Gatilho de Entrada (Opt-in Real)
-
-### Onde Fica
-Adicionar um botao discreto no footer do `DecisionMemoryCard` existente.
-
-### Texto do Botao
-"Ver resumo observacional do meu historico"
-
-### Comportamento
-- O botao so aparece se `memory.totalGenerated > 0`
-- Abre um Dialog/Sheet para exibir a reflexao
-- NAO e banner, tooltip, ou descoberta automatica
+Isso impede que futuras iteracoes adicionem automacao sem revisao explicita.
 
 ---
 
-## 7.3 — O Que Pode Ser Mostrado
+## Ajuste 4 — Disclaimer de Inferencia de Formato
 
-A Etapa 7 so pode consumir estados ja existentes:
+No rodape do componente `AdFunnelMap.tsx`, adicionar:
 
-| Permitido | Origem |
-|-----------|--------|
-| `DecisionMemory` | Etapa 4 |
-| `UserDecisionProfile` | Etapa 6 |
-| `ObservedInteractionPattern` | Etapa 6 (renomeado) |
-
-| Proibido | Razao |
-|----------|-------|
-| Qualquer calculo novo | Viola contrato |
-| Score ou ranking | Operacional |
-| Comparacao normativa | Avaliativo |
-
----
-
-## 7.4 — Estrutura da UI (3 Blocos)
-
-### Bloco A — O Que Aconteceu (Fatos)
-Dados factuais, sem adjetivos:
-
-```text
-Voce avaliou explicitamente 8 de 12 recomendacoes.
-Tempo medio entre apresentacao e decisao: 18h.
-Recomendacoes expiradas sem decisao: 2.
+```
+A classificacao de formato (video/estatico) e baseada apenas
+no nome do anuncio e pode conter imprecisoes.
 ```
 
-Fonte: `DecisionMemory` + `UserDecisionProfile`
-
-### Bloco B — Padroes Observados (Latentes)
-Os padroes da Etapa 6, com linguagem fria:
-
-```text
-Padrao observado de latencia: moderado (media 18h).
-Taxa de decisao explicita: 72%.
-Interacao mais frequente com recomendacoes de: Marketing.
-```
-
-Com marcador visual obrigatorio:
-
-```text
-Observacao estatistica. Nao implica preferencia.
-```
-
-### Bloco C — Limite Explicito (Rodape Obrigatorio)
-O rodape etico:
-
-```text
-Este resumo nao altera como o sistema funciona.
-Ele existe apenas para tornar visivel o historico das interacoes.
-```
-
-Este texto e a trava etica. NAO e decorativo.
+Texto em `slate-400`, tamanho `text-xs`, separado por `Separator`.
 
 ---
 
-## 7.5 — Linguagem (Regras Absolutas)
+## Arquivos Afetados
 
-### Proibido
-| Frase | Motivo |
-|-------|--------|
-| "voce tende a..." | Inferencia comportamental |
-| "isso indica que..." | Interpretacao |
-| "o ideal seria..." | Normativo |
-| "usuarios como voce..." | Comparativo |
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/utils/adFormatClassifier.ts` | Usar `CTR_REFERENCE`/`ROAS_REFERENCE` + contrato de escopo no topo |
+| `src/components/dashboard/AdFunnelMap.tsx` | Contrato semantico no topo + disclaimer de formato no rodape |
 
-### Permitido
-| Frase | Tipo |
-|-------|------|
-| "foi observado que..." | Descritivo |
-| "em X eventos..." | Factual |
-| "nao ha dados suficientes para inferir..." | Transparente |
-
----
-
-## 7.6 — Saida Limpa (Sem Gancho)
-
-Depois de fechar o painel:
-- Nenhuma sugestao
-- Nenhuma CTA
-- Nenhuma "proxima acao"
-
-O sistema NAO capitaliza a reflexao.
-
----
-
-## Arquivos a Criar/Modificar
-
-| Arquivo | Acao |
-|---------|------|
-| `src/components/executive/ReflectionModal.tsx` | CRIAR |
-| `src/components/executive/DecisionMemoryCard.tsx` | MODIFICAR - Adicionar botao opt-in |
-
----
-
-## Detalhes de Implementacao
-
-### 1. Novo Componente: ReflectionModal.tsx
-
-Componente que recebe `memory`, `profile` e `interactionStyle` e exibe os 3 blocos.
-
-Props:
-```text
-interface ReflectionModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  memory: DecisionMemory;
-  profile: UserDecisionProfile | null;
-  interactionStyle: ObservedInteractionPattern;
-}
-```
-
-Mapa de labels para padroes:
-```text
-const LatencyPatternLabels = {
-  fast: 'rapido (media < 4h)',
-  moderate: 'moderado (media 4-24h)',
-  slow: 'lento (media > 24h)',
-  insufficient_data: 'dados insuficientes',
-};
-
-const InteractionPatternLabels = {
-  UNKNOWN: 'dados insuficientes para padrao',
-  DIRECT_PREFERENCE: 'decisoes rapidas com alta taxa explicita',
-  DELIBERATIVE: 'decisoes lentas com multiplas sessoes',
-  SELECTIVE: 'alta taxa de rejeicao explicita',
-  PASSIVE: 'muitas expiracoes, poucas decisoes explicitas',
-};
-```
-
-### 2. Modificacao: DecisionMemoryCard.tsx
-
-Adicionar state e botao:
-```text
-// Adicionar import do ReflectionModal
-// Adicionar state: const [isReflectionOpen, setIsReflectionOpen] = useState(false);
-// Adicionar props: profile, interactionStyle
-
-// No footer, antes do disclaimer:
-<Button
-  variant="ghost"
-  size="sm"
-  onClick={() => setIsReflectionOpen(true)}
-  className="w-full text-slate-500 hover:text-slate-700"
->
-  <Eye className="h-4 w-4 mr-2" />
-  Ver resumo observacional do meu historico
-</Button>
-
-<ReflectionModal
-  isOpen={isReflectionOpen}
-  onClose={() => setIsReflectionOpen(false)}
-  memory={memory}
-  profile={profile}
-  interactionStyle={interactionStyle}
-/>
-```
-
-### 3. Ajuste: ExecutiveDashboard ou onde DecisionMemoryCard e usado
-
-Passar `profile` e `interactionStyle` do hook para o card:
-```text
-const { memory, profile, interactionStyle } = useDecisionEvents();
-
-<DecisionMemoryCard 
-  memory={memory} 
-  profile={profile}
-  interactionStyle={interactionStyle}
-/>
-```
-
----
-
-## Ordem de Execucao
-
-```text
-1. Criar src/components/executive/ReflectionModal.tsx
-2. Modificar src/components/executive/DecisionMemoryCard.tsx
-3. Ajustar onde DecisionMemoryCard e usado para passar novas props
-```
-
----
-
-## Criterio de Sucesso
-
-A etapa esta correta se:
-
-| Pergunta | Resposta Correta |
-|----------|------------------|
-| O painel aparece automaticamente? | Nao |
-| O sistema sugere algo? | Nao |
-| Ha comparacao com "ideal"? | Nao |
-| Alguma CTA apos fechar? | Nao |
-| A linguagem e puramente descritiva? | Sim |
-| O rodape etico esta presente? | Sim |
-
----
-
-## Teste de Integridade (Checklist)
-
-| Item | Verificacao |
-|------|-------------|
-| O painel so abre por clique explicito? | Check |
-| Nenhum texto usa "voce tende a..."? | Check |
-| Nenhum texto usa "recomendamos..."? | Check |
-| O rodape etico esta visivel? | Check |
-| Nao ha botao de acao apos fechar? | Check |
-| O sistema continua funcionando igual? | Check |
-
----
-
-## Exemplo Visual Final
-
-```text
-+----------------------------------------------------+
-| DIALOG: Resumo Observacional                        |
-+----------------------------------------------------+
-|                                                     |
-| === O QUE ACONTECEU ===                            |
-| Em 12 recomendacoes apresentadas:                  |
-| - 8 foram avaliadas explicitamente                 |
-| - 2 foram aceitas                                  |
-| - 6 foram rejeitadas                               |
-| - 2 expiraram sem decisao                          |
-|                                                     |
-| Tempo medio entre apresentacao e decisao: 18h.     |
-|                                                     |
-+----------------------------------------------------+
-|                                                     |
-| === PADROES OBSERVADOS ===                         |
-| Padrao de latencia: moderado (media 18h)           |
-| Taxa de decisao explicita: 72%                     |
-| Interacao mais frequente: Marketing (5 eventos)    |
-|                                                     |
-| [!] Observacao estatistica. Nao implica            |
-|     preferencia.                                   |
-|                                                     |
-+----------------------------------------------------+
-|                                                     |
-| Este resumo nao altera como o sistema funciona.    |
-| Ele existe apenas para tornar visivel o historico  |
-| das interacoes.                                    |
-|                                                     |
-|                              [Fechar]              |
-+----------------------------------------------------+
-```
+Nenhum arquivo novo. Estes ajustes se aplicam ao plano ja aprovado (que ainda nao foi implementado), modificando-o antes da criacao dos arquivos.
 
 ---
 
 ## Secao Tecnica
 
-### Dependencias
-- Dialog do Radix UI (ja disponivel)
-- Tipos de `src/types/implicitLearning.ts`
-- Tipos de `src/types/decisions.ts`
-- Hook `useDecisionEvents`
+### Resumo das Constantes
+- `CTR_REFERENCE = 2.0` (antes: `CTR_THRESHOLD`)
+- `ROAS_REFERENCE = 1.5` (antes: `ROAS_THRESHOLD`)
 
-### Padroes Seguidos
-- Modal pattern igual ao `RejectionModal`
-- Cores neutras slate como `DecisionMemoryCard`
-- Separadores com `Separator`
+### Textos Obrigatorios no Componente
+1. Bloco informativo (topo): contrato semantico sobre funcao no funil
+2. Rodape: disclaimer sobre inferencia de formato
+
+### Contrato no Codigo-Fonte
+Bloco de comentario no topo de `adFormatClassifier.ts` listando proibicoes explicitas
+
+### Ordem de Execucao
+Estes ajustes serao incorporados diretamente na implementacao do plano original (criacao dos arquivos). Nao ha execucao separada.
 
