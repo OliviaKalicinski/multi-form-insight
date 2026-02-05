@@ -1,11 +1,17 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { DecisionMemory } from "@/types/decisions";
-import { History, Clock, Info } from "lucide-react";
+import { UserDecisionProfile, ObservedInteractionPattern } from "@/types/implicitLearning";
+import { History, Clock, Info, Eye } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { ReflectionModal } from "./ReflectionModal";
 
 interface DecisionMemoryCardProps {
   memory: DecisionMemory;
+  profile: UserDecisionProfile | null;
+  interactionStyle: ObservedInteractionPattern;
 }
 
 // Mapa de tradução para nomes legíveis de métricas
@@ -33,7 +39,13 @@ const getMetricLabel = (key: string): string => {
   return metricLabels[key] || key;
 };
 
-export const DecisionMemoryCard = ({ memory }: DecisionMemoryCardProps) => {
+export const DecisionMemoryCard = ({ 
+  memory, 
+  profile, 
+  interactionStyle 
+}: DecisionMemoryCardProps) => {
+  const [isReflectionOpen, setIsReflectionOpen] = useState(false);
+
   // Não exibir se não há histórico
   if (memory.totalGenerated === 0) {
     return null;
@@ -140,8 +152,19 @@ export const DecisionMemoryCard = ({ memory }: DecisionMemoryCardProps) => {
           </>
         )}
 
-        {/* SEÇÃO 5: Rodapé Epistemológico */}
+        {/* SEÇÃO 5: Botão Opt-in para Reflexão */}
         <Separator className="bg-slate-200" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsReflectionOpen(true)}
+          className="w-full text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+        >
+          <Eye className="h-4 w-4 mr-2" />
+          Ver resumo observacional do meu histórico
+        </Button>
+
+        {/* SEÇÃO 6: Rodapé Epistemológico */}
         <div className="flex items-start gap-2 text-xs text-slate-400">
           <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
           <p>
@@ -150,6 +173,15 @@ export const DecisionMemoryCard = ({ memory }: DecisionMemoryCardProps) => {
           </p>
         </div>
       </CardContent>
+
+      {/* Modal de Reflexão Opt-in */}
+      <ReflectionModal
+        isOpen={isReflectionOpen}
+        onClose={() => setIsReflectionOpen(false)}
+        memory={memory}
+        profile={profile}
+        interactionStyle={interactionStyle}
+      />
     </Card>
   );
 };

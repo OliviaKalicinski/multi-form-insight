@@ -29,7 +29,10 @@ export default function AnaliseCritica() {
     accept, 
     reject,
     expireOldEvents,
-    loading: loadingDecisions 
+    loading: loadingDecisions,
+    // ⚠️ OBSERVATIONAL ONLY — Etapa 7: Reflexão Opt-in
+    profile,
+    interactionStyle,
   } = useDecisionEvents();
   
   // Expirar eventos antigos ao carregar
@@ -298,7 +301,11 @@ export default function AnaliseCritica() {
       
       {/* MEMÓRIA DE DECISÃO */}
       {memory.totalGenerated > 0 && (
-        <DecisionMemoryCard memory={memory} />
+        <DecisionMemoryCard 
+          memory={memory} 
+          profile={profile}
+          interactionStyle={interactionStyle}
+        />
       )}
       
       {/* ANÁLISE TRIMESTRAL */}
