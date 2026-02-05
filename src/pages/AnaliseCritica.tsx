@@ -7,6 +7,7 @@ import { CriticalAlertCard } from "@/components/executive/CriticalAlertCard";
 import { RecommendationCard } from "@/components/executive/RecommendationCard";
 import { ComparativeMetricCard } from "@/components/executive/ComparativeMetricCard";
 import { TrendInsightCard } from "@/components/executive/TrendInsightCard";
+import { DecisionMemoryCard } from "@/components/executive/DecisionMemoryCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { calcularHealthScore, gerarComparacaoMoM, gerarAnaliseTrimestral, gerarInsights } from "@/utils/criticalAnalysis";
 import { gerarAlertas } from "@/utils/alertSystem";
@@ -23,6 +24,7 @@ export default function AnaliseCritica() {
   const { sectorBenchmarks } = useAppSettings();
   const { 
     events, 
+    memory,
     registerRecommendation, 
     accept, 
     reject,
@@ -292,6 +294,11 @@ export default function AnaliseCritica() {
             ))}
           </div>
         </div>
+      )}
+      
+      {/* MEMÓRIA DE DECISÃO */}
+      {memory.totalGenerated > 0 && (
+        <DecisionMemoryCard memory={memory} />
       )}
       
       {/* ANÁLISE TRIMESTRAL */}
