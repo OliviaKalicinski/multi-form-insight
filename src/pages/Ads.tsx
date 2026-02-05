@@ -25,6 +25,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
+import { AdFunnelMap } from "@/components/dashboard/AdFunnelMap";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -908,6 +909,11 @@ const Ads = () => {
 
               {/* ===== ROW 4: Breakdown by Ad (uses activeAdsData for objective-filtered view) ===== */}
               <AdsBreakdown ads={activeAdsData} selectedMonth={selectedMonth || ""} />
+
+              {/* ===== ROW 5: Funnel Map (Sales view only) ===== */}
+              {objectivesSummary.isSalesView && (
+                <AdFunnelMap adsData={activeAdsData} />
+              )}
             </>
           )}
         </div>
