@@ -13,7 +13,7 @@
 import { DecisionEvent } from '@/types/decisions';
 import {
   UserDecisionProfile,
-  InteractionStyleTendency,
+  ObservedInteractionPattern,
   ProfileMaturity,
   DecisionLatencyPattern,
   CategoryEngagement,
@@ -267,11 +267,13 @@ export function computeUserDecisionProfile(
 }
 
 /**
- * Infere a tendência de estilo de interação do usuário.
+ * Infere o padrão de interação observado do usuário.
  * 
  * @description
  * Esta inferência é DESCRITIVA, não PRESCRITIVA.
  * O resultado NÃO pode ser usado para adaptar o sistema.
+ * 
+ * "O sistema aprende, mas não age como se soubesse."
  * 
  * Lógica de inferência:
  * - UNKNOWN: perfil não confiável
@@ -282,8 +284,8 @@ export function computeUserDecisionProfile(
  */
 export function inferInteractionStyle(
   profile: UserDecisionProfile
-): InteractionStyleTendency {
-  // Perfil não confiável = estilo desconhecido
+): ObservedInteractionPattern {
+  // Perfil não confiável = padrão desconhecido
   if (!profile.isReliable) {
     return 'UNKNOWN';
   }

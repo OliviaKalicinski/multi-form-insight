@@ -10,12 +10,15 @@
 // "O sistema aprende, mas não age como se soubesse."
 
 /**
- * Tendência de estilo de interação inferida do comportamento do usuário.
+ * Padrão de interação observado do comportamento do usuário.
  * 
  * @description Este tipo é OBSERVACIONAL, não OPERACIONAL.
  * Não pode ser usado para alterar ranking, frequência, ou visibilidade.
+ * 
+ * O nome "Observed" é intencional: descreve o passado, não prescreve o futuro.
+ * "O sistema aprende, mas não age como se soubesse."
  */
-export type InteractionStyleTendency = 
+export type ObservedInteractionPattern = 
   | 'UNKNOWN'           // Dados insuficientes
   | 'DIRECT_PREFERENCE' // Padrão: decisões rápidas, alta taxa explícita
   | 'DELIBERATIVE'      // Padrão: decisões lentas, múltiplas sessões

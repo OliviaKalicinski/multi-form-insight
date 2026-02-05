@@ -13,7 +13,7 @@ import {
 } from '@/types/decisions';
 import { Recommendation } from '@/types/executive';
 import { toast } from 'sonner';
-import { UserDecisionProfile, InteractionStyleTendency } from '@/types/implicitLearning';
+import { UserDecisionProfile, ObservedInteractionPattern } from '@/types/implicitLearning';
 import { computeUserDecisionProfile, inferInteractionStyle } from '@/utils/implicitLearningCalculator';
 
 interface RegisterRecommendationParams {
@@ -329,8 +329,8 @@ export function useDecisionEvents() {
     return computeUserDecisionProfile(user.id, events, new Date());
   }, [user?.id, events]);
 
-  // Estilo de interação inferido (também latente, sem efeito)
-  const interactionStyle = useMemo((): InteractionStyleTendency => {
+  // Padrão de interação observado (também latente, sem efeito)
+  const interactionStyle = useMemo((): ObservedInteractionPattern => {
     if (!profile) return 'UNKNOWN';
     return inferInteractionStyle(profile);
   }, [profile]);
@@ -347,7 +347,15 @@ export function useDecisionEvents() {
     checkPreviousRejections,
     getPendingEventForRecommendation,
     fetchEvents,
-    // Etapa 6: estados latentes (observacionais, não operacionais)
+    
+    // ============================================
+    // ⚠️ OBSERVATIONAL ONLY — DO NOT USE FOR UI OR LOGIC
+    // ============================================
+    // Etapa 6: estados latentes de aprendizado implícito.
+    // Esses valores existem para observação futura.
+    // NÃO usar para: ranking, filtro, linguagem, frequência.
+    // "O sistema aprende, mas não age como se soubesse."
+    // ============================================
     profile,
     interactionStyle,
   };
