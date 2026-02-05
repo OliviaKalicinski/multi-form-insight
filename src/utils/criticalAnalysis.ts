@@ -143,22 +143,24 @@ export const calcularHealthScore = (
 const calcularScoreMarketing = (
   marketing: ExecutiveMetrics['marketing'],
   benchmarks: SectorBenchmarks
-): number => {
+): number | null => {
+  // REGRA: Sem benchmarks, não calcular score
+  if (!benchmarks.roasMedio || !benchmarks.ctr || !benchmarks.cpc) {
+    return null;
+  }
+  
   let score = 0;
   
   // ROAS (40 pontos)
-  const roasBenchmark = benchmarks.roasMedio || 3.2;
-  const roasScore = Math.min((marketing.roasAds / roasBenchmark) * 40, 40);
+  const roasScore = Math.min((marketing.roasAds / benchmarks.roasMedio) * 40, 40);
   score += roasScore;
   
   // CTR (30 pontos)
-  const ctrBenchmark = benchmarks.ctr || 1.8;
-  const ctrScore = Math.min((marketing.ctr / ctrBenchmark) * 30, 30);
+  const ctrScore = Math.min((marketing.ctr / benchmarks.ctr) * 30, 30);
   score += ctrScore;
   
   // CPC (30 pontos - invertido, menor é melhor)
-  const cpcBenchmark = benchmarks.cpc || 0.45;
-  const cpcScore = Math.min((cpcBenchmark / marketing.cpc) * 30, 30);
+  const cpcScore = Math.min((benchmarks.cpc / marketing.cpc) * 30, 30);
   score += cpcScore;
   
   return Math.round(score);
@@ -167,17 +169,20 @@ const calcularScoreMarketing = (
 const calcularScoreVendas = (
   vendas: ExecutiveMetrics['vendas'],
   benchmarks: SectorBenchmarks
-): number => {
+): number | null => {
+  // REGRA: Sem benchmarks, não calcular score
+  if (!benchmarks.taxaConversao || !benchmarks.ticketMedio) {
+    return null;
+  }
+  
   let score = 0;
   
   // Conversão (50 pontos)
-  const conversaoBenchmark = benchmarks.taxaConversao || 1.2;
-  const conversaoScore = Math.min((vendas.conversao / conversaoBenchmark) * 50, 50);
+  const conversaoScore = Math.min((vendas.conversao / benchmarks.taxaConversao) * 50, 50);
   score += conversaoScore;
   
   // Ticket Médio (50 pontos)
-  const ticketBenchmark = benchmarks.ticketMedio || 180;
-  const ticketScore = Math.min((vendas.ticketMedioReal / ticketBenchmark) * 50, 50);
+  const ticketScore = Math.min((vendas.ticketMedioReal / benchmarks.ticketMedio) * 50, 50);
   score += ticketScore;
   
   return Math.round(score);
@@ -186,22 +191,24 @@ const calcularScoreVendas = (
 const calcularScoreClientes = (
   clientes: ExecutiveMetrics['clientes'],
   benchmarks: SectorBenchmarks
-): number => {
+): number | null => {
+  // REGRA: Sem benchmarks, não calcular score
+  if (!benchmarks.taxaRecompra || !benchmarks.taxaChurn || !benchmarks.ltv) {
+    return null;
+  }
+  
   let score = 0;
   
   // Taxa de Recompra (40 pontos)
-  const recompraBenchmark = benchmarks.taxaRecompra || 38;
-  const recompraScore = Math.min((clientes.taxaRecompra / recompraBenchmark) * 40, 40);
+  const recompraScore = Math.min((clientes.taxaRecompra / benchmarks.taxaRecompra) * 40, 40);
   score += recompraScore;
   
   // Taxa de Churn (invertida - 40 pontos)
-  const churnBenchmark = benchmarks.taxaChurn || 28;
-  const churnScore = Math.min((churnBenchmark / clientes.taxaChurn) * 40, 40);
+  const churnScore = Math.min((benchmarks.taxaChurn / clientes.taxaChurn) * 40, 40);
   score += churnScore;
   
   // LTV (20 pontos)
-  const ltvBenchmark = benchmarks.ltv || 420;
-  const ltvScore = Math.min((clientes.ltv / ltvBenchmark) * 20, 20);
+  const ltvScore = Math.min((clientes.ltv / benchmarks.ltv) * 20, 20);
   score += ltvScore;
   
   return Math.round(score);
@@ -210,15 +217,19 @@ const calcularScoreClientes = (
 const calcularScoreProdutos = (
   produtos: ExecutiveMetrics['produtos'],
   benchmarks: SectorBenchmarks
-): number => {
+): number | null => {
+  // REGRA: Sem benchmark de margem, não calcular score
+  if (!benchmarks.margemLiquida) {
+    return null;
+  }
+  
   let score = 0;
   
   // Margem (60 pontos)
-  const margemBenchmark = benchmarks.margemLiquida || 22;
-  const margemScore = Math.min((produtos.margemMedia / margemBenchmark) * 60, 60);
+  const margemScore = Math.min((produtos.margemMedia / benchmarks.margemLiquida) * 60, 60);
   score += margemScore;
   
-  // Diversificação (40 pontos)
+  // Diversificação (40 pontos) - não depende de benchmark
   const diversificacaoScore = Math.min((produtos.sku / 50) * 40, 40);
   score += diversificacaoScore;
   
@@ -369,25 +380,23 @@ export const gerarInsights = (
     });
   }
   
-  // Atenções
-  const roasBenchmark = benchmarks.roasMedio || 3.2;
-  if (atual.marketing.roasAds < 0.8) {
+  // Atenções - REGRA: Só gera se benchmark existir
+  if (benchmarks.roasMedio && atual.marketing.roasAds < 0.8) {
     const prejuizo = atual.marketing.investimentoAds - atual.marketing.receitaAds;
     insights.push({
       type: 'atencao',
       title: 'ROAS Crítico - Operação em Prejuízo',
-      description: `ROAS de ${atual.marketing.roasAds.toFixed(2)}x está ${((roasBenchmark - atual.marketing.roasAds) / roasBenchmark * 100).toFixed(0)}% abaixo do benchmark do setor (${roasBenchmark}x). Prejuízo operacional de R$ ${(prejuizo / 1000).toFixed(1)}K no mês. Urgente: revisar campanhas com baixo ROI e realocar budget.`,
+      description: `ROAS de ${atual.marketing.roasAds.toFixed(2)}x está ${((benchmarks.roasMedio - atual.marketing.roasAds) / benchmarks.roasMedio * 100).toFixed(0)}% abaixo do benchmark do setor (${benchmarks.roasMedio}x). Prejuízo operacional de R$ ${(prejuizo / 1000).toFixed(1)}K no mês. Urgente: revisar campanhas com baixo ROI e realocar budget.`,
       metrics: [
         { label: 'ROAS Atual', value: atual.marketing.roasAds.toFixed(2) + 'x', trend: calcularVariacao(atual.marketing.roasAds, anterior.marketing.roasAds) },
-        { label: 'Benchmark', value: roasBenchmark.toFixed(2) + 'x', trend: 0 },
+        { label: 'Benchmark', value: benchmarks.roasMedio.toFixed(2) + 'x', trend: 0 },
       ],
     });
   }
   
-  // Oportunidades
-  const recompraBenchmark = benchmarks.taxaRecompra || 38;
-  if (atual.clientes.taxaRecompra < recompraBenchmark) {
-    const gap = recompraBenchmark - atual.clientes.taxaRecompra;
+  // Oportunidades - REGRA: Só gera se benchmark existir
+  if (benchmarks.taxaRecompra && atual.clientes.taxaRecompra < benchmarks.taxaRecompra) {
+    const gap = benchmarks.taxaRecompra - atual.clientes.taxaRecompra;
     const potencial = (atual.vendas.receita / atual.clientes.taxaRecompra) * gap;
     insights.push({
       type: 'oportunidade',
@@ -395,7 +404,7 @@ export const gerarInsights = (
       description: `Taxa de recompra de ${atual.clientes.taxaRecompra}% está ${gap.toFixed(0)}pp abaixo do setor. Implementar programa de fidelidade + email marketing pode gerar +R$ ${(potencial / 1000).toFixed(1)}K/mês em receita recorrente.`,
       metrics: [
         { label: 'Recompra Atual', value: atual.clientes.taxaRecompra + '%', trend: 0 },
-        { label: 'Potencial', value: recompraBenchmark + '%', trend: 0 },
+        { label: 'Potencial', value: benchmarks.taxaRecompra + '%', trend: 0 },
       ],
     });
   }
