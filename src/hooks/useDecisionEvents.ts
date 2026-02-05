@@ -19,6 +19,7 @@ interface RegisterRecommendationParams {
   periodReference: string;
   metricValue: number;
   benchmark: number | null;
+  metricSnapshotLabel?: string; // Snapshot legível da métrica (ex: "ROAS = 0.74x")
 }
 
 export function useDecisionEvents() {
@@ -77,6 +78,7 @@ export function useDecisionEvents() {
     periodReference,
     metricValue,
     benchmark,
+    metricSnapshotLabel,
   }: RegisterRecommendationParams): Promise<string | null> => {
     if (!user?.id) {
       console.warn('Usuário não autenticado - não é possível registrar decisão');
