@@ -1,116 +1,326 @@
 
 
-# Plano: Ajustes Semânticos de Proteção — Etapa 6
+# Plano: Etapa 7 — Reflexao Opt-in (Consciencia sem Intervencao)
 
 ## Objetivo
-Congelar semanticamente os tipos e valores da Etapa 6 para impedir interpretações futuras que levem a uso operacional.
+Permitir que o usuario acesse um espelho observacional de seu proprio historico de decisoes, de forma completamente voluntaria, sem que o sistema ofereca sugestoes, comparacoes ou induza qualquer acao.
 
 ---
 
-## Ajuste 1: Renomear InteractionStyleTendency
+## Principio-Guia
 
-### Problema
-O nome `InteractionStyleTendency` pode sugerir que o sistema deve "atender" a essa tendência.
+> "O sistema pode revelar o que observa — apenas quando o usuario pede — e nunca como orientacao."
 
-### Solução
-Renomear para `ObservedInteractionPattern` — reforça que é um **padrão observado**, não uma preferência a ser atendida.
-
-### Arquivos a Modificar
-
-| Arquivo | Mudança |
-|---------|---------|
-| `src/types/implicitLearning.ts` | Renomear tipo e atualizar JSDoc |
-| `src/utils/implicitLearningCalculator.ts` | Atualizar imports e referências |
-| `src/hooks/useDecisionEvents.ts` | Atualizar import e tipo de retorno |
-
-### Código Específico
-
-**src/types/implicitLearning.ts** (linhas 12-23):
-```typescript
-/**
- * Padrão de interação observado do comportamento do usuário.
- * 
- * @description Este tipo é OBSERVACIONAL, não OPERACIONAL.
- * Não pode ser usado para alterar ranking, frequência, ou visibilidade.
- * 
- * O nome "Observed" é intencional: descreve o passado, não prescreve o futuro.
- */
-export type ObservedInteractionPattern = 
-  | 'UNKNOWN'           // Dados insuficientes
-  | 'DIRECT_PREFERENCE' // Padrão: decisões rápidas, alta taxa explícita
-  | 'DELIBERATIVE'      // Padrão: decisões lentas, múltiplas sessões
-  | 'SELECTIVE'         // Padrão: alta taxa de rejeição explícita
-  | 'PASSIVE';          // Padrão: muitas expirações, poucas decisões
-```
+Esta etapa NAO fecha um loop.
+Ela abre um espelho.
 
 ---
 
-## Ajuste 2: Comentários de Proteção no Retorno do Hook
+## 7.1 — Contrato Etico (Obrigatorio)
 
-### Problema
-O ponto de consumo é o mais perigoso. Alguém pode importar `profile` e usá-lo para filtrar.
-
-### Solução
-Adicionar comentário de alerta explícito no retorno do hook.
-
-### Código Específico
-
-**src/hooks/useDecisionEvents.ts** (linhas 338-353):
-```typescript
-  return {
-    events,
-    memory,
-    loading,
-    error,
-    registerRecommendation,
-    accept,
-    reject,
-    expireOldEvents,
-    checkPreviousRejections,
-    getPendingEventForRecommendation,
-    fetchEvents,
-    
-    // ============================================
-    // ⚠️ OBSERVATIONAL ONLY — DO NOT USE FOR UI OR LOGIC
-    // ============================================
-    // Etapa 6: estados latentes de aprendizado implícito.
-    // Esses valores existem para observação futura.
-    // NÃO usar para: ranking, filtro, linguagem, frequência.
-    // "O sistema aprende, mas não age como se soubesse."
-    // ============================================
-    profile,
-    interactionStyle,
-  };
-```
-
----
-
-## Resumo de Mudanças
-
-| Arquivo | Linha(s) | Mudança |
-|---------|----------|---------|
-| `src/types/implicitLearning.ts` | 12-23 | Renomear `InteractionStyleTendency` → `ObservedInteractionPattern` |
-| `src/utils/implicitLearningCalculator.ts` | 16, 283-285 | Atualizar import e assinatura de função |
-| `src/hooks/useDecisionEvents.ts` | 16, 333, 338-353 | Atualizar import e adicionar comentários de proteção |
-
----
-
-## Ordem de Execução
+Antes de qualquer codigo, o arquivo principal tera o contrato:
 
 ```text
-1. src/types/implicitLearning.ts — Renomear tipo
-2. src/utils/implicitLearningCalculator.ts — Atualizar referências
-3. src/hooks/useDecisionEvents.ts — Atualizar import + comentários
+// ============================================
+// ETAPA 7 — CONTRATO DE REFLEXAO OPT-IN
+// ============================================
+//
+// Esta etapa e:
+//   - EXPLICITA (so aparece se o usuario pedir)
+//   - DESCRITIVA (mostra observacoes)
+//   - NAO OPERACIONAL (nao muda o sistema)
+//
+// PROIBIDO:
+//   - Sugerir acoes
+//   - Recomendar mudancas
+//   - Comparar com "ideal"
+//   - Avaliar comportamento
+//   - Induzir reflexao direcionada
+//
+// O sistema mostra.
+// O usuario interpreta.
+//
+// ============================================
 ```
 
 ---
 
-## Critério de Sucesso
+## 7.2 — Gatilho de Entrada (Opt-in Real)
 
-A mudança está correta se:
+### Onde Fica
+Adicionar um botao discreto no footer do `DecisionMemoryCard` existente.
 
-1. O nome do tipo comunica claramente que é **observação**, não **preferência**
-2. O comentário no retorno do hook é visível e explícito
-3. Qualquer desenvolvedor futuro entende imediatamente que não deve usar para lógica
-4. A frase-guia aparece no ponto de consumo
+### Texto do Botao
+"Ver resumo observacional do meu historico"
+
+### Comportamento
+- O botao so aparece se `memory.totalGenerated > 0`
+- Abre um Dialog/Sheet para exibir a reflexao
+- NAO e banner, tooltip, ou descoberta automatica
+
+---
+
+## 7.3 — O Que Pode Ser Mostrado
+
+A Etapa 7 so pode consumir estados ja existentes:
+
+| Permitido | Origem |
+|-----------|--------|
+| `DecisionMemory` | Etapa 4 |
+| `UserDecisionProfile` | Etapa 6 |
+| `ObservedInteractionPattern` | Etapa 6 (renomeado) |
+
+| Proibido | Razao |
+|----------|-------|
+| Qualquer calculo novo | Viola contrato |
+| Score ou ranking | Operacional |
+| Comparacao normativa | Avaliativo |
+
+---
+
+## 7.4 — Estrutura da UI (3 Blocos)
+
+### Bloco A — O Que Aconteceu (Fatos)
+Dados factuais, sem adjetivos:
+
+```text
+Voce avaliou explicitamente 8 de 12 recomendacoes.
+Tempo medio entre apresentacao e decisao: 18h.
+Recomendacoes expiradas sem decisao: 2.
+```
+
+Fonte: `DecisionMemory` + `UserDecisionProfile`
+
+### Bloco B — Padroes Observados (Latentes)
+Os padroes da Etapa 6, com linguagem fria:
+
+```text
+Padrao observado de latencia: moderado (media 18h).
+Taxa de decisao explicita: 72%.
+Interacao mais frequente com recomendacoes de: Marketing.
+```
+
+Com marcador visual obrigatorio:
+
+```text
+Observacao estatistica. Nao implica preferencia.
+```
+
+### Bloco C — Limite Explicito (Rodape Obrigatorio)
+O rodape etico:
+
+```text
+Este resumo nao altera como o sistema funciona.
+Ele existe apenas para tornar visivel o historico das interacoes.
+```
+
+Este texto e a trava etica. NAO e decorativo.
+
+---
+
+## 7.5 — Linguagem (Regras Absolutas)
+
+### Proibido
+| Frase | Motivo |
+|-------|--------|
+| "voce tende a..." | Inferencia comportamental |
+| "isso indica que..." | Interpretacao |
+| "o ideal seria..." | Normativo |
+| "usuarios como voce..." | Comparativo |
+
+### Permitido
+| Frase | Tipo |
+|-------|------|
+| "foi observado que..." | Descritivo |
+| "em X eventos..." | Factual |
+| "nao ha dados suficientes para inferir..." | Transparente |
+
+---
+
+## 7.6 — Saida Limpa (Sem Gancho)
+
+Depois de fechar o painel:
+- Nenhuma sugestao
+- Nenhuma CTA
+- Nenhuma "proxima acao"
+
+O sistema NAO capitaliza a reflexao.
+
+---
+
+## Arquivos a Criar/Modificar
+
+| Arquivo | Acao |
+|---------|------|
+| `src/components/executive/ReflectionModal.tsx` | CRIAR |
+| `src/components/executive/DecisionMemoryCard.tsx` | MODIFICAR - Adicionar botao opt-in |
+
+---
+
+## Detalhes de Implementacao
+
+### 1. Novo Componente: ReflectionModal.tsx
+
+Componente que recebe `memory`, `profile` e `interactionStyle` e exibe os 3 blocos.
+
+Props:
+```text
+interface ReflectionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  memory: DecisionMemory;
+  profile: UserDecisionProfile | null;
+  interactionStyle: ObservedInteractionPattern;
+}
+```
+
+Mapa de labels para padroes:
+```text
+const LatencyPatternLabels = {
+  fast: 'rapido (media < 4h)',
+  moderate: 'moderado (media 4-24h)',
+  slow: 'lento (media > 24h)',
+  insufficient_data: 'dados insuficientes',
+};
+
+const InteractionPatternLabels = {
+  UNKNOWN: 'dados insuficientes para padrao',
+  DIRECT_PREFERENCE: 'decisoes rapidas com alta taxa explicita',
+  DELIBERATIVE: 'decisoes lentas com multiplas sessoes',
+  SELECTIVE: 'alta taxa de rejeicao explicita',
+  PASSIVE: 'muitas expiracoes, poucas decisoes explicitas',
+};
+```
+
+### 2. Modificacao: DecisionMemoryCard.tsx
+
+Adicionar state e botao:
+```text
+// Adicionar import do ReflectionModal
+// Adicionar state: const [isReflectionOpen, setIsReflectionOpen] = useState(false);
+// Adicionar props: profile, interactionStyle
+
+// No footer, antes do disclaimer:
+<Button
+  variant="ghost"
+  size="sm"
+  onClick={() => setIsReflectionOpen(true)}
+  className="w-full text-slate-500 hover:text-slate-700"
+>
+  <Eye className="h-4 w-4 mr-2" />
+  Ver resumo observacional do meu historico
+</Button>
+
+<ReflectionModal
+  isOpen={isReflectionOpen}
+  onClose={() => setIsReflectionOpen(false)}
+  memory={memory}
+  profile={profile}
+  interactionStyle={interactionStyle}
+/>
+```
+
+### 3. Ajuste: ExecutiveDashboard ou onde DecisionMemoryCard e usado
+
+Passar `profile` e `interactionStyle` do hook para o card:
+```text
+const { memory, profile, interactionStyle } = useDecisionEvents();
+
+<DecisionMemoryCard 
+  memory={memory} 
+  profile={profile}
+  interactionStyle={interactionStyle}
+/>
+```
+
+---
+
+## Ordem de Execucao
+
+```text
+1. Criar src/components/executive/ReflectionModal.tsx
+2. Modificar src/components/executive/DecisionMemoryCard.tsx
+3. Ajustar onde DecisionMemoryCard e usado para passar novas props
+```
+
+---
+
+## Criterio de Sucesso
+
+A etapa esta correta se:
+
+| Pergunta | Resposta Correta |
+|----------|------------------|
+| O painel aparece automaticamente? | Nao |
+| O sistema sugere algo? | Nao |
+| Ha comparacao com "ideal"? | Nao |
+| Alguma CTA apos fechar? | Nao |
+| A linguagem e puramente descritiva? | Sim |
+| O rodape etico esta presente? | Sim |
+
+---
+
+## Teste de Integridade (Checklist)
+
+| Item | Verificacao |
+|------|-------------|
+| O painel so abre por clique explicito? | Check |
+| Nenhum texto usa "voce tende a..."? | Check |
+| Nenhum texto usa "recomendamos..."? | Check |
+| O rodape etico esta visivel? | Check |
+| Nao ha botao de acao apos fechar? | Check |
+| O sistema continua funcionando igual? | Check |
+
+---
+
+## Exemplo Visual Final
+
+```text
++----------------------------------------------------+
+| DIALOG: Resumo Observacional                        |
++----------------------------------------------------+
+|                                                     |
+| === O QUE ACONTECEU ===                            |
+| Em 12 recomendacoes apresentadas:                  |
+| - 8 foram avaliadas explicitamente                 |
+| - 2 foram aceitas                                  |
+| - 6 foram rejeitadas                               |
+| - 2 expiraram sem decisao                          |
+|                                                     |
+| Tempo medio entre apresentacao e decisao: 18h.     |
+|                                                     |
++----------------------------------------------------+
+|                                                     |
+| === PADROES OBSERVADOS ===                         |
+| Padrao de latencia: moderado (media 18h)           |
+| Taxa de decisao explicita: 72%                     |
+| Interacao mais frequente: Marketing (5 eventos)    |
+|                                                     |
+| [!] Observacao estatistica. Nao implica            |
+|     preferencia.                                   |
+|                                                     |
++----------------------------------------------------+
+|                                                     |
+| Este resumo nao altera como o sistema funciona.    |
+| Ele existe apenas para tornar visivel o historico  |
+| das interacoes.                                    |
+|                                                     |
+|                              [Fechar]              |
++----------------------------------------------------+
+```
+
+---
+
+## Secao Tecnica
+
+### Dependencias
+- Dialog do Radix UI (ja disponivel)
+- Tipos de `src/types/implicitLearning.ts`
+- Tipos de `src/types/decisions.ts`
+- Hook `useDecisionEvents`
+
+### Padroes Seguidos
+- Modal pattern igual ao `RejectionModal`
+- Cores neutras slate como `DecisionMemoryCard`
+- Separadores com `Separator`
 
