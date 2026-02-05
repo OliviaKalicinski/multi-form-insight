@@ -66,9 +66,16 @@ export const RecommendationCard = ({ recommendation, rank }: RecommendationCardP
         </div>
         
         <div className="flex items-center justify-between text-xs pt-2 border-t">
-          <div>
-            <span className="text-muted-foreground">Responsável: </span>
-            <span className="font-semibold">{recommendation.responsavel}</span>
+          <div className="flex items-center gap-4">
+            <div>
+              <span className="text-muted-foreground">Responsável: </span>
+              <span className="font-semibold">{recommendation.responsavel}</span>
+            </div>
+            {recommendation.basedOnMetric && (
+              <div className="text-muted-foreground">
+                Baseado em: <span className="font-medium text-blue-600">{recommendation.basedOnMetric}</span>
+              </div>
+            )}
           </div>
           <div className={cn(
             "px-2 py-1 rounded",
