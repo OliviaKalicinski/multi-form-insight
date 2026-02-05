@@ -404,3 +404,172 @@ export const canGenerateFullRecommendation = (
   
   return { allowed: true };
 };
+
+// ============================================
+// Sistema de Confiança Temporal (Etapa 3)
+// ============================================
+// Define se uma métrica tem dados suficientes para
+// justificar atenção, alerta ou decisão.
+// ============================================
+
+export type TemporalConfidence = 
+  | 'INSUFFICIENT'   // < 7 dias de dados
+  | 'STABILIZING'    // 7-29 dias de dados
+  | 'STABLE';        // >= 30 dias de dados
+
+// Labels para exibição
+export const TemporalConfidenceLabels: Record<TemporalConfidence, string> = {
+  INSUFFICIENT: 'Dados Insuficientes',
+  STABILIZING: 'Estabilizando',
+  STABLE: 'Estável',
+};
+
+// Badges curtas para UI
+export const TemporalConfidenceBadges: Record<TemporalConfidence, string> = {
+  INSUFFICIENT: 'IMAT',   // Imaturo
+  STABILIZING: 'ESTAB',   // Estabilizando
+  STABLE: '',             // Não exibe badge
+};
+
+// Interface de metadados temporais
+export interface TemporalMetadata {
+  dataPoints: number;           // Quantidade de registros
+  windowDays: number;           // Janela em dias (calculada)
+  firstDate: Date | null;       // Primeiro registro
+  lastDate: Date | null;        // Último registro
+  confidence: TemporalConfidence;
+  label: string;                // Ex: "23 dias de dados"
+}
+
+// Mapeamento de temporal por categoria
+export interface ExecutiveMetricsTemporal {
+  vendas: TemporalMetadata;
+  marketing: TemporalMetadata;
+  clientes: TemporalMetadata;
+  produtos: TemporalMetadata;
+  operacoes: TemporalMetadata;
+}
+
+// ============================================
+// Funções de Cálculo de Confiança Temporal
+// ============================================
+
+/**
+ * Calcula a confiança temporal baseada na janela de dias
+ */
+export const calculateTemporalConfidence = (windowDays: number): TemporalConfidence => {
+  if (windowDays < 7) return 'INSUFFICIENT';
+  if (windowDays < 30) return 'STABILIZING';
+  return 'STABLE';
+};
+
+/**
+ * Cria metadados temporais a partir de dados
+ */
+export const createTemporalMetadata = (
+  dataPoints: number,
+  windowDays: number,
+  firstDate: Date | null,
+  lastDate: Date | null
+): TemporalMetadata => {
+  const confidence = calculateTemporalConfidence(windowDays);
+  
+  const label = windowDays === 0 
+    ? 'Sem dados' 
+    : `${windowDays} dia${windowDays > 1 ? 's' : ''} de dados`;
+  
+  return {
+    dataPoints,
+    windowDays,
+    firstDate,
+    lastDate,
+    confidence,
+    label,
+  };
+};
+
+/**
+ * Cria temporal default (sem dados)
+ */
+export const createEmptyTemporalMetadata = (): TemporalMetadata => ({
+  dataPoints: 0,
+  windowDays: 0,
+  firstDate: null,
+  lastDate: null,
+  confidence: 'INSUFFICIENT',
+  label: 'Sem dados',
+});
+
+// ============================================
+// Guardrails Temporais (Contrato de Ação)
+// ============================================
+
+/**
+ * Verifica se confiança temporal permite alertas
+ * INSUFFICIENT não gera alertas (apenas sinais)
+ */
+export const canGenerateTemporalAlert = (confidence: TemporalConfidence): boolean => {
+  return confidence === 'STABILIZING' || confidence === 'STABLE';
+};
+
+/**
+ * Verifica se confiança temporal permite recomendações
+ * Apenas STABLE pode gerar recomendações
+ */
+export const canGenerateTemporalRecommendation = (confidence: TemporalConfidence): boolean => {
+  return confidence === 'STABLE';
+};
+
+/**
+ * Verifica se requer aviso de dados iniciais
+ */
+export const requiresTemporalWarning = (confidence: TemporalConfidence): boolean => {
+  return confidence === 'INSUFFICIENT' || confidence === 'STABILIZING';
+};
+
+/**
+ * Verifica se recomendação pode ser gerada (autoridade + nature + benchmark + temporal)
+ * Regra completa: DECISIONAL + REAL + benchmark existe + STABLE
+ */
+export const canGenerateFullRecommendationWithTemporal = (
+  authority: MetricAuthority,
+  nature: MetricNature,
+  hasBenchmark: boolean,
+  temporalConfidence: TemporalConfidence
+): { allowed: boolean; blockedReason?: string } => {
+  // Checagem 1: Authority
+  if (authority !== 'DECISIONAL') {
+    return { 
+      allowed: false, 
+      blockedReason: `Métrica ${MetricAuthorityLabels[authority]} não tem autoridade para gerar recomendação` 
+    };
+  }
+  
+  // Checagem 2: Nature
+  if (nature !== 'REAL') {
+    return { 
+      allowed: false, 
+      blockedReason: 'Métrica usa dados estimados ou inferidos' 
+    };
+  }
+  
+  // Checagem 3: Benchmark
+  if (!hasBenchmark) {
+    return { 
+      allowed: false, 
+      blockedReason: 'Benchmark de referência não configurado' 
+    };
+  }
+  
+  // Checagem 4: Temporal
+  if (temporalConfidence !== 'STABLE') {
+    return { 
+      allowed: false, 
+      blockedReason: temporalConfidence === 'INSUFFICIENT' 
+        ? 'Base temporal insuficiente (< 7 dias)'
+        : 'Dados em estabilização (< 30 dias)'
+    };
+  }
+  
+  return { allowed: true };
+};

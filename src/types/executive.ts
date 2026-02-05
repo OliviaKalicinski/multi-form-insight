@@ -1,6 +1,6 @@
 // Interfaces para análise executiva
 
-import { ExecutiveMetricsMeta, ExecutiveMetricsSource, ExecutiveMetricsAuthority } from './metricNature';
+import { ExecutiveMetricsMeta, ExecutiveMetricsSource, ExecutiveMetricsAuthority, ExecutiveMetricsTemporal } from './metricNature';
 
 export interface VendasMetrics {
   receita: number;
@@ -56,7 +56,8 @@ export interface ExecutiveMetrics {
   operacoes: OperacoesMetrics;
   _meta?: ExecutiveMetricsMeta;
   _source?: ExecutiveMetricsSource;
-  _authority?: ExecutiveMetricsAuthority; // Autoridade de cada métrica
+  _authority?: ExecutiveMetricsAuthority;
+  _temporal?: ExecutiveMetricsTemporal; // Confiança temporal de cada categoria
 }
 
 export interface HealthScore {

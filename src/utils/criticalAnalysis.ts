@@ -1,6 +1,16 @@
 import { ExecutiveMetrics, HealthScore, MonthComparison, QuarterlyAnalysis, TrendInsight, InsightClass } from "@/types/executive";
 import { SectorBenchmarks } from "@/hooks/useAppSettings";
-import { MetricNature, ExecutiveMetricsMeta, canGenerateRecommendation, canGenerateAlert, createDefaultAuthority } from "@/types/metricNature";
+import { 
+  MetricNature, 
+  ExecutiveMetricsMeta, 
+  canGenerateRecommendation, 
+  canGenerateAlert, 
+  createDefaultAuthority,
+  TemporalConfidence,
+  canGenerateTemporalRecommendation,
+  canGenerateTemporalAlert,
+  requiresTemporalWarning
+} from "@/types/metricNature";
 
 // Calcular variação MoM
 export const calcularVariacao = (atual: number, anterior: number): number => {
@@ -357,7 +367,7 @@ export const gerarAnaliseTrimestral = (
   };
 };
 
-// Gerar insights principais com classificação de autoridade
+// Gerar insights principais com classificação de autoridade e temporal
 export const gerarInsights = (
   atual: ExecutiveMetrics,
   anterior: ExecutiveMetrics,
@@ -367,12 +377,20 @@ export const gerarInsights = (
   const insights: TrendInsight[] = [];
   const meta = atual._meta;
   const authority = atual._authority || createDefaultAuthority();
+  const temporal = atual._temporal;
   
   // Sucessos - Pedidos (OBSERVATIONAL → apenas signal)
   if (atual.vendas.pedidos > anterior.vendas.pedidos) {
     const crescimento = calcularVariacao(atual.vendas.pedidos, anterior.vendas.pedidos);
+    const vendasConfidence = temporal?.vendas.confidence || 'STABLE';
     
     // Pedidos é OBSERVATIONAL, só pode emitir signal
+    // Mas verificar temporal para adicionar contexto
+    let blockedReason: string | undefined;
+    if (!canGenerateTemporalAlert(vendasConfidence)) {
+      blockedReason = `Aguardando maturação temporal (${temporal?.vendas.label || 'dados iniciais'})`;
+    }
+    
     insights.push({
       type: 'sucesso',
       insightClass: 'signal', // OBSERVATIONAL → apenas sinal
@@ -382,29 +400,42 @@ export const gerarInsights = (
         { label: 'Pedidos Atual', value: atual.vendas.pedidos.toString(), trend: crescimento },
         { label: 'Pedidos Anterior', value: anterior.vendas.pedidos.toString(), trend: 0 },
       ],
+      blockedReason,
       basedOnMetric: 'pedidos',
     });
   }
   
-  // Atenções - ROAS (DECISIONAL → pode gerar recommendation se REAL + benchmark)
+  // Atenções - ROAS (DECISIONAL → pode gerar recommendation se REAL + benchmark + STABLE)
   if (benchmarks.roasMedio && atual.marketing.roasAds < 0.8) {
     const prejuizo = atual.marketing.investimentoAds - atual.marketing.receitaAds;
     const roasNature = meta?.roasAds || 'REAL';
     const roasAuthority = authority.roasAds;
+    const marketingConfidence = temporal?.marketing.confidence || 'STABLE';
     
-    // Determinar classe do insight baseado em autoridade + nature + benchmark
+    // Determinar classe do insight baseado em autoridade + nature + benchmark + temporal
     let insightClass: InsightClass = 'signal';
     let blockedReason: string | undefined;
     
-    if (canGenerateRecommendation(roasAuthority) && roasNature === 'REAL' && benchmarks.roasMedio) {
+    // Verificar todos os requisitos para recommendation
+    if (
+      canGenerateRecommendation(roasAuthority) && 
+      roasNature === 'REAL' && 
+      benchmarks.roasMedio &&
+      canGenerateTemporalRecommendation(marketingConfidence)
+    ) {
       insightClass = 'recommendation';
-    } else if (canGenerateAlert(roasAuthority)) {
+    } else if (canGenerateAlert(roasAuthority) && canGenerateTemporalAlert(marketingConfidence)) {
       insightClass = 'context';
+      // Determinar razão do bloqueio
       if (!canGenerateRecommendation(roasAuthority)) {
         blockedReason = 'Métrica diagnóstica não tem autoridade para gerar recomendação';
       } else if (roasNature !== 'REAL') {
         blockedReason = 'Dados estimados não permitem recomendação';
+      } else if (!canGenerateTemporalRecommendation(marketingConfidence)) {
+        blockedReason = `Dados em ${marketingConfidence === 'INSUFFICIENT' ? 'maturação' : 'estabilização'} (${temporal?.marketing.label})`;
       }
+    } else if (!canGenerateTemporalAlert(marketingConfidence)) {
+      blockedReason = `Aguardando maturação temporal (${temporal?.marketing.label || 'dados iniciais'})`;
     } else {
       blockedReason = 'Métrica não tem autoridade para alertar';
     }
@@ -428,12 +459,20 @@ export const gerarInsights = (
     const gap = benchmarks.taxaRecompra - atual.clientes.taxaRecompra;
     const potencial = (atual.vendas.receita / atual.clientes.taxaRecompra) * gap;
     const recompraAuthority = authority.taxaRecompra;
+    const clientesConfidence = temporal?.clientes.confidence || 'STABLE';
     
     // Taxa Recompra é DIAGNOSTIC, não pode gerar recommendation
-    const insightClass: InsightClass = canGenerateAlert(recompraAuthority) ? 'context' : 'signal';
-    const blockedReason = !canGenerateRecommendation(recompraAuthority) 
-      ? 'Métrica diagnóstica não tem autoridade para gerar recomendação' 
-      : undefined;
+    let insightClass: InsightClass = 'signal';
+    let blockedReason: string | undefined;
+    
+    if (canGenerateAlert(recompraAuthority) && canGenerateTemporalAlert(clientesConfidence)) {
+      insightClass = 'context';
+      blockedReason = 'Métrica diagnóstica não tem autoridade para gerar recomendação';
+    } else if (!canGenerateTemporalAlert(clientesConfidence)) {
+      blockedReason = `Aguardando maturação temporal (${temporal?.clientes.label || 'dados iniciais'})`;
+    } else {
+      blockedReason = 'Métrica não tem autoridade para alertar';
+    }
     
     insights.push({
       type: 'oportunidade',

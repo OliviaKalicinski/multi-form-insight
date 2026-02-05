@@ -1,10 +1,16 @@
 import { Recommendation, ExecutiveMetrics } from "@/types/executive";
 import { SectorBenchmarks } from "@/hooks/useAppSettings";
-import { canGenerateRecommendation, createDefaultAuthority } from "@/types/metricNature";
+import { 
+  canGenerateRecommendation, 
+  createDefaultAuthority,
+  canGenerateTemporalRecommendation,
+  TemporalConfidence
+} from "@/types/metricNature";
 
 /**
  * Gera recomendações baseadas nas métricas executivas
  * REGRA: Se benchmark necessário === null → NÃO gerar recomendação
+ * REGRA TEMPORAL: Só gera se temporalConfidence === STABLE
  * @param atual - Métricas do período atual
  * @param anterior - Métricas do período anterior
  * @param benchmarks - Benchmarks do setor (de app_settings)
@@ -17,36 +23,42 @@ export const gerarRecomendacoes = (
   const recomendacoes: Recommendation[] = [];
   const authority = atual._authority || createDefaultAuthority();
   const meta = atual._meta;
+  const temporal = atual._temporal;
   
   // Rec 1: Otimizar ROAS
-  // REGRA: ROAS é DECISIONAL, pode gerar recomendações
+  // REGRA: ROAS é DECISIONAL, pode gerar recomendações SE temporal STABLE
   if (atual.marketing.roasAds < 1.5) {
     // Verificar autoridade - ROAS é DECISIONAL
     if (canGenerateRecommendation(authority.roasAds)) {
-      const campanhasBaixas = Math.round(atual.marketing.investimentoAds * 0.6 / 100);
-      const economia = campanhasBaixas * 100 * 0.4;
-      
-      recomendacoes.push({
-        id: 'otimizar-roas',
-        title: 'Otimizar Portfolio de Campanhas META',
-        category: 'marketing',
-        actions: [
-          `Pausar ${campanhasBaixas} anúncios com investimento < R$ 50/mês (economia: R$ ${(economia / 1000).toFixed(1)}K)`,
-          'Realocar 70% do budget para top 10 anúncios com ROAS > 2.5x',
-          'Criar 3 campanhas de remarketing para 68K cliques sem conversão',
-          'Testar variações de copy/criativo nos top performers',
-        ],
-        impact: `+R$ ${(economia * 1.5 / 1000).toFixed(0)}K/mês`,
-        roi: 2.5,
-        prazo: '14 dias',
-        responsavel: 'Marketing',
-        custo: 0,
-        prioridade: 0,
-        facilidade: 'alta',
-        basedOnMetric: 'roasAds (DECISIONAL)',
-      });
+      // Verificar temporal - DEVE SER STABLE para gerar recomendação
+      const marketingConfidence = temporal?.marketing.confidence || 'STABLE';
+      if (canGenerateTemporalRecommendation(marketingConfidence)) {
+        const campanhasBaixas = Math.round(atual.marketing.investimentoAds * 0.6 / 100);
+        const economia = campanhasBaixas * 100 * 0.4;
+        
+        recomendacoes.push({
+          id: 'otimizar-roas',
+          title: 'Otimizar Portfolio de Campanhas META',
+          category: 'marketing',
+          actions: [
+            `Pausar ${campanhasBaixas} anúncios com investimento < R$ 50/mês (economia: R$ ${(economia / 1000).toFixed(1)}K)`,
+            'Realocar 70% do budget para top 10 anúncios com ROAS > 2.5x',
+            'Criar 3 campanhas de remarketing para 68K cliques sem conversão',
+            'Testar variações de copy/criativo nos top performers',
+          ],
+          impact: `+R$ ${(economia * 1.5 / 1000).toFixed(0)}K/mês`,
+          roi: 2.5,
+          prazo: '14 dias',
+          responsavel: 'Marketing',
+          custo: 0,
+          prioridade: 0,
+          facilidade: 'alta',
+          basedOnMetric: 'roasAds (DECISIONAL)',
+        });
+      }
+      // Se não STABLE, simplesmente não gera (bloqueado por temporal)
     }
-    // Se não pode recomendar, simplesmente não gera (sem fallback)
+    // Se não pode recomendar por autoridade, simplesmente não gera
   }
   
   // Rec 2: Programa de Retenção
@@ -55,28 +67,32 @@ export const gerarRecomendacoes = (
   if (benchmarks.taxaChurn && atual.clientes.taxaChurn > benchmarks.taxaChurn) {
     // Verificar autoridade - Churn é DECISIONAL
     if (canGenerateRecommendation(authority.taxaChurn)) {
-      const gap = atual.clientes.taxaChurn - benchmarks.taxaChurn;
-      const potencial = (atual.vendas.receita * gap) / 100;
-      
-      recomendacoes.push({
-        id: 'programa-retencao',
-        title: 'Lançar Programa de Fidelidade e Retenção',
-        category: 'clientes',
-        actions: [
-          'Criar clube de assinatura com 10% desconto (meta: 50 assinantes no 1º mês)',
-          'Implementar email marketing automatizado (D+7, D+30, D+60 pós-compra)',
-          'Oferecer cupom de R$ 20 para 2ª compra (válido 30 dias)',
-          'WhatsApp personalizado para clientes em risco de churn',
-        ],
-        impact: `+R$ ${(potencial / 1000).toFixed(1)}K/mês`,
-        roi: 3.8,
-        prazo: '30 dias',
-        responsavel: 'CRM + Marketing',
-        custo: 2500,
-        prioridade: 0,
-        facilidade: 'media',
-        basedOnMetric: 'taxaChurn (DECISIONAL)',
-      });
+      // Verificar temporal - DEVE SER STABLE para gerar recomendação
+      const clientesConfidence = temporal?.clientes.confidence || 'STABLE';
+      if (canGenerateTemporalRecommendation(clientesConfidence)) {
+        const gap = atual.clientes.taxaChurn - benchmarks.taxaChurn;
+        const potencial = (atual.vendas.receita * gap) / 100;
+        
+        recomendacoes.push({
+          id: 'programa-retencao',
+          title: 'Lançar Programa de Fidelidade e Retenção',
+          category: 'clientes',
+          actions: [
+            'Criar clube de assinatura com 10% desconto (meta: 50 assinantes no 1º mês)',
+            'Implementar email marketing automatizado (D+7, D+30, D+60 pós-compra)',
+            'Oferecer cupom de R$ 20 para 2ª compra (válido 30 dias)',
+            'WhatsApp personalizado para clientes em risco de churn',
+          ],
+          impact: `+R$ ${(potencial / 1000).toFixed(1)}K/mês`,
+          roi: 3.8,
+          prazo: '30 dias',
+          responsavel: 'CRM + Marketing',
+          custo: 2500,
+          prioridade: 0,
+          facilidade: 'media',
+          basedOnMetric: 'taxaChurn (DECISIONAL)',
+        });
+      }
     }
   }
   
@@ -117,29 +133,33 @@ export const gerarRecomendacoes = (
   }
   
   // Rec 5: Novos Canais
-  // REGRA: CAC é DECISIONAL, pode gerar recomendações
+  // REGRA: CAC é DECISIONAL, pode gerar recomendações SE temporal STABLE
   if (atual.clientes.cac > 350) {
     // Verificar autoridade - CAC é DECISIONAL
     if (canGenerateRecommendation(authority.cac)) {
-      recomendacoes.push({
-        id: 'novos-canais',
-        title: 'Diversificar Canais de Aquisição',
-        category: 'marketing',
-        actions: [
-          'Testar Google Ads (budget: R$ 3K/mês por 60 dias)',
-          'Parcerias com influencers pet (micro: 10-50K seguidores)',
-          'Programa de indicação: R$ 30 crédito para ambos',
-          'Marketplace Magalu/Mercado Livre (teste com 10 SKUs)',
-        ],
-        impact: '+R$ 6K/mês',
-        roi: 2.0,
-        prazo: '60 dias',
-        responsavel: 'Marketing',
-        custo: 5000,
-        prioridade: 0,
-        facilidade: 'media',
-        basedOnMetric: 'cac (DECISIONAL)',
-      });
+      // Verificar temporal - DEVE SER STABLE para gerar recomendação
+      const clientesConfidence = temporal?.clientes.confidence || 'STABLE';
+      if (canGenerateTemporalRecommendation(clientesConfidence)) {
+        recomendacoes.push({
+          id: 'novos-canais',
+          title: 'Diversificar Canais de Aquisição',
+          category: 'marketing',
+          actions: [
+            'Testar Google Ads (budget: R$ 3K/mês por 60 dias)',
+            'Parcerias com influencers pet (micro: 10-50K seguidores)',
+            'Programa de indicação: R$ 30 crédito para ambos',
+            'Marketplace Magalu/Mercado Livre (teste com 10 SKUs)',
+          ],
+          impact: '+R$ 6K/mês',
+          roi: 2.0,
+          prazo: '60 dias',
+          responsavel: 'Marketing',
+          custo: 5000,
+          prioridade: 0,
+          facilidade: 'media',
+          basedOnMetric: 'cac (DECISIONAL)',
+        });
+      }
     }
   }
   

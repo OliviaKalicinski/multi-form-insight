@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendInsight, InsightClass } from "@/types/executive";
-import { CheckCircle, AlertCircle, Lightbulb, Info } from "lucide-react";
+import { CheckCircle, AlertCircle, Lightbulb, Info, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -75,8 +75,16 @@ export const TrendInsightCard = ({ insight }: TrendInsightCardProps) => {
         
         {/* Mostrar razão do bloqueio se existir */}
         {insight.blockedReason && (
-          <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
-            <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div className={cn(
+            "flex items-start gap-2 p-2 rounded text-xs border",
+            insight.blockedReason.includes('temporal') || insight.blockedReason.includes('maturação')
+              ? "bg-blue-50 border-blue-200 text-blue-800"
+              : "bg-amber-50 border-amber-200 text-amber-800"
+          )}>
+            {insight.blockedReason.includes('temporal') || insight.blockedReason.includes('maturação') 
+              ? <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              : <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            }
             <span>{insight.blockedReason}</span>
           </div>
         )}
