@@ -1,559 +1,575 @@
 
-# Plano: Confianca Temporal (Etapa 3)
+
+# Plano: Responsabilidade e Memoria de Decisao (Etapa 4)
 
 ## Objetivo
-Criar um sistema de maturidade temporal que define quando uma metrica tem dados suficientes para justificar atencao, alerta ou decisao - completando o contrato de governanca junto com Nature (Etapa 1) e Authority (Etapa 2).
+Criar um sistema de eventos de decisao que transforma recomendacoes de "sugestoes descartaveis" em contratos rastreados, onde o sistema lembra o que sugeriu, o que foi aceito/rejeitado, e aprende a calibrar sua propria credibilidade.
 
 ---
 
-## BLOCO 1: Classificacao de Confianca Temporal
+## MODELO MENTAL
 
-### 1.1 Criar tipo TemporalConfidence em metricNature.ts
+### Principio Fundador
+Recomendacao sem responsabilidade vira ruido.
+
+O sistema nao mede apenas metricas. Ele mede decisoes tomadas em relacao as metricas.
+
+### Decision Event
+Um Decision Event nasce SOMENTE quando uma recomendacao:
+- E baseada em metrica DECISIONAL
+- Usa dados REAL
+- Tem BENCHMARK configurado
+- Tem confianca temporal STABLE
+
+Ou seja: so quando o sistema tinha legitimidade total para sugerir.
+
+---
+
+## BLOCO 1: Estrutura de Dados
+
+### 1.1 Novo tipo DecisionStatus
 
 ```text
-type TemporalConfidence = 
-  | 'INSUFFICIENT'   // < 7 dias de dados
-  | 'STABILIZING'    // 7-29 dias de dados
-  | 'STABLE';        // >= 30 dias de dados
+type DecisionStatus = 
+  | 'PENDING'    // Exibida, nenhuma acao ainda
+  | 'ACCEPTED'   // Acao tomada pelo usuario
+  | 'REJECTED'   // Conscientemente ignorada
+  | 'EXPIRED';   // Perdeu validade temporal
 ```
 
-### 1.2 Criar interface TemporalMetadata
+### 1.2 Interface DecisionEvent
 
 ```text
-export interface TemporalMetadata {
-  dataPoints: number;        // Quantidade de registros
-  windowDays: number;        // Janela em dias (calculada)
-  firstDate: Date | null;    // Primeiro registro
-  lastDate: Date | null;     // Ultimo registro
-  confidence: TemporalConfidence;
-  label: string;             // Ex: "23 dias de dados"
+interface DecisionEvent {
+  id: string;
+  recommendationId: string;      // ID da recomendacao original
+  recommendationTitle: string;   // Titulo para referencia
+  category: string;              // marketing | clientes | operacoes
+  basedOnMetric: string;         // Metrica DECISIONAL que gerou
+  
+  // Contexto de quando foi gerada
+  generatedAt: Date;
+  periodReference: string;       // Ex: "2026-01"
+  metricValueAtGeneration: number;
+  benchmarkAtGeneration: number;
+  
+  // Estado atual
+  status: DecisionStatus;
+  statusChangedAt: Date | null;
+  
+  // Feedback opcional
+  rejectionReason?: string;      // Motivo da rejeicao (opcional)
+  userNotes?: string;            // Anotacoes livres
+  
+  // Rastreabilidade
+  userId: string;
+  expiresAt: Date;               // Quando vira EXPIRED automaticamente
 }
 ```
 
-### 1.3 Criar mapa ExecutiveMetricsTemporal
+### 1.3 Interface DecisionMemory (agregado)
 
 ```text
-export interface ExecutiveMetricsTemporal {
-  // Por categoria (simplificado - nao por metrica individual)
-  vendas: TemporalMetadata;
-  marketing: TemporalMetadata;
-  clientes: TemporalMetadata;
-  produtos: TemporalMetadata;
-  operacoes: TemporalMetadata;
+interface DecisionMemory {
+  totalGenerated: number;
+  byStatus: {
+    pending: number;
+    accepted: number;
+    rejected: number;
+    expired: number;
+  };
+  byMetric: {
+    [metricKey: string]: {
+      generated: number;
+      accepted: number;
+      rejected: number;
+      acceptanceRate: number;
+    };
+  };
+  avgResponseTimeHours: number;
+  lastUpdated: Date;
 }
 ```
 
-### 1.4 Criar funcao calculateTemporalConfidence
+### 1.4 Opcoes de Rejeicao (nao obrigatorias)
 
 ```text
-export const calculateTemporalConfidence = (
-  windowDays: number
-): TemporalConfidence => {
-  if (windowDays < 7) return 'INSUFFICIENT';
-  if (windowDays < 30) return 'STABILIZING';
-  return 'STABLE';
+const RejectionReasons = [
+  'already_in_progress',    // "Ja em andamento"
+  'not_applicable_now',     // "Nao aplicavel agora"
+  'disagree_with_premise',  // "Discordo da premissa"
+  'lack_of_resources',      // "Falta de recursos"
+  'other',                  // "Outro"
+] as const;
+```
+
+---
+
+## BLOCO 2: Banco de Dados
+
+### 2.1 Criar tabela decision_events
+
+```sql
+CREATE TABLE decision_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  recommendation_id TEXT NOT NULL,
+  recommendation_title TEXT NOT NULL,
+  category TEXT NOT NULL,
+  based_on_metric TEXT NOT NULL,
+  
+  -- Contexto de geracao
+  generated_at TIMESTAMPTZ DEFAULT now(),
+  period_reference TEXT NOT NULL,
+  metric_value_at_generation NUMERIC,
+  benchmark_at_generation NUMERIC,
+  
+  -- Estado
+  status TEXT DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED')),
+  status_changed_at TIMESTAMPTZ,
+  
+  -- Feedback
+  rejection_reason TEXT,
+  user_notes TEXT,
+  
+  -- Rastreabilidade
+  user_id UUID NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Indices para consultas comuns
+CREATE INDEX idx_decision_events_user ON decision_events(user_id);
+CREATE INDEX idx_decision_events_status ON decision_events(status);
+CREATE INDEX idx_decision_events_period ON decision_events(period_reference);
+CREATE INDEX idx_decision_events_metric ON decision_events(based_on_metric);
+```
+
+### 2.2 RLS Policies
+
+```sql
+ALTER TABLE decision_events ENABLE ROW LEVEL SECURITY;
+
+-- Usuarios podem ver/editar apenas seus proprios eventos
+CREATE POLICY "Users can view own decision events"
+  ON decision_events FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own decision events"
+  ON decision_events FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own decision events"
+  ON decision_events FOR UPDATE
+  USING (auth.uid() = user_id);
+```
+
+### 2.3 Funcao para expirar automaticamente
+
+```sql
+-- Funcao para marcar eventos como EXPIRED
+CREATE OR REPLACE FUNCTION expire_old_decisions()
+RETURNS void AS $$
+BEGIN
+  UPDATE decision_events
+  SET status = 'EXPIRED', 
+      status_changed_at = now(),
+      updated_at = now()
+  WHERE status = 'PENDING' 
+    AND expires_at < now();
+END;
+$$ LANGUAGE plpgsql;
+```
+
+---
+
+## BLOCO 3: Tipos TypeScript
+
+### 3.1 Novo arquivo src/types/decisions.ts
+
+```text
+// Estados possiveis de uma decisao
+export type DecisionStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+
+// Motivos de rejeicao (opcionais)
+export const RejectionReasons = {
+  already_in_progress: 'Ja em andamento',
+  not_applicable_now: 'Nao aplicavel agora',
+  disagree_with_premise: 'Discordo da premissa',
+  lack_of_resources: 'Falta de recursos',
+  other: 'Outro',
+} as const;
+
+export type RejectionReasonKey = keyof typeof RejectionReasons;
+
+// Evento de decisao
+export interface DecisionEvent {
+  id: string;
+  recommendationId: string;
+  recommendationTitle: string;
+  category: string;
+  basedOnMetric: string;
+  
+  generatedAt: Date;
+  periodReference: string;
+  metricValueAtGeneration: number;
+  benchmarkAtGeneration: number | null;
+  
+  status: DecisionStatus;
+  statusChangedAt: Date | null;
+  
+  rejectionReason?: RejectionReasonKey;
+  userNotes?: string;
+  
+  userId: string;
+  expiresAt: Date;
+}
+
+// Memoria agregada de decisoes
+export interface DecisionMemory {
+  totalGenerated: number;
+  byStatus: Record<DecisionStatus, number>;
+  byMetric: {
+    [metricKey: string]: {
+      generated: number;
+      accepted: number;
+      rejected: number;
+      acceptanceRate: number;
+    };
+  };
+  avgResponseTimeHours: number;
+  lastUpdated: Date;
+}
+
+// Labels para UI
+export const DecisionStatusLabels: Record<DecisionStatus, string> = {
+  PENDING: 'Pendente',
+  ACCEPTED: 'Aceita',
+  REJECTED: 'Rejeitada',
+  EXPIRED: 'Expirada',
+};
+
+export const DecisionStatusColors: Record<DecisionStatus, string> = {
+  PENDING: 'bg-blue-100 text-blue-800',
+  ACCEPTED: 'bg-green-100 text-green-800',
+  REJECTED: 'bg-red-100 text-red-800',
+  EXPIRED: 'bg-gray-100 text-gray-600',
 };
 ```
 
-### 1.5 Criar factory createTemporalMetadata
+---
+
+## BLOCO 4: Hook para Gerenciar Decisoes
+
+### 4.1 Criar src/hooks/useDecisionEvents.ts
 
 ```text
-export const createTemporalMetadata = (
-  dataPoints: number,
-  firstDate: Date | null,
-  lastDate: Date | null
-): TemporalMetadata => {
-  const windowDays = firstDate && lastDate 
-    ? differenceInDays(lastDate, firstDate) + 1 
-    : 0;
+export function useDecisionEvents() {
+  // Estados
+  const [events, setEvents] = useState<DecisionEvent[]>([]);
+  const [memory, setMemory] = useState<DecisionMemory | null>(null);
+  const [loading, setLoading] = useState(true);
   
-  const confidence = calculateTemporalConfidence(windowDays);
+  // Buscar eventos do usuario
+  const fetchEvents = async () => { ... };
   
-  const label = windowDays === 0 
-    ? 'Sem dados' 
-    : `${windowDays} dia${windowDays > 1 ? 's' : ''} de dados`;
+  // Registrar nova recomendacao como PENDING
+  const registerRecommendation = async (
+    recommendation: Recommendation,
+    periodReference: string,
+    metricValue: number,
+    benchmark: number | null
+  ): Promise<string> => { ... };
+  
+  // Atualizar status
+  const updateStatus = async (
+    eventId: string,
+    status: DecisionStatus,
+    rejectionReason?: RejectionReasonKey,
+    notes?: string
+  ) => { ... };
+  
+  // Aceitar recomendacao
+  const accept = (eventId: string, notes?: string) => 
+    updateStatus(eventId, 'ACCEPTED', undefined, notes);
+  
+  // Rejeitar recomendacao
+  const reject = (eventId: string, reason?: RejectionReasonKey, notes?: string) => 
+    updateStatus(eventId, 'REJECTED', reason, notes);
+  
+  // Calcular memoria agregada
+  const calculateMemory = (): DecisionMemory => { ... };
+  
+  // Verificar se recomendacao similar foi ignorada recentemente
+  const checkPreviousRejections = (
+    recommendationId: string,
+    daysWindow: number = 60
+  ): { count: number; lastRejectedAt: Date | null } => { ... };
   
   return {
-    dataPoints,
-    windowDays,
-    firstDate,
-    lastDate,
-    confidence,
-    label,
+    events,
+    memory,
+    loading,
+    registerRecommendation,
+    accept,
+    reject,
+    checkPreviousRejections,
+    fetchEvents,
   };
-};
-```
-
----
-
-## BLOCO 2: Regras de Bloqueio por Tempo
-
-### 2.1 Criar funcoes de verificacao em metricNature.ts
-
-```text
-// Verifica se confianca permite alertas
-export const canGenerateTemporalAlert = (
-  confidence: TemporalConfidence
-): boolean => {
-  // INSUFFICIENT nao gera alertas
-  return confidence === 'STABILIZING' || confidence === 'STABLE';
-};
-
-// Verifica se confianca permite recomendacoes
-export const canGenerateTemporalRecommendation = (
-  confidence: TemporalConfidence
-): boolean => {
-  // Apenas STABLE pode gerar recomendacoes
-  return confidence === 'STABLE';
-};
-
-// Verifica se requer aviso de dados iniciais
-export const requiresTemporalWarning = (
-  confidence: TemporalConfidence
-): boolean => {
-  return confidence === 'INSUFFICIENT' || confidence === 'STABILIZING';
-};
-```
-
-### 2.2 Labels para UI
-
-```text
-export const TemporalConfidenceLabels: Record<TemporalConfidence, string> = {
-  INSUFFICIENT: 'Dados Insuficientes',
-  STABILIZING: 'Estabilizando',
-  STABLE: 'Estavel',
-};
-
-export const TemporalConfidenceBadges: Record<TemporalConfidence, string> = {
-  INSUFFICIENT: 'IMAT',  // Imaturo
-  STABILIZING: 'ESTAB', // Estabilizando
-  STABLE: '',           // Nao exibe badge
-};
-```
-
----
-
-## BLOCO 3: Integracao com ExecutiveMetrics
-
-### 3.1 Adicionar _temporal ao ExecutiveMetrics (executive.ts)
-
-```text
-export interface ExecutiveMetrics {
-  vendas: VendasMetrics;
-  marketing: MarketingMetrics;
-  clientes: ClientesMetrics;
-  produtos: ProdutosMetrics;
-  operacoes: OperacoesMetrics;
-  _meta?: ExecutiveMetricsMeta;
-  _source?: ExecutiveMetricsSource;
-  _authority?: ExecutiveMetricsAuthority;
-  _temporal?: ExecutiveMetricsTemporal; // NOVO
 }
 ```
 
-### 3.2 Atualizar executiveMetricsCalculator.ts
-
-Calcular janela temporal a partir dos dados recebidos:
-
-```text
-export const calculateExecutiveMetrics = (
-  orders: ProcessedOrder[],
-  adsData: AdsData[],
-  month: string
-): ExecutiveMetrics | null => {
-  // ... calculos existentes ...
-  
-  // Calcular metadados temporais
-  const _temporal = calculateTemporalMetadata(orders, adsData);
-  
-  return {
-    vendas: { ... },
-    marketing: { ... },
-    _meta,
-    _source,
-    _authority,
-    _temporal, // NOVO
-  };
-};
-```
-
-### 3.3 Criar funcao calculateTemporalMetadata
-
-```text
-const calculateTemporalMetadata = (
-  orders: ProcessedOrder[],
-  adsData: AdsData[]
-): ExecutiveMetricsTemporal => {
-  // Vendas
-  const vendasDates = orders.map(o => o.dataVenda);
-  const vendasFirst = vendasDates.length > 0 ? min(vendasDates) : null;
-  const vendasLast = vendasDates.length > 0 ? max(vendasDates) : null;
-  
-  // Marketing (ads)
-  const adsDates = adsData.map(a => parse(a["Inicio dos relatorios"], 'yyyy-MM-dd', new Date()));
-  const adsFirst = adsDates.length > 0 ? min(adsDates) : null;
-  const adsLast = adsDates.length > 0 ? max(adsDates) : null;
-  
-  // Clientes - derivado de vendas
-  const clientesTemporal = createTemporalMetadata(orders.length, vendasFirst, vendasLast);
-  
-  // Produtos - derivado de vendas
-  const produtosTemporal = createTemporalMetadata(orders.length, vendasFirst, vendasLast);
-  
-  // Operacoes - derivado de vendas (NF)
-  const operacoesTemporal = createTemporalMetadata(orders.length, vendasFirst, vendasLast);
-  
-  return {
-    vendas: createTemporalMetadata(orders.length, vendasFirst, vendasLast),
-    marketing: createTemporalMetadata(adsData.length, adsFirst, adsLast),
-    clientes: clientesTemporal,
-    produtos: produtosTemporal,
-    operacoes: operacoesTemporal,
-  };
-};
-```
-
 ---
 
-## BLOCO 4: Guardrails em Alertas e Recomendacoes
+## BLOCO 5: Atualizacoes na Recommendation
 
-### 4.1 Atualizar alertSystem.ts
+### 5.1 Extender interface Recommendation
 
-Adicionar verificacao temporal APOS verificacao de authority:
+Adicionar campos opcionais para rastrear estado:
 
 ```text
-export const gerarAlertas = (
-  atual: ExecutiveMetrics,
-  anterior: ExecutiveMetrics,
-  benchmarks: SectorBenchmarks
-): CriticalAlert[] => {
-  const alertas: CriticalAlert[] = [];
-  const meta = atual._meta;
-  const authority = atual._authority || createDefaultAuthority();
-  const temporal = atual._temporal;
+export interface Recommendation {
+  // ... campos existentes ...
   
-  // ROAS Alert
-  if (atual.marketing.roasAds < 0.8 && benchmarks.roasMedio) {
-    // 1. Verificar authority
-    if (!canGenerateAlert(authority.roasAds)) continue;
-    
-    // 2. Verificar temporal (NOVO)
-    const marketingConfidence = temporal?.marketing.confidence || 'STABLE';
-    if (!canGenerateTemporalAlert(marketingConfidence)) {
-      // Dados insuficientes - skip ou downgrade para info
-      alertas.push({
-        ...alertData,
-        severity: 'info',
-        title: 'ROAS baixo (dados iniciais)',
-        blockedReason: temporal?.marketing.label || 'Base temporal insuficiente',
-      });
-      continue;
-    }
-    
-    // 3. Se STABILIZING, adicionar aviso
-    if (requiresTemporalWarning(marketingConfidence)) {
-      alertData.title += ` (${temporal?.marketing.label})`;
-    }
-    
-    // Gerar alerta normal
-    alertas.push(alertData);
-  }
-};
+  // Estado de decisao (quando vinculado a um evento)
+  decisionEventId?: string;
+  decisionStatus?: DecisionStatus;
+  previousRejections?: number;      // Quantas vezes foi rejeitada antes
+  lastRejectedAt?: Date | null;     // Ultima rejeicao
+}
 ```
 
-### 4.2 Atualizar recommendationEngine.ts
+### 5.2 Funcao para enriquecer recomendacoes
 
 ```text
-export const gerarRecomendacoes = (
-  atual: ExecutiveMetrics,
-  anterior: ExecutiveMetrics,
-  benchmarks: SectorBenchmarks
+// src/utils/recommendationEnricher.ts
+
+export const enrichRecommendationsWithDecisionState = (
+  recommendations: Recommendation[],
+  events: DecisionEvent[]
 ): Recommendation[] => {
-  const recomendacoes: Recommendation[] = [];
-  const authority = atual._authority || createDefaultAuthority();
-  const temporal = atual._temporal;
-  
-  // Rec 1: Otimizar ROAS
-  if (atual.marketing.roasAds < 1.5) {
-    // 1. Verificar authority
-    if (!canGenerateRecommendation(authority.roasAds)) continue;
+  return recommendations.map(rec => {
+    const relatedEvents = events.filter(e => e.recommendationId === rec.id);
+    const pendingEvent = relatedEvents.find(e => e.status === 'PENDING');
+    const rejections = relatedEvents.filter(e => e.status === 'REJECTED');
     
-    // 2. Verificar temporal (NOVO) - DEVE SER STABLE
-    const marketingConfidence = temporal?.marketing.confidence || 'STABLE';
-    if (!canGenerateTemporalRecommendation(marketingConfidence)) {
-      // Nao gerar recomendacao - dados imaturos
-      // Pode adicionar a uma lista de "bloqueados" para transparencia
-      continue;
-    }
-    
-    // Gerar recomendacao
-    recomendacoes.push({ ... });
-  }
-};
-```
-
-### 4.3 Atualizar criticalAnalysis.ts (insights)
-
-```text
-// Ao gerar insights, classificar considerando temporal
-const generateInsight = (
-  metric: string,
-  authority: MetricAuthority,
-  temporal: TemporalConfidence,
-  ...
-): TrendInsight => {
-  // Se temporal INSUFFICIENT, sempre signal
-  if (temporal === 'INSUFFICIENT') {
     return {
-      insightClass: 'signal',
-      blockedReason: 'Aguardando maturacao temporal da metrica',
-      ...
+      ...rec,
+      decisionEventId: pendingEvent?.id,
+      decisionStatus: pendingEvent?.status || null,
+      previousRejections: rejections.length,
+      lastRejectedAt: rejections.length > 0 
+        ? rejections.sort((a, b) => 
+            b.statusChangedAt.getTime() - a.statusChangedAt.getTime()
+          )[0].statusChangedAt 
+        : null,
     };
-  }
-  
-  // Se temporal STABILIZING, pode ser context mas nao recommendation
-  if (temporal === 'STABILIZING') {
-    return {
-      insightClass: authority === 'DECISIONAL' ? 'context' : 'signal',
-      blockedReason: 'Dados em estabilizacao (< 30 dias)',
-      ...
-    };
-  }
-  
-  // STABLE - segue regras normais de authority
-  // ...
+  });
 };
 ```
 
 ---
 
-## BLOCO 5: Funcao Completa de Validacao
+## BLOCO 6: Atualizacoes na UI
 
-### 5.1 Criar canGenerateFullRecommendationWithTemporal
+### 6.1 Atualizar RecommendationCard.tsx
 
-Atualizar a funcao existente para incluir temporal:
-
-```text
-export const canGenerateFullRecommendationWithTemporal = (
-  authority: MetricAuthority,
-  nature: MetricNature,
-  hasBenchmark: boolean,
-  temporalConfidence: TemporalConfidence
-): { allowed: boolean; blockedReason?: string } => {
-  // Checagem 1: Authority
-  if (authority !== 'DECISIONAL') {
-    return { 
-      allowed: false, 
-      blockedReason: `Metrica ${MetricAuthorityLabels[authority]} nao tem autoridade` 
-    };
-  }
-  
-  // Checagem 2: Nature
-  if (nature !== 'REAL') {
-    return { 
-      allowed: false, 
-      blockedReason: 'Metrica usa dados estimados' 
-    };
-  }
-  
-  // Checagem 3: Benchmark
-  if (!hasBenchmark) {
-    return { 
-      allowed: false, 
-      blockedReason: 'Benchmark nao configurado' 
-    };
-  }
-  
-  // Checagem 4: Temporal (NOVO)
-  if (temporalConfidence !== 'STABLE') {
-    return { 
-      allowed: false, 
-      blockedReason: temporalConfidence === 'INSUFFICIENT' 
-        ? 'Base temporal insuficiente (< 7 dias)'
-        : 'Dados em estabilizacao (< 30 dias)'
-    };
-  }
-  
-  return { allowed: true };
-};
-```
-
----
-
-## BLOCO 6: UI - Visibilidade Temporal
-
-### 6.1 Atualizar MetricCard.tsx
-
-Adicionar prop temporal opcional:
+Adicionar micro-feedback de estado:
 
 ```text
-interface MetricCardProps {
-  nature?: MetricNature;
-  authority?: MetricAuthority;
-  temporal?: TemporalConfidence; // NOVO
-  temporalLabel?: string;        // NOVO: "23 dias de dados"
+interface RecommendationCardProps {
+  recommendation: Recommendation;
+  rank: number;
+  onAccept?: (id: string) => void;
+  onReject?: (id: string, reason?: RejectionReasonKey) => void;
 }
+
+// No card, adicionar:
+// 1. Badge de status (PENDING, ACCEPTED, REJECTED)
+// 2. Botoes de acao (Aceitar / Rejeitar)
+// 3. Indicador de rejeicoes anteriores
 ```
 
-Renderizar badge temporal quando nao STABLE:
+Exemplo visual:
 
 ```text
-{temporal && temporal !== 'STABLE' && (
-  <Tooltip>
-    <TooltipTrigger>
-      <Badge 
-        variant="outline" 
-        className={cn(
-          "text-[10px] ml-1",
-          temporal === 'INSUFFICIENT' && "bg-red-50 text-red-700 border-red-200",
-          temporal === 'STABILIZING' && "bg-yellow-50 text-yellow-700 border-yellow-200"
-        )}
-      >
-        {TemporalConfidenceBadges[temporal]}
-      </Badge>
-    </TooltipTrigger>
-    <TooltipContent>
-      {temporalLabel || TemporalConfidenceLabels[temporal]}
-    </TooltipContent>
-  </Tooltip>
-)}
++---------------------------------------------+
+| 🎯 Otimizar Portfolio de Campanhas META     |
+|---------------------------------------------|
+| Impacto: +R$ 3K   ROI: 2.5x   Prazo: 14d    |
+|---------------------------------------------|
+| [✔️ Aceitar]  [✖️ Rejeitar ▼]               |
+|                                              |
+| ⚠️ Ignorada 2x nos ultimos 60 dias          |
++---------------------------------------------+
 ```
 
-### 6.2 Atualizar HealthScoreCard.tsx
+### 6.2 Criar componente RejectionModal
 
-Exibir janela temporal junto com parcialidade:
+Modal simples para capturar motivo (opcional):
 
 ```text
-// Se temporal insuficiente em alguma categoria
-{hasInsufficientTemporal && (
-  <div className="mt-2 p-2 bg-amber-50 rounded border border-amber-200">
-    <p className="text-xs text-amber-700">
-      ⏳ Base temporal incompleta: {temporalReason}
-    </p>
+// src/components/executive/RejectionModal.tsx
+
+interface RejectionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason?: RejectionReasonKey, notes?: string) => void;
+  recommendationTitle: string;
+}
+
+// Modal com:
+// - Opcoes de motivo (radio buttons)
+// - Campo de notas (opcional)
+// - Botao "Rejeitar sem motivo" (sempre visivel)
+```
+
+### 6.3 Atualizar ExecutiveDashboard
+
+No momento de exibir recomendacoes:
+
+```text
+// 1. Registrar recomendacoes novas como PENDING
+// 2. Enriquecer com estado de decisao
+// 3. Passar callbacks de accept/reject para os cards
+```
+
+---
+
+## BLOCO 7: Indicadores de Memoria
+
+### 7.1 Badge de historico
+
+Quando uma recomendacao reaparece apos ser rejeitada:
+
+```text
+{recommendation.previousRejections > 0 && (
+  <div className="flex items-center gap-1 text-xs text-amber-600">
+    <AlertTriangle className="h-3 w-3" />
+    <span>
+      Ignorada {recommendation.previousRejections}x 
+      nos ultimos 60 dias
+    </span>
   </div>
 )}
 ```
 
-### 6.3 Atualizar TrendInsightCard.tsx
-
-Mostrar quando insight foi bloqueado por temporal:
+### 7.2 Card de DecisionMemory (opcional para dashboard)
 
 ```text
-{insight.blockedReason?.includes('temporal') && (
-  <Badge variant="outline" className="text-[10px] bg-amber-50">
-    ⏳ {insight.blockedReason}
-  </Badge>
-)}
+// src/components/executive/DecisionMemoryCard.tsx
+
+// Exibe:
+// - Total de recomendacoes geradas
+// - Taxa de aceitacao geral
+// - Metricas mais aceitas vs mais ignoradas
+// - Tempo medio de resposta
 ```
 
 ---
 
-## BLOCO 7: Formalizacao de Alertas Temporais
+## BLOCO 8: Expiracao Automatica
 
-### 7.1 Criar tipo para alertas temporais
+### 8.1 Logica de expiracao
 
-Formalizar a excecao que ja existe (Receita, Ticket):
+Uma recomendacao PENDING expira quando:
+- Passa 30 dias sem acao, OU
+- O periodo de referencia muda (ex: virou outro mes)
 
-```text
-// Alertas temporais tem regras diferentes:
-// - Podem ser gerados por metricas OBSERVATIONAL
-// - Comparam periodo vs periodo, nao vs benchmark
-// - NAO geram recomendacoes (apenas sinalizacao)
-export interface TemporalAlertConfig {
-  metricKey: string;
-  isTemporalAlert: true;
-  comparesAgainst: 'previous_period';
-  canTriggerRecommendation: false; // Sempre false
-}
-```
-
-### 7.2 Documentar no alertSystem.ts
+### 8.2 Verificacao no frontend
 
 ```text
-// ============================================
-// ALERTAS TEMPORAIS (excecao documentada)
-// ============================================
-// Alertas de Receita e Ticket Medio sao TEMPORAIS:
-// - Comparam periodo atual vs periodo anterior
-// - Permitidos mesmo para metricas OBSERVATIONAL
-// - NUNCA geram recomendacoes
-// - Sao sinalizacoes, nao decisoes
-// ============================================
+// No hook useDecisionEvents
+const checkAndExpireEvents = async () => {
+  const now = new Date();
+  const toExpire = events.filter(
+    e => e.status === 'PENDING' && new Date(e.expiresAt) < now
+  );
+  
+  for (const event of toExpire) {
+    await updateStatus(event.id, 'EXPIRED');
+  }
+};
 ```
 
 ---
 
-## Arquivos a Modificar
+## ARQUIVOS A CRIAR/MODIFICAR
 
 | Arquivo | Acao |
 |---------|------|
-| `src/types/metricNature.ts` | Adicionar TemporalConfidence, TemporalMetadata, ExecutiveMetricsTemporal, guardrails |
-| `src/types/executive.ts` | Adicionar _temporal em ExecutiveMetrics |
-| `src/utils/executiveMetricsCalculator.ts` | Calcular _temporal a partir dos dados |
-| `src/utils/alertSystem.ts` | Aplicar guardrail temporal antes de gerar alertas |
-| `src/utils/recommendationEngine.ts` | Aplicar guardrail temporal antes de gerar recomendacoes |
-| `src/utils/criticalAnalysis.ts` | Considerar temporal na classificacao de insights |
-| `src/components/dashboard/MetricCard.tsx` | Prop temporal + badge |
-| `src/components/executive/HealthScoreCard.tsx` | Indicar janela temporal |
-| `src/components/executive/TrendInsightCard.tsx` | Mostrar bloqueio temporal |
+| `src/types/decisions.ts` | CRIAR - Tipos DecisionEvent, DecisionStatus, etc. |
+| `src/hooks/useDecisionEvents.ts` | CRIAR - Hook para gerenciar eventos |
+| `src/utils/recommendationEnricher.ts` | CRIAR - Enriquecer recomendacoes com estado |
+| `src/types/executive.ts` | MODIFICAR - Extender Recommendation |
+| `src/components/executive/RecommendationCard.tsx` | MODIFICAR - Adicionar acoes |
+| `src/components/executive/RejectionModal.tsx` | CRIAR - Modal de rejeicao |
+| `src/components/executive/DecisionMemoryCard.tsx` | CRIAR - Card de memoria (opcional) |
+| `src/pages/ExecutiveDashboard.tsx` | MODIFICAR - Integrar sistema de decisoes |
+| Migracao SQL | CRIAR - Tabela decision_events com RLS |
 
 ---
 
-## Ordem de Execucao
+## ORDEM DE EXECUCAO
 
 ```text
-1. src/types/metricNature.ts - Criar TemporalConfidence + interfaces + guardrails
-2. src/types/executive.ts - Adicionar _temporal em ExecutiveMetrics
-3. src/utils/executiveMetricsCalculator.ts - Calcular _temporal
-4. src/utils/alertSystem.ts - Aplicar guardrail temporal
-5. src/utils/recommendationEngine.ts - Aplicar guardrail temporal
-6. src/utils/criticalAnalysis.ts - Classificar insights com temporal
-7. src/components/dashboard/MetricCard.tsx - Badge temporal
-8. src/components/executive/HealthScoreCard.tsx - Indicador temporal
-9. src/components/executive/TrendInsightCard.tsx - Bloqueio temporal
+1. Migracao SQL - Criar tabela decision_events
+2. src/types/decisions.ts - Criar tipos
+3. src/types/executive.ts - Extender Recommendation
+4. src/hooks/useDecisionEvents.ts - Criar hook
+5. src/utils/recommendationEnricher.ts - Criar enriquecedor
+6. src/components/executive/RejectionModal.tsx - Criar modal
+7. src/components/executive/RecommendationCard.tsx - Adicionar acoes
+8. src/pages/ExecutiveDashboard.tsx - Integrar tudo
+9. src/components/executive/DecisionMemoryCard.tsx - Card de memoria (opcional)
 ```
 
 ---
 
-## Impacto nas Funcionalidades
+## O QUE NAO FAZER
 
-### Recomendacoes que serao BLOQUEADAS se dados < 30 dias
-- Otimizar ROAS
-- Programa de Retencao (Churn)
-- Novos Canais (CAC)
-
-### Alertas que serao DOWNGRADED se dados < 7 dias
-- ROAS Critico -> info com aviso
-- Churn Critico -> info com aviso
-- CAC Alto -> info com aviso
-
-### Alertas TEMPORAIS (mantidos como estao)
-- Queda Receita (vs mes anterior)
-- Ticket Queda (vs mes anterior)
-- Ja sao sinalizacoes, nao decisoes
+- Nao gamificar decisoes
+- Nao forcar explicacoes
+- Nao punir rejeicao
+- Nao esconder historico
+- Nao automatizar decisoes
 
 ---
 
-## Contrato Final de Recomendacao
+## CONTRATO FINAL COMPLETO (4 ETAPAS)
 
-Uma recomendacao so pode existir se:
+O sistema so age quando:
 
 ```text
-authority === DECISIONAL
-AND nature === REAL
-AND benchmark existe
-AND temporalConfidence === STABLE
+VERDADE (nature)        ✓ REAL
+AUTORIDADE (authority)  ✓ DECISIONAL
+TEMPO (temporal)        ✓ STABLE
+RESPONSABILIDADE        → explícita (PENDING/ACCEPTED/REJECTED/EXPIRED)
 ```
-
-Sem excecoes.
 
 ---
 
-## Validacao Final
+## VALIDACAO FINAL
 
-1. Com 5 dias de dados -> nenhum alerta critico, nenhuma recomendacao
-2. Com 20 dias de dados -> alertas com aviso "estabilizando", nenhuma recomendacao
-3. Com 35 dias de dados -> alertas normais, recomendacoes permitidas
-4. UI exibe "23 dias de dados" discretamente nos cards
-5. Sistema explica: "Aguardando maturacao temporal da metrica"
-6. Alertas temporais (Receita, Ticket) continuam funcionando independentemente
+1. Recomendacao exibida = evento PENDING criado
+2. Usuario pode aceitar com um clique
+3. Usuario pode rejeitar com motivo opcional
+4. Recomendacao ignorada por 30 dias = EXPIRED automatico
+5. Historico de rejeicoes visivel quando recomendacao reaparece
+6. Sistema lembra: quais metricas geram acoes vs quais sao ignoradas
+7. Memoria nao julga - apenas registra realidade
+
+---
+
+## RESPOSTA A PERGUNTA FUNDAMENTAL
+
+> Este sistema deve aprender com o silencio do usuario ou apenas registrar?
+
+**Nesta etapa: apenas registrar.**
+
+A Etapa 4 constroi a infraestrutura de memoria honesta.
+A Etapa 5 (futura) usara essa memoria para calibrar tom, frequencia e confianca.
+
+Por enquanto: o sistema lembra, mas nao muda comportamento ainda.
+
