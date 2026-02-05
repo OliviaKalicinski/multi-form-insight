@@ -196,6 +196,66 @@ export type Database = {
         }
         Relationships: []
       }
+      decision_events: {
+        Row: {
+          based_on_metric: string
+          benchmark_at_generation: number | null
+          category: string
+          created_at: string | null
+          expires_at: string
+          generated_at: string | null
+          id: string
+          metric_value_at_generation: number | null
+          period_reference: string
+          recommendation_id: string
+          recommendation_title: string
+          rejection_reason: string | null
+          status: string | null
+          status_changed_at: string | null
+          updated_at: string | null
+          user_id: string
+          user_notes: string | null
+        }
+        Insert: {
+          based_on_metric: string
+          benchmark_at_generation?: number | null
+          category: string
+          created_at?: string | null
+          expires_at: string
+          generated_at?: string | null
+          id?: string
+          metric_value_at_generation?: number | null
+          period_reference: string
+          recommendation_id: string
+          recommendation_title: string
+          rejection_reason?: string | null
+          status?: string | null
+          status_changed_at?: string | null
+          updated_at?: string | null
+          user_id: string
+          user_notes?: string | null
+        }
+        Update: {
+          based_on_metric?: string
+          benchmark_at_generation?: number | null
+          category?: string
+          created_at?: string | null
+          expires_at?: string
+          generated_at?: string | null
+          id?: string
+          metric_value_at_generation?: number | null
+          period_reference?: string
+          recommendation_id?: string
+          recommendation_title?: string
+          rejection_reason?: string | null
+          status?: string | null
+          status_changed_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+          user_notes?: string | null
+        }
+        Relationships: []
+      }
       followers_data: {
         Row: {
           created_at: string | null
@@ -393,6 +453,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      expire_old_decisions: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
