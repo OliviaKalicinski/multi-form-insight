@@ -11,7 +11,18 @@ import {
   DecisionStatusIcons,
   RejectionReasonKey 
 } from "@/types/decisions";
-import { DecisionInterpretation, DecisionInterpretationLabels } from "@/types/decisionInterpretation";
+import { DecisionInterpretation } from "@/types/decisionInterpretation";
+
+// Mapa de frases contextuais baseadas na interpretação do histórico
+// IMPORTANTE: Isso é DESCRITIVO, não PRESCRITIVO - apenas muda a linguagem
+const InterpretationPosture: Record<DecisionInterpretation, string> = {
+  NEVER_EVALUATED: 'Primeira vez que esta recomendação aparece para você.',
+  RECENTLY_REJECTED: 'Esta recomendação foi rejeitada há menos de 30 dias.',
+  REPEATEDLY_REJECTED: 'Esta recomendação foi rejeitada múltiplas vezes recentemente.',
+  PREVIOUSLY_ACCEPTED: 'Esta recomendação foi aceita em um contexto anterior.',
+  MIXED_HISTORY: 'Esta recomendação tem histórico variado de avaliações.',
+  STALE_PENDING: 'Esta recomendação estava pendente e expirou sem decisão.',
+};
 import { RejectionModal } from "./RejectionModal";
 import { Target, Check, X, AlertTriangle, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -120,6 +131,12 @@ export const RecommendationCard = ({
               </div>
             </div>
           </CardTitle>
+          {/* Postura linguística baseada na interpretação - Etapa 5.3A */}
+          {recommendation.interpretation && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {InterpretationPosture[recommendation.interpretation]}
+            </p>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           {/* KPIs Grid */}
@@ -175,17 +192,9 @@ export const RecommendationCard = ({
                 <span className="font-semibold">{recommendation.responsavel}</span>
               </div>
               {recommendation.basedOnMetric && (
-                <div className="flex flex-col">
-                  <span className="text-muted-foreground">
-                    Baseado em: <span className="font-medium text-blue-600">{recommendation.basedOnMetric}</span>
-                  </span>
-                  {/* Interpretação do histórico - Etapa 5.2 (discreto, apenas descrição) */}
-                  {recommendation.interpretation && recommendation.interpretation !== 'NEVER_EVALUATED' && (
-                    <span className="text-muted-foreground text-[10px]">
-                      Histórico: {DecisionInterpretationLabels[recommendation.interpretation]}
-                    </span>
-                  )}
-                </div>
+                <span className="text-muted-foreground">
+                  Baseado em: <span className="font-medium text-blue-600">{recommendation.basedOnMetric}</span>
+                </span>
               )}
             </div>
             
