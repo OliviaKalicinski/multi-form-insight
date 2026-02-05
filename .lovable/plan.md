@@ -1,263 +1,209 @@
 
 
-# Plano: Ajustes Finos da Etapa 4
+# Plano: Etapa 5.1 — Card de Memória de Decisão
 
 ## Objetivo
-Aplicar refinamentos semanticos e documentais a Etapa 4, preparando o terreno para evolucoes futuras sem quebrar a implementacao atual.
+Criar um card de memória histórica que mostra ao usuário o registro factual das decisões tomadas sobre recomendações, sem influenciar nenhum comportamento do sistema.
 
 ---
 
-## AJUSTE 1: Preparar Diferenciacao de Expiracao
+## Princípio Fundamental
 
-### Arquivo: src/types/decisions.ts
+O card é um **espelho histórico**:
+- Exibe apenas dados que já existem em `useDecisionEvents().memory`
+- Não calcula nada novo
+- Não influencia geração, ordem ou prioridade de recomendações
+- Não contém botões, ações ou CTAs
 
-Adicionar tipo ExpirationReason (documentado, nao usado ainda):
-
-```text
-// ============================================
-// TIPOS FUTUROS (preparacao - nao implementados)
-// ============================================
-// ExpirationReason permitira diferenciar:
-// - TIMEOUT: 30 dias sem acao
-// - SUPERSEDED: nova recomendacao substituiu
-// - CONTEXT_CHANGED: contexto de negocios mudou
-//
-// TODO (Etapa 5+): Migrar EXPIRED para usar este tipo
-// Por enquanto, EXPIRED = TIMEOUT implicitamente.
-// ============================================
-export type ExpirationReason = 
-  | 'TIMEOUT'          // Passou 30 dias sem acao
-  | 'SUPERSEDED'       // Substituida por recomendacao mais recente
-  | 'CONTEXT_CHANGED'; // Condicoes de negocios mudaram
-```
-
-Adicionar campo opcional em DecisionEvent (para futuro):
-
-```text
-// expirationReason?: ExpirationReason; // TODO: Implementar na Etapa 5+
-```
+**Propósito ético**: Provar para o usuário que a memória existe antes de ser usada para qualquer coisa.
 
 ---
 
-## AJUSTE 2: Microcopy do Botao Aceitar
+## Componente: DecisionMemoryCard
 
-### Arquivo: src/components/executive/RecommendationCard.tsx
+### Arquivo a Criar
+`src/components/executive/DecisionMemoryCard.tsx`
 
-Atualizar tooltip do botao Aceitar:
-
-De:
-```text
-<TooltipContent>
-  <p>Marcar como ação aceita</p>
-</TooltipContent>
-```
-
-Para:
-```text
-<TooltipContent side="top" className="max-w-xs">
-  <p className="font-medium">Aceitar recomendação</p>
-  <p className="text-xs text-muted-foreground mt-1">
-    Registra que esta recomendação foi considerada válida neste contexto.
-    Não executa nenhuma ação automaticamente.
-  </p>
-</TooltipContent>
-```
-
-Mesma logica para Rejeitar:
+### Props
 
 ```text
-<TooltipContent side="top" className="max-w-xs">
-  <p className="font-medium">Rejeitar recomendação</p>
-  <p className="text-xs text-muted-foreground mt-1">
-    Registra que esta recomendação não se aplica agora.
-    Você pode informar o motivo opcionalmente.
-  </p>
-</TooltipContent>
-```
-
----
-
-## AJUSTE 3: Campo metricSnapshotLabel
-
-### Arquivo: src/types/decisions.ts
-
-Adicionar campo opcional em DecisionEvent:
-
-```text
-export interface DecisionEvent {
-  // ... campos existentes ...
-  
-  // Snapshot legivel da metrica no momento da geracao
-  // Ex: "ROAS Ads = 0.74x" ou "Churn = 12.3%"
-  metricSnapshotLabel?: string;
+interface DecisionMemoryCardProps {
+  memory: DecisionMemory;
 }
 ```
 
-### Arquivo: src/hooks/useDecisionEvents.ts
-
-Atualizar registerRecommendation para aceitar o label:
+### Estrutura Visual
 
 ```text
-interface RegisterRecommendationParams {
-  recommendation: Recommendation;
-  periodReference: string;
-  metricValue: number;
-  benchmark: number | null;
-  metricSnapshotLabel?: string; // NOVO
-}
++--------------------------------------------------+
+| 📋 Memória de Decisão                            |
+| Registro histórico das recomendações apresentadas |
++--------------------------------------------------+
+|                                                   |
+| [4]         [2]         [1]         [1]          |
+| Geradas    Aceitas    Rejeitadas   Expiradas     |
+|                                                   |
++--------------------------------------------------+
+| ⏱️ Tempo médio: 2.4h entre geração e decisão     |
++--------------------------------------------------+
+| Métrica       Geradas  Aceitas  Rejeitadas  Exp  |
+| ─────────────────────────────────────────────────|
+| roasAds          2        1         1        0   |
+| churn            1        1         0        0   |
+| ticketMedio      1        0         0        1   |
++--------------------------------------------------+
+| ℹ️ Este histórico não altera automaticamente     |
+| recomendações, alertas ou prioridades.           |
+| Ele existe para tornar explícita a relação       |
+| entre sugestões do sistema e decisões humanas.   |
++--------------------------------------------------+
 ```
+
+### Regras de Exibição
+
+1. **Só exibir se `memory.totalGenerated > 0`**
+   - Se não há histórico, não mostrar o card
+
+2. **Tempo médio**: só exibir se `avgResponseTimeHours > 0`
+   - Formatar como horas se < 24h, dias se >= 24h
+
+3. **Tabela por métrica**: não mostrar `acceptanceRate`
+   - Mesmo existindo no tipo, é deliberadamente omitido
+
+4. **Cores neutras**: usar cinza/slate, sem verde/vermelho forte
+   - O card não julga, apenas registra
 
 ---
 
-## AJUSTE 4: Renomear previousRejections para Neutralidade
+## Integração em AnaliseCritica.tsx
 
-### Arquivo: src/utils/recommendationEnricher.ts
+### Localização na Página
 
-Renomear internamente:
-- previousRejections -> priorRejectionCount
-
-### Arquivo: src/components/executive/RecommendationCard.tsx
-
-Atualizar para:
-- Nao mostrar historico quando status === 'EXPIRED' (so REJECTED)
-- Manter a logica de exibicao apenas para rejeicoes explicitas
+Inserir **após** a seção de Recomendações Prioritárias e **antes** da Análise Trimestral:
 
 ```text
-// Antes:
-{hasDecisionHistory && (!status || status === 'PENDING') && (
+{/* RECOMENDAÇÕES PRIORITÁRIAS */}
+...
 
-// Depois:
-// Mostrar historico apenas para rejeicoes explicitas, nao expiracoes
-{priorRejectionCount > 0 && (!status || status === 'PENDING') && (
+{/* MEMÓRIA DE DECISÃO */}
+{memory.totalGenerated > 0 && (
+  <DecisionMemoryCard memory={memory} />
+)}
+
+{/* ANÁLISE TRIMESTRAL */}
+...
 ```
+
+### Fonte de Dados
+
+Usar o hook já existente:
+
+```text
+const { memory } = useDecisionEvents();
+```
+
+Já está disponível no componente `AnaliseCritica.tsx` (linha 24-31).
 
 ---
 
-## AJUSTE 5: Debug Log para Decisoes Nao Registradas
+## Detalhes de Implementação
 
-### Arquivo: src/pages/AnaliseCritica.tsx
-
-Adicionar log quando uma recomendacao nao e registrada por contrato:
+### Seção 1: Cabeçalho
 
 ```text
-// Verificar autoridade da métrica base
-const metricKey = rec.basedOnMetric;
-if (!metricKey) {
-  console.debug('[Decision skipped]', rec.id, 'reason:', 'no basedOnMetric');
-  continue;
-}
-
-// Só registrar se temporal é STABLE
-if (!canGenerateTemporalRecommendation(temporalConfidence)) {
-  console.debug('[Decision skipped]', rec.id, 'reason:', 'temporal not stable', temporalConfidence);
-  continue;
-}
+<CardHeader>
+  <CardTitle className="flex items-center gap-2">
+    <History className="h-5 w-5 text-slate-500" />
+    Memória de Decisão
+  </CardTitle>
+  <CardDescription>
+    Registro histórico das recomendações apresentadas
+  </CardDescription>
+</CardHeader>
 ```
 
----
+### Seção 2: Resumo Geral (4 números)
 
-## AJUSTE 6: Documentar Disciplina sobre acceptanceRate
+Grid com 4 colunas mostrando:
+- Total geradas
+- Aceitas
+- Rejeitadas
+- Expiradas
 
-### Arquivo: src/types/decisions.ts
+**Microcopy abaixo**: "Desde o início do uso deste painel"
 
-Adicionar comentario em DecisionMemory:
+### Seção 3: Tempo Médio de Resposta
+
+Condicional: só mostrar se `avgResponseTimeHours > 0`
 
 ```text
-export interface DecisionMemory {
-  totalGenerated: number;
-  byStatus: Record<DecisionStatus, number>;
-  byMetric: {
-    [metricKey: string]: {
-      generated: number;
-      accepted: number;
-      rejected: number;
-      expired: number;
-      // ============================================
-      // ATENCAO: acceptanceRate e informativo apenas.
-      // NAO usar para:
-      //   - Reordenar recomendacoes
-      //   - Filtrar recomendacoes
-      //   - Reduzir frequencia
-      // 
-      // O uso deste dado sera definido na Etapa 5.
-      // ============================================
-      acceptanceRate: number;
-    };
-  };
-  avgResponseTimeHours: number;
-  lastUpdated: Date;
-}
+const formatResponseTime = (hours: number): string => {
+  if (hours < 24) {
+    return `${hours.toFixed(1)}h`;
+  }
+  const days = hours / 24;
+  return `${days.toFixed(1)} dias`;
+};
 ```
 
----
+**Microcopy**: "Tempo médio entre geração e decisão explícita"
 
-## AJUSTE 7: Comentario Filosofico
+### Seção 4: Tabela por Métrica
 
-### Arquivo: src/types/decisions.ts
+Colunas:
+| Métrica | Geradas | Aceitas | Rejeitadas | Expiradas |
 
-Adicionar no cabecalho:
+- Não mostrar `acceptanceRate`
+- Só exibir métricas com `generated > 0`
+- Usar nomes legíveis para as métricas (mapa de tradução)
+
+### Seção 5: Rodapé Epistemológico
+
+Texto fixo em `text-xs text-muted-foreground`:
 
 ```text
-// ============================================
-// PRINCIPIO EPISTEMICO DA ETAPA 4
-// ============================================
-// A pergunta que o sistema faz NAO e:
-//   "O usuário aceitou?"
-//
-// A pergunta correta e:
-//   "O sistema estava certo para aquele contexto?"
-//
-// Isso evita:
-//   - Sistema subserviente (busca aprovacao)
-//   - Sistema punitivo (julga rejeicao)
-//   - Sistema manipulador (otimiza aceitacao)
-//
-// O sistema registra realidade, nao julga.
-// ============================================
+Este histórico não altera automaticamente recomendações, alertas ou prioridades.
+Ele existe para tornar explícita a relação entre sugestões do sistema e decisões humanas.
 ```
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Acao |
+| Arquivo | Ação |
 |---------|------|
-| `src/types/decisions.ts` | Adicionar ExpirationReason, metricSnapshotLabel, comentarios |
-| `src/hooks/useDecisionEvents.ts` | Adicionar metricSnapshotLabel param |
-| `src/utils/recommendationEnricher.ts` | Renomear previousRejections -> priorRejectionCount |
-| `src/components/executive/RecommendationCard.tsx` | Microcopy + filtrar EXPIRED do historico |
-| `src/pages/AnaliseCritica.tsx` | Adicionar console.debug para skipped decisions |
+| `src/components/executive/DecisionMemoryCard.tsx` | CRIAR |
+| `src/pages/AnaliseCritica.tsx` | MODIFICAR - Adicionar o card |
 
 ---
 
-## Ordem de Execucao
+## Ordem de Execução
 
 ```text
-1. src/types/decisions.ts - Todos os ajustes de tipos e documentacao
-2. src/hooks/useDecisionEvents.ts - Adicionar metricSnapshotLabel
-3. src/utils/recommendationEnricher.ts - Renomear campo
-4. src/components/executive/RecommendationCard.tsx - Microcopy + logica EXPIRED
-5. src/pages/AnaliseCritica.tsx - Debug logs
+1. Criar DecisionMemoryCard.tsx com toda a estrutura
+2. Integrar em AnaliseCritica.tsx após Recomendações
 ```
 
 ---
 
-## O Que NAO Muda
+## O Que Este Card NÃO Faz
 
-- Logica de expiracao (EXPIRED continua = TIMEOUT)
-- Uso de acceptanceRate (continua calculado, nao usado)
-- Comportamento de registro (so DECISIONAL/REAL/STABLE)
-- Fluxo de aceitar/rejeitar
+- Não é score
+- Não é ranking
+- Não é feedback loop
+- Não influencia geração, ordem ou prioridade
+- Nenhuma função de decisão lê este card
+- Não tem botões ou ações
 
 ---
 
-## Validacao
+## Critério de Sucesso
 
-1. ExpirationReason existe como tipo, nao como implementacao
-2. Tooltip do Aceitar explica que nao executa acao
-3. metricSnapshotLabel pode ser passado (opcional)
-4. Historico so mostra rejeicoes, nao expiracoes
-5. Console mostra logs de decisoes nao registradas (modo debug)
-6. acceptanceRate tem comentario de disciplina
-7. Principio epistemico documentado
+A etapa está correta se:
+
+1. O card não muda nada no sistema
+2. O usuário entende o que está vendo
+3. O sistema não reage ao que está no card
+4. Nenhuma função consulta essa memória
+5. Se perguntarem "Isso muda algo?", a resposta é "Ainda não."
 
