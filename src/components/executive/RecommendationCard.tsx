@@ -11,6 +11,7 @@ import {
   DecisionStatusIcons,
   RejectionReasonKey 
 } from "@/types/decisions";
+import { DecisionInterpretation, DecisionInterpretationLabels } from "@/types/decisionInterpretation";
 import { RejectionModal } from "./RejectionModal";
 import { Target, Check, X, AlertTriangle, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface RecommendationCardProps {
-  recommendation: Recommendation;
+  recommendation: Recommendation & { interpretation?: DecisionInterpretation };
   rank: number;
   // Callbacks para ações de decisão
   onAccept?: (id: string, notes?: string) => Promise<void>;
@@ -174,8 +175,16 @@ export const RecommendationCard = ({
                 <span className="font-semibold">{recommendation.responsavel}</span>
               </div>
               {recommendation.basedOnMetric && (
-                <div className="text-muted-foreground">
-                  Baseado em: <span className="font-medium text-blue-600">{recommendation.basedOnMetric}</span>
+                <div className="flex flex-col">
+                  <span className="text-muted-foreground">
+                    Baseado em: <span className="font-medium text-blue-600">{recommendation.basedOnMetric}</span>
+                  </span>
+                  {/* Interpretação do histórico - Etapa 5.2 (discreto, apenas descrição) */}
+                  {recommendation.interpretation && recommendation.interpretation !== 'NEVER_EVALUATED' && (
+                    <span className="text-muted-foreground text-[10px]">
+                      Histórico: {DecisionInterpretationLabels[recommendation.interpretation]}
+                    </span>
+                  )}
                 </div>
               )}
             </div>

@@ -7,6 +7,8 @@
 
 import { Recommendation } from '@/types/executive';
 import { DecisionEvent, DecisionStatus } from '@/types/decisions';
+import { DecisionInterpretation } from '@/types/decisionInterpretation';
+import { interpretDecisionHistory } from '@/utils/decisionInterpreter';
 
 // Interface estendida para recomendações com estado de decisão
 export interface EnrichedRecommendation extends Recommendation {
@@ -21,6 +23,10 @@ export interface EnrichedRecommendation extends Recommendation {
   
   // Flag para UI
   hasDecisionHistory: boolean;
+  
+  // Interpretação semântica do histórico (Etapa 5.2)
+  // APENAS para descrição, não para decisão
+  interpretation: DecisionInterpretation;
 }
 
 /**
@@ -71,6 +77,7 @@ export const enrichRecommendationsWithDecisionState = (
       priorRejectionCount: rejections.length,
       lastRejectedAt,
       hasDecisionHistory: relatedEvents.length > 0,
+      interpretation: interpretDecisionHistory(rec.id, events, new Date()),
     };
   });
 };
