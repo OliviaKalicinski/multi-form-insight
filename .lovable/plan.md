@@ -1,251 +1,141 @@
 
-# Plano: Governanca de Significado (Etapa 2)
+# Plano: Confianca Temporal (Etapa 3)
 
 ## Objetivo
-Criar um sistema de autoridade de metricas que define o que cada metrica pode provocar no sistema - separando sinal de decisao e impedindo que metricas erradas gerem acoes.
+Criar um sistema de maturidade temporal que define quando uma metrica tem dados suficientes para justificar atencao, alerta ou decisao - completando o contrato de governanca junto com Nature (Etapa 1) e Authority (Etapa 2).
 
 ---
 
-## BLOCO 1: Classificacao de Autoridade
+## BLOCO 1: Classificacao de Confianca Temporal
 
-### 1.1 Criar tipo MetricAuthority em metricNature.ts
+### 1.1 Criar tipo TemporalConfidence em metricNature.ts
 
 ```text
-type MetricAuthority = 
-  | 'OBSERVATIONAL'  // informa, nunca age
-  | 'DIAGNOSTIC'     // gera alerta, nao acao
-  | 'DECISIONAL'     // pode sugerir acao
-  | 'RESTRICTED';    // nunca automatizar
+type TemporalConfidence = 
+  | 'INSUFFICIENT'   // < 7 dias de dados
+  | 'STABILIZING'    // 7-29 dias de dados
+  | 'STABLE';        // >= 30 dias de dados
 ```
 
-### 1.2 Criar mapa de autoridades ExecutiveMetricsAuthority
+### 1.2 Criar interface TemporalMetadata
 
 ```text
-export interface ExecutiveMetricsAuthority {
-  // Vendas
-  receita: MetricAuthority;        // OBSERVATIONAL
-  pedidos: MetricAuthority;        // OBSERVATIONAL
-  ticketMedio: MetricAuthority;    // DIAGNOSTIC
-  ticketMedioReal: MetricAuthority; // DIAGNOSTIC
-  conversao: MetricAuthority;      // DIAGNOSTIC
-  
-  // Marketing
-  roasAds: MetricAuthority;        // DECISIONAL
-  cac: MetricAuthority;            // DECISIONAL
-  // ...etc
-  
-  // Clientes
-  taxaChurn: MetricAuthority;      // DECISIONAL
-  taxaRecompra: MetricAuthority;   // DIAGNOSTIC
-  ltv: MetricAuthority;            // RESTRICTED
-  
-  // Produtos
-  margemMedia: MetricAuthority;    // RESTRICTED
-  
-  // Health Score
-  healthScore: MetricAuthority;    // DIAGNOSTIC
+export interface TemporalMetadata {
+  dataPoints: number;        // Quantidade de registros
+  windowDays: number;        // Janela em dias (calculada)
+  firstDate: Date | null;    // Primeiro registro
+  lastDate: Date | null;     // Ultimo registro
+  confidence: TemporalConfidence;
+  label: string;             // Ex: "23 dias de dados"
 }
 ```
 
-### 1.3 Criar factory createDefaultAuthority()
+### 1.3 Criar mapa ExecutiveMetricsTemporal
 
-Retorna o mapa com autoridades pre-definidas conforme tabela do prompt:
-- Receita: OBSERVATIONAL
-- Pedidos: OBSERVATIONAL  
-- Ticket Medio: DIAGNOSTIC
-- Conversao: DIAGNOSTIC
-- ROAS: DECISIONAL
-- CAC: DECISIONAL
-- Churn: DECISIONAL
-- Taxa Recompra: DIAGNOSTIC
-- LTV: RESTRICTED
-- Margem Estimada: RESTRICTED
-- Health Score: DIAGNOSTIC
+```text
+export interface ExecutiveMetricsTemporal {
+  // Por categoria (simplificado - nao por metrica individual)
+  vendas: TemporalMetadata;
+  marketing: TemporalMetadata;
+  clientes: TemporalMetadata;
+  produtos: TemporalMetadata;
+  operacoes: TemporalMetadata;
+}
+```
+
+### 1.4 Criar funcao calculateTemporalConfidence
+
+```text
+export const calculateTemporalConfidence = (
+  windowDays: number
+): TemporalConfidence => {
+  if (windowDays < 7) return 'INSUFFICIENT';
+  if (windowDays < 30) return 'STABILIZING';
+  return 'STABLE';
+};
+```
+
+### 1.5 Criar factory createTemporalMetadata
+
+```text
+export const createTemporalMetadata = (
+  dataPoints: number,
+  firstDate: Date | null,
+  lastDate: Date | null
+): TemporalMetadata => {
+  const windowDays = firstDate && lastDate 
+    ? differenceInDays(lastDate, firstDate) + 1 
+    : 0;
+  
+  const confidence = calculateTemporalConfidence(windowDays);
+  
+  const label = windowDays === 0 
+    ? 'Sem dados' 
+    : `${windowDays} dia${windowDays > 1 ? 's' : ''} de dados`;
+  
+  return {
+    dataPoints,
+    windowDays,
+    firstDate,
+    lastDate,
+    confidence,
+    label,
+  };
+};
+```
 
 ---
 
-## BLOCO 2: Contrato de Acao (Guardrails)
+## BLOCO 2: Regras de Bloqueio por Tempo
 
 ### 2.1 Criar funcoes de verificacao em metricNature.ts
 
 ```text
-// Verifica se metrica pode gerar alerta
-export const canGenerateAlert = (authority: MetricAuthority): boolean => {
-  return authority === 'DIAGNOSTIC' || authority === 'DECISIONAL';
-  // OBSERVATIONAL e RESTRICTED nao geram alertas
+// Verifica se confianca permite alertas
+export const canGenerateTemporalAlert = (
+  confidence: TemporalConfidence
+): boolean => {
+  // INSUFFICIENT nao gera alertas
+  return confidence === 'STABILIZING' || confidence === 'STABLE';
 };
 
-// Verifica se metrica pode gerar recomendacao
-export const canGenerateRecommendation = (authority: MetricAuthority): boolean => {
-  return authority === 'DECISIONAL';
-  // Apenas DECISIONAL pode sugerir acao
+// Verifica se confianca permite recomendacoes
+export const canGenerateTemporalRecommendation = (
+  confidence: TemporalConfidence
+): boolean => {
+  // Apenas STABLE pode gerar recomendacoes
+  return confidence === 'STABLE';
 };
 
-// Verifica se metrica requer aviso explicito
-export const requiresExplicitWarning = (authority: MetricAuthority): boolean => {
-  return authority === 'RESTRICTED';
+// Verifica se requer aviso de dados iniciais
+export const requiresTemporalWarning = (
+  confidence: TemporalConfidence
+): boolean => {
+  return confidence === 'INSUFFICIENT' || confidence === 'STABILIZING';
 };
 ```
 
-### 2.2 Modificar alertSystem.ts
-
-Adicionar verificacao de authority antes de gerar alertas:
+### 2.2 Labels para UI
 
 ```text
-// Para cada alerta:
-const authority = getMetricAuthority('roasAds');
-if (!canGenerateAlert(authority)) {
-  // Skip - metrica nao tem permissao para alertar
-  continue;
-}
-```
+export const TemporalConfidenceLabels: Record<TemporalConfidence, string> = {
+  INSUFFICIENT: 'Dados Insuficientes',
+  STABILIZING: 'Estabilizando',
+  STABLE: 'Estavel',
+};
 
-Alertas de metricas OBSERVATIONAL (receita, pedidos) passam a ser bloqueados.
-O alerta de "queda de receita" sera reclassificado ou removido (receita e OBSERVATIONAL).
-
-### 2.3 Modificar recommendationEngine.ts
-
-Adicionar verificacao de authority antes de gerar recomendacoes:
-
-```text
-// Cada recomendacao deve verificar:
-const roasAuthority = getMetricAuthority('roasAds');
-if (!canGenerateRecommendation(roasAuthority)) {
-  // Skip - nao pode recomendar baseado nesta metrica
-  continue;
-}
-```
-
-Recomendacoes baseadas em ticket medio (DIAGNOSTIC) serao bloqueadas.
-Apenas ROAS, CAC e Churn poderao gerar recomendacoes.
-
----
-
-## BLOCO 3: Separacao entre Sinal e Decisao
-
-### 3.1 Atualizar TrendInsight type em executive.ts
-
-```text
-export interface TrendInsight {
-  type: 'sucesso' | 'atencao' | 'oportunidade';
-  insightClass: 'signal' | 'context' | 'recommendation'; // NOVO
-  title: string;
-  description: string;
-  metrics: { ... }[];
-  blockedReason?: string; // NOVO - explica por que nao ha acao
-}
-```
-
-### 3.2 Regras de classificacao de insights
-
-```text
-insightClass: 'signal'
-- Toda metrica pode emitir (OBSERVATIONAL, DIAGNOSTIC, DECISIONAL)
-- Ex: "ROAS caiu 25%" 
-
-insightClass: 'context'
-- DIAGNOSTIC e DECISIONAL podem emitir
-- Ex: "Ticket medio abaixo do benchmark"
-
-insightClass: 'recommendation'
-- Apenas DECISIONAL pode emitir
-- Apenas se nature === 'REAL'
-- Apenas se benchmark existe
-- Ex: "Pausar campanhas com baixo ROI"
-```
-
-### 3.3 Modificar gerarInsights() em criticalAnalysis.ts
-
-```text
-// Insight de ROAS pode ser recommendation (DECISIONAL + REAL + benchmark)
-if (authority === 'DECISIONAL' && meta.roasAds === 'REAL' && benchmarks.roasMedio) {
-  insights.push({ insightClass: 'recommendation', ... });
-} else if (canGenerateAlert(authority)) {
-  insights.push({ insightClass: 'signal', ... });
-} else {
-  // Explicar por que nao agiu
-  insights.push({ insightClass: 'context', blockedReason: 'Metrica sem autoridade para acao' });
-}
+export const TemporalConfidenceBadges: Record<TemporalConfidence, string> = {
+  INSUFFICIENT: 'IMAT',  // Imaturo
+  STABILIZING: 'ESTAB', // Estabilizando
+  STABLE: '',           // Nao exibe badge
+};
 ```
 
 ---
 
-## BLOCO 4: Visibilidade e Transparencia na UI
+## BLOCO 3: Integracao com ExecutiveMetrics
 
-### 4.1 Atualizar MetricCard.tsx
-
-Adicionar prop authority opcional:
-
-```text
-interface MetricCardProps {
-  nature?: MetricNature;
-  authority?: MetricAuthority; // NOVO
-}
-```
-
-Renderizar badge de authority quando RESTRICTED:
-
-```text
-{authority === 'RESTRICTED' && (
-  <Badge variant="destructive" className="text-[10px]">
-    ⚠️ Restrita
-  </Badge>
-)}
-```
-
-### 4.2 Criar componente AuthorityBadge.tsx
-
-Badge discreto para exibir autoridade:
-
-```text
-const AuthorityBadge = ({ authority }: { authority: MetricAuthority }) => {
-  const config = {
-    OBSERVATIONAL: { label: 'OBS', color: 'gray' },
-    DIAGNOSTIC: { label: 'DIAG', color: 'blue' },
-    DECISIONAL: { label: 'DEC', color: 'green' },
-    RESTRICTED: { label: 'REST', color: 'red' },
-  };
-  
-  return <Badge>{config[authority].label}</Badge>;
-};
-```
-
-### 4.3 Atualizar TrendInsightCard.tsx
-
-Adicionar indicador de classe do insight:
-
-```text
-// Badge indicando se e signal/context/recommendation
-<Badge className={...}>
-  {insight.insightClass === 'signal' ? 'Sinal' : 
-   insight.insightClass === 'context' ? 'Contexto' : 
-   'Recomendacao'}
-</Badge>
-
-// Se bloqueado, mostrar razao
-{insight.blockedReason && (
-  <Tooltip>
-    <TooltipTrigger><Info /></TooltipTrigger>
-    <TooltipContent>{insight.blockedReason}</TooltipContent>
-  </Tooltip>
-)}
-```
-
-### 4.4 Atualizar RecommendationCard.tsx
-
-Mostrar quais metricas fundamentam a recomendacao:
-
-```text
-<div className="text-xs text-muted-foreground">
-  Baseado em: {recommendation.basedOnMetric} (DECISIONAL)
-</div>
-```
-
----
-
-## BLOCO 5: Adicionar _authority ao ExecutiveMetrics
-
-### 5.1 Atualizar executive.ts
+### 3.1 Adicionar _temporal ao ExecutiveMetrics (executive.ts)
 
 ```text
 export interface ExecutiveMetrics {
@@ -256,22 +146,339 @@ export interface ExecutiveMetrics {
   operacoes: OperacoesMetrics;
   _meta?: ExecutiveMetricsMeta;
   _source?: ExecutiveMetricsSource;
-  _authority?: ExecutiveMetricsAuthority; // NOVO
+  _authority?: ExecutiveMetricsAuthority;
+  _temporal?: ExecutiveMetricsTemporal; // NOVO
 }
 ```
 
-### 5.2 Atualizar executiveMetricsCalculator.ts
+### 3.2 Atualizar executiveMetricsCalculator.ts
 
-Retornar _authority junto com _meta e _source:
+Calcular janela temporal a partir dos dados recebidos:
 
 ```text
-return {
-  vendas: { ... },
-  marketing: { ... },
-  _meta,
-  _source,
-  _authority: createDefaultAuthority(), // NOVO
+export const calculateExecutiveMetrics = (
+  orders: ProcessedOrder[],
+  adsData: AdsData[],
+  month: string
+): ExecutiveMetrics | null => {
+  // ... calculos existentes ...
+  
+  // Calcular metadados temporais
+  const _temporal = calculateTemporalMetadata(orders, adsData);
+  
+  return {
+    vendas: { ... },
+    marketing: { ... },
+    _meta,
+    _source,
+    _authority,
+    _temporal, // NOVO
+  };
 };
+```
+
+### 3.3 Criar funcao calculateTemporalMetadata
+
+```text
+const calculateTemporalMetadata = (
+  orders: ProcessedOrder[],
+  adsData: AdsData[]
+): ExecutiveMetricsTemporal => {
+  // Vendas
+  const vendasDates = orders.map(o => o.dataVenda);
+  const vendasFirst = vendasDates.length > 0 ? min(vendasDates) : null;
+  const vendasLast = vendasDates.length > 0 ? max(vendasDates) : null;
+  
+  // Marketing (ads)
+  const adsDates = adsData.map(a => parse(a["Inicio dos relatorios"], 'yyyy-MM-dd', new Date()));
+  const adsFirst = adsDates.length > 0 ? min(adsDates) : null;
+  const adsLast = adsDates.length > 0 ? max(adsDates) : null;
+  
+  // Clientes - derivado de vendas
+  const clientesTemporal = createTemporalMetadata(orders.length, vendasFirst, vendasLast);
+  
+  // Produtos - derivado de vendas
+  const produtosTemporal = createTemporalMetadata(orders.length, vendasFirst, vendasLast);
+  
+  // Operacoes - derivado de vendas (NF)
+  const operacoesTemporal = createTemporalMetadata(orders.length, vendasFirst, vendasLast);
+  
+  return {
+    vendas: createTemporalMetadata(orders.length, vendasFirst, vendasLast),
+    marketing: createTemporalMetadata(adsData.length, adsFirst, adsLast),
+    clientes: clientesTemporal,
+    produtos: produtosTemporal,
+    operacoes: operacoesTemporal,
+  };
+};
+```
+
+---
+
+## BLOCO 4: Guardrails em Alertas e Recomendacoes
+
+### 4.1 Atualizar alertSystem.ts
+
+Adicionar verificacao temporal APOS verificacao de authority:
+
+```text
+export const gerarAlertas = (
+  atual: ExecutiveMetrics,
+  anterior: ExecutiveMetrics,
+  benchmarks: SectorBenchmarks
+): CriticalAlert[] => {
+  const alertas: CriticalAlert[] = [];
+  const meta = atual._meta;
+  const authority = atual._authority || createDefaultAuthority();
+  const temporal = atual._temporal;
+  
+  // ROAS Alert
+  if (atual.marketing.roasAds < 0.8 && benchmarks.roasMedio) {
+    // 1. Verificar authority
+    if (!canGenerateAlert(authority.roasAds)) continue;
+    
+    // 2. Verificar temporal (NOVO)
+    const marketingConfidence = temporal?.marketing.confidence || 'STABLE';
+    if (!canGenerateTemporalAlert(marketingConfidence)) {
+      // Dados insuficientes - skip ou downgrade para info
+      alertas.push({
+        ...alertData,
+        severity: 'info',
+        title: 'ROAS baixo (dados iniciais)',
+        blockedReason: temporal?.marketing.label || 'Base temporal insuficiente',
+      });
+      continue;
+    }
+    
+    // 3. Se STABILIZING, adicionar aviso
+    if (requiresTemporalWarning(marketingConfidence)) {
+      alertData.title += ` (${temporal?.marketing.label})`;
+    }
+    
+    // Gerar alerta normal
+    alertas.push(alertData);
+  }
+};
+```
+
+### 4.2 Atualizar recommendationEngine.ts
+
+```text
+export const gerarRecomendacoes = (
+  atual: ExecutiveMetrics,
+  anterior: ExecutiveMetrics,
+  benchmarks: SectorBenchmarks
+): Recommendation[] => {
+  const recomendacoes: Recommendation[] = [];
+  const authority = atual._authority || createDefaultAuthority();
+  const temporal = atual._temporal;
+  
+  // Rec 1: Otimizar ROAS
+  if (atual.marketing.roasAds < 1.5) {
+    // 1. Verificar authority
+    if (!canGenerateRecommendation(authority.roasAds)) continue;
+    
+    // 2. Verificar temporal (NOVO) - DEVE SER STABLE
+    const marketingConfidence = temporal?.marketing.confidence || 'STABLE';
+    if (!canGenerateTemporalRecommendation(marketingConfidence)) {
+      // Nao gerar recomendacao - dados imaturos
+      // Pode adicionar a uma lista de "bloqueados" para transparencia
+      continue;
+    }
+    
+    // Gerar recomendacao
+    recomendacoes.push({ ... });
+  }
+};
+```
+
+### 4.3 Atualizar criticalAnalysis.ts (insights)
+
+```text
+// Ao gerar insights, classificar considerando temporal
+const generateInsight = (
+  metric: string,
+  authority: MetricAuthority,
+  temporal: TemporalConfidence,
+  ...
+): TrendInsight => {
+  // Se temporal INSUFFICIENT, sempre signal
+  if (temporal === 'INSUFFICIENT') {
+    return {
+      insightClass: 'signal',
+      blockedReason: 'Aguardando maturacao temporal da metrica',
+      ...
+    };
+  }
+  
+  // Se temporal STABILIZING, pode ser context mas nao recommendation
+  if (temporal === 'STABILIZING') {
+    return {
+      insightClass: authority === 'DECISIONAL' ? 'context' : 'signal',
+      blockedReason: 'Dados em estabilizacao (< 30 dias)',
+      ...
+    };
+  }
+  
+  // STABLE - segue regras normais de authority
+  // ...
+};
+```
+
+---
+
+## BLOCO 5: Funcao Completa de Validacao
+
+### 5.1 Criar canGenerateFullRecommendationWithTemporal
+
+Atualizar a funcao existente para incluir temporal:
+
+```text
+export const canGenerateFullRecommendationWithTemporal = (
+  authority: MetricAuthority,
+  nature: MetricNature,
+  hasBenchmark: boolean,
+  temporalConfidence: TemporalConfidence
+): { allowed: boolean; blockedReason?: string } => {
+  // Checagem 1: Authority
+  if (authority !== 'DECISIONAL') {
+    return { 
+      allowed: false, 
+      blockedReason: `Metrica ${MetricAuthorityLabels[authority]} nao tem autoridade` 
+    };
+  }
+  
+  // Checagem 2: Nature
+  if (nature !== 'REAL') {
+    return { 
+      allowed: false, 
+      blockedReason: 'Metrica usa dados estimados' 
+    };
+  }
+  
+  // Checagem 3: Benchmark
+  if (!hasBenchmark) {
+    return { 
+      allowed: false, 
+      blockedReason: 'Benchmark nao configurado' 
+    };
+  }
+  
+  // Checagem 4: Temporal (NOVO)
+  if (temporalConfidence !== 'STABLE') {
+    return { 
+      allowed: false, 
+      blockedReason: temporalConfidence === 'INSUFFICIENT' 
+        ? 'Base temporal insuficiente (< 7 dias)'
+        : 'Dados em estabilizacao (< 30 dias)'
+    };
+  }
+  
+  return { allowed: true };
+};
+```
+
+---
+
+## BLOCO 6: UI - Visibilidade Temporal
+
+### 6.1 Atualizar MetricCard.tsx
+
+Adicionar prop temporal opcional:
+
+```text
+interface MetricCardProps {
+  nature?: MetricNature;
+  authority?: MetricAuthority;
+  temporal?: TemporalConfidence; // NOVO
+  temporalLabel?: string;        // NOVO: "23 dias de dados"
+}
+```
+
+Renderizar badge temporal quando nao STABLE:
+
+```text
+{temporal && temporal !== 'STABLE' && (
+  <Tooltip>
+    <TooltipTrigger>
+      <Badge 
+        variant="outline" 
+        className={cn(
+          "text-[10px] ml-1",
+          temporal === 'INSUFFICIENT' && "bg-red-50 text-red-700 border-red-200",
+          temporal === 'STABILIZING' && "bg-yellow-50 text-yellow-700 border-yellow-200"
+        )}
+      >
+        {TemporalConfidenceBadges[temporal]}
+      </Badge>
+    </TooltipTrigger>
+    <TooltipContent>
+      {temporalLabel || TemporalConfidenceLabels[temporal]}
+    </TooltipContent>
+  </Tooltip>
+)}
+```
+
+### 6.2 Atualizar HealthScoreCard.tsx
+
+Exibir janela temporal junto com parcialidade:
+
+```text
+// Se temporal insuficiente em alguma categoria
+{hasInsufficientTemporal && (
+  <div className="mt-2 p-2 bg-amber-50 rounded border border-amber-200">
+    <p className="text-xs text-amber-700">
+      ⏳ Base temporal incompleta: {temporalReason}
+    </p>
+  </div>
+)}
+```
+
+### 6.3 Atualizar TrendInsightCard.tsx
+
+Mostrar quando insight foi bloqueado por temporal:
+
+```text
+{insight.blockedReason?.includes('temporal') && (
+  <Badge variant="outline" className="text-[10px] bg-amber-50">
+    ⏳ {insight.blockedReason}
+  </Badge>
+)}
+```
+
+---
+
+## BLOCO 7: Formalizacao de Alertas Temporais
+
+### 7.1 Criar tipo para alertas temporais
+
+Formalizar a excecao que ja existe (Receita, Ticket):
+
+```text
+// Alertas temporais tem regras diferentes:
+// - Podem ser gerados por metricas OBSERVATIONAL
+// - Comparam periodo vs periodo, nao vs benchmark
+// - NAO geram recomendacoes (apenas sinalizacao)
+export interface TemporalAlertConfig {
+  metricKey: string;
+  isTemporalAlert: true;
+  comparesAgainst: 'previous_period';
+  canTriggerRecommendation: false; // Sempre false
+}
+```
+
+### 7.2 Documentar no alertSystem.ts
+
+```text
+// ============================================
+// ALERTAS TEMPORAIS (excecao documentada)
+// ============================================
+// Alertas de Receita e Ticket Medio sao TEMPORAIS:
+// - Comparam periodo atual vs periodo anterior
+// - Permitidos mesmo para metricas OBSERVATIONAL
+// - NUNCA geram recomendacoes
+// - Sao sinalizacoes, nao decisoes
+// ============================================
 ```
 
 ---
@@ -280,57 +487,73 @@ return {
 
 | Arquivo | Acao |
 |---------|------|
-| `src/types/metricNature.ts` | Adicionar MetricAuthority, ExecutiveMetricsAuthority, factories, guardrails |
-| `src/types/executive.ts` | Adicionar insightClass e blockedReason em TrendInsight, _authority em ExecutiveMetrics |
-| `src/utils/alertSystem.ts` | Adicionar verificacao de authority antes de gerar alertas |
-| `src/utils/recommendationEngine.ts` | Adicionar verificacao de authority antes de gerar recomendacoes |
-| `src/utils/criticalAnalysis.ts` | Adicionar insightClass na geracao de insights |
-| `src/utils/executiveMetricsCalculator.ts` | Retornar _authority |
-| `src/components/dashboard/MetricCard.tsx` | Prop authority + badge RESTRICTED |
-| `src/components/executive/TrendInsightCard.tsx` | Badge de insightClass + tooltip blockedReason |
-| `src/components/executive/RecommendationCard.tsx` | Indicar metrica base |
+| `src/types/metricNature.ts` | Adicionar TemporalConfidence, TemporalMetadata, ExecutiveMetricsTemporal, guardrails |
+| `src/types/executive.ts` | Adicionar _temporal em ExecutiveMetrics |
+| `src/utils/executiveMetricsCalculator.ts` | Calcular _temporal a partir dos dados |
+| `src/utils/alertSystem.ts` | Aplicar guardrail temporal antes de gerar alertas |
+| `src/utils/recommendationEngine.ts` | Aplicar guardrail temporal antes de gerar recomendacoes |
+| `src/utils/criticalAnalysis.ts` | Considerar temporal na classificacao de insights |
+| `src/components/dashboard/MetricCard.tsx` | Prop temporal + badge |
+| `src/components/executive/HealthScoreCard.tsx` | Indicar janela temporal |
+| `src/components/executive/TrendInsightCard.tsx` | Mostrar bloqueio temporal |
 
 ---
 
 ## Ordem de Execucao
 
 ```text
-1. src/types/metricNature.ts - Criar MetricAuthority + ExecutiveMetricsAuthority + factories + guardrails
-2. src/types/executive.ts - Adicionar insightClass, blockedReason, _authority
-3. src/utils/executiveMetricsCalculator.ts - Retornar _authority
-4. src/utils/alertSystem.ts - Aplicar guardrail de authority
-5. src/utils/recommendationEngine.ts - Aplicar guardrail de authority
-6. src/utils/criticalAnalysis.ts - Classificar insights por classe
-7. src/components/dashboard/MetricCard.tsx - Badge authority
-8. src/components/executive/TrendInsightCard.tsx - Badge insightClass
-9. src/components/executive/RecommendationCard.tsx - Metrica base
+1. src/types/metricNature.ts - Criar TemporalConfidence + interfaces + guardrails
+2. src/types/executive.ts - Adicionar _temporal em ExecutiveMetrics
+3. src/utils/executiveMetricsCalculator.ts - Calcular _temporal
+4. src/utils/alertSystem.ts - Aplicar guardrail temporal
+5. src/utils/recommendationEngine.ts - Aplicar guardrail temporal
+6. src/utils/criticalAnalysis.ts - Classificar insights com temporal
+7. src/components/dashboard/MetricCard.tsx - Badge temporal
+8. src/components/executive/HealthScoreCard.tsx - Indicador temporal
+9. src/components/executive/TrendInsightCard.tsx - Bloqueio temporal
 ```
 
 ---
 
-## Impacto nas Funcionalidades Existentes
+## Impacto nas Funcionalidades
 
-### Alertas que serao BLOQUEADOS
-- Queda de Receita (receita e OBSERVATIONAL) - se mantido, sera reclassificado para signal
-- Qualquer alerta baseado em metrica RESTRICTED
+### Recomendacoes que serao BLOQUEADAS se dados < 30 dias
+- Otimizar ROAS
+- Programa de Retencao (Churn)
+- Novos Canais (CAC)
 
-### Recomendacoes que serao BLOQUEADAS
-- Upsell baseado em Ticket Medio (DIAGNOSTIC, nao DECISIONAL)
-- Retencao baseada em Taxa Recompra (DIAGNOSTIC)
+### Alertas que serao DOWNGRADED se dados < 7 dias
+- ROAS Critico -> info com aviso
+- Churn Critico -> info com aviso
+- CAC Alto -> info com aviso
 
-### Recomendacoes que PERMANECEM
-- Otimizar ROAS (DECISIONAL)
-- Reduzir CAC (DECISIONAL)
-- Combater Churn (DECISIONAL)
+### Alertas TEMPORAIS (mantidos como estao)
+- Queda Receita (vs mes anterior)
+- Ticket Queda (vs mes anterior)
+- Ja sao sinalizacoes, nao decisoes
+
+---
+
+## Contrato Final de Recomendacao
+
+Uma recomendacao so pode existir se:
+
+```text
+authority === DECISIONAL
+AND nature === REAL
+AND benchmark existe
+AND temporalConfidence === STABLE
+```
+
+Sem excecoes.
 
 ---
 
 ## Validacao Final
 
-1. Metrica OBSERVATIONAL nunca gera alerta ou recomendacao
-2. Metrica DIAGNOSTIC gera alerta mas nunca recomendacao
-3. Metrica DECISIONAL pode gerar alerta e recomendacao (se REAL + benchmark)
-4. Metrica RESTRICTED exibe aviso explicito e nunca age
-5. Sistema explica por que nao agiu quando authority bloqueia
-6. Health Score (DIAGNOSTIC) pode alertar mas nao pode recomendar
-
+1. Com 5 dias de dados -> nenhum alerta critico, nenhuma recomendacao
+2. Com 20 dias de dados -> alertas com aviso "estabilizando", nenhuma recomendacao
+3. Com 35 dias de dados -> alertas normais, recomendacoes permitidas
+4. UI exibe "23 dias de dados" discretamente nos cards
+5. Sistema explica: "Aguardando maturacao temporal da metrica"
+6. Alertas temporais (Receita, Ticket) continuam funcionando independentemente
