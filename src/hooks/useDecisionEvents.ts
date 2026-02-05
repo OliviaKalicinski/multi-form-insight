@@ -13,6 +13,8 @@ import {
 } from '@/types/decisions';
 import { Recommendation } from '@/types/executive';
 import { toast } from 'sonner';
+import { UserDecisionProfile, InteractionStyleTendency } from '@/types/implicitLearning';
+import { computeUserDecisionProfile, inferInteractionStyle } from '@/utils/implicitLearningCalculator';
 
 interface RegisterRecommendationParams {
   recommendation: Recommendation;
@@ -306,6 +308,33 @@ export function useDecisionEvents() {
     };
   }, [events]);
 
+  // ============================================
+  // ETAPA 6: APRENDIZADO IMPLÍCITO
+  // ============================================
+  // Perfil de decisão do usuário - estado LATENTE.
+  // 
+  // FRASE-GUIA: "O sistema aprende, mas não age como se soubesse."
+  //
+  // Este perfil é OBSERVACIONAL, não OPERACIONAL.
+  // NÃO usar para:
+  //   - Reordenar recomendações
+  //   - Filtrar ou esconder recomendações
+  //   - Alterar linguagem ou postura
+  //   - Mudar thresholds ou benchmarks
+  //
+  // Existe apenas para etapas futuras, sob novo contrato.
+  // ============================================
+  const profile = useMemo((): UserDecisionProfile | null => {
+    if (!user?.id || events.length === 0) return null;
+    return computeUserDecisionProfile(user.id, events, new Date());
+  }, [user?.id, events]);
+
+  // Estilo de interação inferido (também latente, sem efeito)
+  const interactionStyle = useMemo((): InteractionStyleTendency => {
+    if (!profile) return 'UNKNOWN';
+    return inferInteractionStyle(profile);
+  }, [profile]);
+
   return {
     events,
     memory,
@@ -318,5 +347,8 @@ export function useDecisionEvents() {
     checkPreviousRejections,
     getPendingEventForRecommendation,
     fetchEvents,
+    // Etapa 6: estados latentes (observacionais, não operacionais)
+    profile,
+    interactionStyle,
   };
 }
