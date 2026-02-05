@@ -1,281 +1,153 @@
 
 
-# Plano: Etapa 5.2 — Interpretação de Memória (Sem Adaptação)
+# Plano: Etapa 5.3A — Postura Linguística
 
 ## Objetivo
-Criar uma camada semântica intermediária que **nomeia padrões** no histórico de decisões, sem influenciar nenhum comportamento do sistema.
+Fazer o sistema "falar melhor" baseado na interpretação do histórico, sem adicionar fricção, sem mudar prioridades, sem bloquear ações.
 
 ---
 
 ## Princípio Fundamental
 
-Esta etapa responde à pergunta:
+A interpretação influencia **como o texto é escrito**, não **o que é sugerido**.
 
-> "Como descrever este histórico sem transformá-lo em regra?"
-
-**O que a interpretação é:**
-- Um vocabulário neutro para padrões humanos
-- Uma descrição factual do passado
-
-**O que a interpretação NÃO é:**
-- Score / ranking
-- Critério de filtragem
-- Peso de prioridade
-- Gatilho de adaptação
+| Interpretação | Postura do Sistema |
+|---------------|-------------------|
+| NEVER_EVALUATED | Neutra, primeira apresentação |
+| RECENTLY_REJECTED | Transparente, reconhece rejeição recente |
+| REPEATEDLY_REJECTED | Calma, reconhece padrão sem insistir |
+| PREVIOUSLY_ACCEPTED | Positiva, reconhece contexto anterior |
+| MIXED_HISTORY | Neutra, histórico variado |
+| STALE_PENDING | Neutra, convida reavaliação |
 
 ---
 
-## BLOCO 1: Tipo DecisionInterpretation
+## O Que Muda
 
-### Arquivo a Criar
-`src/types/decisionInterpretation.ts`
+### 1. Subtítulo contextual no RecommendationCard
 
-### Conteúdo
+Adicionar um texto pequeno abaixo do título que muda baseado na interpretação:
 
 ```text
-// ============================================
-// DECISION INTERPRETATION - Etapa 5.2
-// ============================================
-// Camada semântica para nomear padrões no histórico.
-// NÃO influencia geração, ordem ou prioridade.
-// Existe apenas para descrição humana.
-// ============================================
+NEVER_EVALUATED
+→ "Primeira vez que esta recomendação aparece para você."
 
-export type DecisionInterpretation =
-  | 'NEVER_EVALUATED'      // Nunca teve evento registrado
-  | 'RECENTLY_REJECTED'    // Última decisão foi REJECTED há < 30 dias
-  | 'REPEATEDLY_REJECTED'  // 3+ rejeições nos últimos 60 dias
-  | 'PREVIOUSLY_ACCEPTED'  // Última decisão foi ACCEPTED
-  | 'MIXED_HISTORY'        // Histórico variado (aceites e rejeições)
-  | 'STALE_PENDING';       // PENDING expirado ou muito antigo
+RECENTLY_REJECTED  
+→ "Esta recomendação foi rejeitada há menos de 30 dias."
 
-// Labels em português para UI (discreto)
-export const DecisionInterpretationLabels: Record<DecisionInterpretation, string> = {
-  NEVER_EVALUATED: 'Nunca avaliada',
-  RECENTLY_REJECTED: 'Rejeitada recentemente',
-  REPEATEDLY_REJECTED: 'Rejeitada múltiplas vezes',
-  PREVIOUSLY_ACCEPTED: 'Aceita anteriormente',
-  MIXED_HISTORY: 'Histórico misto',
-  STALE_PENDING: 'Pendente expirada',
-};
+REPEATEDLY_REJECTED
+→ "Esta recomendação foi rejeitada múltiplas vezes recentemente."
 
-// ============================================
-// CONTRATO ÉTICO DA ETAPA 5.2
-// ============================================
-// DecisionInterpretation é DESCRITIVA, não PRESCRITIVA.
-//
-// PROIBIDO usar para:
-//   - Ordenar recomendações
-//   - Filtrar recomendações
-//   - Bloquear exibição
-//   - Alterar prioridade
-//   - Reduzir frequência
-//
-// Se isso acontecer, a etapa está ERRADA.
-// ============================================
+PREVIOUSLY_ACCEPTED
+→ "Esta recomendação foi aceita em um contexto anterior."
+
+MIXED_HISTORY
+→ "Esta recomendação tem histórico variado de avaliações."
+
+STALE_PENDING
+→ "Esta recomendação estava pendente e expirou sem decisão."
+```
+
+### 2. Localização na UI
+
+Inserir logo abaixo do CardTitle, como CardDescription:
+
+```text
++--------------------------------------------------+
+| 🎯 Título da Recomendação                   🥇   |
+| Primeira vez que esta recomendação aparece.      | ← NOVO
++--------------------------------------------------+
+| [KPIs Grid]                                      |
+| ...                                              |
++--------------------------------------------------+
 ```
 
 ---
 
-## BLOCO 2: Função Interpretadora Pura
-
-### Arquivo a Criar
-`src/utils/decisionInterpreter.ts`
-
-### Assinatura
-
-```text
-export function interpretDecisionHistory(
-  recommendationId: string,
-  events: DecisionEvent[],
-  now: Date = new Date()
-): DecisionInterpretation
-```
-
-### Regras de Interpretação (ordem de precedência)
-
-```text
-1. Sem eventos → NEVER_EVALUATED
-2. Evento PENDING expirado → STALE_PENDING
-3. 3+ REJECTED em 60 dias → REPEATEDLY_REJECTED
-4. Último REJECTED há < 30 dias → RECENTLY_REJECTED
-5. Último evento ACCEPTED → PREVIOUSLY_ACCEPTED
-6. Tem histórico mas não encaixa acima → MIXED_HISTORY
-```
-
-### Implementação
-
-```text
-import { DecisionEvent, DecisionStatus } from '@/types/decisions';
-import { DecisionInterpretation } from '@/types/decisionInterpretation';
-
-/**
- * Interpreta o histórico de decisões de uma recomendação
- * 
- * IMPORTANTE: Esta função é DESCRITIVA, não PRESCRITIVA.
- * O resultado NÃO deve ser usado para ordenar, filtrar ou priorizar.
- * Existe apenas para nomear padrões de forma legível.
- */
-export function interpretDecisionHistory(
-  recommendationId: string,
-  events: DecisionEvent[],
-  now: Date = new Date()
-): DecisionInterpretation {
-  // Filtrar eventos desta recomendação
-  const related = events.filter(e => e.recommendationId === recommendationId);
-  
-  // 1. Sem eventos → NEVER_EVALUATED
-  if (related.length === 0) {
-    return 'NEVER_EVALUATED';
-  }
-  
-  // Calcular datas de corte
-  const thirtyDaysAgo = new Date(now);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
-  const sixtyDaysAgo = new Date(now);
-  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-  
-  // 2. Verificar PENDING expirado
-  const stalePending = related.find(
-    e => e.status === 'PENDING' && e.expiresAt < now
-  );
-  if (stalePending) {
-    return 'STALE_PENDING';
-  }
-  
-  // 3. Contar rejeições nos últimos 60 dias
-  const recentRejections = related.filter(
-    e => e.status === 'REJECTED' &&
-         e.statusChangedAt &&
-         e.statusChangedAt > sixtyDaysAgo
-  );
-  if (recentRejections.length >= 3) {
-    return 'REPEATEDLY_REJECTED';
-  }
-  
-  // 4. Ordenar por data para encontrar último evento decidido
-  const decidedEvents = related.filter(
-    e => e.status === 'ACCEPTED' || e.status === 'REJECTED'
-  ).sort((a, b) => 
-    (b.statusChangedAt?.getTime() || 0) - (a.statusChangedAt?.getTime() || 0)
-  );
-  
-  const lastDecided = decidedEvents[0];
-  
-  if (lastDecided) {
-    // 4. Última rejeição recente
-    if (lastDecided.status === 'REJECTED' && 
-        lastDecided.statusChangedAt && 
-        lastDecided.statusChangedAt > thirtyDaysAgo) {
-      return 'RECENTLY_REJECTED';
-    }
-    
-    // 5. Último aceite
-    if (lastDecided.status === 'ACCEPTED') {
-      return 'PREVIOUSLY_ACCEPTED';
-    }
-  }
-  
-  // 6. Tem histórico mas não encaixa → MIXED_HISTORY
-  return 'MIXED_HISTORY';
-}
-```
-
----
-
-## BLOCO 3: Uso Mínimo na UI (Tooltip Discreto)
+## Implementação Técnica
 
 ### Arquivo a Modificar
 `src/components/executive/RecommendationCard.tsx`
 
 ### Mudanças
 
-1. Importar o interpretador
-2. Calcular interpretação para a recomendação
-3. Exibir em tooltip discreto (não badge proeminente)
-
-### Onde Exibir
-
-Adicionar pequeno texto em `text-muted-foreground` abaixo de "Baseado em":
+1. Criar mapa de frases contextuais:
 
 ```text
-{interpretation !== 'NEVER_EVALUATED' && (
-  <span className="text-muted-foreground text-[10px]">
-    Histórico: {DecisionInterpretationLabels[interpretation]}
-  </span>
-)}
+const InterpretationPosture: Record<DecisionInterpretation, string> = {
+  NEVER_EVALUATED: 'Primeira vez que esta recomendação aparece para você.',
+  RECENTLY_REJECTED: 'Esta recomendação foi rejeitada há menos de 30 dias.',
+  REPEATEDLY_REJECTED: 'Esta recomendação foi rejeitada múltiplas vezes recentemente.',
+  PREVIOUSLY_ACCEPTED: 'Esta recomendação foi aceita em um contexto anterior.',
+  MIXED_HISTORY: 'Esta recomendação tem histórico variado de avaliações.',
+  STALE_PENDING: 'Esta recomendação estava pendente e expirou sem decisão.',
+};
 ```
 
-### Exemplo Visual
+2. Adicionar CardDescription após CardTitle:
 
 ```text
-Baseado em: ROAS Ads
-Histórico: rejeitada recentemente
+<CardHeader>
+  <CardTitle>...</CardTitle>
+  {recommendation.interpretation && (
+    <p className="text-xs text-muted-foreground mt-1">
+      {InterpretationPosture[recommendation.interpretation]}
+    </p>
+  )}
+</CardHeader>
 ```
 
-Nada mais. Sem cor. Sem ícone. Sem destaque.
+### Regras de Exibição
+
+- Só exibir se `recommendation.interpretation` existir
+- Usar cor neutra (`text-muted-foreground`)
+- Sem ícones extras
+- Sem cores valorativas (verde/vermelho)
+- Sempre calmo e factual
 
 ---
 
-## BLOCO 4: Integração no Enricher (Opcional)
+## Refino do Histórico no Footer
 
-### Arquivo a Modificar
-`src/utils/recommendationEnricher.ts`
-
-### Mudança Opcional
-
-Adicionar campo `interpretation` em `EnrichedRecommendation`:
+Atualmente existe (linha 183-186):
 
 ```text
-export interface EnrichedRecommendation extends Recommendation {
-  // ... campos existentes ...
-  
-  // Interpretação semântica do histórico (Etapa 5.2)
-  // APENAS para descrição, não para decisão
-  interpretation?: DecisionInterpretation;
-}
+Histórico: {DecisionInterpretationLabels[recommendation.interpretation]}
 ```
 
-E calcular durante enrichment:
+Isso pode ser **removido** após adicionar a postura no header, pois seria redundante.
 
-```text
-interpretation: interpretDecisionHistory(rec.id, events, new Date()),
-```
+Ou mantido de forma ainda mais discreta como fallback.
+
+**Decisão recomendada**: Remover do footer para evitar duplicação.
 
 ---
 
-## Arquivos a Criar/Modificar
+## O Que NÃO Muda
+
+- Ranking/ordem das recomendações
+- Prioridade ou score
+- Disponibilidade de ações (aceitar/rejeitar)
+- Geração de novas recomendações
+- Qualquer lógica de decisão
+
+---
+
+## Arquivos a Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/types/decisionInterpretation.ts` | CRIAR - Tipo e labels |
-| `src/utils/decisionInterpreter.ts` | CRIAR - Função pura |
-| `src/utils/recommendationEnricher.ts` | MODIFICAR - Adicionar campo |
-| `src/components/executive/RecommendationCard.tsx` | MODIFICAR - Tooltip discreto |
+| `src/components/executive/RecommendationCard.tsx` | Adicionar postura linguística |
 
 ---
 
 ## Ordem de Execução
 
 ```text
-1. src/types/decisionInterpretation.ts - Criar tipo
-2. src/utils/decisionInterpreter.ts - Criar interpretador
-3. src/utils/recommendationEnricher.ts - Adicionar campo
-4. src/components/executive/RecommendationCard.tsx - Exibir discretamente
+1. Criar mapa InterpretationPosture
+2. Adicionar texto contextual no CardHeader
+3. Remover linha redundante do footer (opcional)
 ```
-
----
-
-## O Que Continua PROIBIDO
-
-- Usar interpretação para ordenar
-- Usar interpretação para filtrar
-- Usar interpretação para bloquear
-- Usar interpretação para priorizar
-- Usar interpretação para reduzir frequência
-
-**Se qualquer função de decisão importar `DecisionInterpretation`, a etapa está errada.**
 
 ---
 
@@ -283,19 +155,32 @@ interpretation: interpretDecisionHistory(rec.id, events, new Date()),
 
 A etapa está correta se:
 
-1. Você pode apagar toda a Etapa 5.2 e o sistema continua funcionando igual
-2. Nenhuma função de decisão importa `DecisionInterpretation`
-3. Só a linguagem muda levemente (tooltip discreto)
-4. O interpretador é uma função pura sem side effects
+1. O texto muda baseado na interpretação
+2. Nenhuma ação é bloqueada
+3. Nenhuma prioridade muda
+4. A linguagem é calma e factual
+5. Você pode deletar a Etapa 5.3A e tudo funciona igual (só perde a frase)
 
 ---
 
-## Próxima Bifurcação (Etapa 5.3)
+## Exemplo Visual Final
 
-Após esta etapa, surge a escolha real:
-
-- **5.3A — Postura**: Linguagem adaptativa baseada em interpretação
-- **5.3B — Fricção Contextual**: Pedir confirmação extra em casos específicos
-
-Mas isso só vem depois que o sistema sabe **nomear** o passado sem **reagir** a ele.
+```text
++--------------------------------------------------+
+| 🎯 Otimizar segmentação de campanhas        🥇   |
+| Esta recomendação foi rejeitada há menos de 30   |
+| dias.                                            |
++--------------------------------------------------+
+| Impacto    ROI      Prazo     Custo              |
+| +R$ 2.5k   3.2x     7 dias    Grátis             |
++--------------------------------------------------+
+| AÇÕES ESPECÍFICAS                                |
+| → Revisar públicos de remarketing                |
+| → Testar lookalike 1% vs 3%                      |
++--------------------------------------------------+
+| Responsável: Marketing                           |
+| Baseado em: ROAS Ads                             |
+|                        [Aceitar] [Rejeitar ▼]    |
++--------------------------------------------------+
+```
 
