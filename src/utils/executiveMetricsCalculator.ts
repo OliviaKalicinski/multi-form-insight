@@ -3,8 +3,65 @@ import { AdsData, ProcessedOrder } from "@/types/marketing";
 import { calculateSalesMetrics } from "./salesCalculator";
 import { calculateAdsMetrics } from "./adsCalculator";
 import { analyzeChurn } from "./customerBehaviorMetrics";
-import { differenceInDays, parse } from "date-fns";
-import { createDefaultMeta, createDefaultSource, createDefaultAuthority, ExecutiveMetricsMeta, ExecutiveMetricsSource, ExecutiveMetricsAuthority } from "@/types/metricNature";
+import { differenceInDays, parse, min, max } from "date-fns";
+import { 
+  createDefaultMeta, 
+  createDefaultSource, 
+  createDefaultAuthority, 
+  createTemporalMetadata,
+  createEmptyTemporalMetadata,
+  ExecutiveMetricsMeta, 
+  ExecutiveMetricsSource, 
+  ExecutiveMetricsAuthority,
+  ExecutiveMetricsTemporal 
+} from "@/types/metricNature";
+
+/**
+ * Calcula metadados temporais a partir dos dados
+ */
+const calculateTemporalMetadataFromData = (
+  orders: ProcessedOrder[],
+  adsData: AdsData[]
+): ExecutiveMetricsTemporal => {
+  // Vendas - extrair datas dos pedidos
+  const vendasDates = orders.map(o => o.dataVenda).filter(d => d instanceof Date && !isNaN(d.getTime()));
+  const vendasFirst = vendasDates.length > 0 ? min(vendasDates) : null;
+  const vendasLast = vendasDates.length > 0 ? max(vendasDates) : null;
+  const vendasWindowDays = vendasFirst && vendasLast 
+    ? differenceInDays(vendasLast, vendasFirst) + 1 
+    : 0;
+  
+  // Marketing - extrair datas dos ads
+  const adsDates = adsData
+    .map(a => {
+      try {
+        const dateStr = a["Início dos relatórios"];
+        if (!dateStr) return null;
+        return parse(dateStr.substring(0, 10), 'yyyy-MM-dd', new Date());
+      } catch {
+        return null;
+      }
+    })
+    .filter((d): d is Date => d !== null && !isNaN(d.getTime()));
+  
+  const adsFirst = adsDates.length > 0 ? min(adsDates) : null;
+  const adsLast = adsDates.length > 0 ? max(adsDates) : null;
+  const adsWindowDays = adsFirst && adsLast 
+    ? differenceInDays(adsLast, adsFirst) + 1 
+    : 0;
+  
+  // Clientes, Produtos, Operações - derivados de vendas
+  const vendasTemporal = createTemporalMetadata(orders.length, vendasWindowDays, vendasFirst, vendasLast);
+  const marketingTemporal = createTemporalMetadata(adsData.length, adsWindowDays, adsFirst, adsLast);
+  
+  return {
+    vendas: vendasTemporal,
+    marketing: marketingTemporal,
+    clientes: vendasTemporal, // Derivado de vendas
+    produtos: vendasTemporal, // Derivado de vendas
+    operacoes: vendasTemporal, // Derivado de vendas (NF)
+  };
+};
 
 /**
  * Calcula ExecutiveMetrics a partir dos dados reais do dashboard
@@ -18,10 +75,11 @@ export const calculateExecutiveMetrics = (
     return null;
   }
 
-  // Inicializar metadados de natureza, origem e autoridade
+  // Inicializar metadados de natureza, origem, autoridade e temporal
   const _source = createDefaultSource();
   const _meta = createDefaultMeta();
   const _authority = createDefaultAuthority();
+  const _temporal = calculateTemporalMetadataFromData(orders, adsData);
 
   // Calcular métricas de vendas
   const salesMetrics = orders.length > 0 ? calculateSalesMetrics(orders) : null;
@@ -215,6 +273,7 @@ export const calculateExecutiveMetrics = (
     _meta,
     _source,
     _authority,
+    _temporal,
   };
 };
 

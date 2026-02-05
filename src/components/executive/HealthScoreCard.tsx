@@ -1,13 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HealthScore } from "@/types/executive";
-import { TrendingUp, TrendingDown, Activity, AlertCircle } from "lucide-react";
+import { ExecutiveMetricsTemporal, requiresTemporalWarning } from "@/types/metricNature";
+import { TrendingUp, TrendingDown, Activity, AlertCircle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface HealthScoreCardProps {
   healthScore: HealthScore;
+  temporal?: ExecutiveMetricsTemporal;
 }
 
-export const HealthScoreCard = ({ healthScore }: HealthScoreCardProps) => {
+export const HealthScoreCard = ({ healthScore, temporal }: HealthScoreCardProps) => {
   const getStatusColor = (status: HealthScore['status']) => {
     switch (status) {
       case 'excellent': return 'from-green-50 to-emerald-50 border-green-500';
@@ -88,6 +90,27 @@ export const HealthScoreCard = ({ healthScore }: HealthScoreCardProps) => {
               {healthScore.partialReasons.map((reason, i) => (
                 <li key={i}>{reason}</li>
               ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Aviso de maturação temporal */}
+        {temporal && (
+          Object.entries(temporal).some(([_, meta]) => requiresTemporalWarning(meta.confidence))
+        ) && (
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+            <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Base temporal em maturação
+            </p>
+            <ul className="text-xs text-blue-700 dark:text-blue-400 mt-1 list-disc list-inside">
+              {Object.entries(temporal).map(([key, meta]) => 
+                requiresTemporalWarning(meta.confidence) ? (
+                  <li key={key} className="capitalize">
+                    {key}: {meta.label}
+                  </li>
+                ) : null
+              )}
             </ul>
           </div>
         )}

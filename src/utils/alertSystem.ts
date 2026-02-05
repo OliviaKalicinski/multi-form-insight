@@ -1,31 +1,59 @@
 import { CriticalAlert, ExecutiveMetrics } from "@/types/executive";
 import { SectorBenchmarks } from "@/hooks/useAppSettings";
-import { MetricNature, canGenerateAlert, createDefaultAuthority } from "@/types/metricNature";
+import { 
+  MetricNature, 
+  canGenerateAlert, 
+  createDefaultAuthority,
+  canGenerateTemporalAlert,
+  requiresTemporalWarning,
+  TemporalConfidence
+} from "@/types/metricNature";
 import { addDays } from "date-fns";
+
+// ============================================
+// ALERTAS TEMPORAIS (exceção documentada)
+// ============================================
+// Alertas de Receita e Ticket Médio são TEMPORAIS:
+// - Comparam período atual vs período anterior
+// - Permitidos mesmo para métricas OBSERVATIONAL
+// - NUNCA geram recomendações
+// - São sinalizações, não decisões
+// ============================================
 
 /**
  * Verifica se pode gerar alerta crítico
  * - Benchmark deve existir e ser > 0
  * - Métrica deve ser REAL (não estimada)
+ * - Confiança temporal deve ser suficiente
  */
 const canGenerateCriticalAlert = (
   benchmarks: SectorBenchmarks,
   benchmarkKey: keyof SectorBenchmarks,
-  metricNature?: MetricNature
-): boolean => {
+  metricNature?: MetricNature,
+  temporalConfidence?: TemporalConfidence
+): { canAlert: boolean; isDowngraded: boolean } => {
   const benchmarkValue = benchmarks[benchmarkKey];
   
   // Benchmark deve existir e não ser null/undefined/0
   if (benchmarkValue === null || benchmarkValue === undefined || benchmarkValue === 0) {
-    return false;
+    return { canAlert: false, isDowngraded: false };
   }
   
   // Se natureza da métrica informada, deve ser REAL para alerta crítico
   if (metricNature && metricNature !== 'REAL') {
-    return false;
+    return { canAlert: false, isDowngraded: false };
   }
   
-  return true;
+  // Verificar confiança temporal
+  if (temporalConfidence && !canGenerateTemporalAlert(temporalConfidence)) {
+    // Dados insuficientes - não gerar alerta crítico
+    return { canAlert: false, isDowngraded: true };
+  }
+  
+  // Se STABILIZING, pode alertar mas com aviso
+  const isDowngraded = temporalConfidence ? requiresTemporalWarning(temporalConfidence) : false;
+  
+  return { canAlert: true, isDowngraded };
 };
 
 /**
@@ -43,64 +71,122 @@ export const gerarAlertas = (
   const alertas: CriticalAlert[] = [];
   const meta = atual._meta;
   const authority = atual._authority || createDefaultAuthority();
+  const temporal = atual._temporal;
   
   // 🔴 CRÍTICO: ROAS < 0.8x
-  // REGRA: Só gera se benchmark.roasMedio existir E authority permite
+  // REGRA: Só gera se benchmark.roasMedio existir E authority permite E temporal permite
   if (atual.marketing.roasAds < 0.8 && benchmarks.roasMedio) {
     // Verificar autoridade - ROAS é DECISIONAL, pode alertar
     if (!canGenerateAlert(authority.roasAds)) {
       // Skip - métrica não tem permissão para alertar
     } else {
-      const canAlert = canGenerateCriticalAlert(benchmarks, 'roasMedio', meta?.roasAds);
-      const roasBenchmark = benchmarks.roasMedio;
-      const prejuizo = atual.marketing.investimentoAds - atual.marketing.receitaAds;
-      const gap = ((atual.marketing.roasAds / roasBenchmark) - 1) * 100;
+      const marketingConfidence = temporal?.marketing.confidence || 'STABLE';
+      const { canAlert, isDowngraded } = canGenerateCriticalAlert(
+        benchmarks, 
+        'roasMedio', 
+        meta?.roasAds,
+        marketingConfidence
+      );
       
-      alertas.push({
-        id: 'roas-critico',
-        severity: canAlert ? 'critical' : 'info',
-        category: 'marketing',
-        alertType: 'benchmark',
-        title: canAlert ? 'ROAS de Anúncios Abaixo do Crítico' : 'ROAS de Anúncios Abaixo do Crítico (ref. incompleta)',
-        metric: 'ROAS',
-        current: atual.marketing.roasAds,
-        benchmark: roasBenchmark,
-        gap,
-        impact: `Prejuízo de R$ ${(prejuizo / 1000).toFixed(1)}K no mês`,
-        action: 'Pausar 60% das campanhas com ROAS < 0.8x e realocar budget para top performers',
-        priority: canAlert ? 'urgent' : 'medium',
-        estimatedFix: '+R$ 12K/mês',
-        deadline: addDays(new Date(), 7),
-      });
+      // Se temporal INSUFFICIENT, criar alerta info em vez de crítico
+      if (!canAlert && !canGenerateTemporalAlert(marketingConfidence)) {
+        alertas.push({
+          id: 'roas-critico-temporal',
+          severity: 'info',
+          category: 'marketing',
+          alertType: 'benchmark',
+          title: `ROAS Baixo (${temporal?.marketing.label || 'dados iniciais'})`,
+          metric: 'ROAS',
+          current: atual.marketing.roasAds,
+          benchmark: benchmarks.roasMedio,
+          gap: ((atual.marketing.roasAds / benchmarks.roasMedio) - 1) * 100,
+          impact: 'Aguardando maturação temporal para alerta',
+          action: 'Monitorar tendência nos próximos dias',
+          priority: 'medium',
+          estimatedFix: 'N/A',
+          deadline: addDays(new Date(), 30),
+        });
+      } else if (canAlert) {
+        const roasBenchmark = benchmarks.roasMedio;
+        const prejuizo = atual.marketing.investimentoAds - atual.marketing.receitaAds;
+        const gap = ((atual.marketing.roasAds / roasBenchmark) - 1) * 100;
+        
+        // Se STABILIZING, adicionar aviso no título
+        const titleSuffix = isDowngraded ? ` (${temporal?.marketing.label})` : '';
+        
+        alertas.push({
+          id: 'roas-critico',
+          severity: isDowngraded ? 'warning' : 'critical',
+          category: 'marketing',
+          alertType: 'benchmark',
+          title: `ROAS de Anúncios Abaixo do Crítico${titleSuffix}`,
+          metric: 'ROAS',
+          current: atual.marketing.roasAds,
+          benchmark: roasBenchmark,
+          gap,
+          impact: `Prejuízo de R$ ${(prejuizo / 1000).toFixed(1)}K no mês`,
+          action: 'Pausar 60% das campanhas com ROAS < 0.8x e realocar budget para top performers',
+          priority: isDowngraded ? 'high' : 'urgent',
+          estimatedFix: '+R$ 12K/mês',
+          deadline: addDays(new Date(), isDowngraded ? 14 : 7),
+        });
+      }
     }
   }
   
   // 🔴 CRÍTICO: Churn > 40%
-  // REGRA: Só gera se benchmark.taxaChurn existir E authority permite
+  // REGRA: Só gera se benchmark.taxaChurn existir E authority permite E temporal permite
   if (atual.clientes.taxaChurn > 40 && benchmarks.taxaChurn) {
     // Verificar autoridade - Churn é DECISIONAL, pode alertar
     if (!canGenerateAlert(authority.taxaChurn)) {
       // Skip - métrica não tem permissão para alertar
     } else {
-      const canAlert = canGenerateCriticalAlert(benchmarks, 'taxaChurn', meta?.taxaChurn);
-      const churnBenchmark = benchmarks.taxaChurn;
+      const clientesConfidence = temporal?.clientes.confidence || 'STABLE';
+      const { canAlert, isDowngraded } = canGenerateCriticalAlert(
+        benchmarks, 
+        'taxaChurn', 
+        meta?.taxaChurn,
+        clientesConfidence
+      );
       
-      alertas.push({
-        id: 'churn-critico',
-        severity: canAlert ? 'critical' : 'info',
-        category: 'clientes',
-        alertType: 'benchmark',
-        title: canAlert ? 'Taxa de Churn em Nível Crítico' : 'Taxa de Churn Alta (ref. incompleta)',
-        metric: 'Churn',
-        current: atual.clientes.taxaChurn,
-        benchmark: churnBenchmark,
-        gap: ((atual.clientes.taxaChurn - churnBenchmark) / churnBenchmark) * 100,
-        impact: `Perda de ${Math.round(atual.clientes.clientesAtivos * (atual.clientes.taxaChurn / 100))} clientes/mês`,
-        action: 'Implementar programa de retenção + email marketing personalizado',
-        priority: canAlert ? 'urgent' : 'medium',
-        estimatedFix: '-15pp de churn em 60 dias',
-        deadline: addDays(new Date(), 14),
-      });
+      if (!canAlert && !canGenerateTemporalAlert(clientesConfidence)) {
+        alertas.push({
+          id: 'churn-critico-temporal',
+          severity: 'info',
+          category: 'clientes',
+          alertType: 'benchmark',
+          title: `Churn Alto (${temporal?.clientes.label || 'dados iniciais'})`,
+          metric: 'Churn',
+          current: atual.clientes.taxaChurn,
+          benchmark: benchmarks.taxaChurn,
+          gap: ((atual.clientes.taxaChurn - benchmarks.taxaChurn) / benchmarks.taxaChurn) * 100,
+          impact: 'Aguardando maturação temporal para alerta',
+          action: 'Monitorar tendência nos próximos dias',
+          priority: 'medium',
+          estimatedFix: 'N/A',
+          deadline: addDays(new Date(), 30),
+        });
+      } else if (canAlert) {
+        const churnBenchmark = benchmarks.taxaChurn;
+        const titleSuffix = isDowngraded ? ` (${temporal?.clientes.label})` : '';
+        
+        alertas.push({
+          id: 'churn-critico',
+          severity: isDowngraded ? 'warning' : 'critical',
+          category: 'clientes',
+          alertType: 'benchmark',
+          title: `Taxa de Churn em Nível Crítico${titleSuffix}`,
+          metric: 'Churn',
+          current: atual.clientes.taxaChurn,
+          benchmark: churnBenchmark,
+          gap: ((atual.clientes.taxaChurn - churnBenchmark) / churnBenchmark) * 100,
+          impact: `Perda de ${Math.round(atual.clientes.clientesAtivos * (atual.clientes.taxaChurn / 100))} clientes/mês`,
+          action: 'Implementar programa de retenção + email marketing personalizado',
+          priority: isDowngraded ? 'high' : 'urgent',
+          estimatedFix: '-15pp de churn em 60 dias',
+          deadline: addDays(new Date(), isDowngraded ? 21 : 14),
+        });
+      }
     }
   }
   
@@ -129,31 +215,58 @@ export const gerarAlertas = (
   }
   
   // 🟡 ATENÇÃO: CAC > R$ 400
-  // REGRA: Só gera se benchmark.cac existir E authority permite
+  // REGRA: Só gera se benchmark.cac existir E authority permite E temporal permite
   if (atual.clientes.cac > 400 && benchmarks.cac) {
     // Verificar autoridade - CAC é DECISIONAL, pode alertar
     if (!canGenerateAlert(authority.cac)) {
       // Skip - métrica não tem permissão para alertar
     } else {
-      const canAlert = canGenerateCriticalAlert(benchmarks, 'cac', meta?.cac);
-      const cacBenchmark = benchmarks.cac;
+      const clientesConfidence = temporal?.clientes.confidence || 'STABLE';
+      const { canAlert, isDowngraded } = canGenerateCriticalAlert(
+        benchmarks, 
+        'cac', 
+        meta?.cac,
+        clientesConfidence
+      );
       
-      alertas.push({
-        id: 'cac-alto',
-        severity: canAlert ? 'warning' : 'info',
-        category: 'marketing',
-        alertType: 'benchmark',
-        title: canAlert ? 'Custo de Aquisição Elevado' : 'Custo de Aquisição Elevado (ref. incompleta)',
-        metric: 'CAC',
-        current: atual.clientes.cac,
-        benchmark: cacBenchmark,
-        gap: ((atual.clientes.cac - cacBenchmark) / cacBenchmark) * 100,
-        impact: `R$ ${(atual.clientes.cac - cacBenchmark).toFixed(0)} acima do ideal por cliente`,
-        action: 'Otimizar segmentação de audiência e testar canais de baixo custo',
-        priority: canAlert ? 'high' : 'medium',
-        estimatedFix: '-R$ 150 de CAC',
-        deadline: addDays(new Date(), 30),
-      });
+      if (!canAlert && !canGenerateTemporalAlert(clientesConfidence)) {
+        alertas.push({
+          id: 'cac-alto-temporal',
+          severity: 'info',
+          category: 'marketing',
+          alertType: 'benchmark',
+          title: `CAC Elevado (${temporal?.clientes.label || 'dados iniciais'})`,
+          metric: 'CAC',
+          current: atual.clientes.cac,
+          benchmark: benchmarks.cac,
+          gap: ((atual.clientes.cac - benchmarks.cac) / benchmarks.cac) * 100,
+          impact: 'Aguardando maturação temporal para alerta',
+          action: 'Monitorar tendência nos próximos dias',
+          priority: 'medium',
+          estimatedFix: 'N/A',
+          deadline: addDays(new Date(), 30),
+        });
+      } else if (canAlert) {
+        const cacBenchmark = benchmarks.cac;
+        const titleSuffix = isDowngraded ? ` (${temporal?.clientes.label})` : '';
+        
+        alertas.push({
+          id: 'cac-alto',
+          severity: isDowngraded ? 'info' : 'warning',
+          category: 'marketing',
+          alertType: 'benchmark',
+          title: `Custo de Aquisição Elevado${titleSuffix}`,
+          metric: 'CAC',
+          current: atual.clientes.cac,
+          benchmark: cacBenchmark,
+          gap: ((atual.clientes.cac - cacBenchmark) / cacBenchmark) * 100,
+          impact: `R$ ${(atual.clientes.cac - cacBenchmark).toFixed(0)} acima do ideal por cliente`,
+          action: 'Otimizar segmentação de audiência e testar canais de baixo custo',
+          priority: isDowngraded ? 'medium' : 'high',
+          estimatedFix: '-R$ 150 de CAC',
+          deadline: addDays(new Date(), isDowngraded ? 45 : 30),
+        });
+      }
     }
   }
   

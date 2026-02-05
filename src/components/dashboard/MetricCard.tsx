@@ -4,9 +4,17 @@ import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProjectionData } from "@/utils/incompleteMonthDetector";
 import { KPITooltip } from "./KPITooltip";
-import { MetricNature, MetricAuthority, requiresExplicitWarning } from "@/types/metricNature";
+import { 
+  MetricNature, 
+  MetricAuthority, 
+  requiresExplicitWarning,
+  TemporalConfidence,
+  TemporalConfidenceBadges,
+  TemporalConfidenceLabels,
+  requiresTemporalWarning
+} from "@/types/metricNature";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, Clock } from "lucide-react";
 
 interface MetricCardProps {
   title: string;
@@ -20,6 +28,8 @@ interface MetricCardProps {
   tooltipKey?: string;
   nature?: MetricNature;
   authority?: MetricAuthority;
+  temporal?: TemporalConfidence;
+  temporalLabel?: string;
 }
 
 export const MetricCard = ({ 
@@ -34,6 +44,8 @@ export const MetricCard = ({
   tooltipKey,
   nature,
   authority,
+  temporal,
+  temporalLabel,
 }: MetricCardProps) => {
   const getTrendColor = () => {
     if (trend === undefined) return "";
@@ -87,6 +99,32 @@ export const MetricCard = ({
                 <p className="text-xs">
                   <strong>Métrica Restrita:</strong> Esta métrica usa dados estimados ou não tem
                   confiabilidade suficiente para gerar alertas ou recomendações automáticas.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {temporal && requiresTemporalWarning(temporal) && (
+            <Tooltip>
+              <TooltipTrigger>
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "text-[10px] px-1.5 py-0 flex items-center gap-0.5",
+                    temporal === 'INSUFFICIENT' && "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800",
+                    temporal === 'STABILIZING' && "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800"
+                  )}
+                >
+                  <Clock className="h-2.5 w-2.5" />
+                  {TemporalConfidenceBadges[temporal]}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="text-xs">
+                  <strong>{TemporalConfidenceLabels[temporal]}:</strong> {temporalLabel || (
+                    temporal === 'INSUFFICIENT' 
+                      ? 'Menos de 7 dias de dados. Aguardando maturação temporal.'
+                      : 'Entre 7-29 dias de dados. Tendência ainda em estabilização.'
+                  )}
                 </p>
               </TooltipContent>
             </Tooltip>
