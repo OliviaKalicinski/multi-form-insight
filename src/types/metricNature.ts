@@ -217,3 +217,190 @@ export const createDefaultSource = (): ExecutiveMetricsSource => ({
   taxaEntrega: 'Hardcoded (96%)',
   pedidosCancelados: 'Hardcoded (4%)',
 });
+
+// ============================================
+// Sistema de Autoridade de Métricas (Etapa 2)
+// ============================================
+// Define o que uma métrica pode provocar no sistema:
+// - OBSERVATIONAL: apenas informa, nunca age
+// - DIAGNOSTIC: pode gerar alertas, não ações
+// - DECISIONAL: pode sugerir ações (recomendações)
+// - RESTRICTED: nunca automatizar, sempre aviso explícito
+// ============================================
+
+export type MetricAuthority = 
+  | 'OBSERVATIONAL'  // informa, nunca age
+  | 'DIAGNOSTIC'     // gera alerta, não ação
+  | 'DECISIONAL'     // pode sugerir ação
+  | 'RESTRICTED';    // nunca automatizar
+
+// Labels para exibição
+export const MetricAuthorityLabels: Record<MetricAuthority, string> = {
+  OBSERVATIONAL: 'Observacional',
+  DIAGNOSTIC: 'Diagnóstico',
+  DECISIONAL: 'Decisório',
+  RESTRICTED: 'Restrita',
+};
+
+// Badges curtas para UI
+export const MetricAuthorityBadges: Record<MetricAuthority, string> = {
+  OBSERVATIONAL: 'OBS',
+  DIAGNOSTIC: 'DIAG',
+  DECISIONAL: 'DEC',
+  RESTRICTED: 'REST',
+};
+
+// Mapeamento de autoridade por métrica
+export interface ExecutiveMetricsAuthority {
+  // Vendas
+  receita: MetricAuthority;        // OBSERVATIONAL
+  pedidos: MetricAuthority;        // OBSERVATIONAL
+  ticketMedio: MetricAuthority;    // DIAGNOSTIC
+  ticketMedioReal: MetricAuthority; // DIAGNOSTIC
+  conversao: MetricAuthority;      // DIAGNOSTIC
+  
+  // Marketing
+  investimentoAds: MetricAuthority; // OBSERVATIONAL
+  receitaAds: MetricAuthority;      // OBSERVATIONAL
+  roasAds: MetricAuthority;         // DECISIONAL
+  roasBruto: MetricAuthority;       // DIAGNOSTIC
+  roasReal: MetricAuthority;        // DIAGNOSTIC
+  roasMeta: MetricAuthority;        // DIAGNOSTIC
+  impressoes: MetricAuthority;      // OBSERVATIONAL
+  cliques: MetricAuthority;         // OBSERVATIONAL
+  ctr: MetricAuthority;             // DIAGNOSTIC
+  cpa: MetricAuthority;             // DIAGNOSTIC
+  cpc: MetricAuthority;             // DIAGNOSTIC
+  
+  // Clientes
+  novosClientes: MetricAuthority;   // OBSERVATIONAL
+  clientesAtivos: MetricAuthority;  // OBSERVATIONAL
+  taxaChurn: MetricAuthority;       // DECISIONAL
+  taxaRecompra: MetricAuthority;    // DIAGNOSTIC
+  ltv: MetricAuthority;             // RESTRICTED
+  cac: MetricAuthority;             // DECISIONAL
+  
+  // Produtos
+  topProduto: MetricAuthority;       // OBSERVATIONAL
+  receitaTopProduto: MetricAuthority; // OBSERVATIONAL
+  margemMedia: MetricAuthority;      // RESTRICTED
+  produtosVendidos: MetricAuthority; // OBSERVATIONAL
+  sku: MetricAuthority;              // OBSERVATIONAL
+  
+  // Operações
+  tempoEmissaoNF: MetricAuthority;   // DIAGNOSTIC
+  tempoEnvio: MetricAuthority;       // RESTRICTED (estimativa)
+  taxaEntrega: MetricAuthority;      // RESTRICTED (estimativa)
+  pedidosCancelados: MetricAuthority; // RESTRICTED (estimativa)
+  
+  // Health Score
+  healthScore: MetricAuthority;      // DIAGNOSTIC
+}
+
+// Factory para criar autoridades default
+export const createDefaultAuthority = (): ExecutiveMetricsAuthority => ({
+  // Vendas - observacionais, apenas informam
+  receita: 'OBSERVATIONAL',
+  pedidos: 'OBSERVATIONAL',
+  ticketMedio: 'DIAGNOSTIC',
+  ticketMedioReal: 'DIAGNOSTIC',
+  conversao: 'DIAGNOSTIC',
+  
+  // Marketing
+  investimentoAds: 'OBSERVATIONAL',
+  receitaAds: 'OBSERVATIONAL',
+  roasAds: 'DECISIONAL',        // Pode gerar recomendações
+  roasBruto: 'DIAGNOSTIC',
+  roasReal: 'DIAGNOSTIC',
+  roasMeta: 'DIAGNOSTIC',
+  impressoes: 'OBSERVATIONAL',
+  cliques: 'OBSERVATIONAL',
+  ctr: 'DIAGNOSTIC',
+  cpa: 'DIAGNOSTIC',
+  cpc: 'DIAGNOSTIC',
+  
+  // Clientes
+  novosClientes: 'OBSERVATIONAL',
+  clientesAtivos: 'OBSERVATIONAL',
+  taxaChurn: 'DECISIONAL',      // Pode gerar recomendações
+  taxaRecompra: 'DIAGNOSTIC',
+  ltv: 'RESTRICTED',            // Nunca automatizar
+  cac: 'DECISIONAL',            // Pode gerar recomendações
+  
+  // Produtos
+  topProduto: 'OBSERVATIONAL',
+  receitaTopProduto: 'OBSERVATIONAL',
+  margemMedia: 'RESTRICTED',    // Estimativa - nunca automatizar
+  produtosVendidos: 'OBSERVATIONAL',
+  sku: 'OBSERVATIONAL',
+  
+  // Operações
+  tempoEmissaoNF: 'DIAGNOSTIC',
+  tempoEnvio: 'RESTRICTED',       // Estimativa
+  taxaEntrega: 'RESTRICTED',      // Estimativa
+  pedidosCancelados: 'RESTRICTED', // Estimativa
+  
+  // Health Score
+  healthScore: 'DIAGNOSTIC',
+});
+
+// ============================================
+// Guardrails de Autoridade (Contrato de Ação)
+// ============================================
+
+/**
+ * Verifica se métrica pode gerar alerta
+ * OBSERVATIONAL e RESTRICTED não geram alertas
+ */
+export const canGenerateAlert = (authority: MetricAuthority): boolean => {
+  return authority === 'DIAGNOSTIC' || authority === 'DECISIONAL';
+};
+
+/**
+ * Verifica se métrica pode gerar recomendação
+ * Apenas DECISIONAL pode sugerir ações
+ */
+export const canGenerateRecommendation = (authority: MetricAuthority): boolean => {
+  return authority === 'DECISIONAL';
+};
+
+/**
+ * Verifica se métrica requer aviso explícito
+ * RESTRICTED sempre exibe warning
+ */
+export const requiresExplicitWarning = (authority: MetricAuthority): boolean => {
+  return authority === 'RESTRICTED';
+};
+
+/**
+ * Verifica se recomendação pode ser gerada (autoridade + nature + benchmark)
+ * Regra completa: DECISIONAL + REAL + benchmark existe
+ */
+export const canGenerateFullRecommendation = (
+  authority: MetricAuthority,
+  nature: MetricNature,
+  hasBenchmark: boolean
+): { allowed: boolean; blockedReason?: string } => {
+  if (authority !== 'DECISIONAL') {
+    return { 
+      allowed: false, 
+      blockedReason: `Métrica ${MetricAuthorityLabels[authority]} não tem autoridade para gerar recomendação` 
+    };
+  }
+  
+  if (nature !== 'REAL') {
+    return { 
+      allowed: false, 
+      blockedReason: 'Métrica usa dados estimados ou inferidos' 
+    };
+  }
+  
+  if (!hasBenchmark) {
+    return { 
+      allowed: false, 
+      blockedReason: 'Benchmark de referência não configurado' 
+    };
+  }
+  
+  return { allowed: true };
+};

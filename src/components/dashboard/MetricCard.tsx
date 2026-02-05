@@ -4,7 +4,9 @@ import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProjectionData } from "@/utils/incompleteMonthDetector";
 import { KPITooltip } from "./KPITooltip";
-import { MetricNature } from "@/types/metricNature";
+import { MetricNature, MetricAuthority, requiresExplicitWarning } from "@/types/metricNature";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertTriangle, Info } from "lucide-react";
 
 interface MetricCardProps {
   title: string;
@@ -17,6 +19,7 @@ interface MetricCardProps {
   projectionData?: ProjectionData | null;
   tooltipKey?: string;
   nature?: MetricNature;
+  authority?: MetricAuthority;
 }
 
 export const MetricCard = ({ 
@@ -30,6 +33,7 @@ export const MetricCard = ({
   projectionData = null,
   tooltipKey,
   nature,
+  authority,
 }: MetricCardProps) => {
   const getTrendColor = () => {
     if (trend === undefined) return "";
@@ -67,6 +71,25 @@ export const MetricCard = ({
             >
               {nature === 'ESTIMATED' ? 'EST' : 'INF'}
             </Badge>
+          )}
+          {authority && requiresExplicitWarning(authority) && (
+            <Tooltip>
+              <TooltipTrigger>
+                <Badge 
+                  variant="destructive" 
+                  className="text-[10px] px-1.5 py-0 flex items-center gap-0.5"
+                >
+                  <AlertTriangle className="h-2.5 w-2.5" />
+                  REST
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="text-xs">
+                  <strong>Métrica Restrita:</strong> Esta métrica usa dados estimados ou não tem
+                  confiabilidade suficiente para gerar alertas ou recomendações automáticas.
+                </p>
+              </TooltipContent>
+            </Tooltip>
           )}
           {isIncomplete && (
             <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800">

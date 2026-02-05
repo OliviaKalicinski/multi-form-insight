@@ -1,6 +1,6 @@
-import { ExecutiveMetrics, HealthScore, MonthComparison, QuarterlyAnalysis, TrendInsight } from "@/types/executive";
+import { ExecutiveMetrics, HealthScore, MonthComparison, QuarterlyAnalysis, TrendInsight, InsightClass } from "@/types/executive";
 import { SectorBenchmarks } from "@/hooks/useAppSettings";
-import { MetricNature, ExecutiveMetricsMeta } from "@/types/metricNature";
+import { MetricNature, ExecutiveMetricsMeta, canGenerateRecommendation, canGenerateAlert, createDefaultAuthority } from "@/types/metricNature";
 
 // Calcular variação MoM
 export const calcularVariacao = (atual: number, anterior: number): number => {
@@ -357,7 +357,7 @@ export const gerarAnaliseTrimestral = (
   };
 };
 
-// Gerar insights principais
+// Gerar insights principais com classificação de autoridade
 export const gerarInsights = (
   atual: ExecutiveMetrics,
   anterior: ExecutiveMetrics,
@@ -365,47 +365,87 @@ export const gerarInsights = (
   benchmarks: SectorBenchmarks
 ): TrendInsight[] => {
   const insights: TrendInsight[] = [];
+  const meta = atual._meta;
+  const authority = atual._authority || createDefaultAuthority();
   
-  // Sucessos
+  // Sucessos - Pedidos (OBSERVATIONAL → apenas signal)
   if (atual.vendas.pedidos > anterior.vendas.pedidos) {
     const crescimento = calcularVariacao(atual.vendas.pedidos, anterior.vendas.pedidos);
+    
+    // Pedidos é OBSERVATIONAL, só pode emitir signal
     insights.push({
       type: 'sucesso',
+      insightClass: 'signal', // OBSERVATIONAL → apenas sinal
       title: 'Volume de Pedidos em Alta',
       description: `Total de pedidos cresceu ${crescimento.toFixed(1)}% vs mês anterior, indicando expansão da base de clientes. Mantenha a estratégia atual de aquisição.`,
       metrics: [
         { label: 'Pedidos Atual', value: atual.vendas.pedidos.toString(), trend: crescimento },
         { label: 'Pedidos Anterior', value: anterior.vendas.pedidos.toString(), trend: 0 },
       ],
+      basedOnMetric: 'pedidos',
     });
   }
   
-  // Atenções - REGRA: Só gera se benchmark existir
+  // Atenções - ROAS (DECISIONAL → pode gerar recommendation se REAL + benchmark)
   if (benchmarks.roasMedio && atual.marketing.roasAds < 0.8) {
     const prejuizo = atual.marketing.investimentoAds - atual.marketing.receitaAds;
+    const roasNature = meta?.roasAds || 'REAL';
+    const roasAuthority = authority.roasAds;
+    
+    // Determinar classe do insight baseado em autoridade + nature + benchmark
+    let insightClass: InsightClass = 'signal';
+    let blockedReason: string | undefined;
+    
+    if (canGenerateRecommendation(roasAuthority) && roasNature === 'REAL' && benchmarks.roasMedio) {
+      insightClass = 'recommendation';
+    } else if (canGenerateAlert(roasAuthority)) {
+      insightClass = 'context';
+      if (!canGenerateRecommendation(roasAuthority)) {
+        blockedReason = 'Métrica diagnóstica não tem autoridade para gerar recomendação';
+      } else if (roasNature !== 'REAL') {
+        blockedReason = 'Dados estimados não permitem recomendação';
+      }
+    } else {
+      blockedReason = 'Métrica não tem autoridade para alertar';
+    }
+    
     insights.push({
       type: 'atencao',
+      insightClass,
       title: 'ROAS Crítico - Operação em Prejuízo',
-      description: `ROAS de ${atual.marketing.roasAds.toFixed(2)}x está ${((benchmarks.roasMedio - atual.marketing.roasAds) / benchmarks.roasMedio * 100).toFixed(0)}% abaixo do benchmark do setor (${benchmarks.roasMedio}x). Prejuízo operacional de R$ ${(prejuizo / 1000).toFixed(1)}K no mês. Urgente: revisar campanhas com baixo ROI e realocar budget.`,
+      description: `ROAS de ${atual.marketing.roasAds.toFixed(2)}x está ${((benchmarks.roasMedio - atual.marketing.roasAds) / benchmarks.roasMedio * 100).toFixed(0)}% abaixo do benchmark do setor (${benchmarks.roasMedio}x). Prejuízo operacional de R$ ${(prejuizo / 1000).toFixed(1)}K no mês.${insightClass === 'recommendation' ? ' Urgente: revisar campanhas com baixo ROI e realocar budget.' : ''}`,
       metrics: [
         { label: 'ROAS Atual', value: atual.marketing.roasAds.toFixed(2) + 'x', trend: calcularVariacao(atual.marketing.roasAds, anterior.marketing.roasAds) },
         { label: 'Benchmark', value: benchmarks.roasMedio.toFixed(2) + 'x', trend: 0 },
       ],
+      blockedReason,
+      basedOnMetric: 'roasAds',
     });
   }
   
-  // Oportunidades - REGRA: Só gera se benchmark existir
+  // Oportunidades - Taxa Recompra (DIAGNOSTIC → apenas signal/context, não recommendation)
   if (benchmarks.taxaRecompra && atual.clientes.taxaRecompra < benchmarks.taxaRecompra) {
     const gap = benchmarks.taxaRecompra - atual.clientes.taxaRecompra;
     const potencial = (atual.vendas.receita / atual.clientes.taxaRecompra) * gap;
+    const recompraAuthority = authority.taxaRecompra;
+    
+    // Taxa Recompra é DIAGNOSTIC, não pode gerar recommendation
+    const insightClass: InsightClass = canGenerateAlert(recompraAuthority) ? 'context' : 'signal';
+    const blockedReason = !canGenerateRecommendation(recompraAuthority) 
+      ? 'Métrica diagnóstica não tem autoridade para gerar recomendação' 
+      : undefined;
+    
     insights.push({
       type: 'oportunidade',
+      insightClass,
       title: 'Potencial de Reativação Não Explorado',
-      description: `Taxa de recompra de ${atual.clientes.taxaRecompra}% está ${gap.toFixed(0)}pp abaixo do setor. Implementar programa de fidelidade + email marketing pode gerar +R$ ${(potencial / 1000).toFixed(1)}K/mês em receita recorrente.`,
+      description: `Taxa de recompra de ${atual.clientes.taxaRecompra}% está ${gap.toFixed(0)}pp abaixo do setor. Potencial de +R$ ${(potencial / 1000).toFixed(1)}K/mês em receita recorrente.`,
       metrics: [
         { label: 'Recompra Atual', value: atual.clientes.taxaRecompra + '%', trend: 0 },
         { label: 'Potencial', value: benchmarks.taxaRecompra + '%', trend: 0 },
       ],
+      blockedReason,
+      basedOnMetric: 'taxaRecompra',
     });
   }
   

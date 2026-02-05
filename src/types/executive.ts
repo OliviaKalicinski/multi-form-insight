@@ -1,6 +1,6 @@
 // Interfaces para análise executiva
 
-import { ExecutiveMetricsMeta, ExecutiveMetricsSource } from './metricNature';
+import { ExecutiveMetricsMeta, ExecutiveMetricsSource, ExecutiveMetricsAuthority } from './metricNature';
 
 export interface VendasMetrics {
   receita: number;
@@ -55,7 +55,8 @@ export interface ExecutiveMetrics {
   produtos: ProdutosMetrics;
   operacoes: OperacoesMetrics;
   _meta?: ExecutiveMetricsMeta;
-  _source?: ExecutiveMetricsSource; // Origem de cada métrica
+  _source?: ExecutiveMetricsSource;
+  _authority?: ExecutiveMetricsAuthority; // Autoridade de cada métrica
 }
 
 export interface HealthScore {
@@ -101,10 +102,15 @@ export interface Recommendation {
   custo: number;
   prioridade: number;
   facilidade: 'baixa' | 'media' | 'alta';
+  basedOnMetric?: string; // Métrica que fundamenta a recomendação (DECISIONAL)
 }
+
+// Classificação de insights separando sinal de decisão
+export type InsightClass = 'signal' | 'context' | 'recommendation';
 
 export interface TrendInsight {
   type: 'sucesso' | 'atencao' | 'oportunidade';
+  insightClass: InsightClass; // Classificação: sinal, contexto ou recomendação
   title: string;
   description: string;
   metrics: {
@@ -112,6 +118,8 @@ export interface TrendInsight {
     value: string;
     trend: number;
   }[];
+  blockedReason?: string; // Explica por que ação não foi gerada
+  basedOnMetric?: string; // Métrica que fundamenta o insight
 }
 
 export interface MonthComparison {
