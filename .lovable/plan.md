@@ -1,199 +1,281 @@
 
 
-# Plano: Etapa 5.1 — Card de Memória de Decisão
+# Plano: Etapa 5.2 — Interpretação de Memória (Sem Adaptação)
 
 ## Objetivo
-Criar um card de memória histórica que mostra ao usuário o registro factual das decisões tomadas sobre recomendações, sem influenciar nenhum comportamento do sistema.
+Criar uma camada semântica intermediária que **nomeia padrões** no histórico de decisões, sem influenciar nenhum comportamento do sistema.
 
 ---
 
 ## Princípio Fundamental
 
-O card é um **espelho histórico**:
-- Exibe apenas dados que já existem em `useDecisionEvents().memory`
-- Não calcula nada novo
-- Não influencia geração, ordem ou prioridade de recomendações
-- Não contém botões, ações ou CTAs
+Esta etapa responde à pergunta:
 
-**Propósito ético**: Provar para o usuário que a memória existe antes de ser usada para qualquer coisa.
+> "Como descrever este histórico sem transformá-lo em regra?"
+
+**O que a interpretação é:**
+- Um vocabulário neutro para padrões humanos
+- Uma descrição factual do passado
+
+**O que a interpretação NÃO é:**
+- Score / ranking
+- Critério de filtragem
+- Peso de prioridade
+- Gatilho de adaptação
 
 ---
 
-## Componente: DecisionMemoryCard
+## BLOCO 1: Tipo DecisionInterpretation
 
 ### Arquivo a Criar
-`src/components/executive/DecisionMemoryCard.tsx`
+`src/types/decisionInterpretation.ts`
 
-### Props
+### Conteúdo
 
 ```text
-interface DecisionMemoryCardProps {
-  memory: DecisionMemory;
+// ============================================
+// DECISION INTERPRETATION - Etapa 5.2
+// ============================================
+// Camada semântica para nomear padrões no histórico.
+// NÃO influencia geração, ordem ou prioridade.
+// Existe apenas para descrição humana.
+// ============================================
+
+export type DecisionInterpretation =
+  | 'NEVER_EVALUATED'      // Nunca teve evento registrado
+  | 'RECENTLY_REJECTED'    // Última decisão foi REJECTED há < 30 dias
+  | 'REPEATEDLY_REJECTED'  // 3+ rejeições nos últimos 60 dias
+  | 'PREVIOUSLY_ACCEPTED'  // Última decisão foi ACCEPTED
+  | 'MIXED_HISTORY'        // Histórico variado (aceites e rejeições)
+  | 'STALE_PENDING';       // PENDING expirado ou muito antigo
+
+// Labels em português para UI (discreto)
+export const DecisionInterpretationLabels: Record<DecisionInterpretation, string> = {
+  NEVER_EVALUATED: 'Nunca avaliada',
+  RECENTLY_REJECTED: 'Rejeitada recentemente',
+  REPEATEDLY_REJECTED: 'Rejeitada múltiplas vezes',
+  PREVIOUSLY_ACCEPTED: 'Aceita anteriormente',
+  MIXED_HISTORY: 'Histórico misto',
+  STALE_PENDING: 'Pendente expirada',
+};
+
+// ============================================
+// CONTRATO ÉTICO DA ETAPA 5.2
+// ============================================
+// DecisionInterpretation é DESCRITIVA, não PRESCRITIVA.
+//
+// PROIBIDO usar para:
+//   - Ordenar recomendações
+//   - Filtrar recomendações
+//   - Bloquear exibição
+//   - Alterar prioridade
+//   - Reduzir frequência
+//
+// Se isso acontecer, a etapa está ERRADA.
+// ============================================
+```
+
+---
+
+## BLOCO 2: Função Interpretadora Pura
+
+### Arquivo a Criar
+`src/utils/decisionInterpreter.ts`
+
+### Assinatura
+
+```text
+export function interpretDecisionHistory(
+  recommendationId: string,
+  events: DecisionEvent[],
+  now: Date = new Date()
+): DecisionInterpretation
+```
+
+### Regras de Interpretação (ordem de precedência)
+
+```text
+1. Sem eventos → NEVER_EVALUATED
+2. Evento PENDING expirado → STALE_PENDING
+3. 3+ REJECTED em 60 dias → REPEATEDLY_REJECTED
+4. Último REJECTED há < 30 dias → RECENTLY_REJECTED
+5. Último evento ACCEPTED → PREVIOUSLY_ACCEPTED
+6. Tem histórico mas não encaixa acima → MIXED_HISTORY
+```
+
+### Implementação
+
+```text
+import { DecisionEvent, DecisionStatus } from '@/types/decisions';
+import { DecisionInterpretation } from '@/types/decisionInterpretation';
+
+/**
+ * Interpreta o histórico de decisões de uma recomendação
+ * 
+ * IMPORTANTE: Esta função é DESCRITIVA, não PRESCRITIVA.
+ * O resultado NÃO deve ser usado para ordenar, filtrar ou priorizar.
+ * Existe apenas para nomear padrões de forma legível.
+ */
+export function interpretDecisionHistory(
+  recommendationId: string,
+  events: DecisionEvent[],
+  now: Date = new Date()
+): DecisionInterpretation {
+  // Filtrar eventos desta recomendação
+  const related = events.filter(e => e.recommendationId === recommendationId);
+  
+  // 1. Sem eventos → NEVER_EVALUATED
+  if (related.length === 0) {
+    return 'NEVER_EVALUATED';
+  }
+  
+  // Calcular datas de corte
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const sixtyDaysAgo = new Date(now);
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+  
+  // 2. Verificar PENDING expirado
+  const stalePending = related.find(
+    e => e.status === 'PENDING' && e.expiresAt < now
+  );
+  if (stalePending) {
+    return 'STALE_PENDING';
+  }
+  
+  // 3. Contar rejeições nos últimos 60 dias
+  const recentRejections = related.filter(
+    e => e.status === 'REJECTED' &&
+         e.statusChangedAt &&
+         e.statusChangedAt > sixtyDaysAgo
+  );
+  if (recentRejections.length >= 3) {
+    return 'REPEATEDLY_REJECTED';
+  }
+  
+  // 4. Ordenar por data para encontrar último evento decidido
+  const decidedEvents = related.filter(
+    e => e.status === 'ACCEPTED' || e.status === 'REJECTED'
+  ).sort((a, b) => 
+    (b.statusChangedAt?.getTime() || 0) - (a.statusChangedAt?.getTime() || 0)
+  );
+  
+  const lastDecided = decidedEvents[0];
+  
+  if (lastDecided) {
+    // 4. Última rejeição recente
+    if (lastDecided.status === 'REJECTED' && 
+        lastDecided.statusChangedAt && 
+        lastDecided.statusChangedAt > thirtyDaysAgo) {
+      return 'RECENTLY_REJECTED';
+    }
+    
+    // 5. Último aceite
+    if (lastDecided.status === 'ACCEPTED') {
+      return 'PREVIOUSLY_ACCEPTED';
+    }
+  }
+  
+  // 6. Tem histórico mas não encaixa → MIXED_HISTORY
+  return 'MIXED_HISTORY';
 }
 ```
 
-### Estrutura Visual
-
-```text
-+--------------------------------------------------+
-| 📋 Memória de Decisão                            |
-| Registro histórico das recomendações apresentadas |
-+--------------------------------------------------+
-|                                                   |
-| [4]         [2]         [1]         [1]          |
-| Geradas    Aceitas    Rejeitadas   Expiradas     |
-|                                                   |
-+--------------------------------------------------+
-| ⏱️ Tempo médio: 2.4h entre geração e decisão     |
-+--------------------------------------------------+
-| Métrica       Geradas  Aceitas  Rejeitadas  Exp  |
-| ─────────────────────────────────────────────────|
-| roasAds          2        1         1        0   |
-| churn            1        1         0        0   |
-| ticketMedio      1        0         0        1   |
-+--------------------------------------------------+
-| ℹ️ Este histórico não altera automaticamente     |
-| recomendações, alertas ou prioridades.           |
-| Ele existe para tornar explícita a relação       |
-| entre sugestões do sistema e decisões humanas.   |
-+--------------------------------------------------+
-```
-
-### Regras de Exibição
-
-1. **Só exibir se `memory.totalGenerated > 0`**
-   - Se não há histórico, não mostrar o card
-
-2. **Tempo médio**: só exibir se `avgResponseTimeHours > 0`
-   - Formatar como horas se < 24h, dias se >= 24h
-
-3. **Tabela por métrica**: não mostrar `acceptanceRate`
-   - Mesmo existindo no tipo, é deliberadamente omitido
-
-4. **Cores neutras**: usar cinza/slate, sem verde/vermelho forte
-   - O card não julga, apenas registra
-
 ---
 
-## Integração em AnaliseCritica.tsx
+## BLOCO 3: Uso Mínimo na UI (Tooltip Discreto)
 
-### Localização na Página
+### Arquivo a Modificar
+`src/components/executive/RecommendationCard.tsx`
 
-Inserir **após** a seção de Recomendações Prioritárias e **antes** da Análise Trimestral:
+### Mudanças
+
+1. Importar o interpretador
+2. Calcular interpretação para a recomendação
+3. Exibir em tooltip discreto (não badge proeminente)
+
+### Onde Exibir
+
+Adicionar pequeno texto em `text-muted-foreground` abaixo de "Baseado em":
 
 ```text
-{/* RECOMENDAÇÕES PRIORITÁRIAS */}
-...
-
-{/* MEMÓRIA DE DECISÃO */}
-{memory.totalGenerated > 0 && (
-  <DecisionMemoryCard memory={memory} />
+{interpretation !== 'NEVER_EVALUATED' && (
+  <span className="text-muted-foreground text-[10px]">
+    Histórico: {DecisionInterpretationLabels[interpretation]}
+  </span>
 )}
-
-{/* ANÁLISE TRIMESTRAL */}
-...
 ```
 
-### Fonte de Dados
-
-Usar o hook já existente:
+### Exemplo Visual
 
 ```text
-const { memory } = useDecisionEvents();
+Baseado em: ROAS Ads
+Histórico: rejeitada recentemente
 ```
 
-Já está disponível no componente `AnaliseCritica.tsx` (linha 24-31).
+Nada mais. Sem cor. Sem ícone. Sem destaque.
 
 ---
 
-## Detalhes de Implementação
+## BLOCO 4: Integração no Enricher (Opcional)
 
-### Seção 1: Cabeçalho
+### Arquivo a Modificar
+`src/utils/recommendationEnricher.ts`
+
+### Mudança Opcional
+
+Adicionar campo `interpretation` em `EnrichedRecommendation`:
 
 ```text
-<CardHeader>
-  <CardTitle className="flex items-center gap-2">
-    <History className="h-5 w-5 text-slate-500" />
-    Memória de Decisão
-  </CardTitle>
-  <CardDescription>
-    Registro histórico das recomendações apresentadas
-  </CardDescription>
-</CardHeader>
+export interface EnrichedRecommendation extends Recommendation {
+  // ... campos existentes ...
+  
+  // Interpretação semântica do histórico (Etapa 5.2)
+  // APENAS para descrição, não para decisão
+  interpretation?: DecisionInterpretation;
+}
 ```
 
-### Seção 2: Resumo Geral (4 números)
-
-Grid com 4 colunas mostrando:
-- Total geradas
-- Aceitas
-- Rejeitadas
-- Expiradas
-
-**Microcopy abaixo**: "Desde o início do uso deste painel"
-
-### Seção 3: Tempo Médio de Resposta
-
-Condicional: só mostrar se `avgResponseTimeHours > 0`
+E calcular durante enrichment:
 
 ```text
-const formatResponseTime = (hours: number): string => {
-  if (hours < 24) {
-    return `${hours.toFixed(1)}h`;
-  }
-  const days = hours / 24;
-  return `${days.toFixed(1)} dias`;
-};
-```
-
-**Microcopy**: "Tempo médio entre geração e decisão explícita"
-
-### Seção 4: Tabela por Métrica
-
-Colunas:
-| Métrica | Geradas | Aceitas | Rejeitadas | Expiradas |
-
-- Não mostrar `acceptanceRate`
-- Só exibir métricas com `generated > 0`
-- Usar nomes legíveis para as métricas (mapa de tradução)
-
-### Seção 5: Rodapé Epistemológico
-
-Texto fixo em `text-xs text-muted-foreground`:
-
-```text
-Este histórico não altera automaticamente recomendações, alertas ou prioridades.
-Ele existe para tornar explícita a relação entre sugestões do sistema e decisões humanas.
+interpretation: interpretDecisionHistory(rec.id, events, new Date()),
 ```
 
 ---
 
-## Arquivos a Modificar
+## Arquivos a Criar/Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/executive/DecisionMemoryCard.tsx` | CRIAR |
-| `src/pages/AnaliseCritica.tsx` | MODIFICAR - Adicionar o card |
+| `src/types/decisionInterpretation.ts` | CRIAR - Tipo e labels |
+| `src/utils/decisionInterpreter.ts` | CRIAR - Função pura |
+| `src/utils/recommendationEnricher.ts` | MODIFICAR - Adicionar campo |
+| `src/components/executive/RecommendationCard.tsx` | MODIFICAR - Tooltip discreto |
 
 ---
 
 ## Ordem de Execução
 
 ```text
-1. Criar DecisionMemoryCard.tsx com toda a estrutura
-2. Integrar em AnaliseCritica.tsx após Recomendações
+1. src/types/decisionInterpretation.ts - Criar tipo
+2. src/utils/decisionInterpreter.ts - Criar interpretador
+3. src/utils/recommendationEnricher.ts - Adicionar campo
+4. src/components/executive/RecommendationCard.tsx - Exibir discretamente
 ```
 
 ---
 
-## O Que Este Card NÃO Faz
+## O Que Continua PROIBIDO
 
-- Não é score
-- Não é ranking
-- Não é feedback loop
-- Não influencia geração, ordem ou prioridade
-- Nenhuma função de decisão lê este card
-- Não tem botões ou ações
+- Usar interpretação para ordenar
+- Usar interpretação para filtrar
+- Usar interpretação para bloquear
+- Usar interpretação para priorizar
+- Usar interpretação para reduzir frequência
+
+**Se qualquer função de decisão importar `DecisionInterpretation`, a etapa está errada.**
 
 ---
 
@@ -201,9 +283,19 @@ Ele existe para tornar explícita a relação entre sugestões do sistema e deci
 
 A etapa está correta se:
 
-1. O card não muda nada no sistema
-2. O usuário entende o que está vendo
-3. O sistema não reage ao que está no card
-4. Nenhuma função consulta essa memória
-5. Se perguntarem "Isso muda algo?", a resposta é "Ainda não."
+1. Você pode apagar toda a Etapa 5.2 e o sistema continua funcionando igual
+2. Nenhuma função de decisão importa `DecisionInterpretation`
+3. Só a linguagem muda levemente (tooltip discreto)
+4. O interpretador é uma função pura sem side effects
+
+---
+
+## Próxima Bifurcação (Etapa 5.3)
+
+Após esta etapa, surge a escolha real:
+
+- **5.3A — Postura**: Linguagem adaptativa baseada em interpretação
+- **5.3B — Fricção Contextual**: Pedir confirmação extra em casos específicos
+
+Mas isso só vem depois que o sistema sabe **nomear** o passado sem **reagir** a ele.
 
