@@ -1,5 +1,6 @@
 import { ExecutiveMetrics, HealthScore, MonthComparison, QuarterlyAnalysis, TrendInsight } from "@/types/executive";
-import { benchmarksPetFood } from "@/data/executiveData";
+import { SectorBenchmarks } from "@/hooks/useAppSettings";
+import { MetricNature, ExecutiveMetricsMeta } from "@/types/metricNature";
 
 // Calcular variação MoM
 export const calcularVariacao = (atual: number, anterior: number): number => {
@@ -15,14 +16,93 @@ const isOperacoesEstimada = (operacoes: ExecutiveMetrics["operacoes"]): boolean 
   return tempoEnvioHardcoded || taxaEntregaHardcoded;
 };
 
+// Detectar se produtos usa valores hardcoded (margem estimada)
+const isProdutosEstimado = (produtos: ExecutiveMetrics["produtos"]): boolean => {
+  // Margem fixa de 18% é hardcoded
+  return produtos.margemMedia === 18;
+};
+
+// Validar se um componente do score pode ser calculado com confiança
+interface ScoreValidation {
+  isValid: boolean;
+  reason?: string;
+}
+
+const validateScoreComponent = (
+  component: 'marketing' | 'vendas' | 'clientes' | 'produtos' | 'operacoes',
+  benchmarks: SectorBenchmarks,
+  meta?: ExecutiveMetricsMeta
+): ScoreValidation => {
+  switch (component) {
+    case 'produtos':
+      if (meta?.margemMedia === 'ESTIMATED') {
+        return { isValid: false, reason: 'Margem média estimada (18%)' };
+      }
+      break;
+    case 'operacoes':
+      if (meta?.tempoEnvio === 'ESTIMATED' || meta?.taxaEntrega === 'ESTIMATED') {
+        return { isValid: false, reason: 'Operações com dados estimados' };
+      }
+      break;
+    case 'marketing':
+      if (!benchmarks.roasMedio || !benchmarks.ctr || !benchmarks.cpc) {
+        return { isValid: false, reason: 'Benchmarks de marketing incompletos' };
+      }
+      break;
+    case 'clientes':
+      if (!benchmarks.taxaRecompra || !benchmarks.taxaChurn || !benchmarks.ltv) {
+        return { isValid: false, reason: 'Benchmarks de clientes incompletos' };
+      }
+      break;
+    case 'vendas':
+      if (!benchmarks.taxaConversao || !benchmarks.ticketMedio) {
+        return { isValid: false, reason: 'Benchmarks de vendas incompletos' };
+      }
+      break;
+  }
+  return { isValid: true };
+};
+
 // Calcular Health Score
-export const calcularHealthScore = (metrics: ExecutiveMetrics): HealthScore => {
+export const calcularHealthScore = (
+  metrics: ExecutiveMetrics,
+  benchmarks: SectorBenchmarks
+): HealthScore => {
+  const partialReasons: string[] = [];
+  const meta = metrics._meta;
+
+  // Validar cada componente
+  const validations = {
+    marketing: validateScoreComponent('marketing', benchmarks, meta),
+    vendas: validateScoreComponent('vendas', benchmarks, meta),
+    clientes: validateScoreComponent('clientes', benchmarks, meta),
+    produtos: validateScoreComponent('produtos', benchmarks, meta),
+    operacoes: validateScoreComponent('operacoes', benchmarks, meta),
+  };
+
+  // Adicionar razões de parcialidade
+  Object.entries(validations).forEach(([key, validation]) => {
+    if (!validation.isValid && validation.reason) {
+      partialReasons.push(validation.reason);
+    }
+  });
+
   const breakdown = {
-    marketing: calcularScoreMarketing(metrics.marketing),
-    vendas: calcularScoreVendas(metrics.vendas),
-    clientes: calcularScoreClientes(metrics.clientes),
-    produtos: calcularScoreProdutos(metrics.produtos),
-    operacoes: calcularScoreOperacoes(metrics.operacoes),
+    marketing: validations.marketing.isValid 
+      ? calcularScoreMarketing(metrics.marketing, benchmarks) 
+      : null,
+    vendas: validations.vendas.isValid 
+      ? calcularScoreVendas(metrics.vendas, benchmarks) 
+      : null,
+    clientes: validations.clientes.isValid 
+      ? calcularScoreClientes(metrics.clientes, benchmarks) 
+      : null,
+    produtos: validations.produtos.isValid 
+      ? calcularScoreProdutos(metrics.produtos, benchmarks) 
+      : null,
+    operacoes: validations.operacoes.isValid 
+      ? calcularScoreOperacoes(metrics.operacoes) 
+      : null,
   };
 
   // Filtrar apenas scores válidos (exclui null)
@@ -34,70 +114,108 @@ export const calcularHealthScore = (metrics: ExecutiveMetrics): HealthScore => {
     ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length)
     : 0;
 
-  let status: HealthScore['status'];
-  if (overall >= 80) status = 'excellent';
-  else if (overall >= 60) status = 'good';
-  else if (overall >= 40) status = 'warning';
-  else status = 'critical';
+  // Determinar status
+  const hasNullComponents = Object.values(breakdown).some(v => v === null);
+  const isPartial = hasNullComponents || partialReasons.length > 0;
 
-  return { overall, breakdown, status };
+  let status: HealthScore['status'];
+  if (isPartial) {
+    status = 'partial';
+  } else if (overall >= 80) {
+    status = 'excellent';
+  } else if (overall >= 60) {
+    status = 'good';
+  } else if (overall >= 40) {
+    status = 'warning';
+  } else {
+    status = 'critical';
+  }
+
+  return { 
+    overall, 
+    breakdown, 
+    status, 
+    isPartial, 
+    partialReasons 
+  };
 };
 
-const calcularScoreMarketing = (marketing: ExecutiveMetrics['marketing']): number => {
+const calcularScoreMarketing = (
+  marketing: ExecutiveMetrics['marketing'],
+  benchmarks: SectorBenchmarks
+): number => {
   let score = 0;
   
   // ROAS (40 pontos)
-  const roasScore = Math.min((marketing.roasAds / benchmarksPetFood.roasMedio) * 40, 40);
+  const roasBenchmark = benchmarks.roasMedio || 3.2;
+  const roasScore = Math.min((marketing.roasAds / roasBenchmark) * 40, 40);
   score += roasScore;
   
   // CTR (30 pontos)
-  const ctrScore = Math.min((marketing.ctr / benchmarksPetFood.ctr) * 30, 30);
+  const ctrBenchmark = benchmarks.ctr || 1.8;
+  const ctrScore = Math.min((marketing.ctr / ctrBenchmark) * 30, 30);
   score += ctrScore;
   
-  // CPC (30 pontos)
-  const cpcScore = Math.min((benchmarksPetFood.cpc / marketing.cpc) * 30, 30);
+  // CPC (30 pontos - invertido, menor é melhor)
+  const cpcBenchmark = benchmarks.cpc || 0.45;
+  const cpcScore = Math.min((cpcBenchmark / marketing.cpc) * 30, 30);
   score += cpcScore;
   
   return Math.round(score);
 };
 
-const calcularScoreVendas = (vendas: ExecutiveMetrics['vendas']): number => {
+const calcularScoreVendas = (
+  vendas: ExecutiveMetrics['vendas'],
+  benchmarks: SectorBenchmarks
+): number => {
   let score = 0;
   
   // Conversão (50 pontos)
-  const conversaoScore = Math.min((vendas.conversao / benchmarksPetFood.taxaConversao) * 50, 50);
+  const conversaoBenchmark = benchmarks.taxaConversao || 1.2;
+  const conversaoScore = Math.min((vendas.conversao / conversaoBenchmark) * 50, 50);
   score += conversaoScore;
   
   // Ticket Médio (50 pontos)
-  const ticketScore = Math.min((vendas.ticketMedioReal / benchmarksPetFood.ticketMedio) * 50, 50);
+  const ticketBenchmark = benchmarks.ticketMedio || 180;
+  const ticketScore = Math.min((vendas.ticketMedioReal / ticketBenchmark) * 50, 50);
   score += ticketScore;
   
   return Math.round(score);
 };
 
-const calcularScoreClientes = (clientes: ExecutiveMetrics['clientes']): number => {
+const calcularScoreClientes = (
+  clientes: ExecutiveMetrics['clientes'],
+  benchmarks: SectorBenchmarks
+): number => {
   let score = 0;
   
   // Taxa de Recompra (40 pontos)
-  const recompraScore = Math.min((clientes.taxaRecompra / benchmarksPetFood.taxaRecompra) * 40, 40);
+  const recompraBenchmark = benchmarks.taxaRecompra || 38;
+  const recompraScore = Math.min((clientes.taxaRecompra / recompraBenchmark) * 40, 40);
   score += recompraScore;
   
   // Taxa de Churn (invertida - 40 pontos)
-  const churnScore = Math.min((benchmarksPetFood.taxaChurn / clientes.taxaChurn) * 40, 40);
+  const churnBenchmark = benchmarks.taxaChurn || 28;
+  const churnScore = Math.min((churnBenchmark / clientes.taxaChurn) * 40, 40);
   score += churnScore;
   
   // LTV (20 pontos)
-  const ltvScore = Math.min((clientes.ltv / benchmarksPetFood.ltv) * 20, 20);
+  const ltvBenchmark = benchmarks.ltv || 420;
+  const ltvScore = Math.min((clientes.ltv / ltvBenchmark) * 20, 20);
   score += ltvScore;
   
   return Math.round(score);
 };
 
-const calcularScoreProdutos = (produtos: ExecutiveMetrics['produtos']): number => {
+const calcularScoreProdutos = (
+  produtos: ExecutiveMetrics['produtos'],
+  benchmarks: SectorBenchmarks
+): number => {
   let score = 0;
   
   // Margem (60 pontos)
-  const margemScore = Math.min((produtos.margemMedia / benchmarksPetFood.margemLiquida) * 60, 60);
+  const margemBenchmark = benchmarks.margemLiquida || 22;
+  const margemScore = Math.min((produtos.margemMedia / margemBenchmark) * 60, 60);
   score += margemScore;
   
   // Diversificação (40 pontos)
@@ -232,7 +350,8 @@ export const gerarAnaliseTrimestral = (
 export const gerarInsights = (
   atual: ExecutiveMetrics,
   anterior: ExecutiveMetrics,
-  healthScore: HealthScore
+  healthScore: HealthScore,
+  benchmarks: SectorBenchmarks
 ): TrendInsight[] => {
   const insights: TrendInsight[] = [];
   
@@ -251,22 +370,24 @@ export const gerarInsights = (
   }
   
   // Atenções
+  const roasBenchmark = benchmarks.roasMedio || 3.2;
   if (atual.marketing.roasAds < 0.8) {
     const prejuizo = atual.marketing.investimentoAds - atual.marketing.receitaAds;
     insights.push({
       type: 'atencao',
       title: 'ROAS Crítico - Operação em Prejuízo',
-      description: `ROAS de ${atual.marketing.roasAds.toFixed(2)}x está ${((benchmarksPetFood.roasMedio - atual.marketing.roasAds) / benchmarksPetFood.roasMedio * 100).toFixed(0)}% abaixo do benchmark do setor (${benchmarksPetFood.roasMedio}x). Prejuízo operacional de R$ ${(prejuizo / 1000).toFixed(1)}K no mês. Urgente: revisar campanhas com baixo ROI e realocar budget.`,
+      description: `ROAS de ${atual.marketing.roasAds.toFixed(2)}x está ${((roasBenchmark - atual.marketing.roasAds) / roasBenchmark * 100).toFixed(0)}% abaixo do benchmark do setor (${roasBenchmark}x). Prejuízo operacional de R$ ${(prejuizo / 1000).toFixed(1)}K no mês. Urgente: revisar campanhas com baixo ROI e realocar budget.`,
       metrics: [
         { label: 'ROAS Atual', value: atual.marketing.roasAds.toFixed(2) + 'x', trend: calcularVariacao(atual.marketing.roasAds, anterior.marketing.roasAds) },
-        { label: 'Benchmark', value: benchmarksPetFood.roasMedio.toFixed(2) + 'x', trend: 0 },
+        { label: 'Benchmark', value: roasBenchmark.toFixed(2) + 'x', trend: 0 },
       ],
     });
   }
   
   // Oportunidades
-  if (atual.clientes.taxaRecompra < benchmarksPetFood.taxaRecompra) {
-    const gap = benchmarksPetFood.taxaRecompra - atual.clientes.taxaRecompra;
+  const recompraBenchmark = benchmarks.taxaRecompra || 38;
+  if (atual.clientes.taxaRecompra < recompraBenchmark) {
+    const gap = recompraBenchmark - atual.clientes.taxaRecompra;
     const potencial = (atual.vendas.receita / atual.clientes.taxaRecompra) * gap;
     insights.push({
       type: 'oportunidade',
@@ -274,7 +395,7 @@ export const gerarInsights = (
       description: `Taxa de recompra de ${atual.clientes.taxaRecompra}% está ${gap.toFixed(0)}pp abaixo do setor. Implementar programa de fidelidade + email marketing pode gerar +R$ ${(potencial / 1000).toFixed(1)}K/mês em receita recorrente.`,
       metrics: [
         { label: 'Recompra Atual', value: atual.clientes.taxaRecompra + '%', trend: 0 },
-        { label: 'Potencial', value: benchmarksPetFood.taxaRecompra + '%', trend: 0 },
+        { label: 'Potencial', value: recompraBenchmark + '%', trend: 0 },
       ],
     });
   }

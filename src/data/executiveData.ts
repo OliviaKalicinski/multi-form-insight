@@ -135,7 +135,11 @@ export const dadosMensais: Record<string, ExecutiveMetrics> = {
   },
 };
 
-// Benchmarks do setor Pet Food
+/**
+ * @deprecated NÃO USAR - Migrado para app_settings.sector_benchmarks
+ * Mantido apenas para referência histórica.
+ * Use useAppSettings().sectorBenchmarks no lugar.
+ */
 export const benchmarksPetFood = {
   roasMedio: 3.2,
   roasMinimo: 2.5,

@@ -4,6 +4,7 @@ import { calculateSalesMetrics } from "./salesCalculator";
 import { calculateAdsMetrics } from "./adsCalculator";
 import { analyzeChurn } from "./customerBehaviorMetrics";
 import { differenceInDays, parse } from "date-fns";
+import { createDefaultMeta, ExecutiveMetricsMeta } from "@/types/metricNature";
 
 /**
  * Calcula ExecutiveMetrics a partir dos dados reais do dashboard
@@ -16,6 +17,9 @@ export const calculateExecutiveMetrics = (
   if (orders.length === 0 && adsData.length === 0) {
     return null;
   }
+
+  // Inicializar metadados de natureza
+  const _meta = createDefaultMeta();
 
   // Calcular métricas de vendas
   const salesMetrics = orders.length > 0 ? calculateSalesMetrics(orders) : null;
@@ -139,8 +143,11 @@ export const calculateExecutiveMetrics = (
   const produtosVendidos = Array.from(produtosMap.values()).reduce((sum, p) => sum + p.quantidade, 0);
   const skuUnicos = produtosMap.size;
   
-  // Margem média (estimativa conservadora de 18%)
+  // ═══════════════════════════════════════════════════════════════
+  // ESTIMATIVA: Margem média (não há dados reais no CSV)
+  // ═══════════════════════════════════════════════════════════════
   const margemMedia = 18;
+  _meta.margemMedia = 'ESTIMATED';
 
   // ===== OPERAÇÕES =====
   // Tempo médio de emissão de NF (DADO REAL - calculado do CSV)
@@ -151,11 +158,15 @@ export const calculateExecutiveMetrics = (
 
   // ═══════════════════════════════════════════════════════════════
   // ESTIMATIVAS (não há dados reais no CSV)
-  // Esses valores NÃO são usados no HealthScore (peso zero)
   // ═══════════════════════════════════════════════════════════════
   const tempoEnvio = 2.5;      // ESTIMATIVA: dias médios até despacho
   const taxaEntrega = 96;      // ESTIMATIVA: % entregas bem-sucedidas
   const pedidosCancelados = Math.round(pedidos * 0.04); // ESTIMATIVA: 4%
+  
+  // Marcar como estimativas no _meta
+  _meta.tempoEnvio = 'ESTIMATED';
+  _meta.taxaEntrega = 'ESTIMATED';
+  _meta.pedidosCancelados = 'ESTIMATED';
 
   return {
     vendas: {
@@ -199,6 +210,7 @@ export const calculateExecutiveMetrics = (
       taxaEntrega,
       pedidosCancelados,
     },
+    _meta,
   };
 };
 

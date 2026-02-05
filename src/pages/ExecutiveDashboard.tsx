@@ -176,8 +176,8 @@ export default function ExecutiveDashboard() {
   const { alerts, opportunities } = useMemo(() => {
     if (!currentMetrics || !previousMetrics) return { alerts: [], opportunities: [] };
     
-    const alerts = gerarAlertas(currentMetrics, previousMetrics);
-    const recommendations = gerarRecomendacoes(currentMetrics, previousMetrics);
+    const alerts = gerarAlertas(currentMetrics, previousMetrics, sectorBenchmarks);
+    const recommendations = gerarRecomendacoes(currentMetrics, previousMetrics, sectorBenchmarks);
     
     // Convert top recommendations to opportunities
     const opportunities = recommendations.slice(0, 3).map(rec => ({
@@ -189,7 +189,7 @@ export default function ExecutiveDashboard() {
     }));
     
     return { alerts, opportunities };
-  }, [currentMetrics, previousMetrics]);
+  }, [currentMetrics, previousMetrics, sectorBenchmarks]);
 
   // Calculate goal progress - use financialGoals.receita from database
   const hasRevenueGoal = financialGoals.receita > 0;

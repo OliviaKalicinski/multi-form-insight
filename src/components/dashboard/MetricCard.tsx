@@ -4,6 +4,7 @@ import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProjectionData } from "@/utils/incompleteMonthDetector";
 import { KPITooltip } from "./KPITooltip";
+import { MetricNature } from "@/types/metricNature";
 
 interface MetricCardProps {
   title: string;
@@ -15,6 +16,7 @@ interface MetricCardProps {
   isIncomplete?: boolean;
   projectionData?: ProjectionData | null;
   tooltipKey?: string;
+  nature?: MetricNature;
 }
 
 export const MetricCard = ({ 
@@ -27,6 +29,7 @@ export const MetricCard = ({
   isIncomplete = false,
   projectionData = null,
   tooltipKey,
+  nature,
 }: MetricCardProps) => {
   const getTrendColor = () => {
     if (trend === undefined) return "";
@@ -53,6 +56,18 @@ export const MetricCard = ({
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {title}
           </CardTitle>
+          {nature && nature !== 'REAL' && (
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-[10px] px-1.5 py-0",
+                nature === 'ESTIMATED' && "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
+                nature === 'INFERRED' && "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800"
+              )}
+            >
+              {nature === 'ESTIMATED' ? 'EST' : 'INF'}
+            </Badge>
+          )}
           {isIncomplete && (
             <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800">
               📅 Up to date

@@ -1,5 +1,7 @@
 // Interfaces para análise executiva
 
+import { ExecutiveMetricsMeta } from './metricNature';
+
 export interface VendasMetrics {
   receita: number;
   pedidos: number;
@@ -52,18 +54,21 @@ export interface ExecutiveMetrics {
   clientes: ClientesMetrics;
   produtos: ProdutosMetrics;
   operacoes: OperacoesMetrics;
+  _meta?: ExecutiveMetricsMeta; // Metadados sobre natureza das métricas
 }
 
 export interface HealthScore {
   overall: number; // 0-100
   breakdown: {
-    marketing: number;
-    vendas: number;
-    clientes: number;
-    produtos: number;
-    operacoes: number | null; // null = dados estimados/não confiáveis
+    marketing: number | null;
+    vendas: number | null;
+    clientes: number | null;
+    produtos: number | null;
+    operacoes: number | null;
   };
-  status: 'critical' | 'warning' | 'good' | 'excellent';
+  status: 'critical' | 'warning' | 'good' | 'excellent' | 'partial';
+  isPartial: boolean;
+  partialReasons: string[];
 }
 
 export interface CriticalAlert {
