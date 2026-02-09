@@ -95,10 +95,16 @@ const getAdMetrics = (ad: AdsData) => {
   const investment = parseValue(ad["Valor usado (BRL)"]);
   const impressions = parseValue(ad["Impressões"]);
   const revenue = parseValue(ad["Valor de conversão da compra"]);
-  const clicks = parseValue(ad["Cliques de saída"]) || parseValue(ad["Cliques no link"]) || parseValue(ad["Cliques (todos)"]);
+  const clicks = parseValue(ad["Cliques (todos)"]);
 
-  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-  const roas = investment > 0 ? revenue / investment : 0;
+  // Usar valores do Meta (CSV) como fonte primaria
+  const ctrFromCsv = parseValue(ad["CTR (todos)"]);
+  const roasFromCsv = parseValue(ad["ROAS de resultados"]);
+
+  // Fallback: calcular apenas se o CSV nao trouxer o valor
+  const ctr = ctrFromCsv > 0 ? ctrFromCsv : (impressions > 0 ? (clicks / impressions) * 100 : 0);
+  const roas = roasFromCsv > 0 ? roasFromCsv : (investment > 0 ? revenue / investment : 0);
+
   const classification = investment >= 10 ? classifyFunnelRole(ctr, roas) : null;
 
   return { ctr, roas, clicks, classification };
