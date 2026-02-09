@@ -1,71 +1,81 @@
 
-# Plano: Classificacao visual por quadrante na tabela de anuncios
+# Plano: Regra de classificacao visivel + cores dinamicas em CTR e ROAS
 
 ## Objetivo
 
-Adicionar coluna "Classificacao" na tabela `AdsBreakdown` com badge colorida e tooltip, reutilizando a logica ja existente em `adFormatClassifier.ts` (`classifyFunnelRole`, `getRoleMeta`).
+Duas mudancas na tabela `AdsBreakdown`:
+
+1. Mostrar a regra de classificacao (thresholds CTR >= 2% e ROAS >= 1.5x) de forma visivel para o usuario
+2. Colorir os valores de CTR e ROAS com verde/vermelho baseado nos thresholds da classificacao, para que a combinacao visual explique o quadrante
 
 ## Alteracoes
 
 ### Arquivo unico: `src/components/dashboard/AdsBreakdown.tsx`
 
-### 1. Imports adicionais
+### 1. Cores dinamicas no CTR (linha 381)
 
-- `classifyFunnelRole`, `getRoleMeta`, `FUNNEL_ROLE_ORDER` de `@/utils/adFormatClassifier`
-- `Tooltip`, `TooltipTrigger`, `TooltipContent`, `TooltipProvider` de `@/components/ui/tooltip`
+Antes: verde apenas se CTR >= 1.5 (threshold arbitrario e diferente da classificacao).
 
-### 2. Novo tipo de ordenacao
+Depois: verde se CTR >= 2.0, vermelho se CTR < 2.0. Usar os mesmos thresholds da classificacao por quadrante.
 
-Adicionar `'classification'` ao tipo `SortColumn`:
-
-```typescript
-type SortColumn = 'investment' | 'impressions' | 'clicks' | 'ctr' | 'purchases' | 'roas' | 'classification' | null;
+```
+CTR >= 2.0  →  text-green-600 font-medium
+CTR < 2.0   →  text-red-500
 ```
 
-### 3. Logica de classificacao dentro de `processedAds`
+### 2. Cores dinamicas no ROAS (linhas 396-402)
 
-Para cada anuncio, calcular CTR e ROAS inline e derivar `performanceClass` usando `classifyFunnelRole(ctr, roas)`. Filtro de investimento >= R$10 ja e aplicado no AdFunnelMap; aqui a classificacao simplesmente mostra "-" para anuncios abaixo desse threshold.
+Antes: verde se ROAS >= 1, amarelo se < 1.
 
-### 4. Ordenacao por classificacao
+Depois: verde se ROAS >= 1.5, vermelho se ROAS < 1.5 (e > 0). Alinhado com o threshold da classificacao.
 
-No switch de ordenacao, mapear cada `FunnelRole` para um peso numerico seguindo a prioridade definida pelo usuario:
+```
+ROAS >= 1.5  →  text-green-600 font-semibold
+ROAS > 0 && < 1.5  →  text-red-500
+ROAS === 0  →  text-muted-foreground "-"
+```
 
-| Prioridade | Classe | Peso |
-|---|---|---|
-| 1 | Conversor | 0 |
-| 2 | Conversor Silencioso | 1 |
-| 3 | Isca de Atencao | 2 |
-| 4 | Ineficiente | 3 |
+Isso permite que o usuario veja visualmente a combinacao: verde+verde = Conversor, verde+vermelho = Isca, etc.
 
-### 5. Nova coluna no header
+### 3. Legenda da regra de classificacao
 
-Adicionar coluna "Classificacao" com botao de ordenacao, posicionada apos a coluna ROAS e antes de "Tipo de Resultado".
+Adicionar um bloco pequeno abaixo do header do card (dentro do `CardHeader`, apos o `CardDescription`) com a regra resumida:
 
-### 6. Nova celula no body
+```text
+Classificacao: CTR >= 2% e ROAS >= 1.5x = Conversor | CTR >= 2% e ROAS < 1.5x = Isca | ...
+```
 
-Para cada linha:
-- Calcular `ctr` (cliques / impressoes * 100) e `roas` (receita / investimento)
-- Se investimento < 10: mostrar badge cinza "Sem dados"
-- Senao: mostrar badge colorida com o label da classificacao
+Formato: uma linha de badges compactas lado a lado, cada uma com a cor da classificacao e o criterio resumido. Envoltas em um container com borda leve e padding minimo, com icone de info.
 
-Cores das badges (Tailwind):
-- Conversor: `bg-green-100 text-green-800`
-- Isca de Atencao: `bg-yellow-100 text-yellow-800`
-- Conversor Silencioso: `bg-blue-100 text-blue-800`
-- Ineficiente: `bg-red-100 text-red-800`
+Layout:
 
-### 7. Tooltip obrigatorio
+```text
+[🟢 Conversor: CTR>=2% + ROAS>=1.5x] [🟡 Isca: CTR>=2% + ROAS<1.5x] [🔵 Silencioso: CTR<2% + ROAS>=1.5x] [🔴 Ineficiente: CTR<2% + ROAS<1.5x]
+```
 
-Cada badge envolta em `Tooltip` com o texto descritivo vindo de `getRoleMeta(role).description`. Tooltips customizados conforme solicitado:
-- Conversor: "Criativo atrai e converte. Bom candidato para escala."
-- Isca de Atencao: "Chama atencao, mas nao gera retorno financeiro."
-- Conversor Silencioso: "Baixo CTR, mas alta eficiencia. Trafego qualificado."
-- Ineficiente: "Baixa atencao e baixo retorno. Avaliar pausa."
+Em mobile (< md), empilhar em 2 colunas.
 
-## O que NAO muda
+## Secao tecnica
 
-- Nenhum calculo existente alterado
-- Nenhum grafico novo criado
-- Nenhum arquivo novo criado
-- Componentes `AdFunnelMap`, `adFormatClassifier.ts` intocados
-- Filtro de tipo de resultado continua funcionando normalmente
+### Thresholds
+
+Importar `CTR_REFERENCE` e `ROAS_REFERENCE` de `adFormatClassifier.ts` -- porem estes sao constantes locais (nao exportadas). Opcoes:
+
+- Exportar as constantes do classificador (mudanca minima em `adFormatClassifier.ts`: adicionar `export` nas linhas 20-21)
+- Ou declarar constantes locais no componente referenciando os mesmos valores
+
+Recomendacao: exportar do classificador para manter source of truth unica. Mudanca de 2 palavras (`export const` em vez de `const`).
+
+### Arquivos modificados
+
+| Arquivo | Mudanca |
+|---|---|
+| `src/utils/adFormatClassifier.ts` | Exportar `CTR_REFERENCE` e `ROAS_REFERENCE` |
+| `src/components/dashboard/AdsBreakdown.tsx` | Cores CTR/ROAS, legenda de regra |
+
+### O que NAO muda
+
+- Nenhum calculo alterado
+- Classificacao continua usando `classifyFunnelRole` existente
+- Ordenacao e filtros intocados
+- Tooltips das badges mantidos
