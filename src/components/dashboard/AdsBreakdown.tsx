@@ -17,8 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { TrendingUp, TrendingDown, DollarSign, MousePointer, ShoppingCart, Package, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { classifyFunnelRole, getRoleMeta, type FunnelRole } from "@/utils/adFormatClassifier";
 
 interface AdsBreakdownProps {
   ads: AdsData[];
@@ -68,17 +70,48 @@ const calculateRoas = (ad: AdsData): number => {
   return investment > 0 && revenue > 0 ? revenue / investment : 0;
 };
 
-type SortColumn = 'investment' | 'impressions' | 'clicks' | 'ctr' | 'purchases' | 'roas' | null;
+type SortColumn = 'investment' | 'impressions' | 'clicks' | 'ctr' | 'purchases' | 'roas' | 'classification' | null;
+
+const CLASSIFICATION_WEIGHT: Record<FunnelRole, number> = {
+  conversor: 0,
+  conversor_silencioso: 1,
+  isca_atencao: 2,
+  ineficiente: 3,
+};
+
+const CLASSIFICATION_TOOLTIPS: Record<FunnelRole, string> = {
+  conversor: "Criativo atrai e converte. Bom candidato para escala.",
+  isca_atencao: "Chama atenção, mas não gera retorno financeiro.",
+  conversor_silencioso: "Baixo CTR, mas alta eficiência. Tráfego qualificado.",
+  ineficiente: "Baixa atenção e baixo retorno. Avaliar pausa.",
+};
+
+const CLASSIFICATION_COLORS: Record<FunnelRole, string> = {
+  conversor: "bg-green-100 text-green-800",
+  isca_atencao: "bg-yellow-100 text-yellow-800",
+  conversor_silencioso: "bg-blue-100 text-blue-800",
+  ineficiente: "bg-red-100 text-red-800",
+};
+
+const getAdClassification = (ad: AdsData) => {
+  const investment = parseValue(ad["Valor usado (BRL)"]);
+  const impressions = parseValue(ad["Impressões"]);
+  const revenue = parseValue(ad["Valor de conversão da compra"]);
+  const clicks = parseValue(ad["Cliques de saída"]) || parseValue(ad["Cliques no link"]) || parseValue(ad["Cliques (todos)"]);
+
+  if (investment < 10) return null;
+
+  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+  const roas = investment > 0 ? revenue / investment : 0;
+
+  return classifyFunnelRole(ctr, roas);
+};
 type SortDirection = 'asc' | 'desc' | null;
 
 export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
   const [sortColumn, setSortColumn] = useState<SortColumn>('investment');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [filterResultType, setFilterResultType] = useState<string>("all");
-
-  if (ads.length === 0) {
-    return null;
-  }
 
   // Extrair tipos únicos de resultado
   const uniqueResultTypes = useMemo(() => {
@@ -142,6 +175,12 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
             valueA = calculateRoas(a);
             valueB = calculateRoas(b);
             break;
+          case 'classification':
+            const classA = getAdClassification(a);
+            const classB = getAdClassification(b);
+            valueA = classA ? CLASSIFICATION_WEIGHT[classA] : 99;
+            valueB = classB ? CLASSIFICATION_WEIGHT[classB] : 99;
+            break;
         }
 
         return sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
@@ -166,6 +205,10 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
       ? <ArrowUp className="h-3 w-3 ml-1" />
       : <ArrowDown className="h-3 w-3 ml-1" />;
   };
+
+  if (ads.length === 0) {
+    return null;
+  }
 
   return (
     <Card className="mt-6">
@@ -292,6 +335,19 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                     </div>
                   </Button>
                 </TableHead>
+                <TableHead className="text-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent"
+                    onClick={() => handleSort('classification')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Classificação
+                      {getSortIcon('classification')}
+                    </div>
+                  </Button>
+                </TableHead>
                 <TableHead>Tipo de Resultado</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -305,6 +361,7 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                 const purchases = parseValue(ad["Compras"]);
                 const roas = calculateRoas(ad);
                 const status = ad["Veiculação da campanha"];
+                const classification = getAdClassification(ad);
 
                 return (
                   <TableRow key={index}>
@@ -342,6 +399,26 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                         </span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {classification ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold cursor-default ${CLASSIFICATION_COLORS[classification]}`}>
+                                {getRoleMeta(classification).label}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[220px] text-center">
+                              <p className="text-xs">{CLASSIFICATION_TOOLTIPS[classification]}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gray-100 text-gray-500">
+                          Sem dados
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>
