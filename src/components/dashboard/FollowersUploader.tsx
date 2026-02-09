@@ -68,6 +68,7 @@ export const FollowersUploader = ({
 
     Papa.parse(file, {
       header: true,
+      delimiter: "",
       skipEmptyLines: true,
       complete: async (results) => {
         try {
