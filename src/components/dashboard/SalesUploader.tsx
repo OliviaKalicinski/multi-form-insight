@@ -109,6 +109,7 @@ export const SalesUploader = ({
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      delimiter: "",
       complete: async (results) => {
         const processedData = validateAndProcessData(results.data);
         
