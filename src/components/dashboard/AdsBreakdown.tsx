@@ -20,7 +20,8 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { TrendingUp, TrendingDown, DollarSign, MousePointer, ShoppingCart, Package, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { classifyFunnelRole, getRoleMeta, type FunnelRole } from "@/utils/adFormatClassifier";
+import { classifyFunnelRole, getRoleMeta, CTR_REFERENCE, ROAS_REFERENCE, type FunnelRole } from "@/utils/adFormatClassifier";
+import { Info } from "lucide-react";
 
 interface AdsBreakdownProps {
   ads: AdsData[];
@@ -247,6 +248,22 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
             </Select>
           </div>
         </div>
+        <div className="mt-3 flex flex-wrap gap-2 items-center rounded-md border border-border/50 bg-muted/30 px-3 py-2">
+          <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground mr-1">Regra:</span>
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-800">
+            Conversor: CTR≥{CTR_REFERENCE}% + ROAS≥{ROAS_REFERENCE}x
+          </span>
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-yellow-100 text-yellow-800">
+            Isca: CTR≥{CTR_REFERENCE}% + ROAS&lt;{ROAS_REFERENCE}x
+          </span>
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800">
+            Silencioso: CTR&lt;{CTR_REFERENCE}% + ROAS≥{ROAS_REFERENCE}x
+          </span>
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-800">
+            Ineficiente: CTR&lt;{CTR_REFERENCE}% + ROAS&lt;{ROAS_REFERENCE}x
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
@@ -378,7 +395,7 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                       {formatNumber(clicks)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className={ctr >= 1.5 ? "text-green-600 font-medium" : ""}>
+                      <span className={ctr >= CTR_REFERENCE ? "text-green-600 font-medium" : "text-red-500"}>
                         {ctr.toFixed(2)}%
                       </span>
                     </TableCell>
@@ -394,7 +411,7 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                     </TableCell>
                     <TableCell className="text-right">
                       {roas > 0 ? (
-                        <span className={roas >= 1 ? "text-green-600 font-semibold" : "text-yellow-600"}>
+                        <span className={roas >= ROAS_REFERENCE ? "text-green-600 font-semibold" : "text-red-500"}>
                           {roas.toFixed(2)}x
                         </span>
                       ) : (
