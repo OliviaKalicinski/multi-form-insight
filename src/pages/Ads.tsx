@@ -138,6 +138,11 @@ const Ads = () => {
     return calculateAdsMetrics(activeAdsData);
   }, [activeAdsData]);
 
+  // Investimento total de TODOS os objetivos (não filtrado)
+  const totalInvestmentAllObjectives = useMemo(() => {
+    return calculateAdsMetrics(currentMonthAdsData).investimentoTotal;
+  }, [currentMonthAdsData]);
+
   // Calculate trends vs previous month (using same objective filter)
   const trends = useMemo(() => {
     if (!selectedMonth || isLast12MonthsView) return null;
@@ -178,7 +183,7 @@ const Ads = () => {
   }, [selectedMonth, availableMonths, adsData, metrics, isLast12MonthsView, primaryObjective]);
 
   // Derived metrics - use ROAS thresholds from database
-  const netProfit = metrics.valorConversaoTotal - metrics.investimentoTotal;
+  const netProfit = metrics.valorConversaoTotal - totalInvestmentAllObjectives;
   const roasGoal = sectorBenchmarks.roasMedio || 3.0;
   const roasExcelente = sectorBenchmarks.roasExcelente || 4.0;
   const roasMinimo = sectorBenchmarks.roasMinimo || 2.5;
@@ -448,7 +453,7 @@ const Ads = () => {
                       {/* Investment */}
                       <StatusMetricCard
                         title="Investimento"
-                        value={formatCurrency(metrics.investimentoTotal)}
+                        value={formatCurrency(totalInvestmentAllObjectives)}
                         icon={<DollarSign className="h-3 w-3" />}
                         trend={trends?.investmentTrend}
                         status="neutral"
