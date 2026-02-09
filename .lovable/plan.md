@@ -1,64 +1,65 @@
 
 
-# Ajustes finais na tabela de anuncios
+# Corrigir inconsistencia entre CTR/ROAS exibidos e classificacao
 
-## O que ja existe
+## Problema
 
-- Coluna "Classificacao" com badges coloridas e tooltips
-- Ordenacao por CTR, ROAS e Classificacao
-- Legenda de regra visivel no header
-- Cores dinamicas em CTR e ROAS baseadas nos thresholds
+A classificacao e os valores exibidos usam fontes de dados diferentes:
 
-## O que muda
+| Dado | Valor exibido na tabela | Valor usado na classificacao |
+|---|---|---|
+| CTR | `ad["CTR (todos)"]` (pre-calculado do CSV) | `cliques_de_saida / impressoes * 100` (calculado) |
+| Cliques | `ad["Cliques (todos)"]` | `ad["Cliques de saida"]` (prioridade) |
+| ROAS | `ad["ROAS de resultados"]` (se existir no CSV) | `receita / investimento` (sempre calculado) |
+
+Resultado: um anuncio mostra CTR 2.93% e ROAS 2.41x (ambos acima dos thresholds), mas a classificacao calcula internamente com cliques de saida (que pode dar CTR < 2%) e classifica como "Conversor Silencioso".
+
+## Solucao
+
+Unificar: usar os **mesmos valores calculados** para exibicao, coloracao E classificacao. A funcao `getAdClassification` ja calcula CTR e ROAS corretamente — basta reutilizar esses valores na tabela.
+
+## Alteracoes
 
 ### Arquivo unico: `src/components/dashboard/AdsBreakdown.tsx`
 
-### 1. Reordenar colunas
+### 1. Expandir retorno de `getAdClassification`
 
-Ordem atual: Investimento - Impressoes - Cliques - CTR - Compras - ROAS - Classificacao
-
-Nova ordem: Investimento - Impressoes - Cliques - **Compras** - **CTR** - **ROAS** - Classificacao
-
-Mover header e celula de Compras para antes de CTR.
-
-### 2. Atualizar textos dos tooltips
-
-Os tooltips atuais sao curtos. Substituir pelos textos educativos completos:
-
-| Classe | Texto atual | Texto novo |
-|---|---|---|
-| Conversor | "Criativo atrai e converte. Bom candidato para escala." | "Criativo atrai cliques e gera retorno financeiro. Bom candidato para escala." |
-| Isca | "Chama atencao, mas nao gera retorno financeiro." | "CTR alto indica criativo atrativo, mas o baixo ROAS mostra que os cliques nao estao se convertendo em receita. Investigar oferta, publico ou pagina." |
-| Silencioso | "Baixo CTR, mas alta eficiencia. Trafego qualificado." | "Poucos cliques, mas altamente qualificados. CTR baixo nao e problema aqui." |
-| Ineficiente | "Baixa atencao e baixo retorno. Avaliar pausa." | "Baixa atencao e baixo retorno financeiro. Avaliar pausa ou reformulacao." |
-
-### 3. Adicionar filtro por Classificacao
-
-Novo dropdown ao lado do filtro de "Tipo de resultado" existente:
-
-- Estado: `filterClassification` com opcoes: all, conversor, isca_atencao, conversor_silencioso, ineficiente
-- Filtro aplicado no `processedAds` usando `getAdClassification`
-- Labels amigaveis: Conversor, Isca de Atencao, Conversor Silencioso, Ineficiente
-
-## Secao tecnica
-
-### Alteracoes no header (TableHeader)
-
-Mover o bloco `TableHead` de Compras (linhas 328-341) para antes do bloco CTR (linhas 315-327).
-
-### Alteracoes no body (TableBody)
-
-Mover a celula `TableCell` de Compras (linhas 402-411) para antes da celula CTR (linhas 397-401).
-
-### Novo estado e filtro
+Alterar para retornar um objeto com os valores calculados alem da classificacao:
 
 ```typescript
-const [filterClassification, setFilterClassification] = useState<string>("all");
+const getAdMetrics = (ad: AdsData) => {
+  const investment = parseValue(ad["Valor usado (BRL)"]);
+  const impressions = parseValue(ad["Impressões"]);
+  const revenue = parseValue(ad["Valor de conversão da compra"]);
+  const clicks = parseValue(ad["Cliques de saída"]) 
+    || parseValue(ad["Cliques no link"]) 
+    || parseValue(ad["Cliques (todos)"]);
+
+  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+  const roas = investment > 0 ? revenue / investment : 0;
+  const classification = investment >= 10 ? classifyFunnelRole(ctr, roas) : null;
+
+  return { ctr, roas, clicks, classification };
+};
 ```
 
-No `processedAds`, apos filtro de tipo de resultado, adicionar filtro por classificacao.
+### 2. Usar valores unificados no render da tabela
 
-### Contagem no CardDescription
+Dentro do `.map()` do body (linhas 399-407), substituir:
 
-Atualizar para refletir ambos os filtros ativos.
+- `ctr` vem de `getAdMetrics(ad).ctr` em vez de `parseValue(ad["CTR (todos)"])`
+- `roas` vem de `getAdMetrics(ad).roas` em vez de `calculateRoas(ad)`
+- `clicks` vem de `getAdMetrics(ad).clicks` em vez de `parseValue(ad["Cliques (todos)"])`
 
+### 3. Usar mesma funcao na ordenacao
+
+Na ordenacao por `ctr` (linha 182), usar `getAdMetrics(a).ctr` em vez de `parseValue(a["CTR (todos)"])`.
+Na ordenacao por `roas`, usar `getAdMetrics(a).roas`.
+
+### 4. Remover `calculateRoas`
+
+A funcao `calculateRoas` (linhas 62-72) usava `ad["ROAS de resultados"]` do CSV como fonte primaria, criando divergencia. Sera removida, unificando tudo em `getAdMetrics`.
+
+## Resultado esperado
+
+O anuncio do exemplo (CTR 2.93%, ROAS 2.41x) sera classificado como **Conversor** (verde) porque agora exibicao e classificacao usam exatamente os mesmos valores calculados.
