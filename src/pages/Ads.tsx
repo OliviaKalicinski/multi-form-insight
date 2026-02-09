@@ -27,7 +27,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
-import { AdFunnelMap } from "@/components/dashboard/AdFunnelMap";
+import { AdClassificationChart } from "@/components/dashboard/AdClassificationChart";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -1073,9 +1073,9 @@ const Ads = () => {
               {/* ===== ROW 6: Breakdown by Ad (uses activeAdsData for objective-filtered view) ===== */}
               <AdsBreakdown ads={activeAdsData} selectedMonth={selectedMonth || ""} />
 
-              {/* ===== ROW 7: Funnel Map (Sales view only) ===== */}
+              {/* ===== ROW 7: Classification Chart (Sales view only) ===== */}
               {objectivesSummary.isSalesView && (
-                <AdFunnelMap adsData={activeAdsData} />
+                <AdClassificationChart adsData={activeAdsData} />
               )}
             </>
           )}
