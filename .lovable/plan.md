@@ -1,65 +1,160 @@
 
 
-# Plano: Corrigir ROAS na pagina de Anuncios para usar investimento total
+# Reestruturar pagina de Anuncios - 5 Fases
 
-## Diagnostico
+## FASE 1 -- Aliases semanticos e correcoes de investimento
 
-Apos analise detalhada, o problema do ROAS com investimento filtrado existe **apenas na pagina de Anuncios** (`Ads.tsx`):
-
-| Pagina | Fonte do Investimento | Status |
-|---|---|---|
-| Ads.tsx | `activeAdsData` (filtrado por objetivo) | **Precisa corrigir** |
-| ExecutiveDashboard.tsx | Todos os ads do mes (sem filtro de objetivo) | OK |
-| PerformanceFinanceira.tsx | Todos os ads do mes (sem filtro de objetivo) | OK |
-
-Na pagina de Ads, o `metrics.roas` e calculado como `valorConversaoTotal / investimentoTotal` usando apenas os 22 anuncios de vendas (R$ 8.887,01), quando deveria usar o investimento total de R$ 11.866,75.
-
-## Solucao
-
-Recalcular o ROAS na pagina de Ads usando `totalInvestmentAllObjectives` (ja criado no passo anterior) ao inves do `metrics.investimentoTotal` filtrado.
-
-### Alteracoes em `src/pages/Ads.tsx`
-
-1. **Criar um ROAS corrigido** usando receita de vendas dividida pelo investimento total:
-   ```
-   roasCorrigido = metrics.valorConversaoTotal / totalInvestmentAllObjectives
-   ```
-
-2. **Substituir `metrics.roas`** nos seguintes locais:
-   - Hero card principal de ROAS (valor grande, linha ~413)
-   - Badge de status do ROAS (linha ~404)
-   - Calculo do `roasProgress` (linha ~190)
-   - Chamada a `getRoasStatus` e `getRoasInterpretation`
-   - Texto de calculo que mostra "Receita / Investimento" (linha ~418-420)
-   - Trend do ROAS (continua usando o trend existente)
-
-3. **Atualizar `roasStatusInfo`** para usar o ROAS corrigido
-
-4. **Atualizar referencia ao investimento** na linha de calculo visual (linha ~420) que mostra o denominador
-
-### Resultado esperado
-
-- ROAS exibido: R$ 14.004,65 / R$ 11.866,75 = **1.18x** (antes mostrava ~1.58x com investimento filtrado)
-- Investimento no card: R$ 11.866,75 (ja corrigido no passo anterior)
-- Receita e conversoes: continuam refletindo apenas campanhas de vendas
-
-### Secao tecnica
-
-Adicionar apos `totalInvestmentAllObjectives`:
+### 1.1 Aliases (apos linha 149)
 
 ```typescript
-const correctedRoas = totalInvestmentAllObjectives > 0 
-  ? metrics.valorConversaoTotal / totalInvestmentAllObjectives 
-  : 0;
+const totalInvestment = totalInvestmentAllObjectives;
+const objectiveInvestment = metrics.investimentoTotal;
+const revenueBenchmarkMultiplier = 3;
+const grossMediaResult = metrics.valorConversaoTotal - totalInvestment;
 ```
 
-Substituir todas as ocorrencias de `metrics.roas` na renderizacao por `correctedRoas`. Manter `metrics.roas` apenas no calculo de trends (que compara mes a mes com a mesma logica).
+### 1.2 Correcoes pontuais
 
-Locais exatos de substituicao:
-- Linha 190: `roasProgress` 
-- Linha 208-215: `getRoasStatus(metrics.roas)` 
-- Linha 404: Badge condicional
-- Linha 413: Valor principal
-- Linha 420: Denominador do calculo visual
-- Linha 444: `getRoasInterpretation`
+| Linha atual | Antes | Depois |
+|---|---|---|
+| 191 | `netProfit` | Substituir por `grossMediaResult` (mesmo calculo, nome correto) |
+| 477 | `metrics.investimentoTotal * 3` | `totalInvestment * revenueBenchmarkMultiplier` |
+| 641 | ROI card com `metrics.roi` | Renomear para "Resultado Bruto" com `formatCurrency(grossMediaResult)`, badge Positivo/Negativo |
+| 881 | `metrics.investimentoTotal` | `totalInvestment` com label "Investido (total midia):" |
+
+O card de ROI (linha 639-646) passa a exibir valor monetario (nao percentual), com status baseado em positivo/negativo, e tooltip: "Resultado bruto considerando apenas investimento em midia."
+
+---
+
+## FASE 5 (executada antes das fases visuais) -- Filtro manual de objetivo
+
+### Estado
+
+Adicionar `useState` no componente:
+
+```typescript
+const [manualObjective, setManualObjective] = useState<string>('auto');
+```
+
+### Logica
+
+Criar `effectiveObjective` que substitui `primaryObjective` em todos os usos:
+
+```typescript
+const effectiveObjective = useMemo(() => {
+  if (manualObjective === 'auto') return determinePrimaryObjective(currentMonthAdsData);
+  return manualObjective;
+}, [manualObjective, currentMonthAdsData]);
+```
+
+Substituir `primaryObjective` por `effectiveObjective` em: `activeAdsData`, `objectivesSummary`, trends.
+
+### UI
+
+Adicionar `ToggleGroup` no header (entre titulo e badges):
+
+- Opcoes: Auto (detectado) | Sales | Engagement | Traffic
+- Opcoes sem dados ficam desabilitadas
+- Import de `ToggleGroup` e `ToggleGroupItem` de `@/components/ui/toggle-group`
+
+### Persistencia
+
+Usar `sessionStorage` para manter selecao durante a sessao.
+
+---
+
+## FASE 2 -- BLOCO 1: Decisao (topo, substitui ROW 1 atual)
+
+O ROW 1 atual (ROAS hero 2-col + 6 satellite cards 3-col) e substituido por:
+
+```text
++---------------------------+---------------------------+---------------------------+
+| ROAS do Negocio (HERO)    | Resultado Bruto de Midia  | Status Decisional         |
+| correctedRoas             | grossMediaResult          | Texto: Escalavel /        |
+| Receita total / invest.   | Badge: Positivo/Negativo  | Saudavel / Em observacao  |
+|   total em midia          | Tooltip honesto            | / Prejuizo operacional   |
+| Barra progresso vs meta   |                           | Subtexto explicativo      |
++---------------------------+---------------------------+---------------------------+
+```
+
+### Card 1 -- ROAS do Negocio
+
+- Subtitulo: "Receita total / investimento total em midia" (evita confusao com ROAS Meta)
+- Reutiliza toda a logica existente de `getRoasStatus`, `getRoasInterpretation`, `roasProgress`
+- Cor dinamica via thresholds do banco
+
+### Card 2 -- Resultado Bruto de Midia
+
+- Valor: `formatCurrency(grossMediaResult)`
+- Badge: "Positivo" (verde) ou "Negativo" (vermelho)
+- Edge case: quando `totalInvestment === 0`, estado neutro, sem badge
+- Tooltip: "Receita de vendas menos investimento total em midia. Nao considera custos operacionais."
+- Visual: valor financeiro (sem cores de performance relativa)
+
+### Card 3 -- Status Decisional
+
+Derivado do ROAS, sem nova engine:
+
+| Condicao | Label | Cor |
+|---|---|---|
+| correctedRoas >= roasExcelente | Escalavel | Verde |
+| correctedRoas >= roasMedio | Saudavel | Azul |
+| correctedRoas >= roasMinimo | Em observacao | Amarelo |
+| correctedRoas < roasMinimo | Prejuizo operacional | Vermelho |
+
+Subtexto curto explicativo para cada estado. Sem animacoes.
+
+---
+
+## FASE 3 -- BLOCO 2: Diagnostico rapido
+
+Substitui os 6 satellite cards + ROW 2.5 por um grid compacto:
+
+```text
++-------------+-------------+-------------+------------------+
+|    CTR      |    CPC      |    CPA      |  Taxa Conversao  |
++-------------+-------------+-------------+------------------+
+| Investimento|   Receita   |  Conversoes |      CPM         |
+|  (total)    | (atribuida) |             |                  |
++-------------+-------------+-------------+------------------+
+```
+
+- Linha 1: diagnostico de eficiencia, usa `objectiveInvestment`
+- Linha 2: contexto de escala. Investimento usa `totalInvestment`. Receita com label "Receita atribuida aos anuncios"
+- Todos compact, trends opcionais, tooltips existentes
+- Status visual neutro (sem cores fortes de sucesso/perigo)
+
+---
+
+## FASE 4 -- Reorganizar blocos existentes
+
+Nova ordem da pagina (Sales View):
+
+1. BLOCO 1: Decisao (3 cards -- FASE 2)
+2. BLOCO 2: Diagnostico (grid 2x4 -- FASE 3)
+3. Funil de Conversao + Alcance e Performance (movido, sem mudanca de calculo)
+4. Metricas adicionais: LPV, Ticket Medio, Frequencia (sem ROI, que agora esta no BLOCO 1)
+5. Resumo Financeiro Inline (ROW 3 corrigido com `totalInvestment` e label "Investido (total midia)")
+6. AdsBreakdown (tabela, sem mudanca)
+7. AdFunnelMap (quadrante, sem mudanca)
+
+Sem scroll automatico nem highlights animados.
+
+---
+
+## Resumo de alteracoes
+
+| Arquivo | Mudancas |
+|---|---|
+| `src/pages/Ads.tsx` | Todas as 5 fases: aliases, filtro manual, bloco decisional, diagnostico, reorganizacao |
+
+Nenhum arquivo novo. Nenhum componente externo alterado. Imports adicionais: `useState` (ja importado via React), `ToggleGroup`/`ToggleGroupItem`.
+
+### Ordem de execucao
+
+1. FASE 1: aliases + correcoes de investimento
+2. FASE 5: filtro manual de objetivo
+3. FASE 2: bloco decisional
+4. FASE 3: bloco diagnostico
+5. FASE 4: reorganizar blocos
 
