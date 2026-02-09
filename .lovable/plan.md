@@ -1,43 +1,54 @@
 
-
-# Plano: Corrigir datas dos anuncios e delimitadores dos uploaders
+# Plano: Corrigir valor total de investimento Meta em novembro
 
 ## Diagnostico
 
-### Problema das datas de anuncios
-Todos os registros de cada mes ficam com data `YYYY-MM-01` porque a funcao `extractDateFromMonth` extrai apenas o primeiro dia do campo "Mes" (ex: "2025-11-01 - 2025-11-30" vira "2025-11-01"). Isso acontece para TODOS os meses, nao apenas novembro.
+O valor exibido de R$ 8.887,01 nao esta errado tecnicamente -- ele reflete apenas os anuncios com objetivo **OUTCOME_SALES** (22 de 39 anuncios). Os demais anuncios sao filtrados por objetivo:
 
-**Porem, isso e o comportamento esperado para o formato de exportacao mensal do Meta Ads.** Os 39 registros de novembro sao 39 anuncios diferentes, nao 39 dias. Os totais estao corretos:
-- Gasto: R$ 11.866,75
-- Impressoes: 845.211
-- Cliques: 17.493
-- Conversoes: 339
-- Receita: R$ 14.004,65
-
-**Nenhuma correcao e necessaria no parser de anuncios** -- o campo `data` serve como referencia mensal, e os dashboards ja agrupam por mes (YYYY-MM).
-
-### Problema dos delimitadores
-Dois uploaders nao tem auto-deteccao de delimitador, o que pode causar falha ao importar CSVs com ponto-e-virgula ou tab:
-
-| Uploader | Delimitador | Status |
+| Objetivo | Anuncios | Gasto |
 |---|---|---|
-| SalesUploader | `""` (auto) | OK |
-| AdsUploader | `""` (auto) | OK |
-| FollowersUploader | nenhum (padrao virgula) | Precisa corrigir |
-| CSVUploader (marketing) | nenhum (padrao virgula) | Precisa corrigir |
-| InstagramMetricsParser | parser manual | OK |
+| OUTCOME_SALES | 22 | R$ 8.887,01 |
+| LINK_CLICKS | 3 | R$ 1.666,69 |
+| OUTCOME_ENGAGEMENT | 10 | R$ 920,01 |
+| OUTCOME_LEADS | 4 | R$ 393,04 |
+| **Total** | **39** | **R$ 11.866,75** |
+
+A logica atual funciona assim:
+1. `currentMonthAdsData` contem todos os 39 anuncios de novembro
+2. `determinePrimaryObjective()` detecta que existem anuncios de vendas e define objetivo primario como `OUTCOME_SALES`
+3. `activeAdsData` filtra para mostrar apenas os 22 anuncios de vendas
+4. `calculateAdsMetrics(activeAdsData)` calcula investimento = R$ 8.887,01
+5. Os KPIs no topo da pagina usam esse valor filtrado
 
 ## Solucao
 
-Adicionar `delimiter: ""` nos dois uploaders que estao faltando:
+Separar o KPI de **Investimento Total** para sempre mostrar o gasto de TODAS as campanhas do mes, independente do objetivo. Os demais KPIs (ROAS, CPA, conversoes) continuam usando apenas os dados filtrados por objetivo, pois so fazem sentido no contexto de vendas.
 
-### Arquivo 1: `src/components/dashboard/FollowersUploader.tsx`
-- Adicionar `delimiter: ""` na chamada `Papa.parse` (linha 69-71)
+### Alteracoes
 
-### Arquivo 2: `src/components/dashboard/CSVUploader.tsx`
-- Adicionar `delimiter: ""` na chamada `Papa.parse` (linha 73-75)
+**Arquivo: `src/pages/Ads.tsx`**
 
-## Secao tecnica
+1. Adicionar um `useMemo` para calcular o investimento total de TODOS os anuncios do mes (usando `currentMonthAdsData` ao inves de `activeAdsData`)
+2. Atualizar o KPI "Investimento Total" no hero card para usar esse valor global
+3. Manter todos os outros KPIs (ROAS, CPA, compras, CTR) usando `metrics` filtrado por objetivo
 
-Ambas as alteracoes sao identicas -- adicionar uma unica linha `delimiter: "",` apos `header: true,` na configuracao do PapaParse. Isso habilita auto-deteccao de separadores (virgula, ponto-e-virgula, tab).
+Isso garante que:
+- O investimento exibido sera R$ 11.866,75 (todos os objetivos)
+- ROAS, CPA e conversoes continuam refletindo apenas as campanhas de vendas
+- A tabela de detalhamento continua mostrando todos os anuncios com filtro por tipo
 
+### Secao tecnica
+
+Adicionar apos a linha do `const metrics`:
+
+```typescript
+const totalInvestmentAllObjectives = useMemo(() => {
+  return calculateAdsMetrics(currentMonthAdsData).investimentoTotal;
+}, [currentMonthAdsData]);
+```
+
+Substituir `metrics.investimentoTotal` por `totalInvestmentAllObjectives` nos seguintes locais:
+- Hero card de investimento (linha ~440)
+- Calculo de `netProfit` (linha 181)
+
+Manter `metrics.investimentoTotal` nos calculos de ROAS e CPA que dependem do filtro por objetivo.
