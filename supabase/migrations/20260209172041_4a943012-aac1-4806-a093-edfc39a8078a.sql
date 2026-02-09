@@ -1,0 +1,1 @@
+ALTER TABLE ads_data DROP CONSTRAINT IF EXISTS ads_data_data_campanha_conjunto_anuncio_key;
