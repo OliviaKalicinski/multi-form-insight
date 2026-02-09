@@ -449,7 +449,7 @@ export const useDataPersistence = () => {
       const uniqueRowsMap = new Map<string, typeof rawRows[0]>();
       
       rawRows.forEach((row) => {
-        const key = `${row.data}|${row.campanha}|${row.conjunto}|${row.anuncio}`;
+        const key = `${row.data}|${row.campanha}|${row.conjunto}|${row.anuncio}|${row.objetivo}`;
         
         if (uniqueRowsMap.has(key)) {
           // Aggregate values for duplicate entries
@@ -512,7 +512,7 @@ export const useDataPersistence = () => {
       const { data, error } = await supabase
         .from("ads_data")
         .upsert(rowsWithUploadId, { 
-          onConflict: "data,campanha,conjunto,anuncio",
+          onConflict: "data,campanha,conjunto,anuncio,objetivo",
           ignoreDuplicates: false 
         })
         .select();
