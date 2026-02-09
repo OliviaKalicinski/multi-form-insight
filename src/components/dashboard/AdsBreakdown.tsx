@@ -81,11 +81,19 @@ const CLASSIFICATION_WEIGHT: Record<FunnelRole, number> = {
 };
 
 const CLASSIFICATION_TOOLTIPS: Record<FunnelRole, string> = {
-  conversor: "Criativo atrai e converte. Bom candidato para escala.",
-  isca_atencao: "Chama atenção, mas não gera retorno financeiro.",
-  conversor_silencioso: "Baixo CTR, mas alta eficiência. Tráfego qualificado.",
-  ineficiente: "Baixa atenção e baixo retorno. Avaliar pausa.",
+  conversor: "Criativo atrai cliques e gera retorno financeiro. Bom candidato para escala.",
+  isca_atencao: "CTR alto indica criativo atrativo, mas o baixo ROAS mostra que os cliques não estão se convertendo em receita. Investigar oferta, público ou página.",
+  conversor_silencioso: "Poucos cliques, mas altamente qualificados. CTR baixo não é problema aqui.",
+  ineficiente: "Baixa atenção e baixo retorno financeiro. Avaliar pausa ou reformulação.",
 };
+
+const CLASSIFICATION_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "all", label: "Todas classificações" },
+  { value: "conversor", label: "Conversor" },
+  { value: "isca_atencao", label: "Isca de Atenção" },
+  { value: "conversor_silencioso", label: "Conversor Silencioso" },
+  { value: "ineficiente", label: "Ineficiente" },
+];
 
 const CLASSIFICATION_COLORS: Record<FunnelRole, string> = {
   conversor: "bg-green-100 text-green-800",
@@ -113,6 +121,7 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
   const [sortColumn, setSortColumn] = useState<SortColumn>('investment');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [filterResultType, setFilterResultType] = useState<string>("all");
+  const [filterClassification, setFilterClassification] = useState<string>("all");
 
   // Extrair tipos únicos de resultado
   const uniqueResultTypes = useMemo(() => {
@@ -143,6 +152,11 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
     // Aplicar filtro de tipo de resultado
     if (filterResultType !== "all") {
       filtered = filtered.filter(ad => ad["Tipo de resultado"] === filterResultType);
+    }
+
+    // Aplicar filtro de classificação
+    if (filterClassification !== "all") {
+      filtered = filtered.filter(ad => getAdClassification(ad) === filterClassification);
     }
 
     // Aplicar ordenação
@@ -196,7 +210,7 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
     }
 
     return filtered;
-  }, [ads, sortColumn, sortDirection, filterResultType]);
+  }, [ads, sortColumn, sortDirection, filterResultType, filterClassification]);
 
   const getSortIcon = (column: SortColumn) => {
     if (sortColumn !== column) {
@@ -224,15 +238,27 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
               <span>
                 {processedAds.length} {processedAds.length !== ads.length && `de ${ads.length}`} anúncios
               </span>
-              {filterResultType !== "all" && (
+              {(filterResultType !== "all" || filterClassification !== "all") && (
                 <Badge variant="secondary" className="ml-2">
                   Filtrado
                 </Badge>
               )}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={filterClassification} onValueChange={setFilterClassification}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Classificação" />
+              </SelectTrigger>
+              <SelectContent>
+                {CLASSIFICATION_FILTER_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={filterResultType} onValueChange={setFilterResultType}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Tipo de resultado" />
@@ -317,11 +343,12 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                     variant="ghost"
                     size="sm"
                     className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort('ctr')}
+                    onClick={() => handleSort('purchases')}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      CTR
-                      {getSortIcon('ctr')}
+                      <ShoppingCart className="h-4 w-4" />
+                      Compras
+                      {getSortIcon('purchases')}
                     </div>
                   </Button>
                 </TableHead>
@@ -330,12 +357,11 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                     variant="ghost"
                     size="sm"
                     className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort('purchases')}
+                    onClick={() => handleSort('ctr')}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      <ShoppingCart className="h-4 w-4" />
-                      Compras
-                      {getSortIcon('purchases')}
+                      CTR
+                      {getSortIcon('ctr')}
                     </div>
                   </Button>
                 </TableHead>
@@ -395,11 +421,6 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                       {formatNumber(clicks)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className={ctr >= CTR_REFERENCE ? "text-green-600 font-medium" : "text-red-500"}>
-                        {ctr.toFixed(2)}%
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
                       {purchases > 0 ? (
                         <span className="flex items-center justify-end gap-1 text-green-600 font-medium">
                           <TrendingUp className="h-3 w-3" />
@@ -408,6 +429,11 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                       ) : (
                         <span className="text-muted-foreground">0</span>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className={ctr >= CTR_REFERENCE ? "text-green-600 font-medium" : "text-red-500"}>
+                        {ctr.toFixed(2)}%
+                      </span>
                     </TableCell>
                     <TableCell className="text-right">
                       {roas > 0 ? (
