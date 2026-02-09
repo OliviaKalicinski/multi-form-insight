@@ -59,17 +59,6 @@ const parseValue = (value: string | number | undefined | null): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const calculateRoas = (ad: AdsData): number => {
-  // 1. Tentar pegar do export direto
-  const roasExported = parseValue(ad["ROAS de resultados"]);
-  if (roasExported > 0) return roasExported;
-
-  // 2. Calcular manualmente se não veio
-  const investment = parseValue(ad["Valor usado (BRL)"]);
-  const revenue = parseValue(ad["Valor de conversão da compra"]);
-
-  return investment > 0 && revenue > 0 ? revenue / investment : 0;
-};
 
 type SortColumn = 'investment' | 'impressions' | 'clicks' | 'ctr' | 'purchases' | 'roas' | 'classification' | null;
 
@@ -102,18 +91,17 @@ const CLASSIFICATION_COLORS: Record<FunnelRole, string> = {
   ineficiente: "bg-red-100 text-red-800",
 };
 
-const getAdClassification = (ad: AdsData) => {
+const getAdMetrics = (ad: AdsData) => {
   const investment = parseValue(ad["Valor usado (BRL)"]);
   const impressions = parseValue(ad["Impressões"]);
   const revenue = parseValue(ad["Valor de conversão da compra"]);
   const clicks = parseValue(ad["Cliques de saída"]) || parseValue(ad["Cliques no link"]) || parseValue(ad["Cliques (todos)"]);
 
-  if (investment < 10) return null;
-
   const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
   const roas = investment > 0 ? revenue / investment : 0;
+  const classification = investment >= 10 ? classifyFunnelRole(ctr, roas) : null;
 
-  return classifyFunnelRole(ctr, roas);
+  return { ctr, roas, clicks, classification };
 };
 type SortDirection = 'asc' | 'desc' | null;
 
@@ -156,7 +144,7 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
 
     // Aplicar filtro de classificação
     if (filterClassification !== "all") {
-      filtered = filtered.filter(ad => getAdClassification(ad) === filterClassification);
+      filtered = filtered.filter(ad => getAdMetrics(ad).classification === filterClassification);
     }
 
     // Aplicar ordenação
@@ -175,24 +163,24 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
             valueB = parseValue(b["Impressões"]);
             break;
           case 'clicks':
-            valueA = parseValue(a["Cliques (todos)"]);
-            valueB = parseValue(b["Cliques (todos)"]);
+            valueA = getAdMetrics(a).clicks;
+            valueB = getAdMetrics(b).clicks;
             break;
           case 'ctr':
-            valueA = parseValue(a["CTR (todos)"]);
-            valueB = parseValue(b["CTR (todos)"]);
+            valueA = getAdMetrics(a).ctr;
+            valueB = getAdMetrics(b).ctr;
             break;
           case 'purchases':
             valueA = parseValue(a["Compras"]);
             valueB = parseValue(b["Compras"]);
             break;
           case 'roas':
-            valueA = calculateRoas(a);
-            valueB = calculateRoas(b);
+            valueA = getAdMetrics(a).roas;
+            valueB = getAdMetrics(b).roas;
             break;
           case 'classification':
-            const classA = getAdClassification(a);
-            const classB = getAdClassification(b);
+            const classA = getAdMetrics(a).classification;
+            const classB = getAdMetrics(b).classification;
             valueA = classA ? CLASSIFICATION_WEIGHT[classA] : 99;
             valueB = classB ? CLASSIFICATION_WEIGHT[classB] : 99;
             break;
@@ -399,12 +387,9 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
               {processedAds.map((ad, index) => {
                 const investment = parseValue(ad["Valor usado (BRL)"]);
                 const impressions = parseValue(ad["Impressões"]);
-                const clicks = parseValue(ad["Cliques (todos)"]);
-                const ctr = parseValue(ad["CTR (todos)"]);
                 const purchases = parseValue(ad["Compras"]);
-                const roas = calculateRoas(ad);
                 const status = ad["Veiculação da campanha"];
-                const classification = getAdClassification(ad);
+                const { ctr, roas, clicks, classification } = getAdMetrics(ad);
 
                 return (
                   <TableRow key={index}>
