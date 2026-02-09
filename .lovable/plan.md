@@ -1,54 +1,65 @@
 
-# Plano: Corrigir valor total de investimento Meta em novembro
+
+# Plano: Corrigir ROAS na pagina de Anuncios para usar investimento total
 
 ## Diagnostico
 
-O valor exibido de R$ 8.887,01 nao esta errado tecnicamente -- ele reflete apenas os anuncios com objetivo **OUTCOME_SALES** (22 de 39 anuncios). Os demais anuncios sao filtrados por objetivo:
+Apos analise detalhada, o problema do ROAS com investimento filtrado existe **apenas na pagina de Anuncios** (`Ads.tsx`):
 
-| Objetivo | Anuncios | Gasto |
+| Pagina | Fonte do Investimento | Status |
 |---|---|---|
-| OUTCOME_SALES | 22 | R$ 8.887,01 |
-| LINK_CLICKS | 3 | R$ 1.666,69 |
-| OUTCOME_ENGAGEMENT | 10 | R$ 920,01 |
-| OUTCOME_LEADS | 4 | R$ 393,04 |
-| **Total** | **39** | **R$ 11.866,75** |
+| Ads.tsx | `activeAdsData` (filtrado por objetivo) | **Precisa corrigir** |
+| ExecutiveDashboard.tsx | Todos os ads do mes (sem filtro de objetivo) | OK |
+| PerformanceFinanceira.tsx | Todos os ads do mes (sem filtro de objetivo) | OK |
 
-A logica atual funciona assim:
-1. `currentMonthAdsData` contem todos os 39 anuncios de novembro
-2. `determinePrimaryObjective()` detecta que existem anuncios de vendas e define objetivo primario como `OUTCOME_SALES`
-3. `activeAdsData` filtra para mostrar apenas os 22 anuncios de vendas
-4. `calculateAdsMetrics(activeAdsData)` calcula investimento = R$ 8.887,01
-5. Os KPIs no topo da pagina usam esse valor filtrado
+Na pagina de Ads, o `metrics.roas` e calculado como `valorConversaoTotal / investimentoTotal` usando apenas os 22 anuncios de vendas (R$ 8.887,01), quando deveria usar o investimento total de R$ 11.866,75.
 
 ## Solucao
 
-Separar o KPI de **Investimento Total** para sempre mostrar o gasto de TODAS as campanhas do mes, independente do objetivo. Os demais KPIs (ROAS, CPA, conversoes) continuam usando apenas os dados filtrados por objetivo, pois so fazem sentido no contexto de vendas.
+Recalcular o ROAS na pagina de Ads usando `totalInvestmentAllObjectives` (ja criado no passo anterior) ao inves do `metrics.investimentoTotal` filtrado.
 
-### Alteracoes
+### Alteracoes em `src/pages/Ads.tsx`
 
-**Arquivo: `src/pages/Ads.tsx`**
+1. **Criar um ROAS corrigido** usando receita de vendas dividida pelo investimento total:
+   ```
+   roasCorrigido = metrics.valorConversaoTotal / totalInvestmentAllObjectives
+   ```
 
-1. Adicionar um `useMemo` para calcular o investimento total de TODOS os anuncios do mes (usando `currentMonthAdsData` ao inves de `activeAdsData`)
-2. Atualizar o KPI "Investimento Total" no hero card para usar esse valor global
-3. Manter todos os outros KPIs (ROAS, CPA, compras, CTR) usando `metrics` filtrado por objetivo
+2. **Substituir `metrics.roas`** nos seguintes locais:
+   - Hero card principal de ROAS (valor grande, linha ~413)
+   - Badge de status do ROAS (linha ~404)
+   - Calculo do `roasProgress` (linha ~190)
+   - Chamada a `getRoasStatus` e `getRoasInterpretation`
+   - Texto de calculo que mostra "Receita / Investimento" (linha ~418-420)
+   - Trend do ROAS (continua usando o trend existente)
 
-Isso garante que:
-- O investimento exibido sera R$ 11.866,75 (todos os objetivos)
-- ROAS, CPA e conversoes continuam refletindo apenas as campanhas de vendas
-- A tabela de detalhamento continua mostrando todos os anuncios com filtro por tipo
+3. **Atualizar `roasStatusInfo`** para usar o ROAS corrigido
+
+4. **Atualizar referencia ao investimento** na linha de calculo visual (linha ~420) que mostra o denominador
+
+### Resultado esperado
+
+- ROAS exibido: R$ 14.004,65 / R$ 11.866,75 = **1.18x** (antes mostrava ~1.58x com investimento filtrado)
+- Investimento no card: R$ 11.866,75 (ja corrigido no passo anterior)
+- Receita e conversoes: continuam refletindo apenas campanhas de vendas
 
 ### Secao tecnica
 
-Adicionar apos a linha do `const metrics`:
+Adicionar apos `totalInvestmentAllObjectives`:
 
 ```typescript
-const totalInvestmentAllObjectives = useMemo(() => {
-  return calculateAdsMetrics(currentMonthAdsData).investimentoTotal;
-}, [currentMonthAdsData]);
+const correctedRoas = totalInvestmentAllObjectives > 0 
+  ? metrics.valorConversaoTotal / totalInvestmentAllObjectives 
+  : 0;
 ```
 
-Substituir `metrics.investimentoTotal` por `totalInvestmentAllObjectives` nos seguintes locais:
-- Hero card de investimento (linha ~440)
-- Calculo de `netProfit` (linha 181)
+Substituir todas as ocorrencias de `metrics.roas` na renderizacao por `correctedRoas`. Manter `metrics.roas` apenas no calculo de trends (que compara mes a mes com a mesma logica).
 
-Manter `metrics.investimentoTotal` nos calculos de ROAS e CPA que dependem do filtro por objetivo.
+Locais exatos de substituicao:
+- Linha 190: `roasProgress` 
+- Linha 208-215: `getRoasStatus(metrics.roas)` 
+- Linha 404: Badge condicional
+- Linha 413: Valor principal
+- Linha 420: Denominador do calculo visual
+- Linha 444: `getRoasInterpretation`
+
