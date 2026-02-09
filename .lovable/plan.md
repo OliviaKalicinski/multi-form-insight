@@ -1,37 +1,24 @@
 
 
-# Plano: Resetar dados do banco
+# Plano: Remover constraint duplicada na tabela ads_data
 
-## O que sera feito
+## Problema
 
-Limpar todos os registros das tabelas de dados, mantendo a estrutura do banco intacta (tabelas, constraints, RLS, funções).
+Existe uma constraint antiga com nome auto-gerado `ads_data_data_campanha_conjunto_anuncio_key` que nao foi removida pela migracao anterior (que so removeu `ads_data_unique_key`). Essa constraint antiga ainda impede insercoes onde `data + campanha + conjunto + anuncio` sao iguais, mesmo que o `objetivo` seja diferente.
 
-## Tabelas que serao limpas
+## Solucao
 
-| Tabela | Conteudo |
-|---|---|
-| `sales_data` | Dados de vendas |
-| `ads_data` | Dados de anuncios |
-| `followers_data` | Dados de seguidores |
-| `marketing_data` | Metricas de marketing/Instagram |
-| `audience_data` | Dados de publico |
-| `upload_history` | Historico de uploads |
-| `decision_events` | Eventos de decisao do executivo |
+Uma unica migracao SQL para remover a constraint remanescente:
 
-## O que NAO sera afetado
-
-- `user_roles` -- usuarios e permissoes continuam
-- `app_settings` -- configuracoes do app continuam
-- Toda a estrutura do banco (tabelas, constraints, RLS, funcoes)
-- Codigo do frontend
+```sql
+ALTER TABLE ads_data DROP CONSTRAINT IF EXISTS ads_data_data_campanha_conjunto_anuncio_key;
+```
 
 ## Secao tecnica
 
-Uma unica migracao SQL com TRUNCATE em cascata:
+| Recurso | Mudanca |
+|---|---|
+| Migracao SQL | Remover constraint `ads_data_data_campanha_conjunto_anuncio_key` |
 
-```sql
-TRUNCATE TABLE sales_data, ads_data, followers_data, marketing_data, audience_data, upload_history, decision_events;
-```
-
-Apos a execucao, basta reimportar todos os CSVs normalmente pela interface de upload.
+Nenhuma alteracao de codigo necessaria. Apos a migracao, basta reimportar o CSV de anuncios normalmente.
 
