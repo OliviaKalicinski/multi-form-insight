@@ -1,91 +1,42 @@
 
 
-# Plano: Transparencia de Cortes no Mapa CTR x ROAS
+# Plano: Corrigir parse de CSV de vendas com delimitador ponto-e-virgula
 
-## Objetivo
-Tornar visivel ao usuario o que o mapa esta mostrando e o que esta omitindo, sem remover nenhum filtro existente.
+## Problema identificado
 
----
+O arquivo `expedicao_2.0_1.csv` usa **ponto-e-virgula (;)** como separador de colunas. O `SalesUploader` nao configura o PapaParse para auto-detectar o delimitador, entao ele assume **virgula (,)** e o parse falha silenciosamente -- todas as colunas viram uma unica string, a validacao Zod rejeita as linhas, e nenhum dado e salvo.
 
-## Mudancas
+O `AdsUploader` ja usa `delimiter: ""` (auto-detect) e funciona corretamente.
 
-### 1. `src/utils/adFormatClassifier.ts` — Retornar metadados de corte
+## Correcao
 
-Modificar `buildAdFunnelMap` para retornar, alem do array de entries, um objeto de diagnostico:
+### Arquivo: `src/components/dashboard/SalesUploader.tsx`
 
-```text
-interface FunnelMapResult {
-  entries: AdFunnelEntry[];
-  diagnostics: {
-    totalRows: number;         // linhas originais recebidas
-    uniqueAds: number;         // nomes unicos apos agrupamento
-    excludedBySpend: number;   // descartados por gasto < R$10
-    excludedSpendTotal: number; // gasto total dos descartados
-  };
-}
-```
-
-A funcao passa a retornar `FunnelMapResult` em vez de `AdFunnelEntry[]`.
-
-Logica:
-- Contar `ads.length` antes de agrupar
-- Contar `grouped.size` apos agrupar
-- Contar quantos grupos tem `spend < 10` antes de descartar
-
-### 2. `src/components/dashboard/AdFunnelMap.tsx` — Exibir transparencia
-
-Adicionar entre o contrato semantico e os cards de quadrante:
-
-**Banner de contexto** (fundo `slate-50`, texto `slate-500`, `text-xs`):
+Adicionar `delimiter: ""` na chamada do `Papa.parse`, identico ao `AdsUploader`:
 
 ```text
-"Exibindo X anuncios (Y linhas agrupadas por nome).
- Z anuncios nao exibidos por gasto < R$10 (total: R$ W)."
-```
-
-Mostra apenas as partes relevantes:
-- Se `excludedBySpend > 0`: mostrar a linha de exclusao
-- Se `uniqueAds < totalRows`: mostrar "agrupadas por nome"
-- Se nenhum corte ocorreu: nao mostrar o banner
-
-### 3. Manter `console.debug` para diagnostico (dev)
-
-No `buildAdFunnelMap`, adicionar:
-
-```text
-console.debug('[AdFunnelMap]', {
-  totalRows: ads.length,
-  uniqueAds: grouped.size,
-  excludedBySpend,
-  displayed: entries.length,
+Papa.parse(file, {
+  header: true,
+  skipEmptyLines: true,
+  delimiter: "",           // <-- adicionar esta linha (auto-detect)
+  complete: async (results) => {
+    ...
+  }
 });
 ```
 
----
+Isso resolve o parse para CSVs com ponto-e-virgula, virgula ou tab.
 
-## O que NAO muda
+## Impacto
 
-- Filtro de `spend < 10` permanece
-- Agrupamento por nome permanece
-- Contrato semantico permanece
-- Disclaimer de formato permanece
-- Nenhuma acao automatica adicionada
+- Nenhum efeito colateral: `delimiter: ""` e a opcao padrao recomendada pelo PapaParse
+- Dados ja salvos no banco nao sao afetados
+- Apos a correcao, o usuario pode refazer o upload do mesmo arquivo e os dados serao persistidos corretamente (merge incremental via upsert)
 
----
-
-## Secao Tecnica
-
-### Arquivos modificados
+## Secao tecnica
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/utils/adFormatClassifier.ts` | `buildAdFunnelMap` retorna `FunnelMapResult` com diagnostics |
-| `src/components/dashboard/AdFunnelMap.tsx` | Consome `FunnelMapResult`, exibe banner de transparencia |
+| `src/components/dashboard/SalesUploader.tsx` | Adicionar `delimiter: ""` no `Papa.parse` |
 
-### Ordem de execucao
-
-```text
-1. Modificar buildAdFunnelMap para retornar FunnelMapResult
-2. Atualizar AdFunnelMap.tsx para consumir o novo formato e exibir banner
-```
-
+Apenas 1 linha adicionada. Sem mudancas de logica ou estrutura.
