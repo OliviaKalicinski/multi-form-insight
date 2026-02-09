@@ -17,8 +17,8 @@ import { AdsData } from "@/types/marketing";
 import { parseAdsValue } from "@/utils/adsCalculator";
 
 // Referências operacionais, não normativas
-const CTR_REFERENCE = 2.0;   // referência operacional, não normativa
-const ROAS_REFERENCE = 1.5;  // referência operacional, não normativa
+export const CTR_REFERENCE = 2.0;   // referência operacional, não normativa
+export const ROAS_REFERENCE = 1.5;  // referência operacional, não normativa
 
 export type AdFormat = 'video' | 'static' | 'unknown';
 export type FunnelRole = 'conversor' | 'isca_atencao' | 'conversor_silencioso' | 'ineficiente';
