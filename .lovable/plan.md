@@ -1,81 +1,64 @@
 
-# Plano: Regra de classificacao visivel + cores dinamicas em CTR e ROAS
 
-## Objetivo
+# Ajustes finais na tabela de anuncios
 
-Duas mudancas na tabela `AdsBreakdown`:
+## O que ja existe
 
-1. Mostrar a regra de classificacao (thresholds CTR >= 2% e ROAS >= 1.5x) de forma visivel para o usuario
-2. Colorir os valores de CTR e ROAS com verde/vermelho baseado nos thresholds da classificacao, para que a combinacao visual explique o quadrante
+- Coluna "Classificacao" com badges coloridas e tooltips
+- Ordenacao por CTR, ROAS e Classificacao
+- Legenda de regra visivel no header
+- Cores dinamicas em CTR e ROAS baseadas nos thresholds
 
-## Alteracoes
+## O que muda
 
 ### Arquivo unico: `src/components/dashboard/AdsBreakdown.tsx`
 
-### 1. Cores dinamicas no CTR (linha 381)
+### 1. Reordenar colunas
 
-Antes: verde apenas se CTR >= 1.5 (threshold arbitrario e diferente da classificacao).
+Ordem atual: Investimento - Impressoes - Cliques - CTR - Compras - ROAS - Classificacao
 
-Depois: verde se CTR >= 2.0, vermelho se CTR < 2.0. Usar os mesmos thresholds da classificacao por quadrante.
+Nova ordem: Investimento - Impressoes - Cliques - **Compras** - **CTR** - **ROAS** - Classificacao
 
-```
-CTR >= 2.0  →  text-green-600 font-medium
-CTR < 2.0   →  text-red-500
-```
+Mover header e celula de Compras para antes de CTR.
 
-### 2. Cores dinamicas no ROAS (linhas 396-402)
+### 2. Atualizar textos dos tooltips
 
-Antes: verde se ROAS >= 1, amarelo se < 1.
+Os tooltips atuais sao curtos. Substituir pelos textos educativos completos:
 
-Depois: verde se ROAS >= 1.5, vermelho se ROAS < 1.5 (e > 0). Alinhado com o threshold da classificacao.
+| Classe | Texto atual | Texto novo |
+|---|---|---|
+| Conversor | "Criativo atrai e converte. Bom candidato para escala." | "Criativo atrai cliques e gera retorno financeiro. Bom candidato para escala." |
+| Isca | "Chama atencao, mas nao gera retorno financeiro." | "CTR alto indica criativo atrativo, mas o baixo ROAS mostra que os cliques nao estao se convertendo em receita. Investigar oferta, publico ou pagina." |
+| Silencioso | "Baixo CTR, mas alta eficiencia. Trafego qualificado." | "Poucos cliques, mas altamente qualificados. CTR baixo nao e problema aqui." |
+| Ineficiente | "Baixa atencao e baixo retorno. Avaliar pausa." | "Baixa atencao e baixo retorno financeiro. Avaliar pausa ou reformulacao." |
 
-```
-ROAS >= 1.5  →  text-green-600 font-semibold
-ROAS > 0 && < 1.5  →  text-red-500
-ROAS === 0  →  text-muted-foreground "-"
-```
+### 3. Adicionar filtro por Classificacao
 
-Isso permite que o usuario veja visualmente a combinacao: verde+verde = Conversor, verde+vermelho = Isca, etc.
+Novo dropdown ao lado do filtro de "Tipo de resultado" existente:
 
-### 3. Legenda da regra de classificacao
-
-Adicionar um bloco pequeno abaixo do header do card (dentro do `CardHeader`, apos o `CardDescription`) com a regra resumida:
-
-```text
-Classificacao: CTR >= 2% e ROAS >= 1.5x = Conversor | CTR >= 2% e ROAS < 1.5x = Isca | ...
-```
-
-Formato: uma linha de badges compactas lado a lado, cada uma com a cor da classificacao e o criterio resumido. Envoltas em um container com borda leve e padding minimo, com icone de info.
-
-Layout:
-
-```text
-[🟢 Conversor: CTR>=2% + ROAS>=1.5x] [🟡 Isca: CTR>=2% + ROAS<1.5x] [🔵 Silencioso: CTR<2% + ROAS>=1.5x] [🔴 Ineficiente: CTR<2% + ROAS<1.5x]
-```
-
-Em mobile (< md), empilhar em 2 colunas.
+- Estado: `filterClassification` com opcoes: all, conversor, isca_atencao, conversor_silencioso, ineficiente
+- Filtro aplicado no `processedAds` usando `getAdClassification`
+- Labels amigaveis: Conversor, Isca de Atencao, Conversor Silencioso, Ineficiente
 
 ## Secao tecnica
 
-### Thresholds
+### Alteracoes no header (TableHeader)
 
-Importar `CTR_REFERENCE` e `ROAS_REFERENCE` de `adFormatClassifier.ts` -- porem estes sao constantes locais (nao exportadas). Opcoes:
+Mover o bloco `TableHead` de Compras (linhas 328-341) para antes do bloco CTR (linhas 315-327).
 
-- Exportar as constantes do classificador (mudanca minima em `adFormatClassifier.ts`: adicionar `export` nas linhas 20-21)
-- Ou declarar constantes locais no componente referenciando os mesmos valores
+### Alteracoes no body (TableBody)
 
-Recomendacao: exportar do classificador para manter source of truth unica. Mudanca de 2 palavras (`export const` em vez de `const`).
+Mover a celula `TableCell` de Compras (linhas 402-411) para antes da celula CTR (linhas 397-401).
 
-### Arquivos modificados
+### Novo estado e filtro
 
-| Arquivo | Mudanca |
-|---|---|
-| `src/utils/adFormatClassifier.ts` | Exportar `CTR_REFERENCE` e `ROAS_REFERENCE` |
-| `src/components/dashboard/AdsBreakdown.tsx` | Cores CTR/ROAS, legenda de regra |
+```typescript
+const [filterClassification, setFilterClassification] = useState<string>("all");
+```
 
-### O que NAO muda
+No `processedAds`, apos filtro de tipo de resultado, adicionar filtro por classificacao.
 
-- Nenhum calculo alterado
-- Classificacao continua usando `classifyFunnelRole` existente
-- Ordenacao e filtros intocados
-- Tooltips das badges mantidos
+### Contagem no CardDescription
+
+Atualizar para refletir ambos os filtros ativos.
+
