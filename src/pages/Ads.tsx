@@ -143,6 +143,11 @@ const Ads = () => {
     return calculateAdsMetrics(currentMonthAdsData).investimentoTotal;
   }, [currentMonthAdsData]);
 
+  // ROAS corrigido: receita de vendas / investimento total (todos objetivos)
+  const correctedRoas = totalInvestmentAllObjectives > 0 
+    ? metrics.valorConversaoTotal / totalInvestmentAllObjectives 
+    : 0;
+
   // Calculate trends vs previous month (using same objective filter)
   const trends = useMemo(() => {
     if (!selectedMonth || isLast12MonthsView) return null;
@@ -187,7 +192,7 @@ const Ads = () => {
   const roasGoal = sectorBenchmarks.roasMedio || 3.0;
   const roasExcelente = sectorBenchmarks.roasExcelente || 4.0;
   const roasMinimo = sectorBenchmarks.roasMinimo || 2.5;
-  const roasProgress = Math.min((metrics.roas / roasGoal) * 100, 150);
+  const roasProgress = Math.min((correctedRoas / roasGoal) * 100, 150);
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -235,7 +240,7 @@ const Ads = () => {
     return "📉 Engajamento baixo, revisar segmentação e criativos.";
   };
 
-  const roasStatusInfo = getRoasStatus(metrics.roas);
+  const roasStatusInfo = getRoasStatus(correctedRoas);
   const engagementStatusInfo = getEngagementStatus(metrics.taxaEngajamento);
 
   // Build objectives label for header
@@ -401,7 +406,7 @@ const Ads = () => {
                                 <span className="text-sm font-semibold text-foreground">ROAS</span>
                               </div>
                               <Badge 
-                                variant={metrics.roas >= 3 ? "default" : "destructive"}
+                                variant={correctedRoas >= 3 ? "default" : "destructive"}
                                 className="text-xs"
                               >
                                 {roasStatusInfo.badge}
@@ -410,14 +415,14 @@ const Ads = () => {
 
                             {/* Main Value */}
                             <p className={cn("text-3xl font-bold", roasStatusInfo.color)}>
-                              {formatRoas(metrics.roas)}
+                              {formatRoas(correctedRoas)}
                             </p>
 
                             {/* Compact Calculation */}
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span>{formatCurrency(metrics.valorConversaoTotal)}</span>
                               <span>/</span>
-                              <span>{formatCurrency(metrics.investimentoTotal)}</span>
+                              <span>{formatCurrency(totalInvestmentAllObjectives)}</span>
                             </div>
 
                             {/* Progress + Trend in one line */}
@@ -441,7 +446,7 @@ const Ads = () => {
 
                             {/* Compact Interpretation */}
                             <p className="text-xs font-medium">
-                              {getRoasInterpretation(metrics.roas)}
+                              {getRoasInterpretation(correctedRoas)}
                             </p>
                           </div>
                         </CardContent>
