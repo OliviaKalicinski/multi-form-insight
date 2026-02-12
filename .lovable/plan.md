@@ -1,64 +1,101 @@
 
 
-# Redesenho da Visao Executiva V2 - Apenas Mundo Online
+# Corrigir limitacoes do Chat com Dados
 
-## Resumo
+## Problemas identificados
 
-Reestruturar a pagina para incluir mais detalhes no Mundo Online (B2C), adicionando blocos de analise de amostras por tipo de pet, produtos vendidos com grafico de pizza, e distribuicao por estados. Remover a coluna B2B/B2B2C por enquanto.
+1. **Produtos "Desconhecido"**: A funcao usa `p.nome || p.name` (linha 136) mas o campo correto nos dados e `descricaoAjustada` ou `descricao`. Nenhum registro tem campo `nome` ou `name`.
 
-## Layout Final
+2. **Dados truncados - Vendas**: 2.781 registros no banco, limite atual e 1.000 (perde 64% dos dados).
 
-A pagina tera layout de coluna unica (ou duas colunas internas dentro do Mundo Online), com os seguintes blocos:
+3. **Dados truncados - Marketing**: 2.035 registros no banco, limite atual e 300 (perde 85% dos dados).
 
-### 1. Header (manter)
-- Titulo "Fotografia Operacional"
-- Toggle 7 dias / 1 dia (7d padrao)
-- Label do periodo
+4. **Dados truncados - Ads**: 478 registros no banco, limite atual e 300 (perde 37% dos dados).
 
-### 2. Bloco Receita (ajustar)
-- Receita Total (destaque grande)
-- Grid com: Receita Produtos, Frete (com % do total), Receita Media por Produto
-- Adicionar lista de receita media por produto individual (agrupar produtos por nome, calcular media)
+5. **Sem estatisticas de amostras**: Nao ha breakdown de amostras por tipo de pet nem contagem separada.
 
-### 3. Bloco Pedidos (manter estrutura atual)
-- Total de Pedidos
-- Apenas Amostra / Com Produto
-- Ticket Medio / Media Produtos por Pedido
+## Solucao
 
-### 4. Bloco Pedidos Somente Amostras (novo/expandido)
-- Quantidade de pedidos so amostra
-- Breakdown: Cachorro, Gato, Cachorro + Gato (pedidos com ambos tipos)
-- Grafico de pizza (donut) com distribuicao por estado dos pedidos so amostra
+Reescrever a funcao `chat-with-data` para:
+- Buscar dados em lotes (paginacao) ate cobrir tudo
+- Agregar no servidor antes de enviar ao modelo de IA
+- Usar os campos corretos de produto
 
-### 5. Bloco Pedidos com Produtos (novo)
-- Lista de produtos vendidos (excluindo amostras) com quantidade
-- Grafico de pizza com distribuicao dos produtos
-- Grafico de pizza com distribuicao por estado dos pedidos com produto
+### Alteracoes no arquivo `supabase/functions/chat-with-data/index.ts`
 
-### 6. Bloco Canais de Venda (ajustar)
-- Trocar barras horizontais por grafico de pizza (donut chart)
+### 1. Corrigir mapeamento de produto (critico)
 
-### 7. Mundo Offline - removido temporariamente
-- Remover completamente os blocos B2B e B2B2C
+Linha 136 atual:
+```text
+const name = p.nome || p.name || "Desconhecido";
+```
 
-## Detalhes tecnicos
+Corrigir para:
+```text
+const name = p.descricaoAjustada || p.descricao || p.nome || p.name || "Desconhecido";
+```
 
-### Arquivo principal
-- `src/pages/VisaoExecutivaV2.tsx` - reescrita significativa
+### 2. Buscar todos os registros com paginacao
 
-### Novos calculos no useMemo
-- **Receita media por produto individual**: agrupar por `descricaoAjustada`, somar receita e quantidade, calcular media por produto
-- **Pedidos amostras por tipo de pet**: classificar pedidos so-amostra em Cachorro, Gato, ou Cachorro+Gato (quando o pedido tem amostras de ambos)
-- **Estados separados**: buscar estados do banco separadamente para pedidos so-amostra vs pedidos com produto
-- **Produtos vendidos (sem amostras)**: agrupar por `descricaoAjustada`, calcular quantidade e receita
+Criar funcao auxiliar `fetchAll` que busca em lotes de 1000 ate nao haver mais registros. Substituir as chamadas com `.limit()` por esta funcao.
 
-### Graficos de pizza
-- Usar `PieChart`, `Pie`, `Cell`, `Tooltip` do Recharts (ja instalado)
-- Donut chart com `innerRadius` e `outerRadius`
-- Legenda manual abaixo do grafico
-- Paleta de 5 cores usando variaveis CSS do tema (`chart-1` a `chart-5`)
+```text
+async function fetchAll(supabase, table, select, dateCol, minDate, orderCol) {
+  const PAGE = 1000;
+  let all = [];
+  let from = 0;
+  while (true) {
+    const { data } = await supabase
+      .from(table)
+      .select(select)
+      .gte(dateCol, minDate)
+      .order(orderCol, { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (!data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
+```
 
-### Busca de estados
-- Expandir o `useEffect` atual para buscar estados separados por tipo de pedido (so-amostra vs com-produto)
-- Usar os IDs dos pedidos filtrados para fazer query na tabela `sales_data`
+### 3. Adicionar estatisticas de amostras
 
+No `aggregateSales`, apos iterar os produtos, classificar pedidos somente-amostra por tipo de pet:
+- Verificar se descricao contem "caes" ou "cachorro" -> Cachorro
+- Verificar se descricao contem "gatos" ou "gato" -> Gato
+- Pedido com ambos -> Cachorro + Gato
+
+Adicionar ao contexto:
+```text
+amostras: {
+  total_pedidos_amostra: N,
+  cachorro: N,
+  gato: N,
+  ambos: N,
+}
+```
+
+### 4. Adicionar top produtos por mes
+
+Expandir o `aggregateSales` para agrupar produtos por mes (YYYY-MM), gerando uma estrutura `top_produtos_por_mes` com os 10 produtos mais vendidos por quantidade e receita em cada mes.
+
+### 5. Aumentar detalhamento de ads por dia
+
+Mudar o range de 14 dias para 30 dias no breakdown diario de ads (linha 196: `d14` -> `d30`).
+
+### 6. Atualizar system prompt
+
+Adicionar instrucoes sobre:
+- Amostras e seu breakdown por tipo de pet
+- Campo `top_produtos_por_mes` para perguntas temporais
+- Remover aviso de truncamento (dados agora sao completos)
+
+## Resultado esperado
+
+- Produtos aparecerao com nomes reais (ex: "Comida de Dragao - Original (90g)")
+- Todos os 2.781 registros de vendas serao processados
+- Todos os registros de ads e marketing serao incluidos
+- Chat tera dados de amostras por tipo de pet
+- Avisos de truncamento desaparecerao
