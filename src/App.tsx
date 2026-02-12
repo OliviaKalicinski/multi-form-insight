@@ -26,6 +26,7 @@ import AnaliseSamples from "./pages/AnaliseSamples";
 import AnaliseCritica from "./pages/AnaliseCritica";
 import AnaliseChurn from "./pages/AnaliseChurn";
 import Publico from "./pages/Publico";
+import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
 import NotFound from "./pages/NotFound";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -99,7 +100,15 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           
           {/* Protected routes */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/visao-executiva-v2" replace />} />
+          
+          <Route path="/visao-executiva-v2" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <VisaoExecutivaV2 />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
           
           <Route path="/dashboard" element={
             <ProtectedRoute>
