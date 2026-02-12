@@ -17,21 +17,25 @@ import { Info } from "lucide-react";
 import { AdsData } from "@/types/marketing";
 import { parseAdsValue } from "@/utils/adsCalculator";
 import {
-  classifyFunnelRole,
+  classifyByObjective,
+  calcMedian,
   CTR_REFERENCE,
   ROAS_REFERENCE,
   getRoleMeta,
+  getEfficiencyAxisInfo,
   type FunnelRole,
+  type AdObjectiveType,
 } from "@/utils/adFormatClassifier";
 
 interface AdClassificationChartProps {
   adsData: AdsData[];
+  objective?: AdObjectiveType;
 }
 
 interface ScatterPoint {
   adName: string;
   ctr: number;
-  roas: number;
+  efficiencyValue: number; // ROAS, CPR, or CPC depending on objective
   investment: number;
   role: FunnelRole;
 }
@@ -59,24 +63,28 @@ const ROLE_ORDER: FunnelRole[] = [
 const formatCurrency = (v: number) =>
   `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const CustomTooltip = ({ active, payload }: any) => {
+const CustomTooltip = ({ active, payload, axisLabel }: any) => {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload as ScatterPoint;
   const meta = getRoleMeta(d.role);
+  const isCurrency = axisLabel !== 'ROAS (x)';
   return (
     <div className="rounded-md border bg-background p-3 shadow-md text-sm space-y-1">
       <p className="font-semibold truncate max-w-[260px]">{d.adName}</p>
       <p>CTR: {d.ctr.toFixed(2)}%</p>
-      <p>ROAS: {d.roas.toFixed(2)}x</p>
+      <p>{axisLabel}: {isCurrency ? formatCurrency(d.efficiencyValue) : `${d.efficiencyValue.toFixed(2)}x`}</p>
       <p>Investimento: {formatCurrency(d.investment)}</p>
       <p className="text-xs text-muted-foreground">{meta.label}</p>
     </div>
   );
 };
 
-export const AdClassificationChart = ({ adsData }: AdClassificationChartProps) => {
+export const AdClassificationChart = ({ adsData, objective = 'OUTCOME_SALES' }: AdClassificationChartProps) => {
+  const axisInfo = useMemo(() => getEfficiencyAxisInfo(objective), [objective]);
+  const isSales = objective === 'OUTCOME_SALES' || !objective;
+
   const points = useMemo(() => {
-    const grouped = new Map<string, { ctrSum: number; roasSum: number; investSum: number; count: number }>();
+    const grouped = new Map<string, { ctrSum: number; roasSum: number; cprSum: number; cpcSum: number; investSum: number; resultsSum: number; clicksSum: number; count: number }>();
 
     for (const ad of adsData) {
       const name = (ad["Nome do anúncio"] || ad["Anúncio"] || "Sem nome").trim();
@@ -84,6 +92,7 @@ export const AdClassificationChart = ({ adsData }: AdClassificationChartProps) =
       const impressions = parseValue(ad["Impressões"]);
       const revenue = parseValue(ad["Valor de conversão da compra"]);
       const clicks = parseValue(ad["Cliques (todos)"]);
+      const results = parseValue(ad["Resultados"]);
       const ctrCsv = parseValue(ad["CTR (todos)"]);
       const roasCsv = parseValue(ad["ROAS de resultados"]);
 
@@ -95,42 +104,55 @@ export const AdClassificationChart = ({ adsData }: AdClassificationChartProps) =
         existing.ctrSum += ctr * investment;
         existing.roasSum += roas * investment;
         existing.investSum += investment;
+        existing.resultsSum += results;
+        existing.clicksSum += clicks;
         existing.count += 1;
       } else {
-        grouped.set(name, { ctrSum: ctr * investment, roasSum: roas * investment, investSum: investment, count: 1 });
+        grouped.set(name, { ctrSum: ctr * investment, roasSum: roas * investment, cprSum: 0, cpcSum: 0, investSum: investment, resultsSum: results, clicksSum: clicks, count: 1 });
       }
     }
 
-    const result: ScatterPoint[] = [];
+    // First pass: build entries with raw values
+    const rawEntries: { adName: string; ctr: number; roas: number; cpr: number; cpc: number; investment: number }[] = [];
     for (const [adName, g] of grouped) {
       if (g.investSum < 10) continue;
       const ctr = g.investSum > 0 ? g.ctrSum / g.investSum : 0;
       const roas = g.investSum > 0 ? g.roasSum / g.investSum : 0;
-      result.push({
-        adName,
-        ctr,
-        roas,
-        investment: g.investSum,
-        role: classifyFunnelRole(ctr, roas),
-      });
+      const cpr = g.resultsSum > 0 ? g.investSum / g.resultsSum : 0;
+      const cpc = g.clicksSum > 0 ? g.investSum / g.clicksSum : 0;
+      rawEntries.push({ adName, ctr, roas, cpr, cpc, investment: g.investSum });
     }
-    return result;
-  }, [adsData]);
+
+    // Compute medians
+    const medianCpr = calcMedian(rawEntries.map(e => e.cpr).filter(v => v > 0));
+    const medianCpc = calcMedian(rawEntries.map(e => e.cpc).filter(v => v > 0));
+
+    const result: ScatterPoint[] = rawEntries.map(e => {
+      const efficiencyValue = isSales ? e.roas : (objective === 'OUTCOME_ENGAGEMENT' ? e.cpr : e.cpc);
+      return {
+        adName: e.adName,
+        ctr: e.ctr,
+        efficiencyValue,
+        investment: e.investment,
+        role: classifyByObjective(objective, e.ctr, { roas: e.roas, cpr: e.cpr, cpc: e.cpc, medianCpr, medianCpc }),
+      };
+    });
+
+    return { points: result, medianCpr, medianCpc };
+  }, [adsData, objective, isSales]);
+
+  const { points: scatterPoints, medianCpr, medianCpc } = points;
+  const referenceY = isSales ? ROAS_REFERENCE : (objective === 'OUTCOME_ENGAGEMENT' ? medianCpr : medianCpc);
 
   const byRole = useMemo(() => {
     const map = new Map<FunnelRole, ScatterPoint[]>();
     for (const role of ROLE_ORDER) {
-      map.set(role, points.filter((p) => p.role === role));
+      map.set(role, scatterPoints.filter((p) => p.role === role));
     }
     return map;
-  }, [points]);
+  }, [scatterPoints]);
 
-  const investRange = useMemo(() => {
-    const vals = points.map((p) => p.investment);
-    return [Math.min(...vals, 10), Math.max(...vals, 100)] as [number, number];
-  }, [points]);
-
-  if (points.length === 0) return null;
+  if (scatterPoints.length === 0) return null;
 
   return (
     <Card>
@@ -141,9 +163,10 @@ export const AdClassificationChart = ({ adsData }: AdClassificationChartProps) =
         <div className="flex gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
           <p className="text-sm text-slate-600">
-            Cada ponto é um anúncio posicionado por CTR e ROAS. As linhas de referência
-            (CTR {CTR_REFERENCE}% e ROAS {ROAS_REFERENCE}x) dividem os 4 quadrantes de classificação.
-            O tamanho do ponto é proporcional ao investimento.
+          Cada ponto é um anúncio posicionado por CTR e {axisInfo.label}. As linhas de referência
+            dividem os 4 quadrantes de classificação.
+            {!isSales && " A linha horizontal marca a mediana do grupo."}
+            {" "}O tamanho do ponto é proporcional ao investimento.
           </p>
         </div>
 
@@ -161,12 +184,13 @@ export const AdClassificationChart = ({ adsData }: AdClassificationChartProps) =
             </XAxis>
             <YAxis
               type="number"
-              dataKey="roas"
-              name="ROAS"
-              unit="x"
+              dataKey="efficiencyValue"
+              name={axisInfo.label}
+              unit={axisInfo.unit}
               tick={{ fontSize: 12 }}
+              reversed={!isSales}
             >
-              <Label value="ROAS (x)" angle={-90} position="insideLeft" offset={5} style={{ fontSize: 12 }} />
+              <Label value={axisInfo.label} angle={-90} position="insideLeft" offset={5} style={{ fontSize: 12 }} />
             </YAxis>
             <ZAxis
               type="number"
@@ -174,7 +198,7 @@ export const AdClassificationChart = ({ adsData }: AdClassificationChartProps) =
               range={[40, 400]}
               name="Investimento"
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip axisLabel={axisInfo.label} />} />
             <Legend
               formatter={(value: string) => <span className="text-sm">{value}</span>}
             />
@@ -188,11 +212,11 @@ export const AdClassificationChart = ({ adsData }: AdClassificationChartProps) =
               label={{ value: `CTR ${CTR_REFERENCE}%`, position: "top", fontSize: 11, fill: "#64748b" }}
             />
             <ReferenceLine
-              y={ROAS_REFERENCE}
+              y={referenceY}
               stroke="#94a3b8"
               strokeDasharray="6 4"
               strokeWidth={1.5}
-              label={{ value: `ROAS ${ROAS_REFERENCE}x`, position: "right", fontSize: 11, fill: "#64748b" }}
+              label={{ value: isSales ? `ROAS ${ROAS_REFERENCE}x` : `${axisInfo.key.toUpperCase()} mediana`, position: "right", fontSize: 11, fill: "#64748b" }}
             />
 
             {/* One Scatter per role for distinct colors */}

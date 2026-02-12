@@ -1071,12 +1071,10 @@ const Ads = () => {
               </Card>
 
               {/* ===== ROW 6: Breakdown by Ad (uses activeAdsData for objective-filtered view) ===== */}
-              <AdsBreakdown ads={activeAdsData} selectedMonth={selectedMonth || ""} />
+              <AdsBreakdown ads={activeAdsData} selectedMonth={selectedMonth || ""} objective={effectiveObjective} />
 
-              {/* ===== ROW 7: Classification Chart (Sales view only) ===== */}
-              {objectivesSummary.isSalesView && (
-                <AdClassificationChart adsData={activeAdsData} />
-              )}
+              {/* ===== ROW 7: Classification Chart ===== */}
+              <AdClassificationChart adsData={activeAdsData} objective={effectiveObjective} />
             </>
           )}
         </div>
