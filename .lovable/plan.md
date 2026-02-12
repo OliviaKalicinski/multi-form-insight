@@ -1,67 +1,76 @@
 
+# Filtrar Anuncios Ativos e Incluir CTR na Analise
 
-# Sugestoes inteligentes para o Chat com Dados
+## Problema
 
-## Objetivo
+1. O chat analisa TODOS os anuncios (ativos, inativos, arquivados) sem distinção - recomenda pausar anúncios que já estão inativos
+2. Falta CTR por anúncio individual (aparece "Calculando..." na resposta)
+3. Para escalar, deveria focar nos top 10 dos últimos 2 meses, não de todo o histórico
 
-Substituir as 4 sugestoes genéricas atuais por perguntas que exploram as capacidades analíticas exclusivas do chat — coisas que o dashboard nao mostra diretamente.
+## Solução
 
-## Sugestoes atuais (a substituir)
+### Arquivo modificado
+- `supabase/functions/chat-with-data/index.ts`
 
-```text
-"Qual foi o faturamento dos últimos 7 dias?"
-"Quais são os produtos mais vendidos?"
-"Como está o ROAS dos anúncios?"
-"Qual a taxa de conversão de amostras?"
-```
+### Mudança 1: Incluir `status_veiculacao` no select de ads_data (~linha 70)
 
-Essas perguntas trazem respostas que o dashboard ja mostra. O chat brilha quando cruza dados, compara períodos ou gera narrativas.
+Adicionar `status_veiculacao` ao select para que o campo esteja disponível na agregação.
 
-## Novas sugestoes propostas
+### Mudança 2: Separar anúncios ativos vs inativos na agregação (~linha 336-360)
 
-1. **"Relatório resumido da última semana"**
-   - Cruza vendas + ads + seguidores em uma narrativa unica
-   - Dashboard mostra cada area separada; chat integra tudo
+Criar dois grupos no `aggregateAds`:
 
-2. **"Relatório da campanha de amostras: conversões e ROI"**
-   - Analisa funil completo: amostras enviadas, conversões, tempo medio, aumento de ticket
-   - Dashboard mostra numeros soltos; chat calcula o funil
+- `top_anuncios_ativos`: apenas anúncios com `status_veiculacao = 'active'`, com CTR calculado (cliques/impressões * 100). Top 30 por receita.
+- `top_anuncios_inativos`: anúncios com status `inactive`, `archived` ou `not_delivering`. Top 15 para referência.
 
-3. **"Quais os top 10 clientes e quanto cada um já comprou?"**
-   - Usa os novos dados de `top_clientes` com detalhes individuais
-   - Dashboard nao tem visao por cliente individual
+Para cada anúncio, incluir o campo `ctr` calculado e o `status`.
 
-4. **"Compare a performance de janeiro vs fevereiro"**
-   - Usa `por_mes` para comparar metricas entre meses
-   - Dashboard mostra tendencia mas nao faz comparacao direta mes-a-mes
+### Mudança 3: Criar lista "escalar" dos últimos 2 meses (~linha 362)
 
-5. **"Quais anúncios devo pausar e quais escalar?"**
-   - Usa a classificacao por quadrantes (Conversor, Isca, Silencioso, Ineficiente)
-   - Dashboard mostra metricas; chat gera recomendacao de acao
+Filtrar rows dos últimos 60 dias, agrupar por anúncio (apenas ativos), ordenar por receita, pegar top 10. Chamar `candidatos_escalar_2m`.
 
-6. **"Quantos clientes VIP temos e quem são?"**
-   - Usa `clientes_resumo` + `top_clientes` com segmentacao
-   - Dashboard nao tem segmentacao por nome/email
+### Mudança 4: Atualizar system prompt (~linha 507-512)
+
+Instruir a IA:
+- Para "pausar": usar `top_anuncios_ativos` com ROAS baixo (apenas ativos, pois não faz sentido pausar algo já inativo)
+- Para "escalar": usar `candidatos_escalar_2m` (top 10 ativos dos últimos 2 meses por receita)
+- CTR agora está disponível por anúncio — usar para classificação nos quadrantes
+- O campo `status` indica se o anúncio está ativo/inativo/arquivado
 
 ## Detalhes tecnicos
 
-### Arquivo modificado
-- `src/components/dashboard/DataChat.tsx`
-
-### Mudanca
-Substituir o array `SUGGESTIONS` (linha 14-19) por:
-
-```typescript
-const SUGGESTIONS = [
-  "Relatório resumido da última semana",
-  "Relatório da campanha de amostras: conversões e ROI",
-  "Quais os top 10 clientes e quanto cada um já comprou?",
-  "Compare a performance de janeiro vs fevereiro",
-  "Quais anúncios devo pausar e quais escalar?",
-  "Quantos clientes VIP temos e quem são?",
-];
+### Select atualizado
+```text
+"data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, conjunto, anuncio, objetivo, status_veiculacao"
 ```
 
-### Layout
-As 6 sugestoes cabem no grid existente (`grid gap-2`). Cada uma tem texto curto o suficiente para ficar em 1-2 linhas no card de sugestao.
+### Nova lógica de agregação por anúncio
+```text
+Para cada anúncio no adMap:
+  - ctr = impressoes > 0 ? (cliques / impressoes * 100).toFixed(2) + "%" : "0%"
+  - status = status mais recente do anúncio (moda ou último registro)
+  - Separar em ativos vs inativos baseado no status
+```
 
+### Candidatos a escalar (últimos 2 meses)
+```text
+const d60 = now - 60 * 86400000;
+Filtrar rows com data >= d60 e status_veiculacao = 'active'
+Agrupar por anúncio, ordenar por receita desc, top 10
+Incluir: nome, gasto, receita, roas, ctr, cliques, conversoes
+```
+
+### Prompt atualizado (seção ADS)
+```text
+- "top_anuncios_ativos": anúncios ATIVOS com CTR e ROAS. Use para recomendar pausar (ROAS baixo) ou manter.
+- "candidatos_escalar_2m": top 10 anúncios ATIVOS dos últimos 2 meses por receita. Use para recomendar escalar.
+- "top_anuncios_inativos": referência de anúncios já pausados/arquivados.
+- IMPORTANTE: só recomende pausar anúncios que estão ATIVOS. Anúncios inativos já estão pausados.
+```
+
+## Resultado esperado
+
+Quando o usuário perguntar "Quais anúncios devo pausar e quais escalar?":
+- **Pausar**: lista apenas anúncios ATIVOS com ROAS ruim, com CTR visível
+- **Escalar**: top 10 ativos dos últimos 2 meses com melhor receita/ROAS
+- **CTR**: aparece calculado para cada anúncio (sem "Calculando...")
