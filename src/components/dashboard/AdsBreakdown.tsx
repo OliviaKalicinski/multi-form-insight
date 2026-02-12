@@ -20,12 +20,13 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { TrendingUp, TrendingDown, DollarSign, MousePointer, ShoppingCart, Package, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { classifyFunnelRole, getRoleMeta, CTR_REFERENCE, ROAS_REFERENCE, type FunnelRole } from "@/utils/adFormatClassifier";
+import { classifyFunnelRole, classifyByObjective, calcMedian, getRoleMeta, CTR_REFERENCE, ROAS_REFERENCE, getEfficiencyAxisInfo, type FunnelRole, type AdObjectiveType } from "@/utils/adFormatClassifier";
 import { Info } from "lucide-react";
 
 interface AdsBreakdownProps {
   ads: AdsData[];
   selectedMonth: string;
+  objective?: AdObjectiveType;
 }
 
 const formatCurrency = (value: number) => 
@@ -96,22 +97,22 @@ const getAdMetrics = (ad: AdsData) => {
   const impressions = parseValue(ad["Impressões"]);
   const revenue = parseValue(ad["Valor de conversão da compra"]);
   const clicks = parseValue(ad["Cliques (todos)"]);
+  const results = parseValue(ad["Resultados"]);
 
-  // Usar valores do Meta (CSV) como fonte primaria
   const ctrFromCsv = parseValue(ad["CTR (todos)"]);
   const roasFromCsv = parseValue(ad["ROAS de resultados"]);
 
-  // Fallback: calcular apenas se o CSV nao trouxer o valor
   const ctr = ctrFromCsv > 0 ? ctrFromCsv : (impressions > 0 ? (clicks / impressions) * 100 : 0);
   const roas = roasFromCsv > 0 ? roasFromCsv : (investment > 0 ? revenue / investment : 0);
+  const cpr = results > 0 && investment > 0 ? investment / results : 0;
+  const cpc = clicks > 0 && investment > 0 ? investment / clicks : 0;
 
-  const classification = investment >= 10 ? classifyFunnelRole(ctr, roas) : null;
-
-  return { ctr, roas, clicks, classification };
+  // Classification deferred to component (needs median context)
+  return { ctr, roas, clicks, cpr, cpc, results };
 };
 type SortDirection = 'asc' | 'desc' | null;
 
-export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
+export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }: AdsBreakdownProps) => {
   const [sortColumn, setSortColumn] = useState<SortColumn>('investment');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [filterResultType, setFilterResultType] = useState<string>("all");
@@ -139,18 +140,40 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
     }
   };
 
+  // Axis info based on objective
+  const axisInfo = useMemo(() => getEfficiencyAxisInfo(objective), [objective]);
+  const isSales = objective === 'OUTCOME_SALES' || !objective;
+
+  // Compute medians for classification
+  const { medianCpr, medianCpc } = useMemo(() => {
+    const allMetrics = ads.filter(a => parseValue(a["Valor usado (BRL)"]) >= 10).map(getAdMetrics);
+    return {
+      medianCpr: calcMedian(allMetrics.map(m => m.cpr).filter(v => v > 0)),
+      medianCpc: calcMedian(allMetrics.map(m => m.cpc).filter(v => v > 0)),
+    };
+  }, [ads]);
+
+  const classifyAd = (m: ReturnType<typeof getAdMetrics>, investment: number): FunnelRole | null => {
+    if (investment < 10) return null;
+    return classifyByObjective(objective, m.ctr, {
+      roas: m.roas, cpr: m.cpr, cpc: m.cpc, medianCpr, medianCpc,
+    });
+  };
+
   // Filtrar e ordenar anúncios
   const processedAds = useMemo(() => {
     let filtered = [...ads];
 
-    // Aplicar filtro de tipo de resultado
     if (filterResultType !== "all") {
       filtered = filtered.filter(ad => ad["Tipo de resultado"] === filterResultType);
     }
 
-    // Aplicar filtro de classificação
     if (filterClassification !== "all") {
-      filtered = filtered.filter(ad => getAdMetrics(ad).classification === filterClassification);
+      filtered = filtered.filter(ad => {
+        const m = getAdMetrics(ad);
+        const inv = parseValue(ad["Valor usado (BRL)"]);
+        return classifyAd(m, inv) === filterClassification;
+      });
     }
 
     // Aplicar ordenação
@@ -180,16 +203,24 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
             valueA = parseValue(a["Compras"]);
             valueB = parseValue(b["Compras"]);
             break;
-          case 'roas':
-            valueA = getAdMetrics(a).roas;
-            valueB = getAdMetrics(b).roas;
+          case 'roas': {
+            const mA = getAdMetrics(a);
+            const mB = getAdMetrics(b);
+            valueA = isSales ? mA.roas : (objective === 'OUTCOME_ENGAGEMENT' ? mA.cpr : mA.cpc);
+            valueB = isSales ? mB.roas : (objective === 'OUTCOME_ENGAGEMENT' ? mB.cpr : mB.cpc);
+            // For CPR/CPC lower is better, invert sort
+            if (!isSales) { const tmp = valueA; valueA = valueB; valueB = tmp; }
             break;
-          case 'classification':
-            const classA = getAdMetrics(a).classification;
-            const classB = getAdMetrics(b).classification;
+          }
+          case 'classification': {
+            const invA2 = parseValue(a["Valor usado (BRL)"]);
+            const invB2 = parseValue(b["Valor usado (BRL)"]);
+            const classA = classifyAd(getAdMetrics(a), invA2);
+            const classB = classifyAd(getAdMetrics(b), invB2);
             valueA = classA ? CLASSIFICATION_WEIGHT[classA] : 99;
             valueB = classB ? CLASSIFICATION_WEIGHT[classB] : 99;
             break;
+          }
         }
 
         return sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
@@ -271,18 +302,37 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
         <div className="mt-3 flex flex-wrap gap-2 items-center rounded-md border border-border/50 bg-muted/30 px-3 py-2">
           <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <span className="text-xs text-muted-foreground mr-1">Regra:</span>
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-800">
-            Conversor: CTR≥{CTR_REFERENCE}% + ROAS≥{ROAS_REFERENCE}x
-          </span>
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-yellow-100 text-yellow-800">
-            Isca: CTR≥{CTR_REFERENCE}% + ROAS&lt;{ROAS_REFERENCE}x
-          </span>
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800">
-            Silencioso: CTR&lt;{CTR_REFERENCE}% + ROAS≥{ROAS_REFERENCE}x
-          </span>
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-800">
-            Ineficiente: CTR&lt;{CTR_REFERENCE}% + ROAS&lt;{ROAS_REFERENCE}x
-          </span>
+          {isSales ? (
+            <>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-800">
+                Conversor: CTR≥{CTR_REFERENCE}% + ROAS≥{ROAS_REFERENCE}x
+              </span>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-yellow-100 text-yellow-800">
+                Isca: CTR≥{CTR_REFERENCE}% + ROAS&lt;{ROAS_REFERENCE}x
+              </span>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800">
+                Silencioso: CTR&lt;{CTR_REFERENCE}% + ROAS≥{ROAS_REFERENCE}x
+              </span>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-800">
+                Ineficiente: CTR&lt;{CTR_REFERENCE}% + ROAS&lt;{ROAS_REFERENCE}x
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-800">
+                Conversor: CTR≥{CTR_REFERENCE}% + {axisInfo.key.toUpperCase()} ≤ mediana
+              </span>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-yellow-100 text-yellow-800">
+                Isca: CTR≥{CTR_REFERENCE}% + {axisInfo.key.toUpperCase()} &gt; mediana
+              </span>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800">
+                Silencioso: CTR&lt;{CTR_REFERENCE}% + {axisInfo.key.toUpperCase()} ≤ mediana
+              </span>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-800">
+                Ineficiente: CTR&lt;{CTR_REFERENCE}% + {axisInfo.key.toUpperCase()} &gt; mediana
+              </span>
+            </>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -341,7 +391,7 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                   >
                     <div className="flex items-center justify-end gap-1">
                       <ShoppingCart className="h-4 w-4" />
-                      Compras
+                      {isSales ? 'Compras' : 'Resultados'}
                       {getSortIcon('purchases')}
                     </div>
                   </Button>
@@ -367,7 +417,7 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                     onClick={() => handleSort('roas')}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      ROAS
+                      {isSales ? 'ROAS' : axisInfo.key.toUpperCase()}
                       {getSortIcon('roas')}
                     </div>
                   </Button>
@@ -394,8 +444,22 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                 const investment = parseValue(ad["Valor usado (BRL)"]);
                 const impressions = parseValue(ad["Impressões"]);
                 const purchases = parseValue(ad["Compras"]);
+                const results = parseValue(ad["Resultados"]);
                 const status = ad["Veiculação da campanha"];
-                const { ctr, roas, clicks, classification } = getAdMetrics(ad);
+                const adMetrics = getAdMetrics(ad);
+                const { ctr, roas, clicks, cpr, cpc } = adMetrics;
+                const classification = classifyAd(adMetrics, investment);
+
+                // Dynamic efficiency metric
+                const effValue = isSales ? roas : (objective === 'OUTCOME_ENGAGEMENT' ? cpr : cpc);
+                const effDisplay = isSales
+                  ? (roas > 0 ? `${roas.toFixed(2)}x` : '-')
+                  : (effValue > 0 ? formatCurrency(effValue) : '-');
+                const effGood = isSales
+                  ? roas >= ROAS_REFERENCE
+                  : (objective === 'OUTCOME_ENGAGEMENT' ? (medianCpr > 0 && cpr <= medianCpr && cpr > 0) : (medianCpc > 0 && cpc <= medianCpc && cpc > 0));
+
+                const countValue = isSales ? purchases : results;
 
                 return (
                   <TableRow key={index}>
@@ -412,10 +476,10 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                       {formatNumber(clicks)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {purchases > 0 ? (
+                      {countValue > 0 ? (
                         <span className="flex items-center justify-end gap-1 text-green-600 font-medium">
                           <TrendingUp className="h-3 w-3" />
-                          {formatNumber(purchases)}
+                          {formatNumber(countValue)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">0</span>
@@ -427,9 +491,9 @@ export const AdsBreakdown = ({ ads, selectedMonth }: AdsBreakdownProps) => {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      {roas > 0 ? (
-                        <span className={roas >= ROAS_REFERENCE ? "text-green-600 font-semibold" : "text-red-500"}>
-                          {roas.toFixed(2)}x
+                      {effDisplay !== '-' ? (
+                        <span className={effGood ? "text-green-600 font-semibold" : "text-red-500"}>
+                          {effDisplay}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">-</span>

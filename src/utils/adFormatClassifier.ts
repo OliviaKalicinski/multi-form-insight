@@ -169,3 +169,68 @@ export const FUNNEL_ROLE_ORDER: FunnelRole[] = [
 ];
 
 export const getRoleMeta = (role: FunnelRole): RoleMeta => ROLE_META[role];
+
+// ============================================
+// CLASSIFICACAO POR OBJETIVO
+// ============================================
+
+export type AdObjectiveType = 'OUTCOME_SALES' | 'OUTCOME_ENGAGEMENT' | 'OUTCOME_TRAFFIC' | string;
+
+/**
+ * Para Engagement/Traffic, a referencia do eixo Y eh a mediana do grupo.
+ * Para Sales, mantemos ROAS_REFERENCE fixo.
+ */
+export const classifyByObjective = (
+  objective: AdObjectiveType,
+  ctr: number,
+  opts: { roas?: number; cpr?: number; cpc?: number; medianCpr?: number; medianCpc?: number },
+): FunnelRole => {
+  if (objective === 'OUTCOME_SALES' || !objective) {
+    return classifyFunnelRole(ctr, opts.roas ?? 0);
+  }
+
+  const highCtr = ctr >= CTR_REFERENCE;
+
+  if (objective === 'OUTCOME_ENGAGEMENT') {
+    const median = opts.medianCpr ?? 0;
+    const cpr = opts.cpr ?? Infinity;
+    // "Bom resultado" = CPR abaixo ou igual à mediana (quanto menor, melhor)
+    const goodResult = median > 0 && cpr <= median;
+    if (highCtr && goodResult) return 'conversor';
+    if (highCtr && !goodResult) return 'isca_atencao';
+    if (!highCtr && goodResult) return 'conversor_silencioso';
+    return 'ineficiente';
+  }
+
+  if (objective === 'OUTCOME_TRAFFIC') {
+    const median = opts.medianCpc ?? 0;
+    const cpc = opts.cpc ?? Infinity;
+    const goodResult = median > 0 && cpc <= median;
+    if (highCtr && goodResult) return 'conversor';
+    if (highCtr && !goodResult) return 'isca_atencao';
+    if (!highCtr && goodResult) return 'conversor_silencioso';
+    return 'ineficiente';
+  }
+
+  // Fallback para objetivos desconhecidos: usar Sales logic
+  return classifyFunnelRole(ctr, opts.roas ?? 0);
+};
+
+/**
+ * Calcula a mediana de um array de numeros.
+ */
+export const calcMedian = (values: number[]): number => {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
+/**
+ * Retorna label e unidade do eixo Y conforme o objetivo ativo.
+ */
+export const getEfficiencyAxisInfo = (objective: AdObjectiveType): { label: string; unit: string; key: string } => {
+  if (objective === 'OUTCOME_ENGAGEMENT') return { label: 'CPR (R$)', unit: '', key: 'cpr' };
+  if (objective === 'OUTCOME_TRAFFIC') return { label: 'CPC (R$)', unit: '', key: 'cpc' };
+  return { label: 'ROAS (x)', unit: 'x', key: 'roas' };
+};
