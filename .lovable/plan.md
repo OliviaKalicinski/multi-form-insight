@@ -1,101 +1,76 @@
 
 
-# Corrigir limitacoes do Chat com Dados
+# Adicionar breakdown por anuncio individual no Chat com Dados
 
-## Problemas identificados
+## Problema
 
-1. **Produtos "Desconhecido"**: A funcao usa `p.nome || p.name` (linha 136) mas o campo correto nos dados e `descricaoAjustada` ou `descricao`. Nenhum registro tem campo `nome` ou `name`.
-
-2. **Dados truncados - Vendas**: 2.781 registros no banco, limite atual e 1.000 (perde 64% dos dados).
-
-3. **Dados truncados - Marketing**: 2.035 registros no banco, limite atual e 300 (perde 85% dos dados).
-
-4. **Dados truncados - Ads**: 478 registros no banco, limite atual e 300 (perde 37% dos dados).
-
-5. **Sem estatisticas de amostras**: Nao ha breakdown de amostras por tipo de pet nem contagem separada.
+A funcao `aggregateAds` agrega todos os dados de ads em totais e por dia, mas nao envia o detalhamento por anuncio individual ao modelo de IA. O banco tem o campo `anuncio` com nomes unicos (ex: "TP003 - Amostra Gatos", "TP003 - Petisco de BSF"), mas o chat nunca recebe essa informacao.
 
 ## Solucao
 
-Reescrever a funcao `chat-with-data` para:
-- Buscar dados em lotes (paginacao) ate cobrir tudo
-- Agregar no servidor antes de enviar ao modelo de IA
-- Usar os campos corretos de produto
+Adicionar um campo `top_anuncios` na saida de `aggregateAds` que agrupa por nome de anuncio, somando gasto, receita, cliques e impressoes, e retornando os top 30 ordenados por receita.
 
 ### Alteracoes no arquivo `supabase/functions/chat-with-data/index.ts`
 
-### 1. Corrigir mapeamento de produto (critico)
+### 1. Adicionar agrupamento por anuncio na funcao `aggregateAds` (linha ~247-286)
 
-Linha 136 atual:
+Dentro da funcao `aggregateAds`, antes do `return`, adicionar:
+
 ```text
-const name = p.nome || p.name || "Desconhecido";
+const adMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }> = {};
+for (const r of rows) {
+  const adName = r.anuncio || r.campanha || "Sem nome";
+  if (!adMap[adName]) adMap[adName] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0, conversoes: 0 };
+  adMap[adName].gasto += Number(r.gasto || 0);
+  adMap[adName].receita += Number(r.receita || 0);
+  adMap[adName].cliques += Number(r.cliques || 0);
+  adMap[adName].impressoes += Number(r.impressoes || 0);
+  adMap[adName].conversoes += Number(r.conversoes || 0);
+}
+
+const topAds = Object.entries(adMap)
+  .sort((a, b) => b[1].receita - a[1].receita)
+  .slice(0, 30)
+  .map(([name, d]) => ({
+    anuncio: name,
+    gasto: d.gasto.toFixed(2),
+    receita: d.receita.toFixed(2),
+    roas: d.gasto > 0 ? (d.receita / d.gasto).toFixed(2) : "0",
+    cliques: d.cliques,
+    impressoes: d.impressoes,
+    conversoes: d.conversoes,
+  }));
 ```
 
-Corrigir para:
-```text
-const name = p.descricaoAjustada || p.descricao || p.nome || p.name || "Desconhecido";
-```
+Adicionar `top_anuncios: topAds` ao objeto de retorno.
 
-### 2. Buscar todos os registros com paginacao
+### 2. Adicionar agrupamento por objetivo
 
-Criar funcao auxiliar `fetchAll` que busca em lotes de 1000 ate nao haver mais registros. Substituir as chamadas com `.limit()` por esta funcao.
+Tambem agrupar por `objetivo` para dar contexto sobre a estrategia:
 
 ```text
-async function fetchAll(supabase, table, select, dateCol, minDate, orderCol) {
-  const PAGE = 1000;
-  let all = [];
-  let from = 0;
-  while (true) {
-    const { data } = await supabase
-      .from(table)
-      .select(select)
-      .gte(dateCol, minDate)
-      .order(orderCol, { ascending: false })
-      .range(from, from + PAGE - 1);
-    if (!data || data.length === 0) break;
-    all = all.concat(data);
-    if (data.length < PAGE) break;
-    from += PAGE;
-  }
-  return all;
+const objectiveMap: Record<string, { gasto: number; receita: number; cliques: number }> = {};
+for (const r of rows) {
+  const obj = r.objetivo || "Desconhecido";
+  if (!objectiveMap[obj]) objectiveMap[obj] = { gasto: 0, receita: 0, cliques: 0 };
+  objectiveMap[obj].gasto += Number(r.gasto || 0);
+  objectiveMap[obj].receita += Number(r.receita || 0);
+  objectiveMap[obj].cliques += Number(r.cliques || 0);
 }
 ```
 
-### 3. Adicionar estatisticas de amostras
+Adicionar `por_objetivo: objectiveMap` ao retorno.
 
-No `aggregateSales`, apos iterar os produtos, classificar pedidos somente-amostra por tipo de pet:
-- Verificar se descricao contem "caes" ou "cachorro" -> Cachorro
-- Verificar se descricao contem "gatos" ou "gato" -> Gato
-- Pedido com ambos -> Cachorro + Gato
+### 3. Atualizar system prompt (linha ~310-313)
 
-Adicionar ao contexto:
-```text
-amostras: {
-  total_pedidos_amostra: N,
-  cachorro: N,
-  gato: N,
-  ambos: N,
-}
-```
-
-### 4. Adicionar top produtos por mes
-
-Expandir o `aggregateSales` para agrupar produtos por mes (YYYY-MM), gerando uma estrutura `top_produtos_por_mes` com os 10 produtos mais vendidos por quantidade e receita em cada mes.
-
-### 5. Aumentar detalhamento de ads por dia
-
-Mudar o range de 14 dias para 30 dias no breakdown diario de ads (linha 196: `d14` -> `d30`).
-
-### 6. Atualizar system prompt
-
-Adicionar instrucoes sobre:
-- Amostras e seu breakdown por tipo de pet
-- Campo `top_produtos_por_mes` para perguntas temporais
-- Remover aviso de truncamento (dados agora sao completos)
+Adicionar instrucoes:
+- "O campo `top_anuncios` contem os 30 anuncios com maior receita, incluindo gasto, receita, ROAS, cliques e impressoes de cada um"
+- "O campo `por_objetivo` agrupa ads por objetivo de campanha (OUTCOME_SALES, LINK_CLICKS, etc.)"
+- "Use `top_anuncios` para responder perguntas sobre melhores/piores anuncios"
 
 ## Resultado esperado
 
-- Produtos aparecerao com nomes reais (ex: "Comida de Dragao - Original (90g)")
-- Todos os 2.781 registros de vendas serao processados
-- Todos os registros de ads e marketing serao incluidos
-- Chat tera dados de amostras por tipo de pet
-- Avisos de truncamento desaparecerao
+- O chat conseguira listar os 5 melhores anuncios de fevereiro com nome, gasto, receita e ROAS
+- Perguntas como "qual anuncio teve melhor ROAS?" serao respondidas com dados reais
+- O breakdown por objetivo dara contexto sobre a estrategia de ads
+
