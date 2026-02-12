@@ -20,12 +20,15 @@ async function fetchAll(
   let all: any[] = [];
   let from = 0;
   while (true) {
-    const { data } = await supabase
+    let query = supabase
       .from(table)
       .select(select)
-      .gte(dateCol, minDate)
       .order(orderCol, { ascending: false })
       .range(from, from + PAGE - 1);
+    if (minDate) {
+      query = query.gte(dateCol, minDate);
+    }
+    const { data } = await query;
     if (!data || data.length === 0) break;
     all = all.concat(data);
     if (data.length < PAGE) break;
@@ -55,30 +58,27 @@ async function fetchUploadMeta(supabase: any) {
 
 // ── Fetch all data context ─────────────────────────────────────────────
 async function fetchDataContext(supabase: any) {
-  const now = Date.now();
-  const d90 = new Date(now - 90 * 86400000).toISOString();
-  const d90Date = d90.split("T")[0];
-
+  // Fetch ALL data — no 90-day filter
   const [salesRaw, adsRaw, followersRaw, marketingRaw, uploadMeta] = await Promise.all([
     fetchAll(
       supabase, "sales_data",
-      "data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom",
-      "data_venda", d90, "data_venda",
+      "data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom, cliente_email, cliente_nome",
+      "data_venda", "", "data_venda",
     ),
     fetchAll(
       supabase, "ads_data",
       "data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, conjunto, anuncio, objetivo",
-      "data", d90Date, "data",
+      "data", "", "data",
     ),
     fetchAll(
       supabase, "followers_data",
       "data, total_seguidores, novos_seguidores, unfollows",
-      "data", d90Date, "data",
+      "data", "", "data",
     ),
     fetchAll(
       supabase, "marketing_data",
       "data, metrica, valor",
-      "data", d90Date, "data",
+      "data", "", "data",
     ),
     fetchUploadMeta(supabase),
   ]);
@@ -97,29 +97,40 @@ async function fetchDataContext(supabase: any) {
 
 // ── Sales aggregation ──────────────────────────────────────────────────
 function aggregateSales(rows: any[]) {
-  if (!rows.length) return { resumo: "Sem dados de vendas nos últimos 90 dias.", detalhes: [] };
+  if (!rows.length) return { resumo: "Sem dados de vendas.", detalhes: [] };
 
   const totalRevenue = rows.reduce((s, r) => s + Number(r.valor_total || 0), 0);
   const totalFreight = rows.reduce((s, r) => s + Number(r.valor_frete || 0), 0);
   const orderCount = rows.length;
   const now = Date.now();
   const d30 = now - 30 * 86400000;
+  const d90 = now - 90 * 86400000;
 
   // Daily breakdown (last 30 days)
   const dayMap: Record<string, { revenue: number; orders: number; freight: number }> = {};
   // Weekly breakdown (30-90 days)
   const weekMap: Record<string, { revenue: number; orders: number; freight: number }> = {};
+  // Monthly breakdown (all data)
+  const monthMap: Record<string, { revenue: number; orders: number; freight: number }> = {};
 
   for (const r of rows) {
     const d = new Date(r.data_venda);
     const ts = d.getTime();
+    const monthKey = d.toISOString().slice(0, 7); // YYYY-MM
+
+    // Always add to monthly
+    if (!monthMap[monthKey]) monthMap[monthKey] = { revenue: 0, orders: 0, freight: 0 };
+    monthMap[monthKey].revenue += Number(r.valor_total || 0);
+    monthMap[monthKey].orders += 1;
+    monthMap[monthKey].freight += Number(r.valor_frete || 0);
+
     if (ts >= d30) {
       const key = d.toISOString().split("T")[0];
       if (!dayMap[key]) dayMap[key] = { revenue: 0, orders: 0, freight: 0 };
       dayMap[key].revenue += Number(r.valor_total || 0);
       dayMap[key].orders += 1;
       dayMap[key].freight += Number(r.valor_frete || 0);
-    } else {
+    } else if (ts >= d90) {
       const weekStart = new Date(d);
       weekStart.setDate(d.getDate() - d.getDay());
       const key = weekStart.toISOString().split("T")[0];
@@ -130,11 +141,9 @@ function aggregateSales(rows: any[]) {
     }
   }
 
-  // Product breakdown — using correct field names
+  // Product breakdown
   const productMap: Record<string, { qty: number; revenue: number }> = {};
-  // Monthly product breakdown
   const monthlyProductMap: Record<string, Record<string, { qty: number; revenue: number }>> = {};
-  // Sample tracking
   let sampleOrders = 0;
   let sampleDog = 0;
   let sampleCat = 0;
@@ -150,7 +159,7 @@ function aggregateSales(rows: any[]) {
       let hasDog = false;
       let hasCat = false;
 
-      const month = new Date(r.data_venda).toISOString().slice(0, 7); // YYYY-MM
+      const month = new Date(r.data_venda).toISOString().slice(0, 7);
 
       for (const p of produtos) {
         const name = p.descricaoAjustada || p.descricao || p.nome || p.name || "Desconhecido";
@@ -163,7 +172,7 @@ function aggregateSales(rows: any[]) {
           const desc = (name + " " + (p.descricao || "")).toLowerCase();
           if (desc.includes("gato") || desc.includes("gatos")) hasCat = true;
           else if (desc.includes("cachorro") || desc.includes("caes") || desc.includes("cães")) hasDog = true;
-          else hasDog = true; // default to dog
+          else hasDog = true;
         } else {
           hasProduct = true;
         }
@@ -172,7 +181,6 @@ function aggregateSales(rows: any[]) {
         productMap[name].qty += qty;
         productMap[name].revenue += price * qty;
 
-        // Monthly
         if (!monthlyProductMap[month]) monthlyProductMap[month] = {};
         if (!monthlyProductMap[month][name]) monthlyProductMap[month][name] = { qty: 0, revenue: 0 };
         monthlyProductMap[month][name].qty += qty;
@@ -193,7 +201,6 @@ function aggregateSales(rows: any[]) {
     .slice(0, 20)
     .map(([name, d]) => ({ nome: name, quantidade: d.qty, receita: d.revenue.toFixed(2) }));
 
-  // Top products per month (top 10 each)
   const topProductsByMonth: Record<string, any[]> = {};
   for (const [month, prods] of Object.entries(monthlyProductMap)) {
     topProductsByMonth[month] = Object.entries(prods)
@@ -216,8 +223,53 @@ function aggregateSales(rows: any[]) {
     statusMap[st] = (statusMap[st] || 0) + 1;
   }
 
+  // ── Customer aggregation ──────────────────────────────────────────────
+  const customerMap: Record<string, { nome: string; email: string; orders: number; revenue: number; firstOrder: string; lastOrder: string }> = {};
+  for (const r of rows) {
+    const email = r.cliente_email || "";
+    const nome = r.cliente_nome || "";
+    const key = email || nome || "Anônimo";
+    if (key === "Anônimo") continue; // skip anonymous
+
+    if (!customerMap[key]) {
+      customerMap[key] = { nome, email, orders: 0, revenue: 0, firstOrder: r.data_venda, lastOrder: r.data_venda };
+    }
+    customerMap[key].orders += 1;
+    customerMap[key].revenue += Number(r.valor_total || 0);
+    const dv = r.data_venda;
+    if (dv < customerMap[key].firstOrder) customerMap[key].firstOrder = dv;
+    if (dv > customerMap[key].lastOrder) customerMap[key].lastOrder = dv;
+  }
+
+  const topClientes = Object.values(customerMap)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 30)
+    .map(c => ({
+      nome: c.nome,
+      email: c.email,
+      total_pedidos: c.orders,
+      receita_total: c.revenue.toFixed(2),
+      ticket_medio: (c.revenue / c.orders).toFixed(2),
+      primeiro_pedido: c.firstOrder?.split("T")[0] || "",
+      ultimo_pedido: c.lastOrder?.split("T")[0] || "",
+    }));
+
+  const allCustomers = Object.values(customerMap);
+  const totalClientes = allCustomers.length;
+  const clientesNovos = allCustomers.filter(c => c.orders === 1).length;
+  const clientesRecorrentes = allCustomers.filter(c => c.orders >= 2).length;
+  const clientesFieis = allCustomers.filter(c => c.orders >= 3 && c.orders <= 4).length;
+  const clientesVIP = allCustomers.filter(c => c.orders >= 5 || c.revenue >= 500).length;
+  const taxaRecompra = totalClientes > 0 ? ((clientesRecorrentes / totalClientes) * 100).toFixed(1) : "0";
+
+  // Dates for first/last purchase range
+  const dates = rows.map(r => r.data_venda).filter(Boolean).sort();
+  const periodo_dados = dates.length > 0
+    ? `${dates[0]?.split("T")[0]} a ${dates[dates.length - 1]?.split("T")[0]}`
+    : "Sem dados";
+
   return {
-    periodo: "Últimos 90 dias",
+    periodo: `Todos os dados disponíveis (${periodo_dados})`,
     total_registros: orderCount,
     total_pedidos: orderCount,
     receita_total: totalRevenue.toFixed(2),
@@ -230,6 +282,9 @@ function aggregateSales(rows: any[]) {
       .sort((a, b) => b[0].localeCompare(a[0]))
       .slice(0, 12)
       .map(([w, d]) => ({ semana: w, pedidos: d.orders, receita: d.revenue.toFixed(2), frete: d.freight.toFixed(2) })),
+    por_mes: Object.entries(monthMap)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([m, d]) => ({ mes: m, pedidos: d.orders, receita: d.revenue.toFixed(2), frete: d.freight.toFixed(2), ticket_medio: (d.revenue / d.orders).toFixed(2) })),
     top_produtos: topProducts,
     top_produtos_por_mes: topProductsByMonth,
     amostras: {
@@ -240,12 +295,21 @@ function aggregateSales(rows: any[]) {
     },
     por_canal: channelMap,
     por_status: statusMap,
+    top_clientes: topClientes,
+    clientes_resumo: {
+      total_clientes_unicos: totalClientes,
+      clientes_novos_1_pedido: clientesNovos,
+      clientes_recorrentes_2_mais: clientesRecorrentes,
+      clientes_fieis_3_4: clientesFieis,
+      clientes_vip_5_mais_ou_500: clientesVIP,
+      taxa_recompra_pct: taxaRecompra,
+    },
   };
 }
 
 // ── Ads aggregation ────────────────────────────────────────────────────
 function aggregateAds(rows: any[]) {
-  if (!rows.length) return { resumo: "Sem dados de ads nos últimos 90 dias." };
+  if (!rows.length) return { resumo: "Sem dados de ads." };
 
   const totalSpend = rows.reduce((s, r) => s + Number(r.gasto || 0), 0);
   const totalRevenue = rows.reduce((s, r) => s + Number(r.receita || 0), 0);
@@ -253,7 +317,7 @@ function aggregateAds(rows: any[]) {
   const totalImpressions = rows.reduce((s, r) => s + Number(r.impressoes || 0), 0);
   const totalConversions = rows.reduce((s, r) => s + Number(r.conversoes || 0), 0);
 
-  // Daily breakdown (last 30 days instead of 14)
+  // Daily breakdown (last 30 days)
   const now = Date.now();
   const d30 = now - 30 * 86400000;
   const dayMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number }> = {};
@@ -269,7 +333,7 @@ function aggregateAds(rows: any[]) {
     }
   }
 
-  // Per-ad breakdown
+  // Per-ad breakdown (all time)
   const adMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }> = {};
   for (const r of rows) {
     const adName = r.anuncio || r.campanha || "Sem nome";
@@ -294,6 +358,35 @@ function aggregateAds(rows: any[]) {
       conversoes: d.conversoes,
     }));
 
+  // ── Monthly ads breakdown (top 15 per month) ─────────────────────────
+  const monthAdMap: Record<string, Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }>> = {};
+  for (const r of rows) {
+    const monthKey = r.data?.slice(0, 7) || "unknown"; // YYYY-MM
+    const adName = r.anuncio || r.campanha || "Sem nome";
+    if (!monthAdMap[monthKey]) monthAdMap[monthKey] = {};
+    if (!monthAdMap[monthKey][adName]) monthAdMap[monthKey][adName] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0, conversoes: 0 };
+    monthAdMap[monthKey][adName].gasto += Number(r.gasto || 0);
+    monthAdMap[monthKey][adName].receita += Number(r.receita || 0);
+    monthAdMap[monthKey][adName].cliques += Number(r.cliques || 0);
+    monthAdMap[monthKey][adName].impressoes += Number(r.impressoes || 0);
+    monthAdMap[monthKey][adName].conversoes += Number(r.conversoes || 0);
+  }
+
+  const topAnunciosPorMes: Record<string, any[]> = {};
+  for (const [month, ads] of Object.entries(monthAdMap)) {
+    topAnunciosPorMes[month] = Object.entries(ads)
+      .sort((a, b) => b[1].receita - a[1].receita)
+      .slice(0, 15)
+      .map(([name, d]) => ({
+        anuncio: name,
+        gasto: d.gasto.toFixed(2),
+        receita: d.receita.toFixed(2),
+        roas: d.gasto > 0 ? (d.receita / d.gasto).toFixed(2) : "0",
+        cliques: d.cliques,
+        conversoes: d.conversoes,
+      }));
+  }
+
   // Per-objective breakdown
   const objectiveMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }> = {};
   for (const r of rows) {
@@ -306,8 +399,37 @@ function aggregateAds(rows: any[]) {
     objectiveMap[obj].conversoes += Number(r.conversoes || 0);
   }
 
+  // Monthly totals for ads
+  const monthTotalMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }> = {};
+  for (const r of rows) {
+    const monthKey = r.data?.slice(0, 7) || "unknown";
+    if (!monthTotalMap[monthKey]) monthTotalMap[monthKey] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0, conversoes: 0 };
+    monthTotalMap[monthKey].gasto += Number(r.gasto || 0);
+    monthTotalMap[monthKey].receita += Number(r.receita || 0);
+    monthTotalMap[monthKey].cliques += Number(r.cliques || 0);
+    monthTotalMap[monthKey].impressoes += Number(r.impressoes || 0);
+    monthTotalMap[monthKey].conversoes += Number(r.conversoes || 0);
+  }
+
+  const adsPorMes = Object.entries(monthTotalMap)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([m, d]) => ({
+      mes: m,
+      gasto: d.gasto.toFixed(2),
+      receita: d.receita.toFixed(2),
+      roas: d.gasto > 0 ? (d.receita / d.gasto).toFixed(2) : "0",
+      cliques: d.cliques,
+      impressoes: d.impressoes,
+      conversoes: d.conversoes,
+    }));
+
+  const dates = rows.map(r => r.data).filter(Boolean).sort();
+  const periodo_dados = dates.length > 0
+    ? `${dates[0]} a ${dates[dates.length - 1]}`
+    : "Sem dados";
+
   return {
-    periodo: "Últimos 90 dias",
+    periodo: `Todos os dados disponíveis (${periodo_dados})`,
     total_registros: rows.length,
     gasto_total: totalSpend.toFixed(2),
     receita_total: totalRevenue.toFixed(2),
@@ -320,7 +442,9 @@ function aggregateAds(rows: any[]) {
     por_dia_30d: Object.entries(dayMap)
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([d, v]) => ({ dia: d, gasto: v.gasto.toFixed(2), receita: v.receita.toFixed(2), cliques: v.cliques, impressoes: v.impressoes })),
+    por_mes: adsPorMes,
     top_anuncios: topAds,
+    top_anuncios_por_mes: topAnunciosPorMes,
     por_objetivo: objectiveMap,
   };
 }
@@ -353,15 +477,43 @@ FORMATO DE RESPOSTA (OBRIGATÓRIO):
 - Evite textos explicativos longos — foque em números + insight curto
 - Exemplo: "**Receita:** R$ 5.908 → ✅ 12% acima da média"
 - Amostras/brindes são produtos com preço <= R$ 1,00
-- Use o campo "por_dia" para responder perguntas sobre períodos curtos (até 30 dias)
-- Use o campo "por_semana" para tendências de médio prazo (30-90 dias)
-- O campo "ultimo_upload" contém a data do último upload de cada tipo de dado — use-o para informar o usuário
-- O campo "amostras" contém breakdown de pedidos somente-amostra por tipo de pet (cachorro, gato, ambos)
-- O campo "top_produtos_por_mes" permite responder perguntas sobre produtos mais vendidos em meses específicos
-- Use o campo "por_dia_30d" de ads para analisar tendências diárias de anúncios nos últimos 30 dias
-- O campo "total_registros" indica quantos registros foram processados — todos os dados disponíveis são incluídos
-- O campo "top_anuncios" em ads contém os 30 anúncios com maior receita, com gasto, receita, ROAS, cliques, impressões e conversões de cada um. Use para responder sobre melhores/piores anúncios.
-- O campo "por_objetivo" em ads agrupa a performance por objetivo de campanha (OUTCOME_SALES, LINK_CLICKS, etc.). Use para analisar estratégia de investimento em ads.
+
+CAMPOS DE DADOS DISPONÍVEIS:
+
+VENDAS:
+- "por_dia": breakdown diário dos últimos 30 dias. Use para perguntas sobre dias recentes.
+- "por_semana": breakdown semanal de 30-90 dias atrás. Use para tendências de médio prazo.
+- "por_mes": breakdown MENSAL de TODOS os dados históricos (receita, pedidos, frete, ticket_medio por mês). Use para consultas sobre meses específicos (ex: "ticket médio de agosto", "receita de dezembro").
+- "top_produtos": top 20 produtos por receita (período completo)
+- "top_produtos_por_mes": top 10 produtos por mês. Use para "quais produtos mais vendidos em [mês]?"
+- "amostras": breakdown de pedidos somente-amostra por tipo de pet (cachorro, gato, ambos)
+
+CLIENTES:
+- "top_clientes": top 30 clientes por receita, com nome, email, total de pedidos, receita total, ticket médio, primeiro e último pedido. Use para "quais os melhores clientes?", "top 10 clientes", etc.
+- "clientes_resumo": métricas gerais da base de clientes:
+  - total_clientes_unicos: total de clientes identificados
+  - clientes_novos_1_pedido: fizeram apenas 1 pedido
+  - clientes_recorrentes_2_mais: fizeram 2+ pedidos
+  - clientes_fieis_3_4: fizeram 3-4 pedidos
+  - clientes_vip_5_mais_ou_500: fizeram 5+ pedidos OU receita >= R$ 500
+  - taxa_recompra_pct: % de clientes que compraram mais de uma vez
+
+SEGMENTAÇÃO DE CLIENTES:
+- Primeira Compra: 1 pedido
+- Recorrente: 2 pedidos
+- Fiel: 3-4 pedidos
+- VIP: 5+ pedidos ou receita >= R$ 500
+
+ADS:
+- "por_dia_30d": breakdown diário de ads dos últimos 30 dias
+- "por_mes": breakdown MENSAL de ads (gasto, receita, ROAS, cliques, impressões, conversões por mês). Use para "quanto gastamos em ads em [mês]?"
+- "top_anuncios": top 30 anúncios por receita (período completo)
+- "top_anuncios_por_mes": top 15 anúncios por receita em cada mês (chave YYYY-MM). Use para "melhores anúncios de janeiro", "qual anúncio performou mais em [mês]?"
+- "por_objetivo": performance agrupada por objetivo de campanha
+
+OUTROS:
+- "ultimo_upload": data do último upload de cada tipo de dado — use para informar o usuário
+- "total_registros": quantos registros foram processados
 
 ═══════════════════════════════════════════
 MANUAL DO NEGÓCIO — Comida de Dragão
