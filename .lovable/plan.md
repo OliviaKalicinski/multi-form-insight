@@ -1,81 +1,121 @@
 
 
-# Classificacao de eficiencia por objetivo do anuncio
+# Visao Executiva V2 -- Fotografia Operacional
 
-## Problema atual
-Todos os anuncios sao avaliados pelo mesmo criterio de CTR x ROAS, independente do objetivo. Anuncios de Engagement e Traffic nunca terao ROAS (nao geram compras), entao sao sempre classificados como "Ineficiente" ou "Isca de Atencao" -- o que e injusto e gera ruido na analise.
+## Resumo
 
-## Logica proposta
+Criar uma nova pagina `/visao-executiva-v2` que mostra uma fotografia operacional do negocio (ultimo dia com dados ou ultimos 7 dias), sem metas, alertas, benchmarks ou comparacoes. A pagina atual `/dashboard` permanece intacta.
 
-Anuncios serao avaliados por metricas diferentes conforme seu objetivo:
+## Arquivos criados
 
-```text
-+---------------------+---------------------------+---------------------------+
-| Objetivo            | Eixo X (eficiencia)       | Eixo Y (resultado)        |
-+---------------------+---------------------------+---------------------------+
-| OUTCOME_SALES       | CTR >= 2%                 | ROAS >= 1.5x              |
-| OUTCOME_ENGAGEMENT  | CTR >= 2%                 | CPR <= mediana do grupo    |
-| OUTCOME_TRAFFIC     | CTR >= 2%                 | CPC <= mediana do grupo    |
-+---------------------+---------------------------+---------------------------+
-```
+### 1. `src/pages/VisaoExecutivaV2.tsx`
 
-- **Sales**: mantém CTR x ROAS (sem mudanca)
-- **Engagement**: CTR x Custo por Resultado (CPR). Um anuncio de engagement é "eficiente" se gera resultados a custo baixo
-- **Traffic**: CTR x CPC. Um anuncio de trafego é "eficiente" se traz cliques baratos
+Pagina principal contendo toda a logica e layout.
 
-Os 4 quadrantes continuam existindo com os mesmos nomes, mas o significado do eixo Y muda:
+**Toggle no topo**: ToggleGroup (shadcn) com duas opcoes:
+- "Ultimo Dia" -- filtra salesData pela data mais recente encontrada nos dados
+- "Ultimos 7 Dias" -- filtra os 7 dias ate a data mais recente
 
-- **Conversor**: CTR alto + resultado bom (ROAS alto / CPR baixo / CPC baixo)
-- **Isca de Atencao**: CTR alto + resultado fraco
-- **Conversor Silencioso**: CTR baixo + resultado bom
-- **Ineficiente**: CTR baixo + resultado fraco
+**Calculo da data**: `useMemo` que encontra `Math.max(...salesData.map(o => o.dataVenda.getTime()))` para determinar o ultimo dia com dados. Nao usa `new Date()`.
 
-## O que muda na interface
+**Layout em grid 2 colunas** (`grid grid-cols-1 lg:grid-cols-2 gap-6`):
 
-### Tabela de breakdown (AdsBreakdown.tsx)
-- Coluna "ROAS" passa a mostrar a metrica relevante ao objetivo:
-  - Sales: ROAS (como hoje)
-  - Engagement: CPR (Custo por Resultado) formatado como moeda
-  - Traffic: CPC formatado como moeda
-- Coluna "Compras" passa a mostrar "Resultados" quando o objetivo nao for Sales
-- Header da coluna muda dinamicamente (ex: "ROAS" / "CPR" / "CPC")
+**Coluna esquerda -- Mundo Online (B2C)**:
 
-### Grafico scatter (AdClassificationChart.tsx)
-- Eixo Y muda conforme objetivo:
-  - Sales: ROAS (x)
-  - Engagement: CPR invertido (quanto menor, melhor -- escala invertida)
-  - Traffic: CPC invertido
-- Label do eixo Y muda dinamicamente
+- **Bloco Receita** (Card):
+  - Receita Total (valorTotal de todos os pedidos filtrados)
+  - Receita Produtos (soma de produto.preco para todos os produtos, excluindo frete)
+  - Frete (soma de valorFrete)
+  - Receita Media por Produto = Receita Produtos / Quantidade Total de Produtos Vendidos
 
-### Regra de classificacao (adFormatClassifier.ts)
-- Nova funcao `classifyByObjective(objective, ctr, roas, cpr, cpc, medianCpr, medianCpc)`
-- Para Sales: mantém logica atual (CTR x ROAS)
-- Para Engagement: CTR >= 2% e CPR <= mediana = "Conversor"
-- Para Traffic: CTR >= 2% e CPC <= mediana = "Conversor"
+- **Bloco Pedidos** (Card):
+  - Total de Pedidos
+  - Apenas Amostra (usando `isOnlySampleOrder` de samplesAnalyzer)
+  - Com Produto (pedidos que tem `hasRegularProduct`)
+  - Ticket Medio (somente pedidos com produto): receita dos pedidos com produto / quantidade desses pedidos
+  - Media de Produtos por Pedido (total de itens de produto / total de pedidos)
+
+- **Bloco Amostras** (Card):
+  - Pedidos So Amostra (contagem de pedidos `isOnlySampleOrder`)
+  - Total de Amostras Vendidas (soma de quantidade dos produtos que sao `isSampleProduct`)
+  - Amostras Cachorro (usando `getSamplePetType === 'dog'`)
+  - Amostras Gato (usando `getSamplePetType === 'cat'`)
+
+- **Bloco Distribuicao** (Card):
+  - Top 3 Estados (agrupando por campo `estado` dos pedidos, caso exista no ProcessedOrder -- se nao existir, sera extraido via query ao banco ou omitido)
+  - Distribuicao por Canal (campo `ecommerce` do ProcessedOrder) com barras horizontais simples em div/Tailwind (sem Recharts)
+
+**Coluna direita -- Mundo Offline**:
+
+- **Card B2B**: Exibe "Integracao de dados em andamento" (sem dados no banco)
+- **Card B2B2C**: Exibe "Integracao de dados em andamento" (sem dados no banco)
+
+Ambos os cards mostram a estrutura prevista (Receita Total, Receita Produtos, Frete, Total de Pedidos, Ticket Medio, Produto mais vendido) mas com o placeholder ao inves de zeros.
+
+**Hierarquia visual**:
+- Numeros grandes (`text-3xl font-bold`)
+- Labels pequenos (`text-xs text-muted-foreground`)
+- Espacamento generoso (`space-y-6`, `p-6`)
+- Sem cores de status (sem verde/vermelho) -- usar apenas `text-foreground` e `text-muted-foreground`
+
+## Arquivos modificados
+
+### 2. `src/App.tsx`
+
+- Importar `VisaoExecutivaV2`
+- Adicionar rota `/visao-executiva-v2` (protegida, dentro de AuthenticatedLayout)
+- Alterar redirect de `/` para `/visao-executiva-v2` (em vez de `/dashboard`)
+
+### 3. `src/components/AppSidebar.tsx`
+
+- Adicionar item "Visao Executiva V2" com url `/visao-executiva-v2` na secao Dashboard, acima do item existente "Visao Executiva"
+- Usar icone `LayoutDashboard` (ou `Eye` do lucide)
+
+## O que NAO muda
+
+- ExecutiveDashboard.tsx (pagina atual em `/dashboard`)
+- DashboardContext.tsx
+- AlertSystem, RecommendationEngine, HealthScore
+- GlobalFilter
+- Nenhuma tabela no banco
+- Nenhum outro arquivo existente alem dos dois listados acima
 
 ## Detalhes tecnicos
 
-### Arquivo: `src/utils/adFormatClassifier.ts`
-- Adicionar funcao `classifyByObjective` que recebe o objetivo e as metricas relevantes
-- Calcular mediana de CPR e CPC dentro do grupo de ads do mesmo objetivo
-- Manter `classifyFunnelRole` existente para retrocompatibilidade
+### Filtragem de dados (useMemo local)
 
-### Arquivo: `src/components/dashboard/AdsBreakdown.tsx`
-- Receber nova prop `objective: string` para saber qual objetivo esta ativo
-- Adaptar `getAdMetrics` para retornar CPR/CPC alem de CTR/ROAS
-- Trocar labels das colunas dinamicamente
-- Usar `classifyByObjective` em vez de `classifyFunnelRole` direto
+```text
+salesData (do DashboardContext)
+  |
+  v
+useMemo: encontrar lastDate = max(dataVenda)
+  |
+  v
+toggle === "1d" ? filtrar pedidos com dataVenda no mesmo dia que lastDate
+toggle === "7d" ? filtrar pedidos com dataVenda >= lastDate - 6 dias
+  |
+  v
+Calcular todas as metricas localmente
+```
 
-### Arquivo: `src/components/dashboard/AdClassificationChart.tsx`
-- Receber prop `objective` para adaptar eixo Y
-- Trocar label e escala do eixo Y conforme objetivo
+### Funcoes reutilizadas (sem criar novas)
 
-### Arquivo: `src/pages/Ads.tsx`
-- Passar `objective={effectiveObjective}` para `AdsBreakdown` e `AdClassificationChart`
+- `isSampleProduct`, `isOnlySampleOrder`, `hasRegularProduct`, `getSamplePetType` de `samplesAnalyzer.ts`
+- `formatCurrency` de `salesCalculator.ts`
 
-## Arquivos alterados
-1. `src/utils/adFormatClassifier.ts` -- nova funcao de classificacao por objetivo
-2. `src/components/dashboard/AdsBreakdown.tsx` -- metricas e labels dinamicos
-3. `src/components/dashboard/AdClassificationChart.tsx` -- eixo Y dinamico
-4. `src/pages/Ads.tsx` -- passar prop de objetivo
+### Distribuicao por canal
+
+Usa o campo `ecommerce` de `ProcessedOrder` para agrupar e contar pedidos/receita por canal. Barras horizontais renderizadas com divs Tailwind (`bg-primary/20`, largura proporcional via `style={{ width: pct + '%' }}`).
+
+### Top 3 Estados
+
+O `ProcessedOrder` nao tem campo `estado` diretamente, mas o `sales_data` no banco tem coluna `estado`. Sera necessario verificar se o campo e mapeado no parser. Se nao estiver disponivel no ProcessedOrder, essa secao exibira "Dados nao disponiveis" ate o campo ser adicionado.
+
+### Componentes usados
+
+- Card, CardContent, CardHeader, CardTitle (shadcn)
+- Badge (shadcn)
+- Separator (shadcn)
+- ToggleGroup, ToggleGroupItem (shadcn)
+- Nenhum grafico pesado (sem Recharts)
 
