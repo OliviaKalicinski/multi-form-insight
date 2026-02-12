@@ -7,51 +7,88 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const SALES_LIMIT = 1000;
+const ADS_LIMIT = 300;
+const FOLLOWERS_LIMIT = 100;
+const MARKETING_LIMIT = 300;
+
+async function fetchUploadMeta(supabase: any) {
+  const { data } = await supabase
+    .from("upload_history")
+    .select("data_type, created_at, date_range_end")
+    .order("created_at", { ascending: false });
+
+  const meta: Record<string, { ultimo_upload: string; dados_ate: string | null }> = {};
+  for (const row of data || []) {
+    if (!meta[row.data_type]) {
+      meta[row.data_type] = {
+        ultimo_upload: row.created_at,
+        dados_ate: row.date_range_end,
+      };
+    }
+  }
+  return meta;
+}
+
 async function fetchDataContext(supabase: any) {
-  // Sales: last 90 days aggregated
-  const { data: salesSummary } = await supabase.rpc("get_sales_summary_90d").maybeSingle();
+  const now = Date.now();
+  const d90 = new Date(now - 90 * 86400000).toISOString();
+  const d90Date = d90.split("T")[0];
 
-  // If rpc doesn't exist, fallback to direct query
-  const { data: salesRaw } = await supabase
-    .from("sales_data")
-    .select("data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom")
-    .gte("data_venda", new Date(Date.now() - 90 * 86400000).toISOString())
-    .order("data_venda", { ascending: false })
-    .limit(500);
+  const [salesRes, adsRes, followersRes, marketingRes, uploadMeta] = await Promise.all([
+    supabase
+      .from("sales_data")
+      .select("data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom")
+      .gte("data_venda", d90)
+      .order("data_venda", { ascending: false })
+      .limit(SALES_LIMIT),
+    supabase
+      .from("ads_data")
+      .select("data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, objetivo")
+      .gte("data", d90Date)
+      .order("data", { ascending: false })
+      .limit(ADS_LIMIT),
+    supabase
+      .from("followers_data")
+      .select("data, total_seguidores, novos_seguidores, unfollows")
+      .gte("data", d90Date)
+      .order("data", { ascending: false })
+      .limit(FOLLOWERS_LIMIT),
+    supabase
+      .from("marketing_data")
+      .select("data, metrica, valor")
+      .gte("data", d90Date)
+      .order("data", { ascending: false })
+      .limit(MARKETING_LIMIT),
+    fetchUploadMeta(supabase),
+  ]);
 
-  // Ads: last 90 days
-  const { data: adsRaw } = await supabase
-    .from("ads_data")
-    .select("data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, objetivo")
-    .gte("data", new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0])
-    .order("data", { ascending: false })
-    .limit(300);
+  const salesRaw = salesRes.data || [];
+  const adsRaw = adsRes.data || [];
+  const followersRaw = followersRes.data || [];
+  const marketingRaw = marketingRes.data || [];
 
-  // Followers: last 90 days
-  const { data: followersRaw } = await supabase
-    .from("followers_data")
-    .select("data, total_seguidores, novos_seguidores, unfollows")
-    .gte("data", new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0])
-    .order("data", { ascending: false })
-    .limit(100);
-
-  // Marketing (Instagram metrics): last 90 days
-  const { data: marketingRaw } = await supabase
-    .from("marketing_data")
-    .select("data, metrica, valor")
-    .gte("data", new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0])
-    .order("data", { ascending: false })
-    .limit(300);
-
-  // Pre-aggregate sales for compact context
-  const salesContext = aggregateSales(salesRaw || []);
-  const adsContext = aggregateAds(adsRaw || []);
+  const salesContext = aggregateSales(salesRaw);
+  const adsContext = aggregateAds(adsRaw);
 
   return {
-    vendas: salesContext,
-    ads: adsContext,
-    seguidores: followersRaw || [],
-    marketing: marketingRaw || [],
+    ultimo_upload: uploadMeta,
+    vendas: {
+      ...salesContext,
+      dados_truncados: salesRaw.length >= SALES_LIMIT,
+    },
+    ads: {
+      ...adsContext,
+      dados_truncados: adsRaw.length >= ADS_LIMIT,
+    },
+    seguidores: {
+      dados: followersRaw,
+      dados_truncados: followersRaw.length >= FOLLOWERS_LIMIT,
+    },
+    marketing: {
+      dados: marketingRaw,
+      dados_truncados: marketingRaw.length >= MARKETING_LIMIT,
+    },
   };
 }
 
@@ -61,18 +98,32 @@ function aggregateSales(rows: any[]) {
   const totalRevenue = rows.reduce((s, r) => s + Number(r.valor_total || 0), 0);
   const totalFreight = rows.reduce((s, r) => s + Number(r.valor_frete || 0), 0);
   const orderCount = rows.length;
+  const now = Date.now();
+  const d30 = now - 30 * 86400000;
 
-  // Weekly breakdown
+  // Daily breakdown (last 30 days)
+  const dayMap: Record<string, { revenue: number; orders: number; freight: number }> = {};
+  // Weekly breakdown (30-90 days)
   const weekMap: Record<string, { revenue: number; orders: number; freight: number }> = {};
+
   for (const r of rows) {
     const d = new Date(r.data_venda);
-    const weekStart = new Date(d);
-    weekStart.setDate(d.getDate() - d.getDay());
-    const key = weekStart.toISOString().split("T")[0];
-    if (!weekMap[key]) weekMap[key] = { revenue: 0, orders: 0, freight: 0 };
-    weekMap[key].revenue += Number(r.valor_total || 0);
-    weekMap[key].orders += 1;
-    weekMap[key].freight += Number(r.valor_frete || 0);
+    const ts = d.getTime();
+    if (ts >= d30) {
+      const key = d.toISOString().split("T")[0];
+      if (!dayMap[key]) dayMap[key] = { revenue: 0, orders: 0, freight: 0 };
+      dayMap[key].revenue += Number(r.valor_total || 0);
+      dayMap[key].orders += 1;
+      dayMap[key].freight += Number(r.valor_frete || 0);
+    } else {
+      const weekStart = new Date(d);
+      weekStart.setDate(d.getDate() - d.getDay());
+      const key = weekStart.toISOString().split("T")[0];
+      if (!weekMap[key]) weekMap[key] = { revenue: 0, orders: 0, freight: 0 };
+      weekMap[key].revenue += Number(r.valor_total || 0);
+      weekMap[key].orders += 1;
+      weekMap[key].freight += Number(r.valor_frete || 0);
+    }
   }
 
   // Product breakdown
@@ -118,6 +169,9 @@ function aggregateSales(rows: any[]) {
     receita_total: totalRevenue.toFixed(2),
     frete_total: totalFreight.toFixed(2),
     ticket_medio: (totalRevenue / orderCount).toFixed(2),
+    por_dia: Object.entries(dayMap)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([d, v]) => ({ dia: d, pedidos: v.orders, receita: v.revenue.toFixed(2), frete: v.freight.toFixed(2) })),
     por_semana: Object.entries(weekMap)
       .sort((a, b) => b[0].localeCompare(a[0]))
       .slice(0, 12)
@@ -137,6 +191,22 @@ function aggregateAds(rows: any[]) {
   const totalImpressions = rows.reduce((s, r) => s + Number(r.impressoes || 0), 0);
   const totalConversions = rows.reduce((s, r) => s + Number(r.conversoes || 0), 0);
 
+  // Daily breakdown (last 14 days)
+  const now = Date.now();
+  const d14 = now - 14 * 86400000;
+  const dayMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number }> = {};
+  for (const r of rows) {
+    const d = new Date(r.data);
+    if (d.getTime() >= d14) {
+      const key = r.data;
+      if (!dayMap[key]) dayMap[key] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0 };
+      dayMap[key].gasto += Number(r.gasto || 0);
+      dayMap[key].receita += Number(r.receita || 0);
+      dayMap[key].cliques += Number(r.cliques || 0);
+      dayMap[key].impressoes += Number(r.impressoes || 0);
+    }
+  }
+
   return {
     periodo: "Últimos 90 dias",
     gasto_total: totalSpend.toFixed(2),
@@ -147,14 +217,20 @@ function aggregateAds(rows: any[]) {
     conversoes_total: totalConversions,
     ctr_medio: totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) + "%" : "N/A",
     cpc_medio: totalClicks > 0 ? (totalSpend / totalClicks).toFixed(2) : "N/A",
+    por_dia_14d: Object.entries(dayMap)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([d, v]) => ({ dia: d, gasto: v.gasto.toFixed(2), receita: v.receita.toFixed(2), cliques: v.cliques, impressoes: v.impressoes })),
   };
 }
 
 const SYSTEM_PROMPT = `Você é um analista de dados especialista em e-commerce e marketing digital.
 Você tem acesso aos dados reais do negócio (vendas, anúncios, seguidores do Instagram e métricas de marketing).
 
-REGRAS:
+REGRAS OBRIGATÓRIAS:
 - Responda SEMPRE em português brasileiro
+- SEMPRE comece sua resposta informando o período coberto pelos dados e a data do último upload. Exemplo: "📊 Dados atualizados até DD/MM/AAAA (último upload em DD/MM às HH:MM)."
+- Se o campo "dados_truncados" for true para algum tipo de dado, AVISE CLARAMENTE: "⚠️ Atenção: o volume de dados de [tipo] excede o limite que consigo processar. A análise abaixo cobre apenas parte do período."
+- NUNCA mostre JSON cru — formate SEMPRE em tabelas markdown, listas ou texto corrido
 - Use markdown para formatar: tabelas, listas, negrito, etc.
 - Seja direto e analítico — foque em insights acionáveis
 - Quando fizer comparações, mostre variações percentuais
@@ -165,6 +241,9 @@ REGRAS:
 - Para tabelas grandes, limite a 15 linhas e indique se há mais dados
 - Considere que o negócio é de alimentos/suplementos (Comida de Dragão)
 - Amostras/brindes são produtos com preço <= R$ 1,00
+- Use o campo "por_dia" para responder perguntas sobre períodos curtos (até 30 dias)
+- Use o campo "por_semana" para tendências de médio prazo (30-90 dias)
+- O campo "ultimo_upload" contém a data do último upload de cada tipo de dado — use-o para informar o usuário
 
 DADOS DO NEGÓCIO (contexto atualizado):
 `;
@@ -206,7 +285,6 @@ serve(async (req) => {
       });
     }
 
-    // Fetch data context
     const dataContext = await fetchDataContext(supabase);
     const contextString = JSON.stringify(dataContext, null, 2);
 
