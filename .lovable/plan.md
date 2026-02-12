@@ -1,31 +1,30 @@
 
 
-# Corrigir calculo de Receita Produtos na Visao Executiva V2
+# Ajustar filtro padrao para "Ultimos 7 Dias"
 
-## Problema
+## Contexto
 
-O campo `preco` de cada produto ja contem o **preco total da linha** (vem da coluna "Preco total" do CSV, que ja e preco unitario x quantidade). No entanto, o calculo na pagina multiplica `p.preco * p.quantidade` novamente, inflando o valor.
+A logica de filtragem esta correta: calcula `lastDate` a partir da data mais recente nos dados de vendas (08/02/2026) e filtra os ultimos 7 dias a partir dela (02/02 a 08/02). Os valores exibidos correspondem a esse periodo.
 
-Por isso Receita Produtos (R$ 4.806) aparece maior que Receita Total (R$ 3.364), o que e impossivel.
+O unico ajuste necessario e mudar o valor inicial do filtro de `"1d"` para `"7d"`.
 
-## Correcao
+## Alteracao
 
-### `src/pages/VisaoExecutivaV2.tsx` (linha 90)
+**Arquivo:** `src/pages/VisaoExecutivaV2.tsx`, linha 21
 
-Mudar de:
+De:
 ```text
-totalProductRevenue += p.preco * p.quantidade;
+const [period, setPeriod] = useState<string>("1d");
 ```
 
 Para:
 ```text
-totalProductRevenue += p.preco;
+const [period, setPeriod] = useState<string>("7d");
 ```
 
-Apenas remover a multiplicacao por `p.quantidade`, pois `p.preco` ja representa o valor total daquela linha de produto.
+## Resultado
 
-## Impacto
+- A pagina abrira com "Ultimos 7 Dias" selecionado por padrao
+- O usuario pode alternar para "Ultimo Dia" quando quiser
+- A logica de calculo dos 7 dias ja esta implementada e funcionando corretamente
 
-- Receita Produtos passara a ser menor ou igual a Receita Total (correto)
-- Receita Media por Produto tambem sera corrigida (usa `receitaProdutos / totalProductQty`)
-- Nenhum outro arquivo precisa ser alterado
