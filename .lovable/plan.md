@@ -1,76 +1,91 @@
 
 
-# Adicionar breakdown por anuncio individual no Chat com Dados
+# Enriquecer o System Prompt do Chat com Dados
 
-## Problema
+## Objetivo
 
-A funcao `aggregateAds` agrega todos os dados de ads em totais e por dia, mas nao envia o detalhamento por anuncio individual ao modelo de IA. O banco tem o campo `anuncio` com nomes unicos (ex: "TP003 - Amostra Gatos", "TP003 - Petisco de BSF"), mas o chat nunca recebe essa informacao.
+O chat IA precisa conhecer todas as regras de negocio, definicoes de metricas e logica do dashboard para responder com precisao. Atualmente o system prompt tem regras basicas mas falta o conhecimento profundo que esta espalhado nos arquivos do frontend (`kpiExplanations.ts`, `productNormalizer.ts`, `samplesAnalyzer.ts`, etc.).
 
-## Solucao
+## O que sera feito
 
-Adicionar um campo `top_anuncios` na saida de `aggregateAds` que agrupa por nome de anuncio, somando gasto, receita, cliques e impressoes, e retornando os top 30 ordenados por receita.
+Expandir o `SYSTEM_PROMPT` no arquivo `supabase/functions/chat-with-data/index.ts` com um bloco completo de conhecimento do negocio.
 
-### Alteracoes no arquivo `supabase/functions/chat-with-data/index.ts`
+### Conteudo a adicionar ao system prompt
 
-### 1. Adicionar agrupamento por anuncio na funcao `aggregateAds` (linha ~247-286)
+**1. Sobre o negocio**
+- Comida de Dragao: marca de alimentos e suplementos naturais para pets (caes e gatos)
+- Canais: venda online (B2C) via e-commerce
+- Modelo: venda direta + estrategia de amostras para aquisicao de clientes
 
-Dentro da funcao `aggregateAds`, antes do `return`, adicionar:
+**2. Catalogo de produtos (12 produtos padronizados)**
+- Comida de Dragao - Original (90g)
+- Kit Comida de Dragao - Original (3x90g)
+- Mordida de Dragao - Spirulina (180g)
+- Kit Mordida de Dragao - Spirulina (3x180g)
+- Mordida de Dragao - Legumes (180g)
+- Kit Mordida de Dragao - Legumes (3x180g)
+- Kit Mordida de Dragao Mix (2 produtos)
+- Kit Completo (3 produtos)
+- Suplemento Concentrado para Caes (200g)
+- Suplemento Integral para Caes (180g)
+- Suplemento para Gatos (180g)
+- Kit de Amostras (preco <= R$ 1,00)
 
-```text
-const adMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }> = {};
-for (const r of rows) {
-  const adName = r.anuncio || r.campanha || "Sem nome";
-  if (!adMap[adName]) adMap[adName] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0, conversoes: 0 };
-  adMap[adName].gasto += Number(r.gasto || 0);
-  adMap[adName].receita += Number(r.receita || 0);
-  adMap[adName].cliques += Number(r.cliques || 0);
-  adMap[adName].impressoes += Number(r.impressoes || 0);
-  adMap[adName].conversoes += Number(r.conversoes || 0);
-}
+**3. Regras de amostras**
+- Produto e amostra se: nome contem "amostra" OU preco entre R$ 0,01 e R$ 1,00
+- Pedido "somente amostra" = todos os produtos do pedido sao amostras
+- Pedido "com produto" = tem pelo menos um produto regular (preco > R$ 1,00)
+- Tipo de pet da amostra: verificar se descricao contem "gato"/"gatos" (= gato), senao cachorro
+- Pedido com amostras de ambos tipos = "cachorro + gato"
+- Conversao de amostra: cliente cujo 1o pedido foi somente amostra e depois fez pedido com produto regular
+- Janela de conversao ideal: ate 45 dias apos amostra
 
-const topAds = Object.entries(adMap)
-  .sort((a, b) => b[1].receita - a[1].receita)
-  .slice(0, 30)
-  .map(([name, d]) => ({
-    anuncio: name,
-    gasto: d.gasto.toFixed(2),
-    receita: d.receita.toFixed(2),
-    roas: d.gasto > 0 ? (d.receita / d.gasto).toFixed(2) : "0",
-    cliques: d.cliques,
-    impressoes: d.impressoes,
-    conversoes: d.conversoes,
-  }));
-```
+**4. Definicoes de metricas financeiras**
+- Faturamento Total = soma de valor_total (inclui frete)
+- Receita Liquida = Faturamento Total - Frete Total
+- Ticket Medio = Faturamento Total / Total de Pedidos
+- Ticket Medio Real = exclui pedidos 100% amostra
+- ROAS Real = Receita Liquida (ex-frete) / Investimento em Ads
+- ROAS Meta = Valor de conversao reportado pelo Meta / Investimento
+- ROI = ((Receita - Investimento) / Investimento) x 100
+- CAC = Investimento em Ads / Novos Clientes
+- LTV = Receita Total / Total de Clientes
+- LTV/CAC >= 3x e saudavel
 
-Adicionar `top_anuncios: topAds` ao objeto de retorno.
+**5. Benchmarks de ads**
+- ROAS >= 4x = Excelente, 3-4x = Bom, < 3x = Atencao
+- CTR e metrica DIAGNOSTICA (nao decisional) - nao usar sozinha como indicador de sucesso
+- ROAS e a metrica DECISIONAL primaria para ads de vendas
+- Para objetivos nao-vendas (Engagement, Traffic), a eficiencia e medida por CPC/CPR abaixo da mediana
 
-### 2. Adicionar agrupamento por objetivo
+**6. Classificacao de clientes**
+- Ativo: ultima compra < 30 dias
+- Em risco: ultima compra 31-60 dias
+- Inativo: ultima compra 61-90 dias
+- Churn: ultima compra > 90 dias
+- Taxa retencao >= 70% e bom
+- Taxa recompra >= 30% e bom
 
-Tambem agrupar por `objetivo` para dar contexto sobre a estrategia:
+**7. Quadrantes de classificacao de anuncios**
+- Conversor: CTR alto + ROAS alto (melhor anuncio, escalar)
+- Isca de Atencao: CTR alto + ROAS baixo (atrai cliques mas nao converte)
+- Conversor Silencioso: CTR baixo + ROAS alto (converte bem, melhorar criativo)
+- Ineficiente: CTR baixo + ROAS baixo (pausar ou refazer)
 
-```text
-const objectiveMap: Record<string, { gasto: number; receita: number; cliques: number }> = {};
-for (const r of rows) {
-  const obj = r.objetivo || "Desconhecido";
-  if (!objectiveMap[obj]) objectiveMap[obj] = { gasto: 0, receita: 0, cliques: 0 };
-  objectiveMap[obj].gasto += Number(r.gasto || 0);
-  objectiveMap[obj].receita += Number(r.receita || 0);
-  objectiveMap[obj].cliques += Number(r.cliques || 0);
-}
-```
+**8. Logistica**
+- Tempo medio NF <= 2 dias e bom, 3-5 aceitavel, > 5 atencao
 
-Adicionar `por_objetivo: objectiveMap` ao retorno.
+## Detalhes tecnicos
 
-### 3. Atualizar system prompt (linha ~310-313)
+### Arquivo modificado
+- `supabase/functions/chat-with-data/index.ts` - apenas o bloco `SYSTEM_PROMPT` (linhas 328-357)
 
-Adicionar instrucoes:
-- "O campo `top_anuncios` contem os 30 anuncios com maior receita, incluindo gasto, receita, ROAS, cliques e impressoes de cada um"
-- "O campo `por_objetivo` agrupa ads por objetivo de campanha (OUTCOME_SALES, LINK_CLICKS, etc.)"
-- "Use `top_anuncios` para responder perguntas sobre melhores/piores anuncios"
+### Abordagem
+- Adicionar todo o conhecimento como um bloco "MANUAL DO NEGOCIO" dentro do system prompt, entre as regras obrigatorias e o bloco "DADOS DO NEGOCIO"
+- Manter o prompt existente intacto, apenas inserir o novo bloco antes de "DADOS DO NEGOCIO"
+- Nao alterar nenhuma logica de agregacao ou fetch de dados
 
-## Resultado esperado
-
-- O chat conseguira listar os 5 melhores anuncios de fevereiro com nome, gasto, receita e ROAS
-- Perguntas como "qual anuncio teve melhor ROAS?" serao respondidas com dados reais
-- O breakdown por objetivo dara contexto sobre a estrategia de ads
+### Tamanho estimado
+- O system prompt crescera em ~2.500-3.000 caracteres (texto puro, sem codigo)
+- Isso e aceitavel pois o modelo recebe contexto de dados muito maior que isso
 
