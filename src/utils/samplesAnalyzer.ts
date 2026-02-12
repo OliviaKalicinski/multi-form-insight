@@ -52,10 +52,11 @@ export type PetType = 'dog' | 'cat';
  * Por padrão, assume "dog" (histórico: antes de existir gato, eram todas de cachorro)
  */
 export const getSamplePetType = (produto: { descricao?: string; descricaoAjustada?: string }): PetType => {
-  const name = (produto.descricaoAjustada || produto.descricao || '').toLowerCase();
+  const adjustedName = (produto.descricaoAjustada || '').toLowerCase();
+  const originalName = (produto.descricao || '').toLowerCase();
   
-  // Regra restrita: gato só quando aparece "gato" (já pega "gatos" também)
-  const isCat = name.includes("gato");
+  // Verifica ambos os campos: o normalizado pode perder "gato" (ex: "Kit de Amostras")
+  const isCat = adjustedName.includes("gato") || originalName.includes("gato");
   
   // Histórico: antes de existir gato, todas eram para cachorro (padrão)
   return isCat ? 'cat' : 'dog';
