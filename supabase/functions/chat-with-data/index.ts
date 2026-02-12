@@ -67,7 +67,7 @@ async function fetchDataContext(supabase: any) {
     ),
     fetchAll(
       supabase, "ads_data",
-      "data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, objetivo",
+      "data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, conjunto, anuncio, objetivo",
       "data", d90Date, "data",
     ),
     fetchAll(
@@ -269,6 +269,43 @@ function aggregateAds(rows: any[]) {
     }
   }
 
+  // Per-ad breakdown
+  const adMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }> = {};
+  for (const r of rows) {
+    const adName = r.anuncio || r.campanha || "Sem nome";
+    if (!adMap[adName]) adMap[adName] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0, conversoes: 0 };
+    adMap[adName].gasto += Number(r.gasto || 0);
+    adMap[adName].receita += Number(r.receita || 0);
+    adMap[adName].cliques += Number(r.cliques || 0);
+    adMap[adName].impressoes += Number(r.impressoes || 0);
+    adMap[adName].conversoes += Number(r.conversoes || 0);
+  }
+
+  const topAds = Object.entries(adMap)
+    .sort((a, b) => b[1].receita - a[1].receita)
+    .slice(0, 30)
+    .map(([name, d]) => ({
+      anuncio: name,
+      gasto: d.gasto.toFixed(2),
+      receita: d.receita.toFixed(2),
+      roas: d.gasto > 0 ? (d.receita / d.gasto).toFixed(2) : "0",
+      cliques: d.cliques,
+      impressoes: d.impressoes,
+      conversoes: d.conversoes,
+    }));
+
+  // Per-objective breakdown
+  const objectiveMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }> = {};
+  for (const r of rows) {
+    const obj = r.objetivo || "Desconhecido";
+    if (!objectiveMap[obj]) objectiveMap[obj] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0, conversoes: 0 };
+    objectiveMap[obj].gasto += Number(r.gasto || 0);
+    objectiveMap[obj].receita += Number(r.receita || 0);
+    objectiveMap[obj].cliques += Number(r.cliques || 0);
+    objectiveMap[obj].impressoes += Number(r.impressoes || 0);
+    objectiveMap[obj].conversoes += Number(r.conversoes || 0);
+  }
+
   return {
     periodo: "Últimos 90 dias",
     total_registros: rows.length,
@@ -283,6 +320,8 @@ function aggregateAds(rows: any[]) {
     por_dia_30d: Object.entries(dayMap)
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([d, v]) => ({ dia: d, gasto: v.gasto.toFixed(2), receita: v.receita.toFixed(2), cliques: v.cliques, impressoes: v.impressoes })),
+    top_anuncios: topAds,
+    por_objetivo: objectiveMap,
   };
 }
 
@@ -311,6 +350,8 @@ REGRAS OBRIGATÓRIAS:
 - O campo "top_produtos_por_mes" permite responder perguntas sobre produtos mais vendidos em meses específicos
 - Use o campo "por_dia_30d" de ads para analisar tendências diárias de anúncios nos últimos 30 dias
 - O campo "total_registros" indica quantos registros foram processados — todos os dados disponíveis são incluídos
+- O campo "top_anuncios" em ads contém os 30 anúncios com maior receita, com gasto, receita, ROAS, cliques, impressões e conversões de cada um. Use para responder sobre melhores/piores anúncios.
+- O campo "por_objetivo" em ads agrupa a performance por objetivo de campanha (OUTCOME_SALES, LINK_CLICKS, etc.). Use para analisar estratégia de investimento em ads.
 
 DADOS DO NEGÓCIO (contexto atualizado):
 `;
