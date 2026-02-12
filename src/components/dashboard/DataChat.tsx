@@ -173,7 +173,7 @@ export function DataChat() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[420px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-4rem)] flex flex-col rounded-2xl border bg-background shadow-2xl">
+    <div className="fixed bottom-6 right-6 z-50 w-[520px] max-w-[calc(100vw-2rem)] h-[700px] max-h-[calc(100vh-4rem)] flex flex-col rounded-2xl border bg-background shadow-2xl">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-primary/5 rounded-t-2xl">
         <div className="flex items-center gap-2">
