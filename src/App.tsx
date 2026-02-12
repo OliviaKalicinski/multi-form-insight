@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { DashboardProvider, useDashboard } from "@/contexts/DashboardContext";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { DataChat } from "@/components/dashboard/DataChat";
 import { GlobalFilter } from "@/components/GlobalFilter";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
@@ -73,6 +74,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <main className="flex-1 bg-background">
             {children}
           </main>
+          <DataChat />
         </SidebarInset>
       </div>
     </SidebarProvider>
