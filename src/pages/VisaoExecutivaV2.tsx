@@ -18,7 +18,7 @@ import { Calendar, Clock } from "lucide-react";
 
 const VisaoExecutivaV2 = () => {
   const { salesData, isLoadingData } = useDashboard();
-  const [period, setPeriod] = useState<string>("1d");
+  const [period, setPeriod] = useState<string>("7d");
   const [estadoData, setEstadoData] = useState<Record<string, number>>({});
 
   // Find the last date with data
