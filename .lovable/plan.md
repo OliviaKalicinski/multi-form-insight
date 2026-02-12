@@ -1,63 +1,87 @@
 
 
-# Substituir Mapa CTR x ROAS por grafico visual de classificacao
+# Chat com Inteligencia de Dados no Dashboard
 
-## O que muda
+## Objetivo
+Adicionar uma area de chat dentro do dashboard onde qualquer usuario autenticado pode fazer perguntas sobre os dados (vendas, ads, seguidores, etc.) e receber respostas inteligentes geradas por IA -- similar a experiencia que voce tem aqui na area de edicao.
 
-### 1. Remover AdFunnelMap
+## Como vai funcionar
 
-- Remover import e uso de `AdFunnelMap` em `src/pages/Ads.tsx` (linhas 30, 1076-1079)
-- Deletar arquivo `src/components/dashboard/AdFunnelMap.tsx`
-- Manter `adFormatClassifier.ts` (ainda usado pelo AdsBreakdown para classificacao)
+1. Um botao flutuante (icone de chat) aparece no canto inferior direito de qualquer pagina do dashboard
+2. Ao clicar, abre um painel de chat onde o usuario digita perguntas em linguagem natural
+3. A IA recebe os dados relevantes do banco como contexto e responde com analises, tabelas e insights
+4. As respostas sao renderizadas com suporte a markdown (tabelas, listas, negrito, etc.)
 
-### 2. Criar componente `AdClassificationChart`
+## Arquitetura
 
-Novo arquivo: `src/components/dashboard/AdClassificationChart.tsx`
+```text
+Usuario digita pergunta
+        |
+        v
+  Frontend (React)
+        |
+        v
+  Edge Function (chat-with-data)
+        |
+        +--> Consulta Supabase (sales_data, ads_data, followers_data, etc.)
+        |
+        +--> Envia contexto + pergunta para IA (Lovable AI - sem API key)
+        |
+        v
+  Resposta formatada em markdown
+        |
+        v
+  Renderizada no chat com react-markdown
+```
 
-Um scatter plot (grafico de dispersao) usando Recharts onde:
+## Etapas de implementacao
 
-- **Eixo X** = CTR (%)
-- **Eixo Y** = ROAS (x)
-- **Cada ponto** = um anuncio (tamanho proporcional ao investimento)
-- **Cores** = verde (Conversor), amarelo (Isca), azul (Silencioso), vermelho (Ineficiente)
-- **Linhas de referencia** = CTR = 2% (vertical) e ROAS = 1.5x (horizontal), dividindo os 4 quadrantes
-- **Labels nos quadrantes** = nome da classificacao em cada canto
-- **Tooltip** ao passar o mouse = nome do anuncio, CTR, ROAS, investimento
+### 1. Edge Function `chat-with-data`
+- Recebe a pergunta do usuario e o historico da conversa
+- Consulta as tabelas relevantes do banco (ultimos dados de vendas, ads, seguidores)
+- Monta um prompt com os dados como contexto + a pergunta
+- Chama a Lovable AI (modelo `google/gemini-2.5-flash`) para gerar a resposta
+- Retorna a resposta em texto/markdown
 
-Usa `getAdMetrics` (mesma logica do AdsBreakdown) para garantir consistencia dos valores.
+### 2. Componente de Chat (`DataChat`)
+- Painel flutuante no canto inferior direito
+- Campo de input para digitar perguntas
+- Area de mensagens com scroll (usuario e IA)
+- Renderizacao de markdown nas respostas (react-markdown)
+- Indicador de "digitando..." enquanto a IA processa
+- Botao para minimizar/fechar
 
-Filtro de investimento minimo R$10 mantido para evitar ruido visual.
+### 3. Integracao no Layout
+- O componente de chat sera adicionado dentro do `DashboardLayout` no `App.tsx`
+- Disponivel em todas as paginas do dashboard para usuarios autenticados
+- Nao requer role de admin -- qualquer usuario logado pode usar
 
-### 3. Inserir no lugar do AdFunnelMap
+### 4. Tabela de historico (opcional nesta fase)
+- Nesta primeira versao, o historico sera mantido apenas em memoria (state do React)
+- O chat reinicia ao recarregar a pagina
+- Persistencia pode ser adicionada futuramente
 
-Em `src/pages/Ads.tsx`, onde estava o AdFunnelMap (ROW 7), inserir o novo `AdClassificationChart` com os mesmos dados (`activeAdsData`), visivel apenas na view de Sales.
+## Detalhes tecnicos
 
-## Resultado esperado
+### Edge Function - Dados enviados como contexto
+A funcao vai consultar:
+- `sales_data`: ultimos 90 dias de vendas (resumo agregado, nao linha a linha)
+- `ads_data`: ultimos 90 dias de anuncios (metricas agregadas)
+- `followers_data`: dados de seguidores recentes
+- `marketing_data`: metricas do Instagram
 
-O usuario ve um grafico de dispersao intuitivo onde cada anuncio e um ponto colorido posicionado por CTR e ROAS, com os 4 quadrantes claramente demarcados por linhas de referencia. Permite identificar visualmente clusters de performance e outliers.
+Os dados serao pre-agregados em SQL antes de enviar ao modelo para manter o contexto compacto.
 
-## Secao tecnica
+### Modelo de IA
+- Usa Lovable AI (`google/gemini-2.5-flash`) -- nao precisa de API key
+- Prompt de sistema instrui a IA a responder em portugues, com foco em analise de dados de e-commerce/marketing
+- Suporte a markdown nas respostas
 
-### Dados do grafico
+### Dependencia nova
+- `react-markdown` para renderizar as respostas formatadas
 
-Cada ponto usa valores do Meta (CSV) via `getAdMetrics`:
-- CTR de `ad["CTR (todos)"]`
-- ROAS de `ad["ROAS de resultados"]`
-- Investimento de `ad["Valor usado (BRL)"]`
-- Classificacao via `classifyFunnelRole(ctr, roas)`
-
-### Recharts components utilizados
-
-- `ScatterChart` com `Scatter` (um por classificacao, para cores distintas)
-- `ReferenceLine` x=2 e y=1.5
-- `XAxis` / `YAxis` com labels
-- `ZAxis` para tamanho do ponto (range baseado em investimento)
-- `Tooltip` customizado
-- `Legend` com os 4 nomes de classificacao
-
-### Arquivos alterados
-
-1. `src/components/dashboard/AdClassificationChart.tsx` — novo
-2. `src/pages/Ads.tsx` — trocar import/uso
-3. `src/components/dashboard/AdFunnelMap.tsx` — deletar
+### Seguranca
+- A edge function valida o token JWT do usuario antes de processar
+- Os dados consultados respeitam as politicas RLS existentes
+- Nenhum dado sensivel (emails de clientes, etc.) e enviado ao modelo
 
