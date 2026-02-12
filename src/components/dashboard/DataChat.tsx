@@ -11,10 +11,12 @@ type Msg = { role: "user" | "assistant"; content: string };
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-data`;
 
 const SUGGESTIONS = [
-  "Qual foi o faturamento dos últimos 7 dias?",
-  "Quais são os produtos mais vendidos?",
-  "Como está o ROAS dos anúncios?",
-  "Qual a taxa de conversão de amostras?",
+  "Relatório resumido da última semana",
+  "Relatório da campanha de amostras: conversões e ROI",
+  "Quais os top 10 clientes e quanto cada um já comprou?",
+  "Compare a performance de janeiro vs fevereiro",
+  "Quais anúncios devo pausar e quais escalar?",
+  "Quantos clientes VIP temos e quem são?",
 ];
 
 export function DataChat() {
