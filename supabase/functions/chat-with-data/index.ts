@@ -7,11 +7,34 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SALES_LIMIT = 1000;
-const ADS_LIMIT = 300;
-const FOLLOWERS_LIMIT = 100;
-const MARKETING_LIMIT = 300;
+// ── Pagination helper ──────────────────────────────────────────────────
+async function fetchAll(
+  supabase: any,
+  table: string,
+  select: string,
+  dateCol: string,
+  minDate: string,
+  orderCol: string,
+) {
+  const PAGE = 1000;
+  let all: any[] = [];
+  let from = 0;
+  while (true) {
+    const { data } = await supabase
+      .from(table)
+      .select(select)
+      .gte(dateCol, minDate)
+      .order(orderCol, { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (!data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
 
+// ── Upload metadata ────────────────────────────────────────────────────
 async function fetchUploadMeta(supabase: any) {
   const { data } = await supabase
     .from("upload_history")
@@ -30,68 +53,49 @@ async function fetchUploadMeta(supabase: any) {
   return meta;
 }
 
+// ── Fetch all data context ─────────────────────────────────────────────
 async function fetchDataContext(supabase: any) {
   const now = Date.now();
   const d90 = new Date(now - 90 * 86400000).toISOString();
   const d90Date = d90.split("T")[0];
 
-  const [salesRes, adsRes, followersRes, marketingRes, uploadMeta] = await Promise.all([
-    supabase
-      .from("sales_data")
-      .select("data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom")
-      .gte("data_venda", d90)
-      .order("data_venda", { ascending: false })
-      .limit(SALES_LIMIT),
-    supabase
-      .from("ads_data")
-      .select("data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, objetivo")
-      .gte("data", d90Date)
-      .order("data", { ascending: false })
-      .limit(ADS_LIMIT),
-    supabase
-      .from("followers_data")
-      .select("data, total_seguidores, novos_seguidores, unfollows")
-      .gte("data", d90Date)
-      .order("data", { ascending: false })
-      .limit(FOLLOWERS_LIMIT),
-    supabase
-      .from("marketing_data")
-      .select("data, metrica, valor")
-      .gte("data", d90Date)
-      .order("data", { ascending: false })
-      .limit(MARKETING_LIMIT),
+  const [salesRaw, adsRaw, followersRaw, marketingRaw, uploadMeta] = await Promise.all([
+    fetchAll(
+      supabase, "sales_data",
+      "data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom",
+      "data_venda", d90, "data_venda",
+    ),
+    fetchAll(
+      supabase, "ads_data",
+      "data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, objetivo",
+      "data", d90Date, "data",
+    ),
+    fetchAll(
+      supabase, "followers_data",
+      "data, total_seguidores, novos_seguidores, unfollows",
+      "data", d90Date, "data",
+    ),
+    fetchAll(
+      supabase, "marketing_data",
+      "data, metrica, valor",
+      "data", d90Date, "data",
+    ),
     fetchUploadMeta(supabase),
   ]);
-
-  const salesRaw = salesRes.data || [];
-  const adsRaw = adsRes.data || [];
-  const followersRaw = followersRes.data || [];
-  const marketingRaw = marketingRes.data || [];
 
   const salesContext = aggregateSales(salesRaw);
   const adsContext = aggregateAds(adsRaw);
 
   return {
     ultimo_upload: uploadMeta,
-    vendas: {
-      ...salesContext,
-      dados_truncados: salesRaw.length >= SALES_LIMIT,
-    },
-    ads: {
-      ...adsContext,
-      dados_truncados: adsRaw.length >= ADS_LIMIT,
-    },
-    seguidores: {
-      dados: followersRaw,
-      dados_truncados: followersRaw.length >= FOLLOWERS_LIMIT,
-    },
-    marketing: {
-      dados: marketingRaw,
-      dados_truncados: marketingRaw.length >= MARKETING_LIMIT,
-    },
+    vendas: salesContext,
+    ads: adsContext,
+    seguidores: { dados: followersRaw },
+    marketing: { dados: marketingRaw },
   };
 }
 
+// ── Sales aggregation ──────────────────────────────────────────────────
 function aggregateSales(rows: any[]) {
   if (!rows.length) return { resumo: "Sem dados de vendas nos últimos 90 dias.", detalhes: [] };
 
@@ -126,28 +130,77 @@ function aggregateSales(rows: any[]) {
     }
   }
 
-  // Product breakdown
+  // Product breakdown — using correct field names
   const productMap: Record<string, { qty: number; revenue: number }> = {};
+  // Monthly product breakdown
+  const monthlyProductMap: Record<string, Record<string, { qty: number; revenue: number }>> = {};
+  // Sample tracking
+  let sampleOrders = 0;
+  let sampleDog = 0;
+  let sampleCat = 0;
+  let sampleBoth = 0;
+
   for (const r of rows) {
     try {
       const produtos = typeof r.produtos === "string" ? JSON.parse(r.produtos) : r.produtos;
-      if (Array.isArray(produtos)) {
-        for (const p of produtos) {
-          const name = p.nome || p.name || "Desconhecido";
-          const qty = Number(p.quantidade || p.qty || 1);
-          const price = Number(p.preco || p.price || 0);
-          if (!productMap[name]) productMap[name] = { qty: 0, revenue: 0 };
-          productMap[name].qty += qty;
-          productMap[name].revenue += price * qty;
+      if (!Array.isArray(produtos)) continue;
+
+      let hasProduct = false;
+      let hasSample = false;
+      let hasDog = false;
+      let hasCat = false;
+
+      const month = new Date(r.data_venda).toISOString().slice(0, 7); // YYYY-MM
+
+      for (const p of produtos) {
+        const name = p.descricaoAjustada || p.descricao || p.nome || p.name || "Desconhecido";
+        const qty = Number(p.quantidade || p.qty || 1);
+        const price = Number(p.preco || p.price || 0);
+        const isSample = price <= 1;
+
+        if (isSample) {
+          hasSample = true;
+          const desc = (name + " " + (p.descricao || "")).toLowerCase();
+          if (desc.includes("gato") || desc.includes("gatos")) hasCat = true;
+          else if (desc.includes("cachorro") || desc.includes("caes") || desc.includes("cães")) hasDog = true;
+          else hasDog = true; // default to dog
+        } else {
+          hasProduct = true;
         }
+
+        if (!productMap[name]) productMap[name] = { qty: 0, revenue: 0 };
+        productMap[name].qty += qty;
+        productMap[name].revenue += price * qty;
+
+        // Monthly
+        if (!monthlyProductMap[month]) monthlyProductMap[month] = {};
+        if (!monthlyProductMap[month][name]) monthlyProductMap[month][name] = { qty: 0, revenue: 0 };
+        monthlyProductMap[month][name].qty += qty;
+        monthlyProductMap[month][name].revenue += price * qty;
+      }
+
+      if (hasSample && !hasProduct) {
+        sampleOrders++;
+        if (hasDog && hasCat) sampleBoth++;
+        else if (hasCat) sampleCat++;
+        else sampleDog++;
       }
     } catch { /* skip */ }
   }
 
   const topProducts = Object.entries(productMap)
     .sort((a, b) => b[1].revenue - a[1].revenue)
-    .slice(0, 15)
+    .slice(0, 20)
     .map(([name, d]) => ({ nome: name, quantidade: d.qty, receita: d.revenue.toFixed(2) }));
+
+  // Top products per month (top 10 each)
+  const topProductsByMonth: Record<string, any[]> = {};
+  for (const [month, prods] of Object.entries(monthlyProductMap)) {
+    topProductsByMonth[month] = Object.entries(prods)
+      .sort((a, b) => b[1].qty - a[1].qty)
+      .slice(0, 10)
+      .map(([name, d]) => ({ nome: name, quantidade: d.qty, receita: d.revenue.toFixed(2) }));
+  }
 
   // Channel breakdown
   const channelMap: Record<string, number> = {};
@@ -165,6 +218,7 @@ function aggregateSales(rows: any[]) {
 
   return {
     periodo: "Últimos 90 dias",
+    total_registros: orderCount,
     total_pedidos: orderCount,
     receita_total: totalRevenue.toFixed(2),
     frete_total: totalFreight.toFixed(2),
@@ -177,11 +231,19 @@ function aggregateSales(rows: any[]) {
       .slice(0, 12)
       .map(([w, d]) => ({ semana: w, pedidos: d.orders, receita: d.revenue.toFixed(2), frete: d.freight.toFixed(2) })),
     top_produtos: topProducts,
+    top_produtos_por_mes: topProductsByMonth,
+    amostras: {
+      total_pedidos_somente_amostra: sampleOrders,
+      cachorro: sampleDog,
+      gato: sampleCat,
+      cachorro_e_gato: sampleBoth,
+    },
     por_canal: channelMap,
     por_status: statusMap,
   };
 }
 
+// ── Ads aggregation ────────────────────────────────────────────────────
 function aggregateAds(rows: any[]) {
   if (!rows.length) return { resumo: "Sem dados de ads nos últimos 90 dias." };
 
@@ -191,13 +253,13 @@ function aggregateAds(rows: any[]) {
   const totalImpressions = rows.reduce((s, r) => s + Number(r.impressoes || 0), 0);
   const totalConversions = rows.reduce((s, r) => s + Number(r.conversoes || 0), 0);
 
-  // Daily breakdown (last 14 days)
+  // Daily breakdown (last 30 days instead of 14)
   const now = Date.now();
-  const d14 = now - 14 * 86400000;
+  const d30 = now - 30 * 86400000;
   const dayMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number }> = {};
   for (const r of rows) {
     const d = new Date(r.data);
-    if (d.getTime() >= d14) {
+    if (d.getTime() >= d30) {
       const key = r.data;
       if (!dayMap[key]) dayMap[key] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0 };
       dayMap[key].gasto += Number(r.gasto || 0);
@@ -209,6 +271,7 @@ function aggregateAds(rows: any[]) {
 
   return {
     periodo: "Últimos 90 dias",
+    total_registros: rows.length,
     gasto_total: totalSpend.toFixed(2),
     receita_total: totalRevenue.toFixed(2),
     roas_geral: totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : "N/A",
@@ -217,19 +280,19 @@ function aggregateAds(rows: any[]) {
     conversoes_total: totalConversions,
     ctr_medio: totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) + "%" : "N/A",
     cpc_medio: totalClicks > 0 ? (totalSpend / totalClicks).toFixed(2) : "N/A",
-    por_dia_14d: Object.entries(dayMap)
+    por_dia_30d: Object.entries(dayMap)
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([d, v]) => ({ dia: d, gasto: v.gasto.toFixed(2), receita: v.receita.toFixed(2), cliques: v.cliques, impressoes: v.impressoes })),
   };
 }
 
+// ── System prompt ──────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `Você é um analista de dados especialista em e-commerce e marketing digital.
 Você tem acesso aos dados reais do negócio (vendas, anúncios, seguidores do Instagram e métricas de marketing).
 
 REGRAS OBRIGATÓRIAS:
 - Responda SEMPRE em português brasileiro
 - SEMPRE comece sua resposta informando o período coberto pelos dados e a data do último upload. Exemplo: "📊 Dados atualizados até DD/MM/AAAA (último upload em DD/MM às HH:MM)."
-- Se o campo "dados_truncados" for true para algum tipo de dado, AVISE CLARAMENTE: "⚠️ Atenção: o volume de dados de [tipo] excede o limite que consigo processar. A análise abaixo cobre apenas parte do período."
 - NUNCA mostre JSON cru — formate SEMPRE em tabelas markdown, listas ou texto corrido
 - Use markdown para formatar: tabelas, listas, negrito, etc.
 - Seja direto e analítico — foque em insights acionáveis
@@ -239,15 +302,20 @@ REGRAS OBRIGATÓRIAS:
 - Quando mostrar valores monetários, use o formato R$ X.XXX,XX
 - Arredonde percentuais para 1 casa decimal
 - Para tabelas grandes, limite a 15 linhas e indique se há mais dados
-- Considere que o negócio é de alimentos/suplementos (Comida de Dragão)
+- Considere que o negócio é de alimentos/suplementos para pets (Comida de Dragão)
 - Amostras/brindes são produtos com preço <= R$ 1,00
 - Use o campo "por_dia" para responder perguntas sobre períodos curtos (até 30 dias)
 - Use o campo "por_semana" para tendências de médio prazo (30-90 dias)
 - O campo "ultimo_upload" contém a data do último upload de cada tipo de dado — use-o para informar o usuário
+- O campo "amostras" contém breakdown de pedidos somente-amostra por tipo de pet (cachorro, gato, ambos)
+- O campo "top_produtos_por_mes" permite responder perguntas sobre produtos mais vendidos em meses específicos
+- Use o campo "por_dia_30d" de ads para analisar tendências diárias de anúncios nos últimos 30 dias
+- O campo "total_registros" indica quantos registros foram processados — todos os dados disponíveis são incluídos
 
 DADOS DO NEGÓCIO (contexto atualizado):
 `;
 
+// ── Main handler ───────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
