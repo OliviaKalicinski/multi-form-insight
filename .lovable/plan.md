@@ -1,91 +1,43 @@
 
 
-# Enriquecer o System Prompt do Chat com Dados
+# Melhorar legibilidade do Chat com Dados
 
-## Objetivo
+## Duas alteracoes
 
-O chat IA precisa conhecer todas as regras de negocio, definicoes de metricas e logica do dashboard para responder com precisao. Atualmente o system prompt tem regras basicas mas falta o conhecimento profundo que esta espalhado nos arquivos do frontend (`kpiExplanations.ts`, `productNormalizer.ts`, `samplesAnalyzer.ts`, etc.).
+### 1. Aumentar a janela do chat (DataChat.tsx)
 
-## O que sera feito
+Atualmente o chat tem `w-[420px]` e `h-[600px]`. Vamos aumentar para:
+- Largura: `w-[520px]` (de 420px para 520px)
+- Altura: `h-[700px]` (de 600px para 700px)
 
-Expandir o `SYSTEM_PROMPT` no arquivo `supabase/functions/chat-with-data/index.ts` com um bloco completo de conhecimento do negocio.
+Isso da mais espaco para tabelas e listas longas ficarem legiveis.
 
-### Conteudo a adicionar ao system prompt
+### 2. Instruir a IA a responder em formato mais limpo (system prompt)
 
-**1. Sobre o negocio**
-- Comida de Dragao: marca de alimentos e suplementos naturais para pets (caes e gatos)
-- Canais: venda online (B2C) via e-commerce
-- Modelo: venda direta + estrategia de amostras para aquisicao de clientes
+Adicionar regras de formatacao ao system prompt no arquivo `supabase/functions/chat-with-data/index.ts`:
 
-**2. Catalogo de produtos (12 produtos padronizados)**
-- Comida de Dragao - Original (90g)
-- Kit Comida de Dragao - Original (3x90g)
-- Mordida de Dragao - Spirulina (180g)
-- Kit Mordida de Dragao - Spirulina (3x180g)
-- Mordida de Dragao - Legumes (180g)
-- Kit Mordida de Dragao - Legumes (3x180g)
-- Kit Mordida de Dragao Mix (2 produtos)
-- Kit Completo (3 produtos)
-- Suplemento Concentrado para Caes (200g)
-- Suplemento Integral para Caes (180g)
-- Suplemento para Gatos (180g)
-- Kit de Amostras (preco <= R$ 1,00)
+- Priorizar bullet points em vez de tabelas grandes
+- Usar tabelas apenas para comparacoes diretas (max 5-7 linhas)
+- Separar secoes com titulos em negrito
+- Ser mais conciso — ir direto aos numeros importantes
+- Usar emojis como marcadores visuais (check, alerta, seta)
+- Evitar textos longos explicativos — focar em dados + insight curto
 
-**3. Regras de amostras**
-- Produto e amostra se: nome contem "amostra" OU preco entre R$ 0,01 e R$ 1,00
-- Pedido "somente amostra" = todos os produtos do pedido sao amostras
-- Pedido "com produto" = tem pelo menos um produto regular (preco > R$ 1,00)
-- Tipo de pet da amostra: verificar se descricao contem "gato"/"gatos" (= gato), senao cachorro
-- Pedido com amostras de ambos tipos = "cachorro + gato"
-- Conversao de amostra: cliente cujo 1o pedido foi somente amostra e depois fez pedido com produto regular
-- Janela de conversao ideal: ate 45 dias apos amostra
+Exemplo de instrucao a adicionar:
 
-**4. Definicoes de metricas financeiras**
-- Faturamento Total = soma de valor_total (inclui frete)
-- Receita Liquida = Faturamento Total - Frete Total
-- Ticket Medio = Faturamento Total / Total de Pedidos
-- Ticket Medio Real = exclui pedidos 100% amostra
-- ROAS Real = Receita Liquida (ex-frete) / Investimento em Ads
-- ROAS Meta = Valor de conversao reportado pelo Meta / Investimento
-- ROI = ((Receita - Investimento) / Investimento) x 100
-- CAC = Investimento em Ads / Novos Clientes
-- LTV = Receita Total / Total de Clientes
-- LTV/CAC >= 3x e saudavel
-
-**5. Benchmarks de ads**
-- ROAS >= 4x = Excelente, 3-4x = Bom, < 3x = Atencao
-- CTR e metrica DIAGNOSTICA (nao decisional) - nao usar sozinha como indicador de sucesso
-- ROAS e a metrica DECISIONAL primaria para ads de vendas
-- Para objetivos nao-vendas (Engagement, Traffic), a eficiencia e medida por CPC/CPR abaixo da mediana
-
-**6. Classificacao de clientes**
-- Ativo: ultima compra < 30 dias
-- Em risco: ultima compra 31-60 dias
-- Inativo: ultima compra 61-90 dias
-- Churn: ultima compra > 90 dias
-- Taxa retencao >= 70% e bom
-- Taxa recompra >= 30% e bom
-
-**7. Quadrantes de classificacao de anuncios**
-- Conversor: CTR alto + ROAS alto (melhor anuncio, escalar)
-- Isca de Atencao: CTR alto + ROAS baixo (atrai cliques mas nao converte)
-- Conversor Silencioso: CTR baixo + ROAS alto (converte bem, melhorar criativo)
-- Ineficiente: CTR baixo + ROAS baixo (pausar ou refazer)
-
-**8. Logistica**
-- Tempo medio NF <= 2 dias e bom, 3-5 aceitavel, > 5 atencao
+```
+FORMATO DE RESPOSTA:
+- Prefira bullet points curtos em vez de parágrafos longos
+- Use tabelas APENAS para comparações diretas (máximo 7 linhas)
+- Separe seções com títulos em **negrito**
+- Para cada insight, use o formato: dado → interpretação (1 linha)
+- Use ✅ ⚠️ 🔴 para sinalizar status (bom / atenção / crítico)
+- Seja conciso: máximo 3-4 bullets por seção
+```
 
 ## Detalhes tecnicos
 
-### Arquivo modificado
-- `supabase/functions/chat-with-data/index.ts` - apenas o bloco `SYSTEM_PROMPT` (linhas 328-357)
-
-### Abordagem
-- Adicionar todo o conhecimento como um bloco "MANUAL DO NEGOCIO" dentro do system prompt, entre as regras obrigatorias e o bloco "DADOS DO NEGOCIO"
-- Manter o prompt existente intacto, apenas inserir o novo bloco antes de "DADOS DO NEGOCIO"
-- Nao alterar nenhuma logica de agregacao ou fetch de dados
-
-### Tamanho estimado
-- O system prompt crescera em ~2.500-3.000 caracteres (texto puro, sem codigo)
-- Isso e aceitavel pois o modelo recebe contexto de dados muito maior que isso
+### Arquivos modificados
+1. `src/components/dashboard/DataChat.tsx` — largura e altura do container
+2. `supabase/functions/chat-with-data/index.ts` — regras de formatacao no system prompt
 
