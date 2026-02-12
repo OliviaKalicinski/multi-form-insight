@@ -87,7 +87,7 @@ const VisaoExecutivaV2 = () => {
     let totalProductQty = 0;
     orders.forEach((o) => {
       o.produtos.forEach((p) => {
-        totalProductRevenue += p.preco * p.quantidade;
+        totalProductRevenue += p.preco;
         totalProductQty += p.quantidade;
       });
     });
