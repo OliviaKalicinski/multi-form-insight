@@ -67,7 +67,7 @@ async function fetchDataContext(supabase: any) {
     ),
     fetchAll(
       supabase, "ads_data",
-      "data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, conjunto, anuncio, objetivo",
+      "data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, conjunto, anuncio, objetivo, status_veiculacao",
       "data", "", "data",
     ),
     fetchAll(
@@ -333,30 +333,83 @@ function aggregateAds(rows: any[]) {
     }
   }
 
-  // Per-ad breakdown (all time)
-  const adMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }> = {};
+  // Per-ad breakdown (all time) with status tracking
+  const adMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number; status: string; lastDate: string }> = {};
   for (const r of rows) {
     const adName = r.anuncio || r.campanha || "Sem nome";
-    if (!adMap[adName]) adMap[adName] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0, conversoes: 0 };
+    if (!adMap[adName]) adMap[adName] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0, conversoes: 0, status: "", lastDate: "" };
     adMap[adName].gasto += Number(r.gasto || 0);
     adMap[adName].receita += Number(r.receita || 0);
     adMap[adName].cliques += Number(r.cliques || 0);
     adMap[adName].impressoes += Number(r.impressoes || 0);
     adMap[adName].conversoes += Number(r.conversoes || 0);
+    // Track most recent status
+    if (r.data && r.data > adMap[adName].lastDate) {
+      adMap[adName].lastDate = r.data;
+      adMap[adName].status = r.status_veiculacao || "";
+    }
   }
 
-  const topAds = Object.entries(adMap)
+  const formatAd = (name: string, d: typeof adMap[string]) => ({
+    anuncio: name,
+    gasto: d.gasto.toFixed(2),
+    receita: d.receita.toFixed(2),
+    roas: d.gasto > 0 ? (d.receita / d.gasto).toFixed(2) : "0",
+    ctr: d.impressoes > 0 ? ((d.cliques / d.impressoes) * 100).toFixed(2) + "%" : "0%",
+    cliques: d.cliques,
+    impressoes: d.impressoes,
+    conversoes: d.conversoes,
+    status: d.status || "desconhecido",
+  });
+
+  // Separate active vs inactive ads
+  const activeEntries = Object.entries(adMap).filter(([, d]) => d.status === "active");
+  const inactiveEntries = Object.entries(adMap).filter(([, d]) => d.status !== "active");
+
+  const topAnunciosAtivos = activeEntries
     .sort((a, b) => b[1].receita - a[1].receita)
     .slice(0, 30)
+    .map(([name, d]) => formatAd(name, d));
+
+  const topAnunciosInativos = inactiveEntries
+    .sort((a, b) => b[1].receita - a[1].receita)
+    .slice(0, 15)
+    .map(([name, d]) => formatAd(name, d));
+
+  // Top 10 active ads from last 60 days (candidates to scale)
+  const d60 = now - 60 * 86400000;
+  const recentActiveMap: Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }> = {};
+  for (const r of rows) {
+    const ts = new Date(r.data).getTime();
+    if (ts < d60) continue;
+    if ((r.status_veiculacao || "") !== "active") continue;
+    const adName = r.anuncio || r.campanha || "Sem nome";
+    if (!recentActiveMap[adName]) recentActiveMap[adName] = { gasto: 0, receita: 0, cliques: 0, impressoes: 0, conversoes: 0 };
+    recentActiveMap[adName].gasto += Number(r.gasto || 0);
+    recentActiveMap[adName].receita += Number(r.receita || 0);
+    recentActiveMap[adName].cliques += Number(r.cliques || 0);
+    recentActiveMap[adName].impressoes += Number(r.impressoes || 0);
+    recentActiveMap[adName].conversoes += Number(r.conversoes || 0);
+  }
+
+  const candidatosEscalar2m = Object.entries(recentActiveMap)
+    .sort((a, b) => b[1].receita - a[1].receita)
+    .slice(0, 10)
     .map(([name, d]) => ({
       anuncio: name,
       gasto: d.gasto.toFixed(2),
       receita: d.receita.toFixed(2),
       roas: d.gasto > 0 ? (d.receita / d.gasto).toFixed(2) : "0",
+      ctr: d.impressoes > 0 ? ((d.cliques / d.impressoes) * 100).toFixed(2) + "%" : "0%",
       cliques: d.cliques,
-      impressoes: d.impressoes,
       conversoes: d.conversoes,
     }));
+
+  // Keep legacy topAds for backward compat
+  const topAds = Object.entries(adMap)
+    .sort((a, b) => b[1].receita - a[1].receita)
+    .slice(0, 30)
+    .map(([name, d]) => formatAd(name, d));
 
   // ── Monthly ads breakdown (top 15 per month) ─────────────────────────
   const monthAdMap: Record<string, Record<string, { gasto: number; receita: number; cliques: number; impressoes: number; conversoes: number }>> = {};
@@ -444,6 +497,9 @@ function aggregateAds(rows: any[]) {
       .map(([d, v]) => ({ dia: d, gasto: v.gasto.toFixed(2), receita: v.receita.toFixed(2), cliques: v.cliques, impressoes: v.impressoes })),
     por_mes: adsPorMes,
     top_anuncios: topAds,
+    top_anuncios_ativos: topAnunciosAtivos,
+    top_anuncios_inativos: topAnunciosInativos,
+    candidatos_escalar_2m: candidatosEscalar2m,
     top_anuncios_por_mes: topAnunciosPorMes,
     por_objetivo: objectiveMap,
   };
@@ -507,9 +563,14 @@ SEGMENTAÇÃO DE CLIENTES:
 ADS:
 - "por_dia_30d": breakdown diário de ads dos últimos 30 dias
 - "por_mes": breakdown MENSAL de ads (gasto, receita, ROAS, cliques, impressões, conversões por mês). Use para "quanto gastamos em ads em [mês]?"
-- "top_anuncios": top 30 anúncios por receita (período completo)
+- "top_anuncios_ativos": anúncios ATIVOS com CTR e ROAS calculados. Use para recomendar pausar (ROAS baixo) ou manter. Cada anúncio tem campo "ctr" e "status".
+- "candidatos_escalar_2m": top 10 anúncios ATIVOS dos últimos 2 meses por receita. Use SEMPRE para recomendar quais escalar.
+- "top_anuncios_inativos": referência de anúncios já pausados/arquivados. NÃO recomende pausar estes — já estão inativos.
+- "top_anuncios": top 30 anúncios por receita (período completo, inclui ativos e inativos)
 - "top_anuncios_por_mes": top 15 anúncios por receita em cada mês (chave YYYY-MM). Use para "melhores anúncios de janeiro", "qual anúncio performou mais em [mês]?"
 - "por_objetivo": performance agrupada por objetivo de campanha
+- IMPORTANTE: só recomende PAUSAR anúncios que estão ATIVOS (campo status = "active"). Anúncios inativos já estão pausados.
+- O campo "ctr" está calculado por anúncio — use para classificação nos quadrantes (Conversor, Isca, Silencioso, Ineficiente).
 
 OUTROS:
 - "ultimo_upload": data do último upload de cada tipo de dado — use para informar o usuário
