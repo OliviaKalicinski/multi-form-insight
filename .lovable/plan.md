@@ -1,54 +1,81 @@
 
 
-# Melhorias no Chat de Dados: Contexto temporal + Limites + Prompt enriquecido
+# Classificacao de eficiencia por objetivo do anuncio
 
-## O que muda
+## Problema atual
+Todos os anuncios sao avaliados pelo mesmo criterio de CTR x ROAS, independente do objetivo. Anuncios de Engagement e Traffic nunca terao ROAS (nao geram compras), entao sao sempre classificados como "Ineficiente" ou "Isca de Atencao" -- o que e injusto e gera ruido na analise.
 
-### 1. Ultimo input de dados
-A edge function vai consultar a tabela `upload_history` para buscar a data/hora do upload mais recente de cada tipo de dado (vendas, ads, seguidores, marketing). Essa informacao sera incluida no contexto enviado a IA, junto com uma regra no prompt para que ela **sempre informe ao usuario ate quando os dados vao**.
+## Logica proposta
 
-Exemplo de resposta da IA: *"Os dados de vendas estao atualizados ate 08/02/2026 (ultimo upload em 08/02 as 22:40). Com base nesses dados..."*
+Anuncios serao avaliados por metricas diferentes conforme seu objetivo:
 
-### 2. Aviso de limite de 1000 linhas
-Ao consultar cada tabela, a funcao vai verificar se o numero de linhas retornadas atingiu exatamente o limite (1000 para vendas, 300 para ads, etc.). Se sim, inclui um flag `dados_truncados: true` no contexto, e o prompt instrui a IA a avisar o usuario:
-
-*"Atencao: o volume de dados excede o limite que consigo processar. A analise abaixo cobre apenas parte do periodo solicitado."*
-
-### 3. Prompt com regras mais claras
-O prompt do sistema sera enriquecido com regras adicionais:
-- Sempre mencionar o periodo coberto pelos dados e a data do ultimo upload
-- Nunca mostrar JSON cru -- sempre tabelas ou texto formatado
-- Avisar quando os dados estao truncados
-- Usar agregacao diaria para ultimos 30 dias e semanal para 30-90 dias
-
-## Mudancas tecnicas
-
-### Arquivo: `supabase/functions/chat-with-data/index.ts`
-
-**Nova consulta -- ultimo upload por tipo:**
 ```text
-SELECT data_type, MAX(created_at) as ultimo_upload, 
-       MAX(date_range_end) as dados_ate
-FROM upload_history
-GROUP BY data_type
++---------------------+---------------------------+---------------------------+
+| Objetivo            | Eixo X (eficiencia)       | Eixo Y (resultado)        |
++---------------------+---------------------------+---------------------------+
+| OUTCOME_SALES       | CTR >= 2%                 | ROAS >= 1.5x              |
+| OUTCOME_ENGAGEMENT  | CTR >= 2%                 | CPR <= mediana do grupo    |
+| OUTCOME_TRAFFIC     | CTR >= 2%                 | CPC <= mediana do grupo    |
++---------------------+---------------------------+---------------------------+
 ```
 
-**Flag de truncamento:**
-- Apos cada query, comparar `rows.length` com o limite usado
-- Se `rows.length >= limit`, marcar `dados_truncados = true` no contexto daquele tipo
+- **Sales**: mantém CTR x ROAS (sem mudanca)
+- **Engagement**: CTR x Custo por Resultado (CPR). Um anuncio de engagement é "eficiente" se gera resultados a custo baixo
+- **Traffic**: CTR x CPC. Um anuncio de trafego é "eficiente" se traz cliques baratos
 
-**Agregacao diaria (ultimos 30 dias):**
-- Adicionar campo `por_dia` com receita/pedidos/frete por dia
-- Manter `por_semana` para o periodo 30-90 dias
+Os 4 quadrantes continuam existindo com os mesmos nomes, mas o significado do eixo Y muda:
 
-**Prompt atualizado com novas regras:**
-- "SEMPRE comece informando o periodo dos dados e a data do ultimo upload"
-- "Se `dados_truncados` for true, avise: os dados excedem o limite processavel"
-- "NUNCA mostre JSON cru -- formate sempre em tabelas markdown ou texto"
-- "Use `por_dia` para perguntas sobre periodos curtos (ate 30 dias)"
-- "Use `por_semana` para tendencias de medio prazo"
+- **Conversor**: CTR alto + resultado bom (ROAS alto / CPR baixo / CPC baixo)
+- **Isca de Atencao**: CTR alto + resultado fraco
+- **Conversor Silencioso**: CTR baixo + resultado bom
+- **Ineficiente**: CTR baixo + resultado fraco
 
-**Aumento de limite de vendas:** de 500 para 1000
+## O que muda na interface
 
-### Nenhum outro arquivo precisa ser alterado
-Todas as mudancas sao na edge function. O frontend ja renderiza markdown corretamente.
+### Tabela de breakdown (AdsBreakdown.tsx)
+- Coluna "ROAS" passa a mostrar a metrica relevante ao objetivo:
+  - Sales: ROAS (como hoje)
+  - Engagement: CPR (Custo por Resultado) formatado como moeda
+  - Traffic: CPC formatado como moeda
+- Coluna "Compras" passa a mostrar "Resultados" quando o objetivo nao for Sales
+- Header da coluna muda dinamicamente (ex: "ROAS" / "CPR" / "CPC")
+
+### Grafico scatter (AdClassificationChart.tsx)
+- Eixo Y muda conforme objetivo:
+  - Sales: ROAS (x)
+  - Engagement: CPR invertido (quanto menor, melhor -- escala invertida)
+  - Traffic: CPC invertido
+- Label do eixo Y muda dinamicamente
+
+### Regra de classificacao (adFormatClassifier.ts)
+- Nova funcao `classifyByObjective(objective, ctr, roas, cpr, cpc, medianCpr, medianCpc)`
+- Para Sales: mantém logica atual (CTR x ROAS)
+- Para Engagement: CTR >= 2% e CPR <= mediana = "Conversor"
+- Para Traffic: CTR >= 2% e CPC <= mediana = "Conversor"
+
+## Detalhes tecnicos
+
+### Arquivo: `src/utils/adFormatClassifier.ts`
+- Adicionar funcao `classifyByObjective` que recebe o objetivo e as metricas relevantes
+- Calcular mediana de CPR e CPC dentro do grupo de ads do mesmo objetivo
+- Manter `classifyFunnelRole` existente para retrocompatibilidade
+
+### Arquivo: `src/components/dashboard/AdsBreakdown.tsx`
+- Receber nova prop `objective: string` para saber qual objetivo esta ativo
+- Adaptar `getAdMetrics` para retornar CPR/CPC alem de CTR/ROAS
+- Trocar labels das colunas dinamicamente
+- Usar `classifyByObjective` em vez de `classifyFunnelRole` direto
+
+### Arquivo: `src/components/dashboard/AdClassificationChart.tsx`
+- Receber prop `objective` para adaptar eixo Y
+- Trocar label e escala do eixo Y conforme objetivo
+
+### Arquivo: `src/pages/Ads.tsx`
+- Passar `objective={effectiveObjective}` para `AdsBreakdown` e `AdClassificationChart`
+
+## Arquivos alterados
+1. `src/utils/adFormatClassifier.ts` -- nova funcao de classificacao por objetivo
+2. `src/components/dashboard/AdsBreakdown.tsx` -- metricas e labels dinamicos
+3. `src/components/dashboard/AdClassificationChart.tsx` -- eixo Y dinamico
+4. `src/pages/Ads.tsx` -- passar prop de objetivo
+
