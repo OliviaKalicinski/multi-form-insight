@@ -1,33 +1,31 @@
 
 
-# Corrigir detecao de amostras para gato
+# Corrigir calculo de Receita Produtos na Visao Executiva V2
 
 ## Problema
 
-A funcao `getSamplePetType` usa apenas `descricaoAjustada` (que o `productNormalizer` converte para "Kit de Amostras", perdendo a informacao de "gato"). Precisa verificar tambem o campo `descricao` original. Quando nenhum dos campos contem "gato", o padrao ja e "dog" (cachorro), o que esta correto.
+O campo `preco` de cada produto ja contem o **preco total da linha** (vem da coluna "Preco total" do CSV, que ja e preco unitario x quantidade). No entanto, o calculo na pagina multiplica `p.preco * p.quantidade` novamente, inflando o valor.
 
-## Alteracao
+Por isso Receita Produtos (R$ 4.806) aparece maior que Receita Total (R$ 3.364), o que e impossivel.
 
-### `src/utils/samplesAnalyzer.ts` (linhas 54-61)
+## Correcao
 
-Mudar a funcao `getSamplePetType` para verificar ambos os campos separadamente:
+### `src/pages/VisaoExecutivaV2.tsx` (linha 90)
 
+Mudar de:
 ```text
-De:
-  const name = (produto.descricaoAjustada || produto.descricao || '').toLowerCase();
-  const isCat = name.includes("gato");
-
-Para:
-  const adjustedName = (produto.descricaoAjustada || '').toLowerCase();
-  const originalName = (produto.descricao || '').toLowerCase();
-  const isCat = adjustedName.includes("gato") || originalName.includes("gato");
+totalProductRevenue += p.preco * p.quantidade;
 ```
 
-A logica de retorno permanece igual: `return isCat ? 'cat' : 'dog'` -- ou seja, quando nao houver nome definido ou nenhum campo mencionar "gato", o padrao continua sendo cachorro.
+Para:
+```text
+totalProductRevenue += p.preco;
+```
+
+Apenas remover a multiplicacao por `p.quantidade`, pois `p.preco` ja representa o valor total daquela linha de produto.
 
 ## Impacto
 
-- Corrige a contagem de amostras gato em todas as paginas (Visao Executiva V2, Analise de Amostras)
-- Nenhum outro arquivo alterado
-- Nenhuma mudanca no banco de dados
-
+- Receita Produtos passara a ser menor ou igual a Receita Total (correto)
+- Receita Media por Produto tambem sera corrigida (usa `receitaProdutos / totalProductQty`)
+- Nenhum outro arquivo precisa ser alterado
