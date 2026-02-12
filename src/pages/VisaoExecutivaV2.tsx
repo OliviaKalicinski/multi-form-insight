@@ -15,11 +15,103 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar, Clock } from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+
+const CHART_COLORS = [
+  "hsl(214, 95%, 50%)",
+  "hsl(142, 76%, 36%)",
+  "hsl(38, 92%, 50%)",
+  "hsl(280, 65%, 60%)",
+  "hsl(340, 75%, 55%)",
+  "hsl(190, 80%, 45%)",
+  "hsl(25, 85%, 55%)",
+  "hsl(160, 60%, 40%)",
+];
+
+const DonutChart = ({
+  data,
+  label,
+}: {
+  data: { name: string; value: number; pct?: number }[];
+  label?: string;
+}) => {
+  if (data.length === 0)
+    return (
+      <p className="text-sm text-muted-foreground">Dados não disponíveis</p>
+    );
+
+  const total = data.reduce((s, d) => s + d.value, 0);
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      {label && (
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      )}
+      <div className="w-full" style={{ height: 160 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={40}
+              outerRadius={65}
+              dataKey="value"
+              paddingAngle={2}
+              stroke="none"
+            >
+              {data.map((_, i) => (
+                <Cell
+                  key={i}
+                  fill={CHART_COLORS[i % CHART_COLORS.length]}
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value: number) => value.toLocaleString("pt-BR")}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="w-full space-y-1">
+        {data.map((d, i) => {
+          const pct = total > 0 ? ((d.value / total) * 100).toFixed(0) : "0";
+          return (
+            <div
+              key={d.name}
+              className="flex items-center justify-between text-xs"
+            >
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="w-2.5 h-2.5 rounded-sm shrink-0"
+                  style={{
+                    backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+                  }}
+                />
+                <span className="text-muted-foreground truncate max-w-[120px]">
+                  {d.name}
+                </span>
+              </div>
+              <span className="font-medium tabular-nums">
+                {d.value} ({pct}%)
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const VisaoExecutivaV2 = () => {
   const { salesData, isLoadingData } = useDashboard();
   const [period, setPeriod] = useState<string>("7d");
-  const [estadoData, setEstadoData] = useState<Record<string, number>>({});
+  const [estadoSampleData, setEstadoSampleData] = useState<
+    Record<string, number>
+  >({});
+  const [estadoProductData, setEstadoProductData] = useState<
+    Record<string, number>
+  >({});
 
   // Find the last date with data
   const lastDate = useMemo(() => {
@@ -38,28 +130,43 @@ const VisaoExecutivaV2 = () => {
       );
     }
 
-    // 7d
     const startDate = new Date(lastDate);
     startDate.setDate(startDate.getDate() - 6);
     startDate.setHours(0, 0, 0, 0);
     return salesData.filter((o) => o.dataVenda >= startDate);
   }, [salesData, lastDate, period]);
 
-  // Fetch estado data from DB for filtered orders
+  // Separate sample-only vs product order IDs
+  const { sampleOrderIds, productOrderIds } = useMemo(() => {
+    const sIds: string[] = [];
+    const pIds: string[] = [];
+    filteredOrders.forEach((o) => {
+      if (isOnlySampleOrder(o)) sIds.push(o.numeroPedido);
+      else if (hasRegularProduct(o)) pIds.push(o.numeroPedido);
+    });
+    return { sampleOrderIds: sIds, productOrderIds: pIds };
+  }, [filteredOrders]);
+
+  // Fetch estado data from DB separately for samples and products
   useEffect(() => {
     if (filteredOrders.length === 0) {
-      setEstadoData({});
+      setEstadoSampleData({});
+      setEstadoProductData({});
       return;
     }
 
-    const orderIds = filteredOrders.map((o) => o.numeroPedido);
-
-    const fetchEstados = async () => {
-      // Query in batches if needed
+    const fetchEstados = async (
+      ids: string[],
+      setter: (d: Record<string, number>) => void
+    ) => {
+      if (ids.length === 0) {
+        setter({});
+        return;
+      }
       const { data, error } = await supabase
         .from("sales_data")
         .select("numero_pedido, estado")
-        .in("numero_pedido", orderIds.slice(0, 500));
+        .in("numero_pedido", ids.slice(0, 500));
 
       if (error || !data) return;
 
@@ -68,11 +175,12 @@ const VisaoExecutivaV2 = () => {
         const estado = row.estado || "Não informado";
         counts[estado] = (counts[estado] || 0) + 1;
       });
-      setEstadoData(counts);
+      setter(counts);
     };
 
-    fetchEstados();
-  }, [filteredOrders]);
+    fetchEstados(sampleOrderIds, setEstadoSampleData);
+    fetchEstados(productOrderIds, setEstadoProductData);
+  }, [filteredOrders, sampleOrderIds, productOrderIds]);
 
   // Calculate all metrics
   const metrics = useMemo(() => {
@@ -82,47 +190,90 @@ const VisaoExecutivaV2 = () => {
     // Revenue
     const receitaTotal = orders.reduce((sum, o) => sum + o.valorTotal, 0);
     const frete = orders.reduce((sum, o) => sum + o.valorFrete, 0);
+    const fretePercent =
+      receitaTotal > 0 ? ((frete / receitaTotal) * 100).toFixed(1) : "0";
 
     let totalProductRevenue = 0;
     let totalProductQty = 0;
+
+    // Per-product revenue aggregation
+    const productRevenueMap: Record<
+      string,
+      { revenue: number; qty: number }
+    > = {};
+
     orders.forEach((o) => {
       o.produtos.forEach((p) => {
         totalProductRevenue += p.preco;
         totalProductQty += p.quantidade;
+
+        if (!isSampleProduct(p)) {
+          const key = p.descricaoAjustada || p.descricao;
+          if (!productRevenueMap[key])
+            productRevenueMap[key] = { revenue: 0, qty: 0 };
+          productRevenueMap[key].revenue += p.preco;
+          productRevenueMap[key].qty += p.quantidade;
+        }
       });
     });
 
     const receitaProdutos = totalProductRevenue;
-    const receitaMediaPorProduto =
-      totalProductQty > 0 ? receitaProdutos / totalProductQty : 0;
+
+    // Average revenue per individual product
+    const receitaMediaPorProduto = Object.entries(productRevenueMap)
+      .map(([name, d]) => ({
+        name,
+        avgPrice: d.qty > 0 ? d.revenue / d.qty : 0,
+      }))
+      .sort((a, b) => a.avgPrice - b.avgPrice);
 
     // Orders breakdown
     const onlySampleOrders = orders.filter((o) => isOnlySampleOrder(o));
     const withProductOrders = orders.filter((o) => hasRegularProduct(o));
+
+    // Ticket médio and avg products (excluding samples)
     const ticketMedio =
       withProductOrders.length > 0
         ? withProductOrders.reduce((sum, o) => sum + o.valorTotal, 0) /
           withProductOrders.length
         : 0;
 
-    const totalItems = orders.reduce((sum, o) => sum + o.totalItens, 0);
-    const mediaProdutosPorPedido =
-      totalOrders > 0 ? totalItems / totalOrders : 0;
-
-    // Samples
-    let totalSamplesSold = 0;
-    let samplesDog = 0;
-    let samplesCat = 0;
-    orders.forEach((o) => {
+    // Avg products per order (excluding sample items)
+    let totalNonSampleItems = 0;
+    withProductOrders.forEach((o) => {
       o.produtos.forEach((p) => {
-        if (isSampleProduct(p)) {
-          totalSamplesSold += p.quantidade;
-          const petType = getSamplePetType(p);
-          if (petType === "dog") samplesDog += p.quantidade;
-          else samplesCat += p.quantidade;
-        }
+        if (!isSampleProduct(p)) totalNonSampleItems += p.quantidade;
       });
     });
+    const mediaProdutosPorPedido =
+      withProductOrders.length > 0
+        ? totalNonSampleItems / withProductOrders.length
+        : 0;
+
+    // Sample orders breakdown by pet type
+    let samplesDog = 0;
+    let samplesCat = 0;
+    let samplesBoth = 0;
+
+    onlySampleOrders.forEach((o) => {
+      let hasDog = false;
+      let hasCat = false;
+      o.produtos.forEach((p) => {
+        if (isSampleProduct(p)) {
+          const petType = getSamplePetType(p);
+          if (petType === "dog") hasDog = true;
+          else hasCat = true;
+        }
+      });
+      if (hasDog && hasCat) samplesBoth++;
+      else if (hasCat) samplesCat++;
+      else samplesDog++;
+    });
+
+    // Products sold (excluding samples) with quantities
+    const productsSold = Object.entries(productRevenueMap)
+      .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
+      .sort((a, b) => b.qty - a.qty);
 
     // Channel distribution
     const channelMap: Record<string, { orders: number; revenue: number }> = {};
@@ -135,31 +286,40 @@ const VisaoExecutivaV2 = () => {
     const channels = Object.entries(channelMap)
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.orders - a.orders);
-    const maxChannelOrders = channels.length > 0 ? channels[0].orders : 1;
 
-    // Top 3 estados
-    const topEstados = Object.entries(estadoData)
+    // Estado data for pie charts
+    const estadoSamplePie = Object.entries(estadoSampleData)
+      .filter(([k]) => k !== "Não informado")
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
+      .slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+
+    const estadoProductPie = Object.entries(estadoProductData)
+      .filter(([k]) => k !== "Não informado")
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
 
     return {
       receitaTotal,
       receitaProdutos,
       frete,
+      fretePercent,
       receitaMediaPorProduto,
       totalOrders,
       onlySampleCount: onlySampleOrders.length,
       withProductCount: withProductOrders.length,
       ticketMedio,
       mediaProdutosPorPedido,
-      totalSamplesSold,
       samplesDog,
       samplesCat,
+      samplesBoth,
+      productsSold,
       channels,
-      maxChannelOrders,
-      topEstados,
+      estadoSamplePie,
+      estadoProductPie,
     };
-  }, [filteredOrders, estadoData]);
+  }, [filteredOrders, estadoSampleData, estadoProductData]);
 
   if (isLoadingData) {
     return (
@@ -182,11 +342,9 @@ const VisaoExecutivaV2 = () => {
   const periodLabel = lastDate
     ? period === "1d"
       ? format(lastDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-      : `${format(
-          new Date(lastDate.getTime() - 6 * 86400000),
-          "dd/MM",
-          { locale: ptBR }
-        )} — ${format(lastDate, "dd/MM/yyyy", { locale: ptBR })}`
+      : `${format(new Date(lastDate.getTime() - 6 * 86400000), "dd/MM", {
+          locale: ptBR,
+        })} — ${format(lastDate, "dd/MM/yyyy", { locale: ptBR })}`
     : "";
 
   return (
@@ -226,272 +384,201 @@ const VisaoExecutivaV2 = () => {
         </ToggleGroup>
       </div>
 
-      {/* Grid 2 columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* LEFT COLUMN — Mundo Online (B2C) */}
-        <div className="space-y-6">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            🌎 Mundo Online
-            <Badge variant="secondary" className="text-xs font-normal">
-              B2C
-            </Badge>
-          </h2>
+      {/* MUNDO ONLINE */}
+      <div>
+        <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+          🌎 Mundo Online
+          <Badge variant="secondary" className="text-xs font-normal">
+            B2C
+          </Badge>
+        </h2>
 
-          {/* Bloco Receita */}
+        {/* Row 1: Receita + Pedidos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          {/* Receita */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Receita</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Receita</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               <div>
                 <p className="text-xs text-muted-foreground">Receita Total</p>
-                <p className="text-3xl font-bold">
+                <p className="text-2xl font-bold">
                   {formatCurrency(metrics.receitaTotal)}
                 </p>
               </div>
-              <Separator />
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Frete</p>
+                  <p className="font-semibold">
+                    {formatCurrency(metrics.frete)}{" "}
+                    <span className="text-xs text-muted-foreground font-normal">
+                      ({metrics.fretePercent}% do total)
+                    </span>
+                  </p>
+                </div>
                 <div>
                   <p className="text-xs text-muted-foreground">
                     Receita Produtos
                   </p>
-                  <p className="text-xl font-semibold">
+                  <p className="font-semibold">
                     {formatCurrency(metrics.receitaProdutos)}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Frete</p>
-                  <p className="text-xl font-semibold">
-                    {formatCurrency(metrics.frete)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Receita Média / Produto
-                  </p>
-                  <p className="text-xl font-semibold">
-                    {formatCurrency(metrics.receitaMediaPorProduto)}
-                  </p>
+              </div>
+              <Separator />
+              <div>
+                <p className="text-xs text-muted-foreground font-medium mb-2">
+                  Receita média / produto
+                </p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {metrics.receitaMediaPorProduto.map((p) => (
+                    <div
+                      key={p.name}
+                      className="flex justify-between text-xs"
+                    >
+                      <span className="text-muted-foreground truncate max-w-[60%]">
+                        {p.name}
+                      </span>
+                      <span className="font-medium tabular-nums">
+                        {formatCurrency(p.avgPrice)}
+                      </span>
+                    </div>
+                  ))}
+                  {metrics.receitaMediaPorProduto.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Sem produtos no período
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Bloco Pedidos */}
+          {/* Pedidos */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Pedidos</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Pedidos</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               <div>
                 <p className="text-xs text-muted-foreground">
-                  Total de Pedidos
+                  Qtd total de pedidos
                 </p>
-                <p className="text-3xl font-bold">{metrics.totalOrders}</p>
+                <p className="text-2xl font-bold">{metrics.totalOrders}</p>
               </div>
-              <Separator />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">
-                    Apenas Amostra
+                    Somente amostras
                   </p>
-                  <p className="text-xl font-semibold">
-                    {metrics.onlySampleCount}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Com Produto</p>
-                  <p className="text-xl font-semibold">
-                    {metrics.withProductCount}
-                  </p>
-                </div>
-              </div>
-              <Separator />
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Ticket Médio (c/ produto)
-                  </p>
-                  <p className="text-xl font-semibold">
-                    {formatCurrency(metrics.ticketMedio)}
-                  </p>
+                  <p className="font-semibold">{metrics.onlySampleCount}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">
-                    Média Produtos / Pedido
+                    Ao menos 1 produto
                   </p>
-                  <p className="text-xl font-semibold">
-                    {metrics.mediaProdutosPorPedido.toFixed(1)}
-                  </p>
+                  <p className="font-semibold">{metrics.withProductCount}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
+        </div>
 
-          {/* Bloco Amostras */}
+        {/* Row 2: Amostras + Produtos + Ticket */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {/* Pedidos somente amostras */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Amostras</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">
+                Pedidos somente amostras
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">🐶 Cachorro</span>
+                  <span className="font-semibold">{metrics.samplesDog}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">🐱 Gato</span>
+                  <span className="font-semibold">{metrics.samplesCat}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    🐶🐱 Cachorro + Gato
+                  </span>
+                  <span className="font-semibold">{metrics.samplesBoth}</span>
+                </div>
+              </div>
+              <Separator />
+              <DonutChart
+                data={metrics.estadoSamplePie}
+                label="Principais Estados"
+              />
+            </CardContent>
+          </Card>
+
+          {/* Pedidos produtos */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Pedidos produtos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <DonutChart
+                data={metrics.productsSold.slice(0, 8).map((p) => ({
+                  name: p.name,
+                  value: p.qty,
+                }))}
+                label="Produtos vendidos"
+              />
+              <Separator />
+              <DonutChart
+                data={metrics.estadoProductPie}
+                label="Principais Estados"
+              />
+            </CardContent>
+          </Card>
+
+          {/* Ticket médio + Qtd média */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Ticket médio por pedido</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Pedidos Só Amostra
-                  </p>
-                  <p className="text-3xl font-bold">
-                    {metrics.onlySampleCount}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Total Amostras Vendidas
-                  </p>
-                  <p className="text-3xl font-bold">
-                    {metrics.totalSamplesSold}
-                  </p>
-                </div>
-              </div>
+              <p className="text-2xl font-bold">
+                {formatCurrency(metrics.ticketMedio)}
+              </p>
               <Separator />
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">🐶 Cachorro</p>
-                  <p className="text-xl font-semibold">{metrics.samplesDog}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">🐱 Gato</p>
-                  <p className="text-xl font-semibold">{metrics.samplesCat}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Bloco Distribuição */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Distribuição</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {/* Top 3 Estados */}
               <div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Top 3 Estados
+                <p className="text-xs text-muted-foreground">
+                  Qtd média de produtos
                 </p>
-                {metrics.topEstados.length > 0 ? (
-                  <div className="space-y-2">
-                    {metrics.topEstados.map(([estado, count], i) => (
-                      <div
-                        key={estado}
-                        className="flex items-center justify-between text-sm"
-                      >
-                        <span className="font-medium">
-                          {i + 1}. {estado}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {count} pedidos
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Dados não disponíveis
-                  </p>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Canal de Venda */}
-              <div>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Canal de Venda
+                <p className="text-xs text-muted-foreground mb-1">
+                  (exclui amostras)
                 </p>
-                <div className="space-y-3">
-                  {metrics.channels.map((ch) => {
-                    const pct =
-                      metrics.maxChannelOrders > 0
-                        ? (ch.orders / metrics.maxChannelOrders) * 100
-                        : 0;
-                    return (
-                      <div key={ch.name}>
-                        <div className="flex items-center justify-between text-sm mb-1">
-                          <span className="font-medium">{ch.name}</span>
-                          <span className="text-muted-foreground">
-                            {ch.orders} pedidos
-                          </span>
-                        </div>
-                        <div className="h-2 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary/40"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <p className="text-2xl font-bold">
+                  {metrics.mediaProdutosPorPedido.toFixed(1)}
+                </p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* RIGHT COLUMN — Mundo Offline */}
-        <div className="space-y-6">
-          <h2 className="text-lg font-semibold">🏢 Mundo Offline</h2>
-
-          {/* B2B */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                B2B
-                <Badge variant="outline" className="text-xs font-normal">
-                  Em breve
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p>Receita Total</p>
-                <p>Receita Produtos</p>
-                <p>Frete</p>
-                <p>Total de Pedidos</p>
-                <p>Ticket Médio</p>
-                <p>Produto mais vendido</p>
-              </div>
-              <Separator className="my-4" />
-              <p className="text-sm text-muted-foreground italic">
-                Integração de dados em andamento
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* B2B2C */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                B2B2C
-                <Badge variant="outline" className="text-xs font-normal">
-                  Em breve
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p>Receita Total</p>
-                <p>Receita Produtos</p>
-                <p>Frete</p>
-                <p>Total de Pedidos</p>
-                <p>Ticket Médio</p>
-                <p>Produto mais vendido</p>
-              </div>
-              <Separator className="my-4" />
-              <p className="text-sm text-muted-foreground italic">
-                Integração de dados em andamento
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Row 3: Canais de Venda */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Canais de vendas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DonutChart
+              data={metrics.channels.map((ch) => ({
+                name: ch.name,
+                value: ch.orders,
+              }))}
+            />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
