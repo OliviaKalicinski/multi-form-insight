@@ -1,87 +1,54 @@
 
 
-# Chat com Inteligencia de Dados no Dashboard
+# Melhorias no Chat de Dados: Contexto temporal + Limites + Prompt enriquecido
 
-## Objetivo
-Adicionar uma area de chat dentro do dashboard onde qualquer usuario autenticado pode fazer perguntas sobre os dados (vendas, ads, seguidores, etc.) e receber respostas inteligentes geradas por IA -- similar a experiencia que voce tem aqui na area de edicao.
+## O que muda
 
-## Como vai funcionar
+### 1. Ultimo input de dados
+A edge function vai consultar a tabela `upload_history` para buscar a data/hora do upload mais recente de cada tipo de dado (vendas, ads, seguidores, marketing). Essa informacao sera incluida no contexto enviado a IA, junto com uma regra no prompt para que ela **sempre informe ao usuario ate quando os dados vao**.
 
-1. Um botao flutuante (icone de chat) aparece no canto inferior direito de qualquer pagina do dashboard
-2. Ao clicar, abre um painel de chat onde o usuario digita perguntas em linguagem natural
-3. A IA recebe os dados relevantes do banco como contexto e responde com analises, tabelas e insights
-4. As respostas sao renderizadas com suporte a markdown (tabelas, listas, negrito, etc.)
+Exemplo de resposta da IA: *"Os dados de vendas estao atualizados ate 08/02/2026 (ultimo upload em 08/02 as 22:40). Com base nesses dados..."*
 
-## Arquitetura
+### 2. Aviso de limite de 1000 linhas
+Ao consultar cada tabela, a funcao vai verificar se o numero de linhas retornadas atingiu exatamente o limite (1000 para vendas, 300 para ads, etc.). Se sim, inclui um flag `dados_truncados: true` no contexto, e o prompt instrui a IA a avisar o usuario:
 
+*"Atencao: o volume de dados excede o limite que consigo processar. A analise abaixo cobre apenas parte do periodo solicitado."*
+
+### 3. Prompt com regras mais claras
+O prompt do sistema sera enriquecido com regras adicionais:
+- Sempre mencionar o periodo coberto pelos dados e a data do ultimo upload
+- Nunca mostrar JSON cru -- sempre tabelas ou texto formatado
+- Avisar quando os dados estao truncados
+- Usar agregacao diaria para ultimos 30 dias e semanal para 30-90 dias
+
+## Mudancas tecnicas
+
+### Arquivo: `supabase/functions/chat-with-data/index.ts`
+
+**Nova consulta -- ultimo upload por tipo:**
 ```text
-Usuario digita pergunta
-        |
-        v
-  Frontend (React)
-        |
-        v
-  Edge Function (chat-with-data)
-        |
-        +--> Consulta Supabase (sales_data, ads_data, followers_data, etc.)
-        |
-        +--> Envia contexto + pergunta para IA (Lovable AI - sem API key)
-        |
-        v
-  Resposta formatada em markdown
-        |
-        v
-  Renderizada no chat com react-markdown
+SELECT data_type, MAX(created_at) as ultimo_upload, 
+       MAX(date_range_end) as dados_ate
+FROM upload_history
+GROUP BY data_type
 ```
 
-## Etapas de implementacao
+**Flag de truncamento:**
+- Apos cada query, comparar `rows.length` com o limite usado
+- Se `rows.length >= limit`, marcar `dados_truncados = true` no contexto daquele tipo
 
-### 1. Edge Function `chat-with-data`
-- Recebe a pergunta do usuario e o historico da conversa
-- Consulta as tabelas relevantes do banco (ultimos dados de vendas, ads, seguidores)
-- Monta um prompt com os dados como contexto + a pergunta
-- Chama a Lovable AI (modelo `google/gemini-2.5-flash`) para gerar a resposta
-- Retorna a resposta em texto/markdown
+**Agregacao diaria (ultimos 30 dias):**
+- Adicionar campo `por_dia` com receita/pedidos/frete por dia
+- Manter `por_semana` para o periodo 30-90 dias
 
-### 2. Componente de Chat (`DataChat`)
-- Painel flutuante no canto inferior direito
-- Campo de input para digitar perguntas
-- Area de mensagens com scroll (usuario e IA)
-- Renderizacao de markdown nas respostas (react-markdown)
-- Indicador de "digitando..." enquanto a IA processa
-- Botao para minimizar/fechar
+**Prompt atualizado com novas regras:**
+- "SEMPRE comece informando o periodo dos dados e a data do ultimo upload"
+- "Se `dados_truncados` for true, avise: os dados excedem o limite processavel"
+- "NUNCA mostre JSON cru -- formate sempre em tabelas markdown ou texto"
+- "Use `por_dia` para perguntas sobre periodos curtos (ate 30 dias)"
+- "Use `por_semana` para tendencias de medio prazo"
 
-### 3. Integracao no Layout
-- O componente de chat sera adicionado dentro do `DashboardLayout` no `App.tsx`
-- Disponivel em todas as paginas do dashboard para usuarios autenticados
-- Nao requer role de admin -- qualquer usuario logado pode usar
+**Aumento de limite de vendas:** de 500 para 1000
 
-### 4. Tabela de historico (opcional nesta fase)
-- Nesta primeira versao, o historico sera mantido apenas em memoria (state do React)
-- O chat reinicia ao recarregar a pagina
-- Persistencia pode ser adicionada futuramente
-
-## Detalhes tecnicos
-
-### Edge Function - Dados enviados como contexto
-A funcao vai consultar:
-- `sales_data`: ultimos 90 dias de vendas (resumo agregado, nao linha a linha)
-- `ads_data`: ultimos 90 dias de anuncios (metricas agregadas)
-- `followers_data`: dados de seguidores recentes
-- `marketing_data`: metricas do Instagram
-
-Os dados serao pre-agregados em SQL antes de enviar ao modelo para manter o contexto compacto.
-
-### Modelo de IA
-- Usa Lovable AI (`google/gemini-2.5-flash`) -- nao precisa de API key
-- Prompt de sistema instrui a IA a responder em portugues, com foco em analise de dados de e-commerce/marketing
-- Suporte a markdown nas respostas
-
-### Dependencia nova
-- `react-markdown` para renderizar as respostas formatadas
-
-### Seguranca
-- A edge function valida o token JWT do usuario antes de processar
-- Os dados consultados respeitam as politicas RLS existentes
-- Nenhum dado sensivel (emails de clientes, etc.) e enviado ao modelo
-
+### Nenhum outro arquivo precisa ser alterado
+Todas as mudancas sao na edge function. O frontend ja renderiza markdown corretamente.
