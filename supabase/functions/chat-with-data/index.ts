@@ -353,6 +353,76 @@ REGRAS OBRIGATÓRIAS:
 - O campo "top_anuncios" em ads contém os 30 anúncios com maior receita, com gasto, receita, ROAS, cliques, impressões e conversões de cada um. Use para responder sobre melhores/piores anúncios.
 - O campo "por_objetivo" em ads agrupa a performance por objetivo de campanha (OUTCOME_SALES, LINK_CLICKS, etc.). Use para analisar estratégia de investimento em ads.
 
+═══════════════════════════════════════════
+MANUAL DO NEGÓCIO — Comida de Dragão
+═══════════════════════════════════════════
+
+1. SOBRE O NEGÓCIO
+- Comida de Dragão: marca de alimentos e suplementos naturais para pets (cães e gatos)
+- Canal: venda online (B2C) via e-commerce
+- Modelo: venda direta + estratégia de amostras para aquisição de clientes
+
+2. CATÁLOGO DE PRODUTOS (12 produtos padronizados)
+- Comida de Dragão - Original (90g)
+- Kit Comida de Dragão - Original (3x90g)
+- Mordida de Dragão - Spirulina (180g)
+- Kit Mordida de Dragão - Spirulina (3x180g)
+- Mordida de Dragão - Legumes (180g)
+- Kit Mordida de Dragão - Legumes (3x180g)
+- Kit Mordida de Dragão Mix (2 produtos) — contém 1 Spirulina + 1 Legumes
+- Kit Completo (3 produtos) — contém 1 Original + 1 Spirulina + 1 Legumes
+- Suplemento Concentrado para Cães (200g)
+- Suplemento Integral para Cães (180g)
+- Suplemento para Gatos (180g)
+- Kit de Amostras (preço <= R$ 1,00)
+IMPORTANTE: NÃO existe "Mordida Original". A linha Mordida tem apenas Spirulina e Legumes.
+
+3. REGRAS DE AMOSTRAS
+- Produto é amostra se: nome contém "amostra" OU preço entre R$ 0,01 e R$ 1,00
+- Pedido "somente amostra" = todos os produtos do pedido são amostras
+- Pedido "com produto" = tem pelo menos um produto regular (preço > R$ 1,00)
+- Tipo de pet: descrição contém "gato"/"gatos" → gato; senão → cachorro
+- Pedido com amostras de ambos tipos → "cachorro + gato"
+- Conversão de amostra: cliente cujo 1º pedido foi somente amostra e depois fez pedido com produto regular
+- Janela de conversão ideal: até 45 dias após amostra
+
+4. MÉTRICAS FINANCEIRAS
+- Faturamento Total = soma de valor_total (inclui frete)
+- Receita Líquida = Faturamento Total − Frete Total
+- Ticket Médio = Faturamento Total / Total de Pedidos
+- Ticket Médio Real = exclui pedidos 100% amostra do cálculo
+- ROAS Real = Receita Líquida (ex-frete) / Investimento em Ads
+- ROAS Meta = Valor de conversão reportado pelo Meta / Investimento
+- ROAS Bruto = Faturamento Total / Investimento
+- ROI = ((Receita − Investimento) / Investimento) × 100
+- CAC = Investimento em Ads / Novos Clientes
+- LTV = Receita Total / Total de Clientes
+- LTV/CAC >= 3x é saudável
+
+5. BENCHMARKS DE ADS
+- ROAS >= 4x = Excelente | 3-4x = Bom | < 3x = Atenção
+- CTR é métrica DIAGNÓSTICA (não decisional) — nunca usar sozinha como indicador de sucesso
+- ROAS é a métrica DECISIONAL primária para ads de vendas
+- Para objetivos não-vendas (Engagement, Traffic): eficiência = CPC/CPR abaixo da mediana
+
+6. CLASSIFICAÇÃO DE CLIENTES (por recência de compra)
+- Ativo: última compra < 30 dias
+- Em risco: última compra 31-60 dias
+- Inativo: última compra 61-90 dias
+- Churn: última compra > 90 dias
+- Taxa retenção >= 70% é bom | Taxa recompra >= 30% é bom
+
+7. QUADRANTES DE CLASSIFICAÇÃO DE ANÚNCIOS
+- Conversor: CTR alto + ROAS alto → melhor anúncio, escalar investimento
+- Isca de Atenção: CTR alto + ROAS baixo → atrai cliques mas não converte, investigar oferta/landing page
+- Conversor Silencioso: CTR baixo + ROAS alto → converte bem mas pouca atração, melhorar criativo
+- Ineficiente: CTR baixo + ROAS baixo → pausar ou refazer completamente
+
+8. LOGÍSTICA
+- Tempo médio emissão NF: <= 2 dias = bom | 3-5 dias = aceitável | > 5 dias = atenção
+
+═══════════════════════════════════════════
+
 DADOS DO NEGÓCIO (contexto atualizado):
 `;
 
