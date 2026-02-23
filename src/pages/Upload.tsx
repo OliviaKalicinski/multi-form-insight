@@ -56,8 +56,8 @@ export default function Upload() {
     if (marketingRes.data?.[0]?.data) dates.push(marketingRes.data[0].data);
 
     if (dates.length > 0) {
-      const maxDate = dates.sort().reverse()[0];
-      // Format as DD/MM/YYYY
+      const normalizedDates = dates.map(d => d.substring(0, 10));
+      const maxDate = normalizedDates.sort().reverse()[0];
       const [year, month, day] = maxDate.split('-');
       setLatestDate(`${day}/${month}/${year}`);
     } else {
