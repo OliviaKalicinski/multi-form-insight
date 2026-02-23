@@ -1,76 +1,74 @@
 
-# Filtrar Anuncios Ativos e Incluir CTR na Analise
+# Indicador de Data dos Dados + Links Externos na Pagina de Upload
 
-## Problema
+## O que muda
 
-1. O chat analisa TODOS os anuncios (ativos, inativos, arquivados) sem distinção - recomenda pausar anúncios que já estão inativos
-2. Falta CTR por anúncio individual (aparece "Calculando..." na resposta)
-3. Para escalar, deveria focar nos top 10 dos últimos 2 meses, não de todo o histórico
+Duas adições na pagina de Upload:
 
-## Solução
+### 1. Indicador "Dados ate: DD/MM/YYYY"
 
-### Arquivo modificado
-- `supabase/functions/chat-with-data/index.ts`
+Logo abaixo do subtitulo, mostrar a data mais recente com dados no sistema (nao a data do upload, mas a data real dos dados). Consulta MAX de cada tabela (sales_data.data_venda, ads_data.data, followers_data.data, marketing_data.data) e exibe a maior.
 
-### Mudança 1: Incluir `status_veiculacao` no select de ads_data (~linha 70)
+Isso deixa claro para o usuario que "os dados vao ate aquele dia" -- ja que a importacao e sempre feita no dia seguinte.
 
-Adicionar `status_veiculacao` ao select para que o campo esteja disponível na agregação.
+Exemplo visual:
 
-### Mudança 2: Separar anúncios ativos vs inativos na agregação (~linha 336-360)
+```text
+Upload de Dados                         [Ver Dashboard]
+Faca upload dos arquivos CSV...
+Dados ate: 22/02/2026
+```
 
-Criar dois grupos no `aggregateAds`:
+### 2. Links externos para exportar dados
 
-- `top_anuncios_ativos`: apenas anúncios com `status_veiculacao = 'active'`, com CTR calculado (cliques/impressões * 100). Top 30 por receita.
-- `top_anuncios_inativos`: anúncios com status `inactive`, `archived` ou `not_delivering`. Top 15 para referência.
+Adicionar links diretos para as plataformas de onde os dados sao exportados, posicionados dentro de cada card de upload correspondente. Cada link abre em nova aba.
 
-Para cada anúncio, incluir o campo `ctr` calculado e o `status`.
+- **Anuncios (Meta)**: link para o Ads Manager
+- **Metricas do Instagram**: link para o Facebook Business Insights
+- **Vendas**: link para o ERP Olist
 
-### Mudança 3: Criar lista "escalar" dos últimos 2 meses (~linha 362)
+Cada card tera um pequeno link "Exportar dados" com icone ExternalLink ao lado do titulo, facilitando o fluxo: clicar no link, exportar o CSV na plataforma, voltar e fazer upload.
 
-Filtrar rows dos últimos 60 dias, agrupar por anúncio (apenas ativos), ordenar por receita, pegar top 10. Chamar `candidatos_escalar_2m`.
+## Arquivo modificado
 
-### Mudança 4: Atualizar system prompt (~linha 507-512)
-
-Instruir a IA:
-- Para "pausar": usar `top_anuncios_ativos` com ROAS baixo (apenas ativos, pois não faz sentido pausar algo já inativo)
-- Para "escalar": usar `candidatos_escalar_2m` (top 10 ativos dos últimos 2 meses por receita)
-- CTR agora está disponível por anúncio — usar para classificação nos quadrantes
-- O campo `status` indica se o anúncio está ativo/inativo/arquivado
+- `src/pages/Upload.tsx`
 
 ## Detalhes tecnicos
 
-### Select atualizado
+### Busca da data mais recente
+
+- `useState<string | null>` para armazenar a data formatada
+- `useEffect` + funcao `fetchLatestDataDate` que faz 4 queries paralelas via Supabase:
+  - `supabase.from('sales_data').select('data_venda').order('data_venda', { ascending: false }).limit(1)`
+  - `supabase.from('ads_data').select('data').order('data', { ascending: false }).limit(1)`
+  - `supabase.from('followers_data').select('data').order('data', { ascending: false }).limit(1)`
+  - `supabase.from('marketing_data').select('data').order('data', { ascending: false }).limit(1)`
+- Pega o MAX entre os 4 resultados e formata como DD/MM/YYYY
+- Reexecuta apos cada `handleUploadComplete`
+
+### Links externos
+
+Constantes definidas no componente:
+
 ```text
-"data, gasto, impressoes, cliques, conversoes, receita, alcance, cpc, cpm, ctr, roas_resultados, campanha, conjunto, anuncio, objetivo, status_veiculacao"
+LINKS = {
+  ads: "https://adsmanager.facebook.com/adsmanager/reporting/view?act=539294475386018&..."
+  instagram: "https://business.facebook.com/latest/insights/results?business_id=458832849232355&..."
+  vendas: "https://erp.olist.com/relatorios_personalizados#/view/4449"
+}
 ```
 
-### Nova lógica de agregação por anúncio
-```text
-Para cada anúncio no adMap:
-  - ctr = impressoes > 0 ? (cliques / impressoes * 100).toFixed(2) + "%" : "0%"
-  - status = status mais recente do anúncio (moda ou último registro)
-  - Separar em ativos vs inativos baseado no status
-```
+Cada card de upload recebe um link com icone `ExternalLink` do lucide-react, posicionado ao lado do badge de contagem. O link abre em `target="_blank"`.
 
-### Candidatos a escalar (últimos 2 meses)
-```text
-const d60 = now - 60 * 86400000;
-Filtrar rows com data >= d60 e status_veiculacao = 'active'
-Agrupar por anúncio, ordenar por receita desc, top 10
-Incluir: nome, gasto, receita, roas, ctr, cliques, conversoes
-```
+### Imports adicionais
 
-### Prompt atualizado (seção ADS)
-```text
-- "top_anuncios_ativos": anúncios ATIVOS com CTR e ROAS. Use para recomendar pausar (ROAS baixo) ou manter.
-- "candidatos_escalar_2m": top 10 anúncios ATIVOS dos últimos 2 meses por receita. Use para recomendar escalar.
-- "top_anuncios_inativos": referência de anúncios já pausados/arquivados.
-- IMPORTANTE: só recomende pausar anúncios que estão ATIVOS. Anúncios inativos já estão pausados.
-```
+- `useState`, `useEffect` do React
+- `CalendarDays`, `ExternalLink` do lucide-react
+- `supabase` do client
 
-## Resultado esperado
+### Layout do indicador de data
 
-Quando o usuário perguntar "Quais anúncios devo pausar e quais escalar?":
-- **Pausar**: lista apenas anúncios ATIVOS com ROAS ruim, com CTR visível
-- **Escalar**: top 10 ativos dos últimos 2 meses com melhor receita/ROAS
-- **CTR**: aparece calculado para cada anúncio (sem "Calculando...")
+Renderizado entre a descricao e o grid de uploaders:
+- Icone CalendarDays pequeno
+- Texto "Dados ate: DD/MM/YYYY" em cor muted com a data em destaque (font-semibold)
+- Se nao houver dados, exibe "Nenhum dado importado ainda"
