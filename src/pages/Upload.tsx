@@ -1,5 +1,7 @@
+import { useState, useEffect, useCallback } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { InstagramMetricsUploader } from "@/components/dashboard/InstagramMetricsUploader";
 import { AdsUploader } from "@/components/dashboard/AdsUploader";
 import { SalesUploader } from "@/components/dashboard/SalesUploader";
@@ -14,8 +16,16 @@ import {
   Instagram,
   TrendingUp,
   ShoppingCart,
-  Users
+  Users,
+  CalendarDays,
+  ExternalLink
 } from "lucide-react";
+
+const EXTERNAL_LINKS = {
+  ads: "https://adsmanager.facebook.com/adsmanager/reporting/view?act=539294475386018&business_id=458832849232355&selected_report_id=120227439365750622&ads_manager_write_regions=true#",
+  instagram: "https://business.facebook.com/latest/insights/results?business_id=458832849232355&asset_id=444099275461175&time_range=%257B%2522end%2522%253A%25222026-02-22%2522%252C%2522start%2522%253A%25222026-02-11%2522%257D&platform=Instagram",
+  vendas: "https://erp.olist.com/relatorios_personalizados#/view/4449",
+};
 
 export default function Upload() {
   const navigate = useNavigate();
@@ -29,15 +39,42 @@ export default function Upload() {
     refreshFromDatabase
   } = useDashboard();
 
-  // Os uploaders já usam persist* internamente e fazem merge.
-  // Após o upload, sincronizamos o estado local com o banco.
+  const [latestDate, setLatestDate] = useState<string | null>(null);
+
+  const fetchLatestDataDate = useCallback(async () => {
+    const [salesRes, adsRes, followersRes, marketingRes] = await Promise.all([
+      supabase.from('sales_data').select('data_venda').order('data_venda', { ascending: false }).limit(1),
+      supabase.from('ads_data').select('data').order('data', { ascending: false }).limit(1),
+      supabase.from('followers_data').select('data').order('data', { ascending: false }).limit(1),
+      supabase.from('marketing_data').select('data').order('data', { ascending: false }).limit(1),
+    ]);
+
+    const dates: string[] = [];
+    if (salesRes.data?.[0]?.data_venda) dates.push(salesRes.data[0].data_venda);
+    if (adsRes.data?.[0]?.data) dates.push(adsRes.data[0].data);
+    if (followersRes.data?.[0]?.data) dates.push(followersRes.data[0].data);
+    if (marketingRes.data?.[0]?.data) dates.push(marketingRes.data[0].data);
+
+    if (dates.length > 0) {
+      const maxDate = dates.sort().reverse()[0];
+      // Format as DD/MM/YYYY
+      const [year, month, day] = maxDate.split('-');
+      setLatestDate(`${day}/${month}/${year}`);
+    } else {
+      setLatestDate(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLatestDataDate();
+  }, [fetchLatestDataDate]);
+
   const handleUploadComplete = async () => {
     await refreshFromDatabase();
+    await fetchLatestDataDate();
   };
 
   const hasAnyData = salesData.length > 0 || adsData.length > 0 || followersData.length > 0;
-
-  // Count total Instagram metrics (marketing + followers)
   const instagramMetricsCount = marketingData.length + followersData.length;
 
   return (
@@ -62,6 +99,16 @@ export default function Upload() {
         )}
       </div>
 
+      {/* Latest data date indicator */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <CalendarDays className="h-4 w-4" />
+        {latestDate ? (
+          <span>Dados até: <span className="font-semibold text-foreground">{latestDate}</span></span>
+        ) : (
+          <span>Nenhum dado importado ainda</span>
+        )}
+      </div>
+
       {/* Main Upload Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Instagram Metrics - Featured */}
@@ -77,11 +124,16 @@ export default function Upload() {
                   <CardDescription>Upload múltiplo de CSVs do Instagram</CardDescription>
                 </div>
               </div>
-              {instagramMetricsCount > 0 && (
-                <Badge variant="secondary" className="font-normal">
-                  {instagramMetricsCount} registros
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {instagramMetricsCount > 0 && (
+                  <Badge variant="secondary" className="font-normal">
+                    {instagramMetricsCount} registros
+                  </Badge>
+                )}
+                <a href={EXTERNAL_LINKS.instagram} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                  Exportar <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -99,11 +151,16 @@ export default function Upload() {
                   <ShoppingCart className="h-5 w-5 text-emerald-500" />
                   <CardTitle className="text-base">Vendas</CardTitle>
                 </div>
-                {salesData.length > 0 && (
-                  <Badge variant="secondary" className="font-normal text-xs">
-                    {salesData.length} pedidos
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {salesData.length > 0 && (
+                    <Badge variant="secondary" className="font-normal text-xs">
+                      {salesData.length} pedidos
+                    </Badge>
+                  )}
+                  <a href={EXTERNAL_LINKS.vendas} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                    Exportar <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-2">
@@ -119,11 +176,16 @@ export default function Upload() {
                   <TrendingUp className="h-5 w-5 text-blue-500" />
                   <CardTitle className="text-base">Anúncios (Meta)</CardTitle>
                 </div>
-                {adsData.length > 0 && (
-                  <Badge variant="secondary" className="font-normal text-xs">
-                    {adsData.length} registros
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {adsData.length > 0 && (
+                    <Badge variant="secondary" className="font-normal text-xs">
+                      {adsData.length} registros
+                    </Badge>
+                  )}
+                  <a href={EXTERNAL_LINKS.ads} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                    Exportar <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-2">
