@@ -348,8 +348,8 @@ export const useDataPersistence = () => {
             const { data: existing } = await (supabase
               .from("sales_data")
               .select("numero_pedido")
-              .in("numero_pedido", batch) as any)
-              .eq("fonte_dados", "nf");
+              .in("numero_pedido", batch)
+              .eq("fonte_dados", "nf") as any);
             
             if (existing) {
               existing.forEach((row: any) => {
