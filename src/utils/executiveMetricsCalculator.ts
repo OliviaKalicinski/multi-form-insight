@@ -4,6 +4,7 @@ import { calculateSalesMetrics } from "./salesCalculator";
 import { calculateAdsMetrics } from "./adsCalculator";
 import { analyzeChurn } from "./customerBehaviorMetrics";
 import { differenceInDays, parse, min, max } from "date-fns";
+import { getOfficialRevenue } from "./revenue";
 import { 
   createDefaultMeta, 
   createDefaultSource, 
@@ -103,7 +104,7 @@ export const calculateExecutiveMetrics = (
     );
     return hasRealProduct;
   });
-  const receitaReal = pedidosReais.reduce((sum, o) => sum + o.valorTotal, 0);
+  const receitaReal = pedidosReais.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
   const ticketMedioReal = pedidosReais.length > 0 
     ? receitaReal / pedidosReais.length 
     : ticketMedio;
@@ -117,8 +118,8 @@ export const calculateExecutiveMetrics = (
   const investimentoAds = adsMetrics?.investimentoTotal || 0;
   const receitaAds = adsMetrics?.valorConversaoTotal || receita;
   
-  // Calcular faturamento e frete dos pedidos reais
-  const faturamentoTotal = orders.reduce((sum, o) => sum + o.valorTotal, 0);
+  // Calcular faturamento fiscal e frete dos pedidos reais
+  const faturamentoTotal = orders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
   const freteTotal = orders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
   const percentualFrete = faturamentoTotal > 0 ? freteTotal / faturamentoTotal : 0;
   
@@ -152,9 +153,9 @@ export const calculateExecutiveMetrics = (
     const existing = clientesUnicos.get(order.cpfCnpj);
     if (existing) {
       existing.pedidos += 1;
-      existing.valorTotal += order.valorTotal;
+      existing.valorTotal += getOfficialRevenue(order);
     } else {
-      clientesUnicos.set(order.cpfCnpj, { pedidos: 1, valorTotal: order.valorTotal });
+      clientesUnicos.set(order.cpfCnpj, { pedidos: 1, valorTotal: getOfficialRevenue(order) });
     }
   });
 

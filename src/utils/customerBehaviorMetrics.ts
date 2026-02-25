@@ -1,5 +1,6 @@
 import { ProcessedOrder, CustomerBehaviorMetrics, ChurnRiskCustomer, SalesPeak, OrderVolumeAnalysis, CustomerSegment } from "@/types/marketing";
 import { format, differenceInDays, startOfWeek, endOfWeek } from "date-fns";
+import { getOfficialRevenue } from "./revenue";
 
 /**
  * Analisa churn de clientes
@@ -341,8 +342,8 @@ export const calculateCustomerBehaviorMetrics = (orders: ProcessedOrder[]): Cust
   const totalClientes = clientesMap.size;
   const taxaRecompra = totalClientes > 0 ? (clientesRecompra / totalClientes) * 100 : 0;
 
-  // CLV simplificado: valor total médio por cliente
-  const totalRevenue = orders.reduce((sum, order) => sum + order.valorTotal, 0);
+  // CLV simplificado: receita fiscal média por cliente
+  const totalRevenue = orders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
   const customerLifetimeValue = totalClientes > 0 ? totalRevenue / totalClientes : 0;
 
   // Média de dias entre compras (clientes com 2+ pedidos)

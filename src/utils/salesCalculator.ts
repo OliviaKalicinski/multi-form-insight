@@ -2,6 +2,7 @@ import { format, parse } from "date-fns";
 import { SalesData, ProcessedOrder, SalesMetrics } from "@/types/marketing";
 
 import { standardizeProductName } from './productNormalizer';
+import { getOfficialRevenue } from './revenue';
 
 /**
  * Consolida múltiplos kits de amostras em um único kit por pedido
@@ -188,7 +189,7 @@ export const filterOrdersByMonth = (
  * Calcula faturamento total
  */
 export const calculateRevenue = (orders: ProcessedOrder[]): number => {
-  return orders.reduce((sum, order) => sum + order.valorTotal, 0);
+  return orders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
 };
 
 /**
@@ -273,7 +274,7 @@ export const extractDailyRevenue = (orders: ProcessedOrder[]): { date: string; v
   
   orders.forEach(order => {
     const dateKey = format(order.dataVenda, 'yyyy-MM-dd');
-    dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + order.valorTotal);
+    dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + getOfficialRevenue(order));
   });
   
   return Array.from(dailyMap.entries()).map(([date, value]) => ({ date, value }));
