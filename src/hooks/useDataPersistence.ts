@@ -390,7 +390,7 @@ export const useDataPersistence = () => {
 
         const { data, error } = await supabase
           .from("sales_data")
-          .upsert(rows as any, { onConflict: "numero_pedido", ignoreDuplicates: false })
+          .upsert(rows as any, { onConflict: "numero_pedido,fonte_dados", ignoreDuplicates: false })
           .select();
 
         if (error) {
