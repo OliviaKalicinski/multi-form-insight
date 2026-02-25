@@ -2,3 +2,6 @@ project_id = "hqpupwtddwcvakhhjvcq"
 
 [functions.chat-with-data]
 verify_jwt = false
+
+[functions.assert-economic-invariants]
+verify_jwt = false
