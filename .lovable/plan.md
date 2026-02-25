@@ -1,58 +1,49 @@
 
 
-# Blindagem de Precedencia NF no Banco de Dados
+# Assert Economic Invariants - Implementacao
 
-## Objetivo
+## Resumo
 
-Mover a regra de precedencia fiscal (NF > ecommerce) para o banco de dados, substituir partial indexes por constraints reais, e adicionar CHECK constraints + trigger de protecao.
+Criar a edge function permanente `assert-economic-invariants` com protecao por header secreto, cobrindo os 4 cenarios de invariancia economica + sanidade global.
 
-## Validacao Pre-Migration (confirmada)
+## Arquivos
 
-| Verificacao | Resultado |
-|-------------|-----------|
-| Ecommerce com `numero_pedido IS NULL` | 0 registros |
-| Duplicatas ecommerce | 0 |
-| Partial indexes existentes | `idx_sales_pedido_ecommerce` e `idx_sales_nota_serie` confirmados |
-| CHECK constraints existentes | Nenhuma (campo livre) |
+### 1. `supabase/functions/assert-economic-invariants/index.ts`
 
-## Alteracoes
+Edge function que:
+- Valida header `x-assert-key` contra secret `ASSERT_KEY`
+- Executa 4 cenarios com prefixo `TEST-BLIND-{timestamp}`
+- Cleanup preventivo e final
+- Retorna HTTP 200 (todos passaram) ou HTTP 500 (falha)
 
-### 1. Migration SQL
+**Cenarios:**
 
-Executada em ordem:
+1. **Ecommerce -> NF**: Insere ecommerce, depois NF. Verifica COUNT total = 1, fonte_dados = nf, COUNT ecommerce = 0
+2. **NF -> Ecommerce (bloqueio)**: Insere NF, tenta ecommerce. Verifica erro retornado, COUNT total = 1, fonte_dados = nf, COUNT ecommerce = 0
+3. **Duplicata NF (idempotencia)**: Insere NF com valor 100, upsert com valor 200. Verifica COUNT = 1, valor_total = 200
+4. **Ecommerce isolado (idempotencia)**: Insere ecommerce com valor 50, upsert com valor 75. Verifica COUNT = 1, valor_total = 75, fonte_dados = ecommerce
 
-1. **Drop partial indexes** `idx_sales_pedido_ecommerce` e `idx_sales_nota_serie` (incompativeis com `ON CONFLICT` do Supabase JS)
-2. **UNIQUE constraints reais**:
-   - `uq_sales_nota_serie UNIQUE (numero_nota, serie)` -- NULLs nao conflitam
-   - `uq_sales_pedido_fonte UNIQUE (numero_pedido, fonte_dados)` -- permite mesmo pedido com fontes diferentes
-3. **CHECK constraints**:
-   - `chk_nf_has_nota`: NF deve ter `numero_nota IS NOT NULL`
-   - `chk_ecommerce_has_pedido`: ecommerce deve ter `numero_pedido IS NOT NULL`
-4. **Trigger function** `enforce_nf_precedence()`:
-   - Ecommerce + NF ja existe = RAISE EXCEPTION (bloqueia)
-   - NF + ecommerce existe = DELETE automatico do ecommerce
-   - Protecao contra `numero_pedido IS NULL`
-5. **Trigger** `trg_enforce_nf_precedence` BEFORE INSERT FOR EACH ROW
+**Sanidade global pos-cleanup:**
+- Query por `numero_pedido LIKE 'TEST-BLIND-%' OR numero_nota LIKE 'TEST-BLIND-%'` deve retornar 0
+- Contagem geral por `fonte_dados` (informativa)
 
-### 2. Codigo: `src/hooks/useDataPersistence.ts`
+**Seguranca:**
+- Header `x-assert-key` obrigatorio, comparado contra env `ASSERT_KEY`
+- Retorna 401 se ausente ou incorreto
 
-Linha 393: alterar `onConflict` de `"numero_pedido"` para `"numero_pedido,fonte_dados"` para alinhar com a nova constraint composta.
+### 2. Secret `ASSERT_KEY`
 
-## Garantias
+Solicitar ao usuario via `add_secret` para configurar uma chave de autorizacao.
 
-| Situacao | Resultado |
-|----------|-----------|
-| Ecommerce depois NF | Ecommerce deletado automaticamente |
-| NF depois Ecommerce | Ecommerce bloqueado |
-| So NF | Funciona |
-| So Ecommerce | Funciona |
-| NF sem numero_nota | Bloqueado por CHECK |
-| Ecommerce sem numero_pedido | Bloqueado por CHECK |
+### 3. `.lovable/plan.md`
 
-## Arquivos modificados
+Atualizar com status da implementacao.
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| Migration SQL (nova) | Trigger + CHECK + UNIQUE constraints |
-| `src/hooks/useDataPersistence.ts` | Linha 393: `onConflict: "numero_pedido,fonte_dados"` |
+## Detalhes Tecnicos
+
+- Usa `createClient` com `SUPABASE_SERVICE_ROLE_KEY` para bypass de RLS
+- Campos obrigatorios por registro: `data_venda`, `valor_total`, `produtos` (NOT NULL no schema)
+- NF requer `numero_nota` (CHECK constraint), ecommerce requer `numero_pedido` (CHECK constraint)
+- Upsert NF usa `onConflict: "numero_nota,serie"`, upsert ecommerce usa `onConflict: "numero_pedido,fonte_dados"`
+- Cenario 2 valida estado apos erro (COUNT + fonte_dados), nao apenas presenca de erro
 
