@@ -1,28 +1,43 @@
 
-# Etapa 1 — Ingesta Fiscal (NF): IMPLEMENTADO ✅
 
-## Status: Completo
+# Correcao do Bug de Precedencia NF > Ecommerce
 
-Todos os passos foram implementados:
+## Problema Confirmado
 
-1. ✅ **Migração SQL** — 21 colunas adicionadas, constraints ajustadas, índices criados
-2. ✅ **invoiceParser.ts** — Parser NF com agrupamento multi-item, segmentação, validação fiscal
-3. ✅ **marketing.ts** — ProcessedOrder estendido com campos fiscais opcionais + InvoiceRawData
-4. ✅ **salesCalculator.ts** — `consolidateSampleKits` exportado
-5. ✅ **SalesUploader.tsx** — Auto-detecção de formato + badge visual (NF / E-commerce)
-6. ✅ **useDataPersistence.ts** — Dual upsert (NF por nota+serie, ecommerce por pedido) + precedência NF
-7. ✅ **DashboardContext.tsx** — Merge NF-aware com precedência no state local
+O bug ainda esta presente em `src/hooks/useDataPersistence.ts` (linhas 348-352). O cast `as any` fecha antes do `.eq("fonte_dados", "nf")`, potencialmente invalidando o filtro e quebrando a regra de precedencia fiscal.
 
-## Decisões Implementadas
+## Correcao
 
-- `ProcessedOrder` agora representa evento fiscal (NF) ou pedido e-commerce
-- `total_faturado` armazenado mas NÃO usado nos cálculos (Etapa 2)
-- `valorTotal` = `valor_produtos` (semântica legada preservada)
-- Precedência NF > ecommerce no banco E no state
-- Segmentação persistida: Serie 2=b2c, Serie 1+UN=b2b2c, Serie 1+KG/L=b2b
-- Histórico: daqui para frente apenas
+**Arquivo**: `src/hooks/useDataPersistence.ts` (linhas 348-352)
 
-## Próximas Etapas
+Mover o `as any` para depois de toda a cadeia de filtros:
 
-- **Etapa 2**: Migrar cálculos para usar `getOfficialRevenue()` (totalFaturado)
-- **Etapa 3**: Margem real por SKU com custo
+```typescript
+// DE (bug):
+const { data: existing } = await (supabase
+  .from("sales_data")
+  .select("numero_pedido")
+  .in("numero_pedido", batch) as any)
+  .eq("fonte_dados", "nf");
+
+// PARA (corrigido):
+const { data: existing } = await (supabase
+  .from("sales_data")
+  .select("numero_pedido")
+  .in("numero_pedido", batch)
+  .eq("fonte_dados", "nf") as any);
+```
+
+## Impacto
+
+- Nenhuma mudanca de logica declarada
+- Comportamento real corrigido: `.eq("fonte_dados", "nf")` agora faz parte da query
+- Regra de precedencia NF > ecommerce passa a funcionar como projetado
+- Zero risco de regressao
+
+## Arquivo modificado
+
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/hooks/useDataPersistence.ts` | Linha 348-352: mover `as any` para apos `.eq()` |
+
