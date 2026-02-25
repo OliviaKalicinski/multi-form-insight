@@ -332,56 +332,119 @@ export type Database = {
       sales_data: {
         Row: {
           canal: string | null
+          cfop: string | null
+          chave_acesso: string | null
           cidade: string | null
           cliente_email: string | null
           cliente_nome: string | null
           created_at: string | null
           cupom: string | null
+          data_emissao_nf: string | null
+          data_saida_nf: string | null
           data_venda: string
           estado: string | null
+          fonte_dados: string | null
           forma_envio: string | null
+          frete_por_conta: string | null
           id: string
-          numero_pedido: string
+          id_nota: string | null
+          municipio: string | null
+          natureza_operacao: string | null
+          ncm: string | null
+          numero_nota: string | null
+          numero_pedido: string | null
+          peso_bruto: number | null
+          peso_liquido: number | null
           produtos: Json
+          regime_tributario: string | null
+          segmento_cliente: string | null
+          serie: string | null
           status: string | null
+          total_faturado: number | null
+          uf: string | null
           upload_id: string | null
+          valor_desconto: number | null
           valor_frete: number | null
+          valor_nota: number | null
+          valor_produtos: number | null
           valor_total: number
         }
         Insert: {
           canal?: string | null
+          cfop?: string | null
+          chave_acesso?: string | null
           cidade?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
           created_at?: string | null
           cupom?: string | null
+          data_emissao_nf?: string | null
+          data_saida_nf?: string | null
           data_venda: string
           estado?: string | null
+          fonte_dados?: string | null
           forma_envio?: string | null
+          frete_por_conta?: string | null
           id?: string
-          numero_pedido: string
+          id_nota?: string | null
+          municipio?: string | null
+          natureza_operacao?: string | null
+          ncm?: string | null
+          numero_nota?: string | null
+          numero_pedido?: string | null
+          peso_bruto?: number | null
+          peso_liquido?: number | null
           produtos: Json
+          regime_tributario?: string | null
+          segmento_cliente?: string | null
+          serie?: string | null
           status?: string | null
+          total_faturado?: number | null
+          uf?: string | null
           upload_id?: string | null
+          valor_desconto?: number | null
           valor_frete?: number | null
+          valor_nota?: number | null
+          valor_produtos?: number | null
           valor_total: number
         }
         Update: {
           canal?: string | null
+          cfop?: string | null
+          chave_acesso?: string | null
           cidade?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
           created_at?: string | null
           cupom?: string | null
+          data_emissao_nf?: string | null
+          data_saida_nf?: string | null
           data_venda?: string
           estado?: string | null
+          fonte_dados?: string | null
           forma_envio?: string | null
+          frete_por_conta?: string | null
           id?: string
-          numero_pedido?: string
+          id_nota?: string | null
+          municipio?: string | null
+          natureza_operacao?: string | null
+          ncm?: string | null
+          numero_nota?: string | null
+          numero_pedido?: string | null
+          peso_bruto?: number | null
+          peso_liquido?: number | null
           produtos?: Json
+          regime_tributario?: string | null
+          segmento_cliente?: string | null
+          serie?: string | null
           status?: string | null
+          total_faturado?: number | null
+          uf?: string | null
           upload_id?: string | null
+          valor_desconto?: number | null
           valor_frete?: number | null
+          valor_nota?: number | null
+          valor_produtos?: number | null
           valor_total?: number
         }
         Relationships: [

@@ -141,7 +141,7 @@ export const useDataPersistence = () => {
 
       // Transform sales data back to ProcessedOrder format
       const salesData: ProcessedOrder[] = (salesRaw || []).map((row: any) => ({
-        numeroPedido: row.numero_pedido,
+        numeroPedido: row.numero_pedido || "",
         nomeCliente: row.cliente_nome || "",
         cpfCnpj: row.cliente_email || "",
         ecommerce: row.canal || "",
@@ -151,8 +151,28 @@ export const useDataPersistence = () => {
         dataVenda: new Date(row.data_venda),
         formaEnvio: row.forma_envio || "",
         valorFrete: Number(row.valor_frete) || 0,
-        numeroNF: "",
-        dataEmissao: new Date(row.data_venda),
+        numeroNF: row.numero_nota || "",
+        dataEmissao: row.data_emissao_nf ? new Date(row.data_emissao_nf) : new Date(row.data_venda),
+        // Campos fiscais
+        idNota: row.id_nota || undefined,
+        numeroNota: row.numero_nota || undefined,
+        serie: row.serie || undefined,
+        chaveAcesso: row.chave_acesso || undefined,
+        valorProdutos: row.valor_produtos != null ? Number(row.valor_produtos) : undefined,
+        valorDesconto: row.valor_desconto != null ? Number(row.valor_desconto) : undefined,
+        valorNota: row.valor_nota != null ? Number(row.valor_nota) : undefined,
+        totalFaturado: row.total_faturado != null ? Number(row.total_faturado) : undefined,
+        pesoLiquido: row.peso_liquido != null ? Number(row.peso_liquido) : undefined,
+        pesoBruto: row.peso_bruto != null ? Number(row.peso_bruto) : undefined,
+        regimeTributario: row.regime_tributario || undefined,
+        naturezaOperacao: row.natureza_operacao || undefined,
+        cfop: row.cfop || undefined,
+        ncm: row.ncm || undefined,
+        fretePorConta: row.frete_por_conta || undefined,
+        municipio: row.municipio || undefined,
+        uf: row.uf || undefined,
+        fonteDados: (row.fonte_dados as 'nf' | 'ecommerce') || 'ecommerce',
+        segmentoCliente: row.segmento_cliente || undefined,
       }));
 
       // Transform ads data with all new fields from database
@@ -245,59 +265,143 @@ export const useDataPersistence = () => {
     if (orders.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
     try {
-      // Calculate date range from sales data
       const dates = orders.map(o => o.dataVenda).filter(d => d instanceof Date && !isNaN(d.getTime()));
       const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
       const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
 
-      // Create upload history FIRST and get the ID
+      const isNFData = orders[0]?.fonteDados === 'nf';
+
       const uploadId = await createUploadHistory(
-        "sales",
+        isNFData ? "sales-nf" : "sales",
         orders.length,
         fileName || null,
         minDate ? format(minDate, "yyyy-MM-dd") : null,
         maxDate ? format(maxDate, "yyyy-MM-dd") : null
       );
 
-      const rows = orders.map((order) => ({
-        numero_pedido: order.numeroPedido,
-        data_venda: order.dataVenda.toISOString(),
-        valor_total: order.valorTotal,
-        valor_frete: order.valorFrete,
-        canal: order.ecommerce,
-        status: "completed",
-        cliente_email: order.cpfCnpj,
-        cliente_nome: order.nomeCliente,
-        cidade: "",
-        estado: "",
-        forma_envio: order.formaEnvio,
-        produtos: order.produtos,
-        cupom: "",
-        upload_id: uploadId,
-      }));
+      if (isNFData) {
+        // --- Fluxo NF ---
+        const rows = orders.map((order) => ({
+          numero_pedido: order.numeroPedido || null,
+          data_venda: order.dataVenda.toISOString(),
+          valor_total: order.valorTotal,
+          valor_frete: order.valorFrete,
+          canal: order.ecommerce || null,
+          status: "completed",
+          cliente_email: order.cpfCnpj || null,
+          cliente_nome: order.nomeCliente || null,
+          cidade: order.municipio || "",
+          estado: order.uf || "",
+          forma_envio: order.formaEnvio || "",
+          produtos: order.produtos,
+          cupom: "",
+          upload_id: uploadId,
+          // Campos fiscais
+          id_nota: order.idNota || null,
+          numero_nota: order.numeroNota || null,
+          serie: order.serie || null,
+          chave_acesso: order.chaveAcesso || null,
+          valor_produtos: order.valorProdutos ?? 0,
+          valor_desconto: order.valorDesconto ?? 0,
+          valor_nota: order.valorNota ?? null,
+          total_faturado: order.totalFaturado ?? null,
+          peso_liquido: order.pesoLiquido ?? null,
+          peso_bruto: order.pesoBruto ?? null,
+          regime_tributario: order.regimeTributario || null,
+          natureza_operacao: order.naturezaOperacao || null,
+          cfop: order.cfop || null,
+          ncm: order.ncm || null,
+          frete_por_conta: order.fretePorConta || null,
+          municipio: order.municipio || null,
+          uf: order.uf || null,
+          data_emissao_nf: order.dataEmissao ? format(order.dataEmissao, "yyyy-MM-dd") : null,
+          data_saida_nf: null,
+          fonte_dados: "nf",
+          segmento_cliente: order.segmentoCliente || null,
+        }));
 
-      const { data, error } = await supabase
-        .from("sales_data")
-        .upsert(rows, { onConflict: "numero_pedido", ignoreDuplicates: false })
-        .select();
+        // Upsert com conflict em (numero_nota, serie) via index
+        const { data, error } = await supabase
+          .from("sales_data")
+          .upsert(rows as any, { onConflict: "numero_nota,serie", ignoreDuplicates: false })
+          .select();
 
-      if (error) {
-        // If insert fails, delete the upload history record
-        if (uploadId) {
-          await supabase.from("upload_history").delete().eq("id", uploadId);
+        if (error) {
+          if (uploadId) await supabase.from("upload_history").delete().eq("id", uploadId);
+          throw error;
         }
-        throw error;
+
+        const result = { inserted: data?.length || 0, updated: 0, total: orders.length };
+        setStats((prev) => ({ ...prev, salesCount: prev.salesCount + result.inserted, lastUpdated: new Date() }));
+        return result;
+
+      } else {
+        // --- Fluxo E-commerce (legado) ---
+        // Verificar precedência: se já existe NF com mesmo numero_pedido, pular
+        const numeroPedidos = orders.map(o => o.numeroPedido).filter(Boolean);
+        let nfExistingPedidos = new Set<string>();
+        
+        if (numeroPedidos.length > 0) {
+          // Consultar em batches de 100
+          for (let i = 0; i < numeroPedidos.length; i += 100) {
+            const batch = numeroPedidos.slice(i, i + 100);
+            const { data: existing } = await (supabase
+              .from("sales_data")
+              .select("numero_pedido")
+              .in("numero_pedido", batch) as any)
+              .eq("fonte_dados", "nf");
+            
+            if (existing) {
+              existing.forEach((row: any) => {
+                if (row.numero_pedido) nfExistingPedidos.add(row.numero_pedido);
+              });
+            }
+          }
+        }
+
+        // Filtrar orders que já têm NF correspondente
+        const filteredOrders = orders.filter(o => !nfExistingPedidos.has(o.numeroPedido));
+        const skipped = orders.length - filteredOrders.length;
+        if (skipped > 0) {
+          console.log(`🔒 [Precedência NF] ${skipped} pedidos ignorados (já existem como NF)`);
+        }
+
+        if (filteredOrders.length === 0) {
+          return { inserted: 0, updated: 0, total: orders.length };
+        }
+
+        const rows = filteredOrders.map((order) => ({
+          numero_pedido: order.numeroPedido,
+          data_venda: order.dataVenda.toISOString(),
+          valor_total: order.valorTotal,
+          valor_frete: order.valorFrete,
+          canal: order.ecommerce,
+          status: "completed",
+          cliente_email: order.cpfCnpj,
+          cliente_nome: order.nomeCliente,
+          cidade: "",
+          estado: "",
+          forma_envio: order.formaEnvio,
+          produtos: order.produtos,
+          cupom: "",
+          upload_id: uploadId,
+          fonte_dados: "ecommerce",
+        }));
+
+        const { data, error } = await supabase
+          .from("sales_data")
+          .upsert(rows as any, { onConflict: "numero_pedido", ignoreDuplicates: false })
+          .select();
+
+        if (error) {
+          if (uploadId) await supabase.from("upload_history").delete().eq("id", uploadId);
+          throw error;
+        }
+
+        const result = { inserted: data?.length || 0, updated: 0, total: orders.length };
+        setStats((prev) => ({ ...prev, salesCount: prev.salesCount + result.inserted, lastUpdated: new Date() }));
+        return result;
       }
-
-      const result = {
-        inserted: data?.length || 0,
-        updated: 0,
-        total: orders.length,
-      };
-
-      setStats((prev) => ({ ...prev, salesCount: prev.salesCount + result.inserted, lastUpdated: new Date() }));
-
-      return result;
     } catch (error) {
       console.error("Erro ao salvar vendas:", error);
       throw error;
