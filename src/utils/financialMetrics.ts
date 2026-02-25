@@ -4,6 +4,7 @@ import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistri
 import { extractDailyOrders } from './salesCalculator';
 import { breakdownOrders } from './orderBreakdown';
 import { isOnlySampleOrder } from './samplesAnalyzer';
+import { getOfficialRevenue } from './revenue';
 
 // ======= TYPES =======
 
@@ -173,7 +174,7 @@ export const calculateQuarterlyRevenue = (
     const year = date.getFullYear();
     const quarter = Math.floor(date.getMonth() / 3) + 1;
     const quarterKey = `${year}-Q${quarter}`;
-    quarterlyMap.set(quarterKey, (quarterlyMap.get(quarterKey) || 0) + order.valorTotal);
+    quarterlyMap.set(quarterKey, (quarterlyMap.get(quarterKey) || 0) + getOfficialRevenue(order));
   });
   
   return Array.from(quarterlyMap.entries())
@@ -206,7 +207,7 @@ export const calculateRevenueByPeriod = (
         periodKey = format(order.dataVenda, "yyyy");
         break;
     }
-    revenueMap.set(periodKey, (revenueMap.get(periodKey) || 0) + order.valorTotal);
+    revenueMap.set(periodKey, (revenueMap.get(periodKey) || 0) + getOfficialRevenue(order));
   });
 
   return Array.from(revenueMap.entries())
@@ -287,7 +288,7 @@ export const calculateWeeklyRevenue = (
   orders.forEach(order => {
     const weekStart = startOfWeek(order.dataVenda, { weekStartsOn: 0 });
     const weekKey = format(weekStart, "yyyy-'W'ww");
-    weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + order.valorTotal);
+    weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + getOfficialRevenue(order));
   });
   
   return Array.from(weeklyMap.entries())
@@ -308,7 +309,7 @@ export const analyzeSeasonality = (orders: ProcessedOrder[]): SeasonalityAnalysi
     const monthKey = format(order.dataVenda, "yyyy-MM");
     const existing = monthlyMap.get(monthKey) || { revenue: 0, orders: 0 };
     monthlyMap.set(monthKey, {
-      revenue: existing.revenue + order.valorTotal,
+      revenue: existing.revenue + getOfficialRevenue(order),
       orders: existing.orders + 1,
     });
   });
@@ -333,7 +334,7 @@ export const analyzeSeasonality = (orders: ProcessedOrder[]): SeasonalityAnalysi
     
     const existing = quarterlyMap.get(quarterKey) || { revenue: 0, orders: 0 };
     quarterlyMap.set(quarterKey, {
-      revenue: existing.revenue + order.valorTotal,
+      revenue: existing.revenue + getOfficialRevenue(order),
       orders: existing.orders + 1,
     });
   });
@@ -404,12 +405,12 @@ export const getPlatformPerformance = (orders: ProcessedOrder[]): PlatformPerfor
     const platform = order.ecommerce;
     const existing = platformMap.get(platform) || { revenue: 0, orders: 0 };
     platformMap.set(platform, {
-      revenue: existing.revenue + order.valorTotal,
+      revenue: existing.revenue + getOfficialRevenue(order),
       orders: existing.orders + 1,
     });
   });
 
-  const totalRevenue = orders.reduce((sum, order) => sum + order.valorTotal, 0);
+  const totalRevenue = orders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
 
   const performance = Array.from(platformMap.entries())
     .map(([platform, data]) => ({
@@ -529,7 +530,7 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
     (order) => format(order.dataVenda, "yyyy-MM") === selectedMonth
   );
   
-  const currentRevenue = currentMonthOrders.reduce((sum, order) => sum + order.valorTotal, 0);
+  const currentRevenue = currentMonthOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
 
   // Mês anterior
   const currentDate = parse(selectedMonth, "yyyy-MM", new Date());
@@ -541,7 +542,7 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
     (order) => format(order.dataVenda, "yyyy-MM") === previousMonth
   );
   
-  const previousRevenue = previousMonthOrders.reduce((sum, order) => sum + order.valorTotal, 0);
+  const previousRevenue = previousMonthOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
 
   if (previousRevenue === 0) return 0;
   
@@ -605,10 +606,18 @@ export const calculateFinancialMetrics = (
   const freteTotal = orders.reduce((sum, order) => sum + order.valorFrete, 0);
   
   // ===== CÁLCULOS GERAIS (todos os pedidos) =====
-  const totalRevenue = orders.reduce((sum, order) => sum + order.valorTotal, 0);
-  const faturamentoBruto = totalRevenue + freteTotal;
-  const faturamentoLiquido = totalRevenue;
-  const percentualFrete = faturamentoBruto > 0 ? (freteTotal / faturamentoBruto) * 100 : 0;
+  // Receita fiscal: já inclui frete via getOfficialRevenue
+  const totalRevenue = orders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
+  
+  // [AUDIT] Comparação legada vs fiscal
+  const receitaLegada = orders.reduce((s, o) => s + (o.valorTotal || 0), 0);
+  const delta = receitaLegada > 0
+    ? ((totalRevenue - receitaLegada) / receitaLegada) * 100 : 0;
+  console.log(`[AUDIT] Legada=${receitaLegada.toFixed(2)} | Fiscal=${totalRevenue.toFixed(2)} | Delta=${delta.toFixed(2)}%`);
+  
+  const faturamentoBruto = totalRevenue; // já inclui frete via getOfficialRevenue
+  const faturamentoLiquido = totalRevenue - freteTotal; // ex-frete
+  const percentualFrete = totalRevenue > 0 ? (freteTotal / totalRevenue) * 100 : 0;
   
   const totalOrders = orders.length;
   const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
@@ -616,7 +625,7 @@ export const calculateFinancialMetrics = (
   
   // ===== CÁLCULOS REAIS (sem pedidos de apenas samples) =====
   const realOrders = filterRealOrders(orders);
-  const realRevenue = realOrders.reduce((sum, order) => sum + order.valorTotal, 0);
+  const realRevenue = realOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
   const totalRealOrders = realOrders.length;
   const realAverageTicket = totalRealOrders > 0 ? realRevenue / totalRealOrders : 0;
   
