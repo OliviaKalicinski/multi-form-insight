@@ -176,11 +176,36 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   // Persist functions that save to database AND update local state
   const persistSalesData = useCallback(async (data: ProcessedOrder[], fileName?: string) => {
     const result = await saveSalesData(data, fileName);
-    // Merge new data with existing (avoiding duplicates by numero_pedido)
+    // Merge NF-aware: NF prevalece sobre ecommerce com mesmo numeroPedido
     setSalesDataState(prev => {
-      const existingIds = new Set(prev.map(o => o.numeroPedido));
-      const newOrders = data.filter(o => !existingIds.has(o.numeroPedido));
-      return [...prev, ...newOrders];
+      const isNFUpload = data[0]?.fonteDados === 'nf';
+      
+      if (isNFUpload) {
+        // Para NF: deduplicar por numeroNota + serie
+        const nfKeys = new Set(data.map(o => `${o.numeroNota}|${o.serie}`));
+        // Remover registros existentes que tenham o mesmo numeroPedido (ecommerce cedendo para NF)
+        const nfPedidos = new Set(data.map(o => o.numeroPedido).filter(Boolean));
+        const filtered = prev.filter(o => {
+          // Remover NFs duplicadas
+          if (o.fonteDados === 'nf' && nfKeys.has(`${o.numeroNota}|${o.serie}`)) return false;
+          // Remover ecommerce com mesmo numeroPedido (NF prevalece)
+          if (o.fonteDados !== 'nf' && nfPedidos.has(o.numeroPedido)) return false;
+          return true;
+        });
+        return [...filtered, ...data];
+      } else {
+        // Para ecommerce: deduplicar por numeroPedido, mas NF prevalece
+        const existingNFPedidos = new Set(
+          prev.filter(o => o.fonteDados === 'nf').map(o => o.numeroPedido).filter(Boolean)
+        );
+        const newOrders = data.filter(o => 
+          !existingNFPedidos.has(o.numeroPedido) && 
+          !prev.some(p => p.numeroPedido === o.numeroPedido && p.fonteDados !== 'nf')
+        );
+        const existingIds = new Set(prev.map(o => o.numeroPedido));
+        const uniqueNew = newOrders.filter(o => !existingIds.has(o.numeroPedido));
+        return [...prev, ...uniqueNew];
+      }
     });
     return result;
   }, [saveSalesData]);

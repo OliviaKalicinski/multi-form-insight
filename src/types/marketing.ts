@@ -175,7 +175,8 @@ export interface SalesData {
   "Quantidade de volumes"?: string;
 }
 
-// Processed Order (agrupado por pedido único)
+// Processed Order (agrupado por pedido único ou evento fiscal)
+// A partir da Etapa 1 NF, este objeto pode representar um evento fiscal (Nota) ou um pedido e-commerce.
 export interface ProcessedOrder {
   numeroPedido: string;
   nomeCliente: string;
@@ -195,6 +196,58 @@ export interface ProcessedOrder {
   valorFrete: number;
   numeroNF: string;
   dataEmissao: Date;
+  // Campos fiscais (opcionais - preenchidos apenas para fonte NF)
+  idNota?: string;
+  numeroNota?: string;
+  serie?: string;
+  chaveAcesso?: string;
+  valorProdutos?: number;
+  valorDesconto?: number;
+  valorNota?: number;
+  totalFaturado?: number;
+  pesoLiquido?: number;
+  pesoBruto?: number;
+  regimeTributario?: string;
+  naturezaOperacao?: string;
+  cfop?: string;
+  ncm?: string;
+  fretePorConta?: string;
+  municipio?: string;
+  uf?: string;
+  fonteDados?: 'nf' | 'ecommerce';
+  segmentoCliente?: 'b2c' | 'b2b2c' | 'b2b';
+}
+
+// Raw invoice data from CSV (before processing)
+export interface InvoiceRawData {
+  "ID Nota": string;
+  "Numero Nota": string;
+  "Serie": string;
+  "Chave de Acesso"?: string;
+  "Data emissao": string;
+  "Data saida"?: string;
+  "Natureza da operacao"?: string;
+  "Regime Tributario"?: string;
+  "CFOP"?: string;
+  "NCM"?: string;
+  "Item Descricao": string;
+  "Item Codigo"?: string;
+  "Item Quantidade": string;
+  "Item Valor Unitario": string;
+  "Item Valor Total": string;
+  "Item Unidade"?: string;
+  "Valor Produtos": string;
+  "Frete": string;
+  "Desconto": string;
+  "Total Faturado": string;
+  "Peso Liquido"?: string;
+  "Peso Bruto"?: string;
+  "Frete por conta"?: string;
+  "Municipio"?: string;
+  "UF"?: string;
+  "Observacoes"?: string;
+  "Nome Cliente"?: string;
+  "CPF/CNPJ Cliente"?: string;
 }
 
 // Sales Metrics

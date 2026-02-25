@@ -7,7 +7,7 @@ import { standardizeProductName } from './productNormalizer';
  * Consolida múltiplos kits de amostras em um único kit por pedido
  * Regra de negócio: 1 pedido = 1 kit de amostra (preço R$ 0,01)
  */
-const consolidateSampleKits = (orders: ProcessedOrder[]): ProcessedOrder[] => {
+export const consolidateSampleKits = (orders: ProcessedOrder[]): ProcessedOrder[] => {
   return orders.map(order => {
     // Encontrar todos os produtos "Kit de Amostras"
     const sampleKits = order.produtos.filter(p => p.descricaoAjustada === 'Kit de Amostras');
