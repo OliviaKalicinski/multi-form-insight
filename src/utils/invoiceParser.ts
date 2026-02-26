@@ -93,6 +93,11 @@ const determineSegment = (
  * Processa dados brutos de CSV de Nota Fiscal e retorna ProcessedOrder[]
  */
 export const processInvoiceData = (rawData: any[]): ProcessedOrder[] => {
+  // PREMISSA: NF distintas devem gerar numero_pedido distinto.
+  // O fallback NF-{numeroNota} garante isso. Se o parser mudar para
+  // extrair numero_pedido de Observacoes, validar que NFs distintas
+  // nao compartilham o mesmo valor, caso contrario a logica de
+  // substituicao idempotente pode apagar historico fiscal real.
   console.log(`📥 [NF] Total de linhas no CSV: ${rawData.length}`);
 
   // 1. Validar e filtrar
