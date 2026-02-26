@@ -56,6 +56,42 @@ const extractNumeroPedido = (obs: string | undefined, numeroNota: string): strin
   return `NF-${numeroNota}`;
 };
 
+/**
+ * Extrai numero_pedido_plataforma do campo Observações.
+ * Regex com precedência estrita — para no primeiro match válido.
+ * Defesas: rejeita chaves de acesso (44 dígitos) e números > 12 dígitos.
+ */
+export const extractNumeroPedidoPlataforma = (obs: string | undefined): string | undefined => {
+  if (!obs) return undefined;
+
+  const patterns: RegExp[] = [
+    /Ref\.?\s*a[lo]?\s*pedido\s*n[uú]mero\s*(\d+)/i,
+    /OC:\s*(\d+)/i,
+    /(?:pedido|ped\.?)\s*(?:n[uú]mero|n[º°]|no\.?)?\s*:?\s*(\d+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = obs.match(pattern);
+    if (match && match[1]) {
+      const digits = match[1].trim().replace(/\D/g, '');
+      // Rejeitar chave de acesso NF (44 dígitos) e números > 12 dígitos
+      if (digits.length === 44 || digits.length > 12 || digits.length === 0) continue;
+      return digits;
+    }
+  }
+
+  return undefined;
+};
+
+/** Resultado do processamento de NFs com metadados de cobertura */
+export interface InvoiceProcessingResult {
+  orders: ProcessedOrder[];
+  coberturaPedidoPlataforma: number; // 0-100
+  totalComPlataforma: number;
+  totalSemPlataforma: number;
+  alertaCobertura: boolean; // true se < 90%
+}
+
 /** Parse de data no formato DD/MM/YYYY ou YYYY-MM-DD */
 const parseDate = (dateStr: string): Date => {
   // Try DD/MM/YYYY
@@ -92,7 +128,7 @@ const determineSegment = (
 /**
  * Processa dados brutos de CSV de Nota Fiscal e retorna ProcessedOrder[]
  */
-export const processInvoiceData = (rawData: any[]): ProcessedOrder[] => {
+export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
   // PREMISSA: NF distintas devem gerar numero_pedido distinto.
   // O fallback NF-{numeroNota} garante isso. Se o parser mudar para
   // extrair numero_pedido de Observacoes, validar que NFs distintas
@@ -174,6 +210,12 @@ export const processInvoiceData = (rawData: any[]): ProcessedOrder[] => {
     // Extrair numero_pedido das observações
     const numeroPedido = extractNumeroPedido(first["Observacoes"], numeroNota);
 
+    // Extrair numero_pedido_plataforma de TODAS as linhas
+    let numeroPedidoPlataforma: string | undefined;
+    for (const row of rows) {
+      numeroPedidoPlataforma = extractNumeroPedidoPlataforma(row["Observacoes"]);
+      if (numeroPedidoPlataforma) break;
+    }
     const order: ProcessedOrder = {
       numeroPedido,
       nomeCliente: first["Nome Cliente"] || "",
@@ -207,6 +249,7 @@ export const processInvoiceData = (rawData: any[]): ProcessedOrder[] => {
       uf: first["UF"],
       fonteDados: "nf",
       segmentoCliente,
+      numeroPedidoPlataforma,
     };
 
     orders.push(order);
@@ -222,7 +265,29 @@ export const processInvoiceData = (rawData: any[]): ProcessedOrder[] => {
   });
   console.log(`📊 [NF] Segmentação: B2C=${segCounts.b2c}, B2B2C=${segCounts.b2b2c}, B2B=${segCounts.b2b}`);
 
-  return consolidated;
+  // 5. Calcular cobertura de numero_pedido_plataforma
+  const totalComPlataforma = consolidated.filter(o => o.numeroPedidoPlataforma).length;
+  const totalSemPlataforma = consolidated.length - totalComPlataforma;
+  const coberturaPedidoPlataforma = consolidated.length > 0
+    ? (totalComPlataforma / consolidated.length) * 100
+    : 0;
+
+  const alertaCobertura = coberturaPedidoPlataforma < 90;
+
+  console.log(`🔑 [NF] Cobertura pedido_plataforma: ${totalComPlataforma}/${consolidated.length} (${coberturaPedidoPlataforma.toFixed(1)}%)`);
+  if (alertaCobertura) {
+    console.warn(`⚠️ [NF] ALERTA: Cobertura pedido_plataforma abaixo de 90% (${coberturaPedidoPlataforma.toFixed(1)}%). Verificar padrões de Observações.`);
+  } else if (coberturaPedidoPlataforma < 95) {
+    console.warn(`⚠️ [NF] Aviso: Cobertura pedido_plataforma entre 90-95% (${coberturaPedidoPlataforma.toFixed(1)}%).`);
+  }
+
+  return {
+    orders: consolidated,
+    coberturaPedidoPlataforma,
+    totalComPlataforma,
+    totalSemPlataforma,
+    alertaCobertura,
+  };
 };
 
 /**

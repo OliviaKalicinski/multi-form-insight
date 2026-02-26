@@ -216,6 +216,7 @@ export interface ProcessedOrder {
   uf?: string;
   fonteDados?: 'nf' | 'ecommerce';
   segmentoCliente?: 'b2c' | 'b2b2c' | 'b2b';
+  numeroPedidoPlataforma?: string;
 }
 
 // Raw invoice data from CSV (before processing)
