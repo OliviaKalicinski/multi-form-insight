@@ -173,6 +173,7 @@ export const useDataPersistence = () => {
         uf: row.uf || undefined,
         fonteDados: (row.fonte_dados as 'nf' | 'ecommerce') || 'ecommerce',
         segmentoCliente: row.segmento_cliente || undefined,
+        numeroPedidoPlataforma: row.numero_pedido_plataforma || undefined,
       }));
 
       // Transform ads data with all new fields from database
@@ -318,6 +319,7 @@ export const useDataPersistence = () => {
           data_saida_nf: null,
           fonte_dados: "nf",
           segmento_cliente: order.segmentoCliente || null,
+          numero_pedido_plataforma: order.numeroPedidoPlataforma || null,
         }));
 
         // --- Idempotência: snapshot + purge antes do upsert ---

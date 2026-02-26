@@ -353,6 +353,7 @@ export type Database = {
           ncm: string | null
           numero_nota: string | null
           numero_pedido: string | null
+          numero_pedido_plataforma: string | null
           peso_bruto: number | null
           peso_liquido: number | null
           produtos: Json
@@ -392,6 +393,7 @@ export type Database = {
           ncm?: string | null
           numero_nota?: string | null
           numero_pedido?: string | null
+          numero_pedido_plataforma?: string | null
           peso_bruto?: number | null
           peso_liquido?: number | null
           produtos: Json
@@ -431,6 +433,7 @@ export type Database = {
           ncm?: string | null
           numero_nota?: string | null
           numero_pedido?: string | null
+          numero_pedido_plataforma?: string | null
           peso_bruto?: number | null
           peso_liquido?: number | null
           produtos?: Json

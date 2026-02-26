@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import Papa from "papaparse";
 import { z } from "zod";
 import { processSalesData } from "@/utils/salesCalculator";
-import { processInvoiceData, detectCSVFormat } from "@/utils/invoiceParser";
+import { processInvoiceData, detectCSVFormat, InvoiceProcessingResult } from "@/utils/invoiceParser";
 import { ProcessedOrder } from "@/types/marketing";
 import { useDashboard } from "@/contexts/DashboardContext";
 
@@ -113,7 +113,16 @@ export const SalesUploader = ({
 
         let processedData: ProcessedOrder[] | null = null;
         if (format === "nf") {
-          processedData = processInvoiceData(results.data);
+          const result = processInvoiceData(results.data);
+          processedData = result.orders;
+
+          if (result.alertaCobertura) {
+            toast({
+              title: "Alerta de cobertura",
+              description: `Apenas ${result.coberturaPedidoPlataforma.toFixed(1)}% das NFs têm numero_pedido_plataforma. Verificar padrões de Observações.`,
+              variant: "destructive",
+            });
+          }
         } else {
           processedData = validateEcommerceData(results.data);
         }
