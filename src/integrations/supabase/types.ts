@@ -457,6 +457,48 @@ export type Database = {
           },
         ]
       }
+      sales_data_log: {
+        Row: {
+          arquivo_nome: string | null
+          id_log: string
+          id_original: string
+          motivo: string | null
+          numero_nota: string | null
+          numero_pedido: string | null
+          payload_completo: Json
+          serie: string | null
+          substituido_em: string
+          upload_id: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          arquivo_nome?: string | null
+          id_log?: string
+          id_original: string
+          motivo?: string | null
+          numero_nota?: string | null
+          numero_pedido?: string | null
+          payload_completo: Json
+          serie?: string | null
+          substituido_em?: string
+          upload_id?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          arquivo_nome?: string | null
+          id_log?: string
+          id_original?: string
+          motivo?: string | null
+          numero_nota?: string | null
+          numero_pedido?: string | null
+          payload_completo?: Json
+          serie?: string | null
+          substituido_em?: string
+          upload_id?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
       upload_history: {
         Row: {
           created_at: string
@@ -465,7 +507,9 @@ export type Database = {
           date_range_start: string | null
           file_name: string | null
           id: string
+          pedidos_substituidos: string[] | null
           record_count: number
+          registros_substituidos: number | null
           user_id: string
         }
         Insert: {
@@ -475,7 +519,9 @@ export type Database = {
           date_range_start?: string | null
           file_name?: string | null
           id?: string
+          pedidos_substituidos?: string[] | null
           record_count?: number
+          registros_substituidos?: number | null
           user_id: string
         }
         Update: {
@@ -485,7 +531,9 @@ export type Database = {
           date_range_start?: string | null
           file_name?: string | null
           id?: string
+          pedidos_substituidos?: string[] | null
           record_count?: number
+          registros_substituidos?: number | null
           user_id?: string
         }
         Relationships: []
@@ -526,6 +574,15 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_first_user: { Args: never; Returns: boolean }
+      nf_snapshot_and_purge: {
+        Args: {
+          p_arquivo_nome: string
+          p_numero_pedidos: string[]
+          p_upload_id: string
+          p_usuario_id: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "viewer"

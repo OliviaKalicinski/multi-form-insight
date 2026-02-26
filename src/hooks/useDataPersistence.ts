@@ -320,6 +320,27 @@ export const useDataPersistence = () => {
           segmento_cliente: order.segmentoCliente || null,
         }));
 
+        // --- Idempotência: snapshot + purge antes do upsert ---
+        const pedidos = [...new Set(rows.map(r => r.numero_pedido).filter(Boolean))] as string[];
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const { data: purgedCount, error: rpcError } = await supabase.rpc('nf_snapshot_and_purge', {
+          p_numero_pedidos: pedidos,
+          p_upload_id: uploadId,
+          p_usuario_id: user?.id,
+          p_arquivo_nome: fileName || null,
+        });
+
+        if (rpcError) {
+          console.error('[NF-REPLACE] Erro na RPC:', rpcError);
+          if (uploadId) await supabase.from("upload_history").delete().eq("id", uploadId);
+          throw rpcError;
+        }
+
+        if (purgedCount && purgedCount > 0) {
+          console.log(`[NF-REPLACE] ${purgedCount} registros substituídos: ${pedidos.join(', ')}`);
+        }
+
         // Upsert com conflict em (numero_nota, serie) via index
         const { data, error } = await supabase
           .from("sales_data")
@@ -329,6 +350,14 @@ export const useDataPersistence = () => {
         if (error) {
           if (uploadId) await supabase.from("upload_history").delete().eq("id", uploadId);
           throw error;
+        }
+
+        // Atualizar upload_history com stats de substituição
+        if (uploadId && purgedCount && purgedCount > 0) {
+          await supabase.from("upload_history").update({
+            registros_substituidos: purgedCount,
+            pedidos_substituidos: pedidos,
+          } as any).eq("id", uploadId);
         }
 
         const result = { inserted: data?.length || 0, updated: 0, total: orders.length };
