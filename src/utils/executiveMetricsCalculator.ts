@@ -4,7 +4,7 @@ import { calculateSalesMetrics } from "./salesCalculator";
 import { calculateAdsMetrics } from "./adsCalculator";
 import { analyzeChurn } from "./customerBehaviorMetrics";
 import { differenceInDays, parse, min, max } from "date-fns";
-import { getOfficialRevenue } from "./revenue";
+import { getOfficialRevenue, getRevenueOrders } from "./revenue";
 import { 
   createDefaultMeta, 
   createDefaultSource, 
@@ -91,18 +91,17 @@ export const calculateExecutiveMetrics = (
   // Análise de churn
   const churnAnalysis = orders.length > 0 ? analyzeChurn(orders) : null;
 
+  // Filtro fiscal: somente vendas (exclui brindes/bonificações/devoluções)
+  const revenueOrders = getRevenueOrders(orders);
+
   // ===== VENDAS =====
   const receita = salesMetrics?.faturamentoTotal || 0;
   const pedidos = salesMetrics?.totalPedidos || 0;
   const ticketMedio = pedidos > 0 ? receita / pedidos : 0;
   
-  // Ticket médio real - exclui apenas pedidos de SOMENTE amostra
-  // (pedidos que têm amostra + produto regular são mantidos)
-  const pedidosReais = orders.filter(order => {
-    const hasRealProduct = order.produtos.some(
-      p => p.descricaoAjustada !== 'Kit de Amostras'
-    );
-    return hasRealProduct;
+  // Ticket médio real - exclui pedidos de SOMENTE amostra E não-vendas
+  const pedidosReais = revenueOrders.filter(order => {
+    return order.produtos.some(p => p.descricaoAjustada !== 'Kit de Amostras');
   });
   const receitaReal = pedidosReais.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
   const ticketMedioReal = pedidosReais.length > 0 
@@ -118,9 +117,9 @@ export const calculateExecutiveMetrics = (
   const investimentoAds = adsMetrics?.investimentoTotal || 0;
   const receitaAds = adsMetrics?.valorConversaoTotal || receita;
   
-  // Calcular faturamento fiscal e frete dos pedidos reais
-  const faturamentoTotal = orders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
-  const freteTotal = orders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
+  // Calcular faturamento fiscal e frete (somente vendas)
+  const faturamentoTotal = revenueOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
+  const freteTotal = revenueOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
   const percentualFrete = faturamentoTotal > 0 ? freteTotal / faturamentoTotal : 0;
   
   // === 3 ROAS ===
@@ -147,15 +146,22 @@ export const calculateExecutiveMetrics = (
   const cpa = compras > 0 ? investimentoAds / compras : 0;
 
   // ===== CLIENTES =====
-  // Agrupar clientes únicos
+  // Contagem comportamental: todos os pedidos (brindes mantêm cliente na base)
   const clientesUnicos = new Map<string, { pedidos: number; valorTotal: number }>();
   orders.forEach(order => {
     const existing = clientesUnicos.get(order.cpfCnpj);
     if (existing) {
       existing.pedidos += 1;
-      existing.valorTotal += getOfficialRevenue(order);
     } else {
-      clientesUnicos.set(order.cpfCnpj, { pedidos: 1, valorTotal: getOfficialRevenue(order) });
+      clientesUnicos.set(order.cpfCnpj, { pedidos: 1, valorTotal: 0 });
+    }
+  });
+
+  // Receita fiscal: apenas vendas (para LTV correto)
+  revenueOrders.forEach(order => {
+    const existing = clientesUnicos.get(order.cpfCnpj);
+    if (existing) {
+      existing.valorTotal += getOfficialRevenue(order);
     }
   });
 
@@ -171,9 +177,9 @@ export const calculateExecutiveMetrics = (
   const cac = novosClientes > 0 ? investimentoAds / novosClientes : 0;
 
   // ===== PRODUTOS =====
-  // Agrupar produtos por nome ajustado
+  // Agrupar produtos por nome ajustado (somente vendas - receita fiscal)
   const produtosMap = new Map<string, { quantidade: number; receita: number }>();
-  orders.forEach(order => {
+  revenueOrders.forEach(order => {
     order.produtos.forEach(produto => {
       const existing = produtosMap.get(produto.descricaoAjustada);
       if (existing) {
