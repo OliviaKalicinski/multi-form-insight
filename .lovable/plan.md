@@ -1,164 +1,71 @@
 
 
-# Bloco 1: Consolidar Paradigma Economico no Nucleo
+# Correção da Página de Amostras: Alinhamento Fiscal + Filtro de Recompras
 
-## Resumo
+## Contexto
 
-Aplicar `getRevenueOrders()` em 4 arquivos para que receita, ROAS, ticket medio e LTV excluam brindes/bonificacoes/devolucoes. Modelo adotado: **Receita Comercial Bruta** (somente vendas, devolucoes como metrica operacional separada).
+A página de Amostras opera em paradigma comportamental, mas usa `order.valorTotal` para valores monetários enquanto o resto do dashboard usa `getOfficialRevenue()`. Além disso, bonificações/brindes podem contar como recompras, inflando conversão.
 
----
+## O que muda
 
-## 1. `src/utils/roasCalculator.ts`
+### 1. `src/utils/samplesAnalyzer.ts` -- Import (L1-2)
 
-- Importar `getRevenueOrders` de `./revenue`
-- Filtrar orders antes de somar `faturamentoLiquido`
+Adicionar import de `getOfficialRevenue` e `isRevenueOrder` de `./revenue`.
 
-```typescript
-import { getOfficialRevenue, getRevenueOrders } from "./revenue";
+### 2. Substituir `order.valorTotal` por `getOfficialRevenue(order)` em 6 pontos monetários
 
-// L14: filtrar
-const revenueOrders = getRevenueOrders(orders);
-const faturamentoLiquido = revenueOrders.reduce(
-  (sum, order) => sum + getOfficialRevenue(order), 0
-);
-```
+Estes são os pontos onde o valor é usado para ticket, receita ou LTV -- métricas que o usuário compara com o dashboard:
 
-Todas as metricas derivadas (roas, roi, margemLiquida) passam a usar receita filtrada automaticamente.
+| Linha | Função | Contexto |
+|-------|--------|----------|
+| L105 | `groupOrdersByCustomer` | `totalRevenue += order.valorTotal` |
+| L156 | `getQualifiedSampleCustomers` | `sortedOrders.reduce(...o.valorTotal...)` |
+| L246 | `calculateRepurchaseBehavior` | `totalValue += o.valorTotal` |
+| L309 | `calculateCrossSellMetrics` | `productsWithSample[key].totalValue += order.valorTotal` |
+| L795 | `calculateCohortAnalysis` | `totalTicket += order.valorTotal` |
+| L878 | `calculateSampleMetricsByPetType` | `ticketAccumulator[petType].totalValue += order.valorTotal` |
 
----
+**Pontos que NÃO mudam** (são puramente sobre volume/perfil do primeiro pedido de amostra, não comparáveis com dashboard):
+- L325: ticket médio de pedidos só-amostra (valor ~R$1, contexto de perfil)
+- L329: ticket médio de pedidos amostra+outros (cross-sell mix, contexto de cesta)
+- L510: `avgFirstOrderValue` no perfil do cliente (primeiro pedido, contexto comportamental)
 
-## 2. `src/utils/salesCalculator.ts` (2 pontos)
+### 3. Adicionar filtro `isRevenueOrder` nas recompras regulares (7 pontos)
 
-**2a. `calculateAverageTicket` (L198-202)**
+Em todas as funções que identificam recompras, adicionar `.filter(o => isRevenueOrder(o))` junto ao filtro `hasRegularProduct`. Isso impede que bonificações/brindes inflem taxa de conversão:
 
-Corrigir denominador: dividir por `revenueOrders.length` em vez de `orders.length`. Evitar dupla iteracao calculando receita inline.
+| Linha | Função |
+|-------|--------|
+| L228-229 | `calculateRepurchaseBehavior` -- detecção de recompra |
+| L244 | `calculateRepurchaseBehavior` -- iteração de recompras |
+| L377-379 | `calculateConversionByTime` -- conversão por janela |
+| L427-429 | `calculateRepurchaseQuality` -- recompras regulares |
+| L591-593 | `calculateBehaviorSegmentation` -- contagem de recompras |
+| L778-780 | `calculateCohortAnalysis` -- detecção de recompra |
+| L790-792 | `calculateCohortAnalysis` -- iteração de recompras |
+| L869-871 | `calculateSampleMetricsByPetType` -- recompras por pet |
 
-```typescript
-export const calculateAverageTicket = (orders: ProcessedOrder[]): number => {
-  const revenueOrders = getRevenueOrders(orders);
-  if (revenueOrders.length === 0) return 0;
-  const revenue = revenueOrders.reduce(
-    (sum, order) => sum + getOfficialRevenue(order), 0
-  );
-  return revenue / revenueOrders.length;
-};
-```
+Padrão: onde hoje existe `.filter(o => hasRegularProduct(o))`, passa a ser `.filter(o => hasRegularProduct(o) && isRevenueOrder(o))`.
 
-**2b. `extractDailyRevenue` (L272-281)**
+### 4. `src/pages/AnaliseSamples.tsx` -- Label de segmentação (L159)
 
-Filtrar por `getRevenueOrders` para alinhar grafico diario com cards executivos.
+Alterar `criteria: '2 compras'` para `criteria: '1-2 recompras regulares'` no segmento "Recorrente", alinhando com a lógica real do código (explorers = 1-2 recompras = 2-3 pedidos totais).
 
-```typescript
-export const extractDailyRevenue = (orders: ProcessedOrder[]): { date: string; value: number }[] => {
-  const dailyMap = new Map<string, number>();
-  const revenueOrders = getRevenueOrders(orders);
-  revenueOrders.forEach(order => {
-    const dateKey = format(order.dataVenda, 'yyyy-MM-dd');
-    dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + getOfficialRevenue(order));
-  });
-  return Array.from(dailyMap.entries()).map(([date, value]) => ({ date, value }));
-};
-```
+## O que NÃO muda
 
----
+- Identificação de amostra (`isSampleProduct`, `isSampleOrder`) -- continua comportamental
+- Volume de clientes qualificados -- conta todos os pedidos
+- LTV continua incluindo pedido de amostra (decisão intencional, impacto ~R$1)
+- Perfil do cliente (plataforma, envio, primeiro pedido) -- contexto comportamental puro
+- Análise temporal (contagem mensal de amostras) -- volume, não valor
+- Cesta de compras (`calculateBasketAnalysis`) -- contagem de itens, não valor fiscal
 
-## 3. `src/utils/executiveMetricsCalculator.ts` (6 pontos)
+## Resultado esperado
 
-**3a. Import (L7):** Adicionar `getRevenueOrders`
+- Ticket médio de coorte alinhado com ticket médio do dashboard executivo
+- Taxa de recompra limpa de bonificações/brindes
+- LTV de convertidos consistente entre páginas
+- Label "Recorrente" reflete lógica real
 
-```typescript
-import { getOfficialRevenue, getRevenueOrders } from "./revenue";
-```
-
-**3b. Criar `revenueOrders` (apos L92)**
-
-```typescript
-const revenueOrders = getRevenueOrders(orders);
-```
-
-**3c. Ticket medio real (L101-110):** Filtrar por venda E produto real
-
-```typescript
-const pedidosReais = revenueOrders.filter(order => {
-  return order.produtos.some(p => p.descricaoAjustada !== 'Kit de Amostras');
-});
-const receitaReal = pedidosReais.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
-```
-
-**3d. Faturamento e frete (L122-123):** Usar `revenueOrders`
-
-```typescript
-const faturamentoTotal = revenueOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
-const freteTotal = revenueOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
-```
-
-**3e. Clientes (L151-160):** Separar contagem (todos) de receita (vendas)
-
-```typescript
-const clientesUnicos = new Map<string, { pedidos: number; valorTotal: number }>();
-
-// Contagem comportamental: todos os pedidos
-orders.forEach(order => {
-  const existing = clientesUnicos.get(order.cpfCnpj);
-  if (existing) {
-    existing.pedidos += 1;
-  } else {
-    clientesUnicos.set(order.cpfCnpj, { pedidos: 1, valorTotal: 0 });
-  }
-});
-
-// Receita fiscal: apenas vendas
-revenueOrders.forEach(order => {
-  const existing = clientesUnicos.get(order.cpfCnpj);
-  if (existing) {
-    existing.valorTotal += getOfficialRevenue(order);
-  }
-});
-```
-
-**3f. Produtos (L176-189):** Usar `revenueOrders`
-
-```typescript
-revenueOrders.forEach(order => {
-  order.produtos.forEach(produto => { ... });
-});
-```
-
----
-
-## 4. `src/pages/PerformanceFinanceira.tsx` (L183-186)
-
-Substituir soma manual de `o.valorTotal` por `getOfficialRevenue` com filtro de tipo.
-
-```typescript
-// Adicionar import
-import { getOfficialRevenue, getRevenueOrders } from "@/utils/revenue";
-
-// L183-186
-const revenueFilteredOrders = getRevenueOrders(filteredOrders);
-const faturamentoTotal = revenueFilteredOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
-const freteTotal = revenueFilteredOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
-const faturamentoExFrete = faturamentoTotal - freteTotal;
-```
-
----
-
-## O que NAO muda neste bloco
-
-- Tipos (`ExecutiveMetrics`, `ROASMetrics`) -- sem mudanca de interface
-- Churn (`analyzeChurn`) -- usa todos os pedidos (comportamento)
-- Operacoes (NF, envio) -- usam todos os pedidos
-- `samplesAnalyzer.ts` -- contexto comercial, nao fiscal
-- Card de devolucoes -- bloco futuro separado
-
-## Modelo economico adotado
-
-```text
-RECEITA FISCAL      -> getRevenueOrders(orders) + getOfficialRevenue(order)
-VOLUME OPERACIONAL  -> orders.length (todos)
-COMPORTAMENTO       -> orders (todos, incluindo brindes)
-DEVOLUCOES          -> metrica operacional separada (bloco futuro)
-```
-
-## Total: 4 arquivos, ~12 pontos de correcao
+## Total: 2 arquivos, ~15 pontos de edição
 
