@@ -196,9 +196,12 @@ export const calculateRevenue = (orders: ProcessedOrder[]): number => {
  * Calcula ticket médio
  */
 export const calculateAverageTicket = (orders: ProcessedOrder[]): number => {
-  if (orders.length === 0) return 0;
-  const revenue = calculateRevenue(orders);
-  return revenue / orders.length;
+  const revenueOrders = getRevenueOrders(orders);
+  if (revenueOrders.length === 0) return 0;
+  const revenue = revenueOrders.reduce(
+    (sum, order) => sum + getOfficialRevenue(order), 0
+  );
+  return revenue / revenueOrders.length;
 };
 
 /**
@@ -271,8 +274,9 @@ export const formatQuantity = (value: number): string => {
  */
 export const extractDailyRevenue = (orders: ProcessedOrder[]): { date: string; value: number }[] => {
   const dailyMap = new Map<string, number>();
+  const revenueOrders = getRevenueOrders(orders);
   
-  orders.forEach(order => {
+  revenueOrders.forEach(order => {
     const dateKey = format(order.dataVenda, 'yyyy-MM-dd');
     dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + getOfficialRevenue(order));
   });

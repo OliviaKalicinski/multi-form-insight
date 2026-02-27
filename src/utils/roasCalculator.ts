@@ -1,17 +1,18 @@
 import { ProcessedOrder, AdsData, ROASMetrics } from "@/types/marketing";
 import { parseAdsValue } from "./adsCalculator";
-import { getOfficialRevenue } from "./revenue";
+import { getOfficialRevenue, getRevenueOrders } from "./revenue";
 
 /**
  * Calcula ROAS real baseado em receita fiscal e investimento em ads
- * Receita fiscal = getOfficialRevenue (totalFaturado ou valorTotal + frete)
+ * Receita fiscal = getRevenueOrders (somente vendas) + getOfficialRevenue
  */
 export const calculateROAS = (
   orders: ProcessedOrder[],
   adsData: AdsData[]
 ): ROASMetrics => {
-  // Receita fiscal (inclui frete)
-  const faturamentoLiquido = orders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
+  // Receita fiscal: somente pedidos tipo 'venda' (exclui brindes/bonificações/devoluções)
+  const revenueOrders = getRevenueOrders(orders);
+  const faturamentoLiquido = revenueOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
   
   // Calcular investimento total em ads
   const investimentoAds = adsData.reduce(

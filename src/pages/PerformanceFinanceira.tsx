@@ -19,6 +19,7 @@ import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
 import { IncompleteMonthBadge } from "@/components/dashboard/IncompleteMonthBadge";
 import { calculateFinancialMetrics, analyzeSeasonality, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes, getPlatformPerformanceWithProducts } from "@/utils/financialMetrics";
 import { filterOrdersByMonth, filterOrdersByDateRange, extractDailyRevenue } from "@/utils/salesCalculator";
+import { getOfficialRevenue, getRevenueOrders } from "@/utils/revenue";
 import { filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
@@ -180,9 +181,10 @@ export default function PerformanceFinanceira() {
     const investimentoAds = adsMetrics?.investimentoTotal || 0;
     const valorConversaoMeta = adsMetrics?.valorConversaoTotal || 0;
     
-    // Calcular faturamento e frete
-    const faturamentoTotal = filteredOrders.reduce((sum, o) => sum + o.valorTotal, 0);
-    const freteTotal = filteredOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
+    // Calcular faturamento e frete (somente vendas - paradigma fiscal)
+    const revenueFilteredOrders = getRevenueOrders(filteredOrders);
+    const faturamentoTotal = revenueFilteredOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
+    const freteTotal = revenueFilteredOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
     const faturamentoExFrete = faturamentoTotal - freteTotal;
     
     // 3 ROAS (ROAS Meta já é ex-frete pelo pixel)
