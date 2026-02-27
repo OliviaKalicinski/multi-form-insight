@@ -27,6 +27,9 @@ import AnaliseCritica from "./pages/AnaliseCritica";
 import AnaliseChurn from "./pages/AnaliseChurn";
 import Publico from "./pages/Publico";
 import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
+import Clientes from "./pages/Clientes";
+import ClientePerfil from "./pages/ClientePerfil";
+import Reclamacoes from "./pages/Reclamacoes";
 import NotFound from "./pages/NotFound";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -230,6 +233,30 @@ const App = () => (
             <ProtectedRoute>
               <AuthenticatedLayout>
                 <AnaliseCritica />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/clientes" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <Clientes />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/clientes/:cpfCnpj" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ClientePerfil />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/reclamacoes" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <Reclamacoes />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />

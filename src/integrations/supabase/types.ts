@@ -203,8 +203,10 @@ export type Database = {
           created_at: string | null
           first_order_date: string | null
           id: string
+          is_active: boolean
           last_contact_date: string | null
           last_order_date: string | null
+          merged_into: string | null
           nome: string | null
           observacoes: string | null
           prioridade: string | null
@@ -225,8 +227,10 @@ export type Database = {
           created_at?: string | null
           first_order_date?: string | null
           id?: string
+          is_active?: boolean
           last_contact_date?: string | null
           last_order_date?: string | null
+          merged_into?: string | null
           nome?: string | null
           observacoes?: string | null
           prioridade?: string | null
@@ -247,8 +251,10 @@ export type Database = {
           created_at?: string | null
           first_order_date?: string | null
           id?: string
+          is_active?: boolean
           last_contact_date?: string | null
           last_order_date?: string | null
+          merged_into?: string | null
           nome?: string | null
           observacoes?: string | null
           prioridade?: string | null
@@ -262,6 +268,237 @@ export type Database = {
           total_orders_revenue?: number
           total_revenue?: number
           updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "customer_full"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_complaint: {
+        Row: {
+          acao_orientacao: string | null
+          atendente: string | null
+          atendimento_numero: string | null
+          canal: string | null
+          created_at: string | null
+          created_by: string | null
+          custo_estimado: number | null
+          customer_id: string
+          data_contato: string | null
+          data_fabricacao: string | null
+          data_fechamento: string | null
+          descricao: string
+          gravidade: string | null
+          id: string
+          link_reclamacao: string | null
+          local_compra: string | null
+          lote: string | null
+          natureza_pedido: string | null
+          nf_produto: string | null
+          produto: string | null
+          status: string
+          tipo_reclamacao: string | null
+          transportador: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          acao_orientacao?: string | null
+          atendente?: string | null
+          atendimento_numero?: string | null
+          canal?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          custo_estimado?: number | null
+          customer_id: string
+          data_contato?: string | null
+          data_fabricacao?: string | null
+          data_fechamento?: string | null
+          descricao: string
+          gravidade?: string | null
+          id?: string
+          link_reclamacao?: string | null
+          local_compra?: string | null
+          lote?: string | null
+          natureza_pedido?: string | null
+          nf_produto?: string | null
+          produto?: string | null
+          status?: string
+          tipo_reclamacao?: string | null
+          transportador?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          acao_orientacao?: string | null
+          atendente?: string | null
+          atendimento_numero?: string | null
+          canal?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          custo_estimado?: number | null
+          customer_id?: string
+          data_contato?: string | null
+          data_fabricacao?: string | null
+          data_fechamento?: string | null
+          descricao?: string
+          gravidade?: string | null
+          id?: string
+          link_reclamacao?: string | null
+          local_compra?: string | null
+          lote?: string | null
+          natureza_pedido?: string | null
+          nf_produto?: string | null
+          produto?: string | null
+          status?: string
+          tipo_reclamacao?: string | null
+          transportador?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_complaint_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_complaint_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_full"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_contact_log: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          customer_id: string
+          data_contato: string
+          id: string
+          motivo: string | null
+          responsavel: string | null
+          resultado: string | null
+          resumo: string
+          tipo: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          customer_id: string
+          data_contato?: string
+          id?: string
+          motivo?: string | null
+          responsavel?: string | null
+          resultado?: string | null
+          resumo: string
+          tipo?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string
+          data_contato?: string
+          id?: string
+          motivo?: string | null
+          responsavel?: string | null
+          resultado?: string | null
+          resumo?: string
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_contact_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_contact_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_full"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_identifier: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          id: string
+          is_primary: boolean | null
+          type: string
+          value: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          is_primary?: boolean | null
+          type: string
+          value: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          is_primary?: boolean | null
+          type?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_identifier_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_identifier_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_full"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_merge_log: {
+        Row: {
+          id: string
+          merged_at: string | null
+          merged_by: string | null
+          primary_customer_id: string
+          secondary_customer_id: string
+        }
+        Insert: {
+          id?: string
+          merged_at?: string | null
+          merged_by?: string | null
+          primary_customer_id: string
+          secondary_customer_id: string
+        }
+        Update: {
+          id?: string
+          merged_at?: string | null
+          merged_by?: string | null
+          primary_customer_id?: string
+          secondary_customer_id?: string
         }
         Relationships: []
       }
@@ -648,8 +885,10 @@ export type Database = {
           days_since_last_purchase: number | null
           first_order_date: string | null
           id: string | null
+          is_active: boolean | null
           last_contact_date: string | null
           last_order_date: string | null
+          merged_into: string | null
           nome: string | null
           observacoes: string | null
           prioridade: string | null
@@ -672,8 +911,10 @@ export type Database = {
           days_since_last_purchase?: never
           first_order_date?: string | null
           id?: string | null
+          is_active?: boolean | null
           last_contact_date?: string | null
           last_order_date?: string | null
+          merged_into?: string | null
           nome?: string | null
           observacoes?: string | null
           prioridade?: string | null
@@ -696,8 +937,10 @@ export type Database = {
           days_since_last_purchase?: never
           first_order_date?: string | null
           id?: string | null
+          is_active?: boolean | null
           last_contact_date?: string | null
           last_order_date?: string | null
+          merged_into?: string | null
           nome?: string | null
           observacoes?: string | null
           prioridade?: string | null
@@ -712,11 +955,59 @@ export type Database = {
           total_revenue?: number | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customer_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "customer_full"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
       expire_old_decisions: { Args: never; Returns: number }
+      find_customer_by_identifier: {
+        Args: { p_value: string }
+        Returns: {
+          average_days_between_purchases: number | null
+          cpf_cnpj: string
+          created_at: string | null
+          first_order_date: string | null
+          id: string
+          is_active: boolean
+          last_contact_date: string | null
+          last_order_date: string | null
+          merged_into: string | null
+          nome: string | null
+          observacoes: string | null
+          prioridade: string | null
+          recalculated_at: string | null
+          responsavel: string | null
+          segment: string | null
+          status_manual: string | null
+          tags: Json | null
+          ticket_medio: number | null
+          total_orders_all: number
+          total_orders_revenue: number
+          total_revenue: number
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "customer"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -726,6 +1017,10 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_first_user: { Args: never; Returns: boolean }
+      merge_customers: {
+        Args: { p_primary: string; p_secondary: string }
+        Returns: undefined
+      }
       nf_snapshot_and_purge: {
         Args: {
           p_arquivo_nome: string
