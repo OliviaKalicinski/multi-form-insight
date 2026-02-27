@@ -1,230 +1,96 @@
 
+# Migrar paginas de clientes para ler de customer_full
 
-# Fase 1 -- Customer como Entidade Operacional (Plano Final Refinado)
+## Objetivo
 
-## Correcoes incorporadas desta revisao
+Eliminar o modo hibrido atual onde metricas de cliente sao calculadas em memoria via `calculateCustomerBehaviorMetrics(salesData)`. As tres paginas (SegmentacaoClientes, AnaliseChurn, ComportamentoCliente) passam a ler exclusivamente da view `customer_full` para metricas de cliente. Metricas de pedido (volume, picos) continuam calculadas localmente a partir de `salesData` filtrado.
 
-| Feedback | Decisao |
-|---|---|
-| `cliente_email` e divida tecnica | Documentado, nao renomeado agora. SQL usa `cliente_email` mapeado como identificador |
-| `average_days_between_purchases` com 1 pedido | NULL explicito (nao 0, nao calculado) |
-| Churn na view: usar aritmetica de date | `(now()::date - last_order_date::date)` em vez de `EXTRACT` |
-| `buildCustomerSnapshot` no front e risco de dupla verdade | Mantido apenas como fallback temporario; dashboard migra para ler `customer_full` o mais rapido possivel |
-| `total_orders_all` conta o que? | Todos os tipos de movimento (venda + brinde + bonificacao + devolucao etc.). Metricas economicas usam apenas `total_orders_revenue` |
-| Segment muda se regra mudar | Aceito. `recalculate_all_customers()` existe como ferramenta administrativa para isso |
+## Mudancas
 
----
+### 1. Criar hook `useCustomerData` (`src/hooks/useCustomerData.ts`)
 
-## Arquitetura
+Faz `supabase.from('customer_full').select('*')` e agrega:
 
-```text
-sales_data (imutavel)
-       |
-       v
-recalculate_customer(cpf_cnpj)   -- por cliente individual
-recalculate_all_customers()      -- manutencao/rebuild
-       |
-       v
-customer (entidade real, UPDATE nao DELETE)
-  - campos derivados: revenue, orders, segment, ticket_medio
-  - campos operacionais: tags, observacoes, responsavel (NUNCA tocados por recalc)
-       |
-       v
-customer_full (view: churn dinamico via date arithmetic)
-       |
-       v
-dashboard / CRM / segmentacao
+- `customers`: lista completa de `CustomerSnapshot[]` (mapeando colunas do banco para o tipo TS)
+- `segments`: `CustomerSegment[]` agregado por `segment` (com `ticketMedio`, `arpu`, `totalOrders`)
+- `churnMetrics`: `{ totalClientes, clientesAtivos, clientesEmRisco, clientesInativos, clientesChurn, taxaChurn, taxaRetencao }`
+- `summaryMetrics`: `{ taxaRecompra, customerLifetimeValue, averageDaysBetweenPurchases }` -- todas derivadas dos campos do banco, sem recalcular regras
+- `churnRiskCustomers`: `ChurnRiskCustomer[]` -- clientes com `churn_status != 'active'`, mapeados para o tipo existente
+- `isLoading`, `error`
+
+Toda agregacao e feita no hook sobre os registros retornados. Nenhuma regra de segmento ou churn e recalculada -- vem pronto da view.
+
+Guard de identidade fraca aplicado no fetch: filtra registros com `cpf_cnpj` vazio, null, ou que comece com `nf-`, ou com menos de 4 caracteres.
+
+### 2. Corrigir `buildCustomerSnapshot` (`src/utils/customerSnapshot.ts`)
+
+Adicionar guard de identidade fraca no inicio:
 ```
-
----
-
-## Etapa 1: Migracao SQL
-
-### 1a. Tabela `customer`
-
-```sql
-CREATE TABLE customer (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  cpf_cnpj text NOT NULL UNIQUE,
-  nome text,
-
-  -- Derivados (atualizados por recalculate)
-  total_orders_revenue integer NOT NULL DEFAULT 0,
-  total_orders_all integer NOT NULL DEFAULT 0,
-  total_revenue numeric(14,2) NOT NULL DEFAULT 0,
-  ticket_medio numeric(14,2) DEFAULT 0,
-  first_order_date timestamptz,
-  last_order_date timestamptz,
-  average_days_between_purchases numeric(10,2),  -- NULL se < 2 pedidos
-  segment text CHECK (segment IN ('Primeira Compra','Recorrente','Fiel','VIP')),
-
-  -- Operacionais (manuais, NUNCA sobrescritos por recalc)
-  tags jsonb DEFAULT '[]',
-  observacoes text,
-  responsavel text,
-  prioridade text,
-  status_manual text,
-  last_contact_date timestamptz,
-
-  -- Controle
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
-  recalculated_at timestamptz
-);
-
-ALTER TABLE customer ENABLE ROW LEVEL SECURITY;
+const validOrders = orders.filter(o => o.cpfCnpj && !o.cpfCnpj.startsWith('nf-') && o.cpfCnpj.trim().length > 3);
 ```
+Usar `validOrders` em vez de `orders` para todo agrupamento.
 
-**RLS:**
-- SELECT: authenticated users (`true`)
-- INSERT/UPDATE/DELETE: admins only (`is_admin(auth.uid())`)
+### 3. Migrar `SegmentacaoClientes.tsx`
 
-### 1b. View `customer_full`
+- Remover import de `calculateCustomerBehaviorMetrics`
+- Remover import de `useDashboard` (nao precisa mais de `salesData`)
+- Usar `useCustomerData()` para obter `segments`, `isLoading`
+- Passar `segments` diretamente para `CustomerSegmentationChart` e `SegmentRevenueChart` e `SegmentDetailTable`
+- Manter layout e indicador "todo o historico"
 
-```sql
-CREATE VIEW customer_full AS
-SELECT *,
-  CASE
-    WHEN last_order_date IS NULL THEN NULL
-    ELSE (now()::date - last_order_date::date)
-  END AS days_since_last_purchase,
-  CASE
-    WHEN last_order_date IS NULL THEN 'churned'
-    WHEN (now()::date - last_order_date::date) <= 30 THEN 'active'
-    WHEN (now()::date - last_order_date::date) <= 60 THEN 'at_risk'
-    WHEN (now()::date - last_order_date::date) <= 90 THEN 'inactive'
-    ELSE 'churned'
-  END AS churn_status
-FROM customer;
-```
+### 4. Migrar `AnaliseChurn.tsx`
 
-Churn nunca e congelado. Sempre derivado de `last_order_date` vs `now()::date`.
+- Remover import de `calculateCustomerBehaviorMetrics`
+- Remover `useDashboard` (nao precisa de `salesData`)
+- Usar `useCustomerData()` para obter `churnMetrics`, `churnRiskCustomers`, `isLoading`
+- Os KPI cards leem de `churnMetrics` (totalClientes, clientesAtivos, clientesEmRisco, clientesInativos, taxaChurn)
+- `valorEmRisco` calculado a partir de `churnRiskCustomers.reduce(sum => sum + valorTotal)`
+- `ChurnFunnelChart` recebe `ativos/emRisco/inativos/churn` de `churnMetrics`
+- `ChurnRiskTable` recebe `churnRiskCustomers` do hook
 
-### 1c. Funcao `recalculate_customer(p_cpf_cnpj text)`
+### 5. Migrar `ComportamentoCliente.tsx` (hibrido)
 
-Funcao SQL SECURITY DEFINER que:
+**Do banco (via hook):**
+- Total clientes, taxa recompra, CLV, dias entre compras, clientes ativos/risco/inativos/churn, taxa churn/retencao
+- Breakdown novos vs recorrentes (do `segments`)
+- Estas metricas NAO variam com filtro de mes (sao historicas)
 
-1. Seleciona todos os pedidos de `sales_data` onde `cliente_email = p_cpf_cnpj`
-2. Filtra `tipo_movimento = 'venda'` para metricas economicas (`total_orders_revenue`, `total_revenue`)
-3. Conta todos os pedidos sem filtro para `total_orders_all`
-4. Calcula `total_revenue` usando `COALESCE(total_faturado, valor_total + COALESCE(valor_frete, 0))` (equivalente a `getOfficialRevenue`)
-5. Calcula `ticket_medio = total_revenue / total_orders_revenue`
-6. Calcula `average_days_between_purchases` como media dos intervalos entre compras de venda (NULL se < 2 pedidos)
-7. Determina `segment`:
-   - `total_orders_revenue >= 5 OR total_revenue >= 500` = VIP
-   - `total_orders_revenue >= 3` = Fiel
-   - `total_orders_revenue = 2` = Recorrente
-   - else = Primeira Compra
-8. Faz UPSERT: INSERT se novo, UPDATE apenas campos derivados se existente (preserva tags, observacoes, responsavel, prioridade, status_manual, last_contact_date)
+**Do salesData filtrado (manter calculo local):**
+- `analyzeOrderVolume(filteredOrders)` -- volume diario/semanal/mensal
+- `analyzeSalesPeaks(filteredOrders)` -- picos de venda
+- Tendencia de volume (mes atual vs anterior)
 
-### 1d. Funcao `recalculate_all_customers()`
+**Modo comparacao multi-mes:**
+- Metricas de cliente (totalClientes, taxaRecompra, clientesAtivos, receitaPorCliente) NAO variam por mes -- mostrar aviso de que segmentacao de cliente e historica
+- Metricas de volume por mes continuam funcionando normalmente
 
-Loop sobre `SELECT DISTINCT cliente_email FROM sales_data WHERE cliente_email IS NOT NULL`, chamando `recalculate_customer()` para cada. Ferramenta administrativa.
+### 6. Marcar funcoes legadas como deprecated
 
----
-
-## Etapa 2: Tipos TypeScript
-
-### 2a. Novo tipo `CustomerSnapshot` em `src/types/marketing.ts`
-
-```text
-export interface CustomerSnapshot {
-  cpfCnpj: string;
-  nome: string;
-  totalOrdersRevenue: number;
-  totalOrdersAll: number;
-  totalRevenue: number;
-  firstOrderDate: Date;
-  lastOrderDate: Date;
-  averageDaysBetweenPurchases: number | null;  -- NULL se < 2 pedidos
-  segment: 'Primeira Compra' | 'Recorrente' | 'Fiel' | 'VIP';
-  ticketMedio: number;
-  // Da view (nao persistidos)
-  daysSinceLastPurchase?: number;
-  churnStatus?: 'active' | 'at_risk' | 'inactive' | 'churned';
-  // CRM (operacionais)
-  tags?: string[];
-  observacoes?: string;
-  responsavel?: string;
-}
-```
-
-### 2b. Atualizar `CustomerSegment`
-
-Remover `averageTicket`. Adicionar `totalOrders`, `ticketMedio` (receita/pedidos), `arpu` (receita/clientes).
-
----
-
-## Etapa 3: `buildCustomerSnapshot` -- `src/utils/customerSnapshot.ts`
-
-Funcao pura para uso em memoria (fallback temporario e metricas filtradas por mes).
-
-- Filtra com `isRevenueOrder` para metricas economicas
-- Agrupa todos os orders por `cpfCnpj` para `totalOrdersAll`
-- Usa `getOfficialRevenue` para toda receita
-- `averageDaysBetweenPurchases` = NULL se < 2 pedidos de venda
-- NAO calcula churn (responsabilidade da view)
-
----
-
-## Etapa 4: Refatorar `customerBehaviorMetrics.ts`
-
-- Chama `buildCustomerSnapshot(orders)` internamente
-- Deriva metricas agregadas dos snapshots
-- Para churn em memoria: usa `new Date()` como referencia (compatibilidade ate migrar para leitura do banco)
-- Remove `analyzeChurn` e `segmentCustomers` como funcoes separadas
-- `analyzeOrderVolume` e `analyzeSalesPeaks` continuam recebendo orders (metricas de pedido), mas usam `getOfficialRevenue` para `revenue`
-- Segmentos usam `ticketMedio` (receita/pedidos) e `arpu` (receita/clientes)
-
----
-
-## Etapa 5: Atualizar componentes UI
-
-### SegmentDetailTable.tsx
-- Coluna "Ticket Medio" le `segment.ticketMedio` (receita por pedido)
-- Nova coluna "ARPU" le `segment.arpu` (receita por cliente)
-- Linha total: `ticketMedio = totalRevenue / totalOrders`
-
-### AnaliseSamples.tsx (linhas 146-169)
-- Trocar `averageTicket: 0` por `ticketMedio: 0, arpu: 0, totalOrders: 0`
-
-### SegmentRevenueChart.tsx
-- Sem alteracao (nao usa `averageTicket`)
-
----
-
-## Etapa 6: Integrar recalculate no fluxo de upload
-
-Em `handleUploadComplete` (arquivo `src/pages/Upload.tsx`):
-- Apos `refreshFromDatabase()`, chamar RPC `recalculate_all_customers()`
-
-Alternativa mais eficiente: extrair CPFs dos pedidos inseridos e chamar `recalculate_customer()` individualmente. Decisao durante implementacao.
-
----
-
-## Etapa 7: Popular tabela inicial
-
-Executar `recalculate_all_customers()` uma vez apos criacao da tabela para popular com dados existentes.
-
----
+Em `customerBehaviorMetrics.ts`:
+- `analyzeChurn`: adicionar `@deprecated` -- churn agora vem da view `customer_full`
+- `segmentCustomers`: adicionar `@deprecated` -- segmentos vem da tabela `customer`
+- `calculateCustomerBehaviorMetrics`: adicionar `@deprecated` -- substituido por `useCustomerData` hook
+- Manter `analyzeOrderVolume` e `analyzeSalesPeaks` (metricas de pedido, ainda necessarias)
+- Manter `analyzeChurn` no export para `executiveMetricsCalculator.ts` que ainda a consome (migracao do executivo e fase posterior)
 
 ## Sequencia de implementacao
 
-1. Migracao SQL (tabela `customer`, view `customer_full`, funcoes `recalculate_*`, RLS)
-2. Tipos TypeScript (`CustomerSnapshot`, `CustomerSegment` atualizado)
-3. `buildCustomerSnapshot` (funcao pura em `src/utils/customerSnapshot.ts`)
-4. Refatorar `customerBehaviorMetrics` para usar snapshot internamente
-5. Atualizar componentes UI (`averageTicket` -> `ticketMedio`/`arpu`)
-6. Integrar recalculate no fluxo de upload
-7. Popular tabela com `recalculate_all_customers()`
+1. Corrigir `buildCustomerSnapshot` (guard de identidade fraca)
+2. Criar `useCustomerData` hook
+3. Migrar `SegmentacaoClientes` para hook
+4. Migrar `AnaliseChurn` para hook
+5. Migrar `ComportamentoCliente` (hibrido: hook + volume local)
+6. Marcar funcoes legadas como deprecated
 
 ## O que NAO muda
 
-- Thresholds de churn (30/60/90 dias)
-- Regras de segmentacao (1/2/3-4/5+ OR >=500)
 - `analyzeOrderVolume` e `analyzeSalesPeaks` (metricas de pedido)
-- Pagina de Publico (Instagram)
-- `isRevenueOrder` e `getOfficialRevenue` (reutilizadas)
-- Coluna `cliente_email` em `sales_data` (mapeada como cpfCnpj -- renomeacao adiada)
-- `averageTicket` em `PlatformPerformance`, `TicketDistributionCompact`, `comparisonCalculator` -- esses sao ticket medio por PEDIDO (corretos), nao por cliente
+- Tabela `customer` e view `customer_full` (ja existem)
+- Fluxo de upload com RPC `recalculate_all_customers`
+- `executiveMetricsCalculator.ts` (continua usando `analyzeChurn` por enquanto -- migra em fase posterior)
+- Componentes UI de graficos (recebem mesmas props)
+- `ChurnRiskTable` e `ChurnFunnelChart` (mesma interface)
 
+## Detalhes tecnicos do hook
+
+O hook usa `useQuery` do TanStack React Query para cache e loading state. Query key: `['customer-data']`. Stale time: 5 minutos. O hook mapeia snake_case do banco para camelCase do TypeScript internamente. A filtragem de identidade fraca acontece no `.filter()` pos-fetch, nao no SQL (para simplicidade e porque o volume e pequeno -- ~924 registros).
