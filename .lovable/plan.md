@@ -1,36 +1,65 @@
 
-# Corrigir Guard de Validacao do numero_pedido_plataforma
 
-## Problema
+# Unificar Toasts de Upload NF
 
-O regex `extractNumeroPedidoPlataforma` em `src/utils/invoiceParser.ts` extrai corretamente IDs de pedido de marketplace (ex: Mercado Livre) do campo Observacoes, mas um guard de seguranca rejeita IDs com mais de 12 digitos. IDs do Mercado Livre tem 16 digitos, causando 151 rejeicoes falsas.
+## Resumo
 
-## Correcao
+Eliminar competicao entre toasts no upload de Notas Fiscais. Um unico evento logico deve gerar um unico toast informativo, com toast destrutivo separado apenas para alertas criticos.
 
-**Arquivo unico: `src/utils/invoiceParser.ts` (linha ~104)**
+## Mudancas
 
-Alterar o guard de validacao:
+**Arquivo unico: `src/components/dashboard/SalesUploader.tsx` (linhas 116-153)**
 
-```typescript
-// ANTES
-if (digits.length === 44 || digits.length > 12 || digits.length === 0) continue;
+### 1. Construir resumo NF antes do salvamento (sem disparar toast)
 
-// DEPOIS
-if (digits.length === 44 || digits.length > 20 || digits.length === 0) continue;
+Substituir o bloco das linhas 116-142 para:
+- Processar dados e extrair `nfSummary` e `nfAlerta` como variaveis locais
+- Remover os dois toasts intermediarios (linhas 128-139)
+
+### 2. Integrar resumo no toast de sucesso
+
+Apos salvamento bem-sucedido (linha 150-153), o toast passa a incluir rastreabilidade e classificacao:
+
+```text
+// Pseudocodigo do fluxo resultante
+
+let nfSummary = "";
+let nfAlerta = false;
+
+if (format === "nf") {
+  // Extrair naoVendas e cobertura
+  // Montar nfSummary (sem disparar toast)
+  // Marcar nfAlerta se cobertura < 90%
+}
+
+// Apos persistSalesData:
+if (nfAlerta) {
+  toast destrutivo com cobertura
+}
+
+toast({
+  title: "Dados salvos com sucesso!",
+  description: `${inserted} notas salvas no banco.${nfSummary ? ` ${nfSummary}` : ""}`
+})
 ```
 
-- Mantem a protecao contra chaves de acesso (44 digitos)
-- Mantem protecao contra numeros absurdamente longos (>20)
-- Permite IDs de marketplace com 16 digitos (Mercado Livre)
+### 3. Correcao gramatical
 
-## Impacto esperado
+"notas salvos" corrigido para "notas salvas".
 
-- Cobertura de rastreabilidade sobe de ~88.6% para ~93.5%
-- Alerta destrutivo (< 90%) desaparece
-- Os 201 registros sem Observacoes permanecem sem ID (limitacao operacional, nao bug)
+## Comportamento final
 
-## Validacao
+| Cenario | Resultado |
+|---|---|
+| NF normal | 1 toast com rastreabilidade |
+| NF com brindes | 1 toast com rastreabilidade + classificacao |
+| NF com cobertura < 90% | 1 toast sucesso + 1 destrutivo |
+| E-commerce | 1 toast simples (sem mudanca) |
 
-Apos correcao, re-upload de NFs e verificar:
-- Toast mostra cobertura > 90%
-- Query confirma 151 registros recuperados
+## Nao muda
+
+- Logica de classificacao economica
+- Processamento de dados
+- Toast de fallback local (catch)
+- Comportamento e-commerce
+
