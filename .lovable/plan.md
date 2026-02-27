@@ -1,40 +1,61 @@
 
 
-# Fix: Radar Operacional stuck on loading
+# Nova Reclamacao Page
 
-## Root Cause
+## Summary
+Create a standalone page at `/reclamacoes/nova` for registering complaints. Simple, functional, no overengineering. Three blocks: customer identification, complaint data, submit button.
 
-In `src/hooks/useRadarOperacional.ts`, line 112-113:
+## Files to Create
 
-```typescript
-const now = new Date();
-const date180dAgo = daysAgo(HISTORICAL_WINDOW_DAYS, now).toISOString();
-```
+### 1. `src/pages/ReclamacaoNova.tsx`
+Full-page form with:
 
-Every render creates a new `Date` with different milliseconds. Since `date180dAgo` is used in the query key (`['radar-sales', date180dAgo]`), React Query treats it as a brand new query every render. This prevents any query from completing, causing infinite loading.
+**Block 1 - Customer Identification**
+- Toggle between "Cliente existente" and "Novo cliente"
+- Existing: search input that filters customers by name/cpf_cnpj, clickable list showing top 20 matches, selected customer confirmation
+- New: name + email fields, creates customer on submit with `cpf_cnpj = email` and `observacoes = 'Cliente criado via formulário de reclamação'`
 
-## Fix
+**Block 2 - Complaint Data**
+All fields from the schema, organized in a clean grid:
+- Canal (select: WhatsApp, E-mail, SAC, Instagram, Telefone, Reclame Aqui, Outro)
+- Gravidade (select: Baixa, Media, Alta, Critica)
+- Tipo de Reclamacao (select: Qualidade, Entrega, Atendimento, Produto Errado, Falta de Produto, Validade, Embalagem, Outro)
+- Data do Contato (date input, default: today)
+- Descricao (textarea, required)
+- Produto, Lote, NF do Produto, Local da Compra, Transportador, Natureza do Pedido, Atendente (text inputs)
+- Link da Reclamacao (URL input)
+- Acao/Orientacao (textarea)
 
-1. **Stabilize `now` with `useMemo`** -- recalculate only once per day (or per mount):
+**Block 3 - Submit**
+- Single "Salvar Reclamacao" button
+- Loading state while saving
+- Toast success/error
+- Redirects to `/reclamacoes` on success
 
-```typescript
-const now = useMemo(() => new Date(), []);
-const date180dAgo = useMemo(
-  () => daysAgo(HISTORICAL_WINDOW_DAYS, now).toISOString().split('T')[0],
-  [now]
-);
-```
+**Mutation logic (inline, no separate hook needed for MVP)**
+- If "new customer" mode: INSERT into `customer` first, get `id`
+- INSERT into `customer_complaint` with all fields, `status = 'aberta'`
+- Invalidate `complaints` and `complaints-all` query keys
+- No edge function needed -- authenticated user passes RLS
 
-Using `.split('T')[0]` gives a stable date-only string (`2025-08-31`) for the query key, and `useMemo(() => new Date(), [])` ensures `now` is stable across renders.
+## Files to Modify
 
-2. **Also stabilize the `useMemo` dependency** on line 598:
+### 2. `src/App.tsx`
+- Import `ReclamacaoNova`
+- Add route: `/reclamacoes/nova` with same ProtectedRoute + AuthenticatedLayout wrapper
+- Place it BEFORE the `/reclamacoes` route to avoid route matching issues
 
-Change `now.toDateString()` to just use the memoized `now` directly since it's already stable.
+### 3. `src/pages/Reclamacoes.tsx`
+- Add a "Nova Reclamacao" button in the header (next to Export CSV)
+- `onClick={() => navigate('/reclamacoes/nova')}`
 
-## Files Changed
+## Technical Details
 
-- `src/hooks/useRadarOperacional.ts` -- stabilize `now` and `date180dAgo` with `useMemo`
+- Uses existing `useCustomerData` hook for customer list
+- Uses `useMutation` from tanstack-react-query directly (no new hook file)
+- Customer search filters by `nome` and `cpf_cnpj` (case-insensitive), limited to 20 results
+- Date field sends ISO string with noon time to avoid timezone issues
+- Empty string fields sent as `null` to keep database clean
+- Validation: requires `descricao` + valid customer (selected or new with name+email)
+- No schema changes needed -- all fields already exist in `customer_complaint`
 
-## Secondary Concern: 1000 Row Limit
-
-The `sales_data` query for the last 180 days might hit the 1000 row limit (4105 total rows in the table). Will add `.limit(5000)` or use pagination if needed after fixing the primary loading bug.
