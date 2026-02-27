@@ -145,7 +145,9 @@ const AnaliseSamples = () => {
         ? (metrics.segmentation.oneTime / metrics.volume.uniqueCustomers) * 100
         : 0,
       totalRevenue: 0,
-      averageTicket: 0,
+      totalOrders: 0,
+      ticketMedio: 0,
+      arpu: 0,
       criteria: '1 compra apenas',
     },
     {
@@ -155,7 +157,9 @@ const AnaliseSamples = () => {
         ? (metrics.segmentation.explorers / metrics.volume.uniqueCustomers) * 100
         : 0,
       totalRevenue: 0,
-      averageTicket: 0,
+      totalOrders: 0,
+      ticketMedio: 0,
+      arpu: 0,
       criteria: '1-2 recompras regulares',
     },
     {
@@ -165,7 +169,9 @@ const AnaliseSamples = () => {
         ? (metrics.segmentation.loyal / metrics.volume.uniqueCustomers) * 100
         : 0,
       totalRevenue: 0,
-      averageTicket: 0,
+      totalOrders: 0,
+      ticketMedio: 0,
+      arpu: 0,
       criteria: '4+ compras',
     },
   ];

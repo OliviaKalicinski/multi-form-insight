@@ -24,6 +24,7 @@ const SEGMENT_COLORS: Record<string, string> = {
 export const SegmentDetailTable = ({ segments }: SegmentDetailTableProps) => {
   const totalClientes = segments.reduce((sum, s) => sum + s.count, 0);
   const totalRevenue = segments.reduce((sum, s) => sum + s.totalRevenue, 0);
+  const totalOrders = segments.reduce((sum, s) => sum + s.totalOrders, 0);
 
   // Order: VIP, Fiel, Recorrente, Primeira Compra
   const orderedSegments = ['VIP', 'Fiel', 'Recorrente', 'Primeira Compra']
@@ -40,6 +41,7 @@ export const SegmentDetailTable = ({ segments }: SegmentDetailTableProps) => {
           <TableHead className="text-right">Receita</TableHead>
           <TableHead className="text-right">% Receita</TableHead>
           <TableHead className="text-right">Ticket Médio</TableHead>
+          <TableHead className="text-right">ARPU</TableHead>
           <TableHead>Critério</TableHead>
         </TableRow>
       </TableHeader>
@@ -69,7 +71,10 @@ export const SegmentDetailTable = ({ segments }: SegmentDetailTableProps) => {
                 {revenuePercentage}%
               </TableCell>
               <TableCell className="text-right">
-                {formatCurrency(segment.averageTicket)}
+                {formatCurrency(segment.ticketMedio)}
+              </TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(segment.arpu)}
               </TableCell>
               <TableCell className="text-muted-foreground text-sm">
                 {segment.criteria}
@@ -84,6 +89,9 @@ export const SegmentDetailTable = ({ segments }: SegmentDetailTableProps) => {
           <TableCell className="text-right">100%</TableCell>
           <TableCell className="text-right">{formatCurrency(totalRevenue)}</TableCell>
           <TableCell className="text-right">100%</TableCell>
+          <TableCell className="text-right">
+            {formatCurrency(totalOrders > 0 ? totalRevenue / totalOrders : 0)}
+          </TableCell>
           <TableCell className="text-right">
             {formatCurrency(totalClientes > 0 ? totalRevenue / totalClientes : 0)}
           </TableCell>

@@ -72,6 +72,12 @@ export default function Upload() {
   const handleUploadComplete = async () => {
     await refreshFromDatabase();
     await fetchLatestDataDate();
+    // Recalcular entidade customer após upload de vendas
+    try {
+      await supabase.rpc('recalculate_all_customers');
+    } catch (e) {
+      console.warn('Falha ao recalcular clientes:', e);
+    }
   };
 
   const hasAnyData = salesData.length > 0 || adsData.length > 0 || followersData.length > 0;

@@ -249,29 +249,28 @@ export const segmentCustomers = (orders: ProcessedOrder[]): CustomerSegment[] =>
     if (!existing) {
       clientesMap.set(order.cpfCnpj, {
         pedidos: 1,
-        valorTotal: order.valorTotal,
+        valorTotal: getOfficialRevenue(order),
         primeiraCompra: order.dataVenda,
         ultimaCompra: order.dataVenda
       });
     } else {
       existing.pedidos++;
-      existing.valorTotal += order.valorTotal;
+      existing.valorTotal += getOfficialRevenue(order);
       if (order.dataVenda < existing.primeiraCompra) existing.primeiraCompra = order.dataVenda;
       if (order.dataVenda > existing.ultimaCompra) existing.ultimaCompra = order.dataVenda;
     }
   });
 
   const segments = {
-    'Primeira Compra': { count: 0, totalRevenue: 0 },
-    'Recorrente': { count: 0, totalRevenue: 0 },
-    'Fiel': { count: 0, totalRevenue: 0 },
-    'VIP': { count: 0, totalRevenue: 0 }
+    'Primeira Compra': { count: 0, totalRevenue: 0, totalOrders: 0 },
+    'Recorrente': { count: 0, totalRevenue: 0, totalOrders: 0 },
+    'Fiel': { count: 0, totalRevenue: 0, totalOrders: 0 },
+    'VIP': { count: 0, totalRevenue: 0, totalOrders: 0 }
   };
 
   clientesMap.forEach(cliente => {
     let segment: 'Primeira Compra' | 'Recorrente' | 'Fiel' | 'VIP';
     
-    // Nova lógica baseada em frequência de compra
     if (cliente.pedidos >= 5 || cliente.valorTotal >= 500) {
       segment = 'VIP';
     } else if (cliente.pedidos >= 3) {
@@ -284,43 +283,30 @@ export const segmentCustomers = (orders: ProcessedOrder[]): CustomerSegment[] =>
 
     segments[segment].count++;
     segments[segment].totalRevenue += cliente.valorTotal;
+    segments[segment].totalOrders += cliente.pedidos;
   });
 
   const totalClientes = clientesMap.size;
 
+  const buildSegment = (name: 'Primeira Compra' | 'Recorrente' | 'Fiel' | 'VIP', criteria: string): CustomerSegment => {
+    const s = segments[name];
+    return {
+      segment: name,
+      count: s.count,
+      percentage: totalClientes > 0 ? (s.count / totalClientes) * 100 : 0,
+      totalRevenue: s.totalRevenue,
+      totalOrders: s.totalOrders,
+      ticketMedio: s.totalOrders > 0 ? s.totalRevenue / s.totalOrders : 0,
+      arpu: s.count > 0 ? s.totalRevenue / s.count : 0,
+      criteria,
+    };
+  };
+
   return [
-    {
-      segment: 'Primeira Compra',
-      count: segments['Primeira Compra'].count,
-      percentage: totalClientes > 0 ? (segments['Primeira Compra'].count / totalClientes) * 100 : 0,
-      totalRevenue: segments['Primeira Compra'].totalRevenue,
-      averageTicket: segments['Primeira Compra'].count > 0 ? segments['Primeira Compra'].totalRevenue / segments['Primeira Compra'].count : 0,
-      criteria: 'Apenas 1 pedido'
-    },
-    {
-      segment: 'Recorrente',
-      count: segments['Recorrente'].count,
-      percentage: totalClientes > 0 ? (segments['Recorrente'].count / totalClientes) * 100 : 0,
-      totalRevenue: segments['Recorrente'].totalRevenue,
-      averageTicket: segments['Recorrente'].count > 0 ? segments['Recorrente'].totalRevenue / segments['Recorrente'].count : 0,
-      criteria: '2 pedidos'
-    },
-    {
-      segment: 'Fiel',
-      count: segments['Fiel'].count,
-      percentage: totalClientes > 0 ? (segments['Fiel'].count / totalClientes) * 100 : 0,
-      totalRevenue: segments['Fiel'].totalRevenue,
-      averageTicket: segments['Fiel'].count > 0 ? segments['Fiel'].totalRevenue / segments['Fiel'].count : 0,
-      criteria: '3-4 pedidos'
-    },
-    {
-      segment: 'VIP',
-      count: segments['VIP'].count,
-      percentage: totalClientes > 0 ? (segments['VIP'].count / totalClientes) * 100 : 0,
-      totalRevenue: segments['VIP'].totalRevenue,
-      averageTicket: segments['VIP'].count > 0 ? segments['VIP'].totalRevenue / segments['VIP'].count : 0,
-      criteria: '5+ pedidos ou R$ 500+ gasto'
-    }
+    buildSegment('Primeira Compra', 'Apenas 1 pedido'),
+    buildSegment('Recorrente', '2 pedidos'),
+    buildSegment('Fiel', '3-4 pedidos'),
+    buildSegment('VIP', '5+ pedidos ou R$ 500+ gasto'),
   ];
 };
 
