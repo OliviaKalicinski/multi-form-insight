@@ -101,6 +101,87 @@ const fetchAllRows = async (
   return allData;
 };
 
+// ── Reconciliação de Identidade NF ──────────────────────────────────
+// Corrige pedidos NF que entram sem cpfCnpj (cliente_email vazio no banco),
+// herdando identidade do pedido e-commerce correspondente ou atribuindo ID sintético.
+function reconcileNFIdentity(orders: ProcessedOrder[]): ProcessedOrder[] {
+  if (!orders || orders.length === 0) return orders;
+
+  const normalize = (value?: string | null): string =>
+    (value ?? "").toString().trim();
+
+  const isEmptyId = (value?: string | null): boolean =>
+    !value || normalize(value) === "";
+
+  // 1. Indexar e-commerce por numeroPedidoPlataforma E numeroPedido
+  const ecomMap = new Map<string, ProcessedOrder>();
+  orders.forEach(order => {
+    if (order.fonteDados !== "ecommerce") return;
+    const keys = [
+      normalize(order.numeroPedidoPlataforma),
+      normalize(order.numeroPedido),
+    ].filter(k => k !== "");
+    keys.forEach(key => {
+      if (!ecomMap.has(key)) ecomMap.set(key, order);
+    });
+  });
+
+  // 2. Reconciliar NFs sem identidade
+  let totalOrphan = 0;
+  let matchCount = 0;
+  let syntheticCount = 0;
+  let alreadyIdentified = 0;
+
+  const reconciled = orders.map(order => {
+    if (order.fonteDados !== "nf") return order;
+
+    if (!isEmptyId(order.cpfCnpj)) {
+      alreadyIdentified++;
+      return order;
+    }
+
+    totalOrphan++;
+
+    const platformKey = normalize(order.numeroPedidoPlataforma);
+    const ownKey = normalize(order.numeroPedido);
+
+    const match =
+      (platformKey && ecomMap.get(platformKey)) ||
+      (ownKey && ecomMap.get(ownKey)) ||
+      null;
+
+    if (match && !isEmptyId(match.cpfCnpj)) {
+      matchCount++;
+      return {
+        ...order,
+        cpfCnpj: normalize(match.cpfCnpj),
+        nomeCliente: match.nomeCliente || order.nomeCliente,
+      };
+    }
+
+    // Fallback sintético — garante ID único
+    syntheticCount++;
+    const syntheticId = `nf-${normalize(order.numeroPedido) || Math.random().toString(36).slice(2)}`;
+    return { ...order, cpfCnpj: syntheticId };
+  });
+
+  // 3. Log auditável
+  const rate = totalOrphan > 0 ? ((matchCount / totalOrphan) * 100).toFixed(1) : "N/A";
+  console.log(`
+==============================
+🔎 Reconciliação NF — Identidade
+==============================
+Total pedidos:            ${orders.length}
+NFs já com identidade:    ${alreadyIdentified}
+NFs sem identidade:       ${totalOrphan}
+Reconciliados via match:  ${matchCount}
+IDs sintéticos criados:   ${syntheticCount}
+Taxa de reconciliação:    ${rate}%
+==============================`);
+
+  return reconciled;
+}
+
 export const useDataPersistence = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [stats, setStats] = useState<DataStats>({
@@ -178,6 +259,9 @@ export const useDataPersistence = () => {
         observacoesNF: row.observacoes_nf || undefined,
       }));
 
+      // ── Reconciliação de identidade NF (antes de qualquer cálculo) ──
+      const reconciledSalesData = reconcileNFIdentity(salesData);
+
       // Transform ads data with all new fields from database
       const adsData: AdsData[] = (adsRaw || []).map((row: any) => ({
         "Nome do anúncio": row.anuncio || "",
@@ -235,7 +319,7 @@ export const useDataPersistence = () => {
       }));
 
       setStats({
-        salesCount: salesData.length,
+        salesCount: reconciledSalesData.length,
         adsCount: adsData.length,
         followersCount: followersData.length,
         marketingCount: marketingData.length,
@@ -243,13 +327,13 @@ export const useDataPersistence = () => {
       });
 
       console.log("📊 Dados carregados do banco:", {
-        vendas: salesData.length,
+        vendas: reconciledSalesData.length,
         anuncios: adsData.length,
         seguidores: followersData.length,
         marketing: marketingData.length,
       });
 
-      return { salesData, adsData, followersData, marketingData, lastUpdated };
+      return { salesData: reconciledSalesData, adsData, followersData, marketingData, lastUpdated };
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       toast({
