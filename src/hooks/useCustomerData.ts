@@ -46,7 +46,8 @@ export function useCustomerData() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('customer_full')
-        .select('*');
+        .select('*')
+        .limit(5000);
       if (error) throw error;
       return data as CustomerRow[];
     },
