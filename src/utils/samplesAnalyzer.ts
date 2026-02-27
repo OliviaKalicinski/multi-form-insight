@@ -1,5 +1,6 @@
 import { ProcessedOrder, SampleMetrics, CustomerPurchaseHistory } from "@/types/marketing";
 import { format, differenceInDays, differenceInMonths } from "date-fns";
+import { getOfficialRevenue, isRevenueOrder } from "./revenue";
 
 /**
  * Identifica se um produto é uma amostra baseado em nome OU preço
@@ -102,7 +103,7 @@ export const groupOrdersByCustomer = (orders: ProcessedOrder[]): Map<string, Cus
     const customerData = customerMap.get(key)!;
     customerData.orders.push(order);
     customerData.totalOrders++;
-    customerData.totalRevenue += order.valorTotal;
+    customerData.totalRevenue += getOfficialRevenue(order);
     
     if (isSampleOrder(order)) {
       customerData.hasSample = true;
@@ -153,7 +154,7 @@ export const getQualifiedSampleCustomers = (
       orders: sortedOrders,
       sampleOrder: firstOrder,
       totalOrders: sortedOrders.length,
-      totalRevenue: sortedOrders.reduce((sum, o) => sum + o.valorTotal, 0),
+      totalRevenue: sortedOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0),
       hasSample: true,
       hasRepurchase: sortedOrders.length >= 2,
     });
@@ -226,7 +227,7 @@ export const calculateRepurchaseBehavior = (
     if (!first) return false;
     return c.orders
       .filter(o => o.numeroPedido !== first.numeroPedido)
-      .some(o => hasRegularProduct(o));
+      .some(o => hasRegularProduct(o) && isRevenueOrder(o));
   });
 
   const repurchaseRate = (customersWithRegularRepurchase.length / qualifiedCustomers.length) * 100;
@@ -241,9 +242,9 @@ export const calculateRepurchaseBehavior = (
     const first = c.sampleOrder!;
     const laterOrders = c.orders.filter(o => o.numeroPedido !== first.numeroPedido);
 
-    const regularOrders = laterOrders.filter(o => hasRegularProduct(o));
+    const regularOrders = laterOrders.filter(o => hasRegularProduct(o) && isRevenueOrder(o));
     regularOrders.forEach(o => {
-      totalValue += o.valorTotal;
+      totalValue += getOfficialRevenue(o);
       orderCount++;
     });
 
@@ -306,7 +307,7 @@ export const calculateCrossSellMetrics = (
           productsWithSample[key] = { product: key, count: 0, totalValue: 0 };
         }
         productsWithSample[key].count++;
-        productsWithSample[key].totalValue += order.valorTotal;
+        productsWithSample[key].totalValue += getOfficialRevenue(order);
       }
     });
   });
@@ -376,7 +377,7 @@ export const calculateConversionByTime = (
 
       const convertedInWindow = c.orders.some(o => {
         if (o.numeroPedido === sampleOrder.numeroPedido) return false;
-        if (!hasRegularProduct(o)) return false;
+        if (!hasRegularProduct(o) || !isRevenueOrder(o)) return false;
 
         const daysAfter = differenceInDays(o.dataVenda, sampleOrder.dataVenda);
         return daysAfter > 0 && daysAfter <= days;
@@ -426,7 +427,7 @@ export const calculateRepurchaseQuality = (
     // Considerar apenas recompras regulares
     const regularRepurchases = customer.orders
       .filter(o => o.numeroPedido !== first.numeroPedido)
-      .filter(o => hasRegularProduct(o));
+      .filter(o => hasRegularProduct(o) && isRevenueOrder(o));
     
     totalRepurchases += regularRepurchases.length;
     totalLTV += customer.totalRevenue;
@@ -590,7 +591,7 @@ export const calculateBehaviorSegmentation = (
     if (!first) return 0;
     return customer.orders
       .filter(o => o.numeroPedido !== first.numeroPedido)
-      .filter(o => hasRegularProduct(o))
+      .filter(o => hasRegularProduct(o) && isRevenueOrder(o))
       .length;
   };
   
@@ -777,7 +778,7 @@ export const calculateCohortAnalysis = (
       if (!first) return false;
       return customer.orders
         .filter(o => o.numeroPedido !== first.numeroPedido)
-        .some(o => hasRegularProduct(o));
+        .some(o => hasRegularProduct(o) && isRevenueOrder(o));
     });
     
     let totalTicket = 0;
@@ -789,10 +790,10 @@ export const calculateCohortAnalysis = (
       const first = customer.sampleOrder!;
       const regularRepurchases = customer.orders
         .filter(o => o.numeroPedido !== first.numeroPedido)
-        .filter(o => hasRegularProduct(o));
+        .filter(o => hasRegularProduct(o) && isRevenueOrder(o));
       
       regularRepurchases.forEach(order => {
-        totalTicket += order.valorTotal;
+        totalTicket += getOfficialRevenue(order);
         totalRepurchaseOrders++;
       });
       
@@ -868,14 +869,14 @@ export const calculateSampleMetricsByPetType = (
     
     const regularRepurchases = customer.orders
       .filter(o => o.numeroPedido !== first.numeroPedido)
-      .filter(o => hasRegularProduct(o));
+      .filter(o => hasRegularProduct(o) && isRevenueOrder(o));
     
     if (regularRepurchases.length > 0) {
       result[petType].customersWhoRepurchased++;
       
       // Calcular ticket médio das recompras regulares
       regularRepurchases.forEach(order => {
-        ticketAccumulator[petType].totalValue += order.valorTotal;
+        ticketAccumulator[petType].totalValue += getOfficialRevenue(order);
         ticketAccumulator[petType].orderCount++;
       });
     }
