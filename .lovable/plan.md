@@ -1,65 +1,164 @@
 
 
-# Unificar Toasts de Upload NF
+# Bloco 1: Consolidar Paradigma Economico no Nucleo
 
 ## Resumo
 
-Eliminar competicao entre toasts no upload de Notas Fiscais. Um unico evento logico deve gerar um unico toast informativo, com toast destrutivo separado apenas para alertas criticos.
+Aplicar `getRevenueOrders()` em 4 arquivos para que receita, ROAS, ticket medio e LTV excluam brindes/bonificacoes/devolucoes. Modelo adotado: **Receita Comercial Bruta** (somente vendas, devolucoes como metrica operacional separada).
 
-## Mudancas
+---
 
-**Arquivo unico: `src/components/dashboard/SalesUploader.tsx` (linhas 116-153)**
+## 1. `src/utils/roasCalculator.ts`
 
-### 1. Construir resumo NF antes do salvamento (sem disparar toast)
+- Importar `getRevenueOrders` de `./revenue`
+- Filtrar orders antes de somar `faturamentoLiquido`
 
-Substituir o bloco das linhas 116-142 para:
-- Processar dados e extrair `nfSummary` e `nfAlerta` como variaveis locais
-- Remover os dois toasts intermediarios (linhas 128-139)
+```typescript
+import { getOfficialRevenue, getRevenueOrders } from "./revenue";
 
-### 2. Integrar resumo no toast de sucesso
-
-Apos salvamento bem-sucedido (linha 150-153), o toast passa a incluir rastreabilidade e classificacao:
-
-```text
-// Pseudocodigo do fluxo resultante
-
-let nfSummary = "";
-let nfAlerta = false;
-
-if (format === "nf") {
-  // Extrair naoVendas e cobertura
-  // Montar nfSummary (sem disparar toast)
-  // Marcar nfAlerta se cobertura < 90%
-}
-
-// Apos persistSalesData:
-if (nfAlerta) {
-  toast destrutivo com cobertura
-}
-
-toast({
-  title: "Dados salvos com sucesso!",
-  description: `${inserted} notas salvas no banco.${nfSummary ? ` ${nfSummary}` : ""}`
-})
+// L14: filtrar
+const revenueOrders = getRevenueOrders(orders);
+const faturamentoLiquido = revenueOrders.reduce(
+  (sum, order) => sum + getOfficialRevenue(order), 0
+);
 ```
 
-### 3. Correcao gramatical
+Todas as metricas derivadas (roas, roi, margemLiquida) passam a usar receita filtrada automaticamente.
 
-"notas salvos" corrigido para "notas salvas".
+---
 
-## Comportamento final
+## 2. `src/utils/salesCalculator.ts` (2 pontos)
 
-| Cenario | Resultado |
-|---|---|
-| NF normal | 1 toast com rastreabilidade |
-| NF com brindes | 1 toast com rastreabilidade + classificacao |
-| NF com cobertura < 90% | 1 toast sucesso + 1 destrutivo |
-| E-commerce | 1 toast simples (sem mudanca) |
+**2a. `calculateAverageTicket` (L198-202)**
 
-## Nao muda
+Corrigir denominador: dividir por `revenueOrders.length` em vez de `orders.length`. Evitar dupla iteracao calculando receita inline.
 
-- Logica de classificacao economica
-- Processamento de dados
-- Toast de fallback local (catch)
-- Comportamento e-commerce
+```typescript
+export const calculateAverageTicket = (orders: ProcessedOrder[]): number => {
+  const revenueOrders = getRevenueOrders(orders);
+  if (revenueOrders.length === 0) return 0;
+  const revenue = revenueOrders.reduce(
+    (sum, order) => sum + getOfficialRevenue(order), 0
+  );
+  return revenue / revenueOrders.length;
+};
+```
+
+**2b. `extractDailyRevenue` (L272-281)**
+
+Filtrar por `getRevenueOrders` para alinhar grafico diario com cards executivos.
+
+```typescript
+export const extractDailyRevenue = (orders: ProcessedOrder[]): { date: string; value: number }[] => {
+  const dailyMap = new Map<string, number>();
+  const revenueOrders = getRevenueOrders(orders);
+  revenueOrders.forEach(order => {
+    const dateKey = format(order.dataVenda, 'yyyy-MM-dd');
+    dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + getOfficialRevenue(order));
+  });
+  return Array.from(dailyMap.entries()).map(([date, value]) => ({ date, value }));
+};
+```
+
+---
+
+## 3. `src/utils/executiveMetricsCalculator.ts` (6 pontos)
+
+**3a. Import (L7):** Adicionar `getRevenueOrders`
+
+```typescript
+import { getOfficialRevenue, getRevenueOrders } from "./revenue";
+```
+
+**3b. Criar `revenueOrders` (apos L92)**
+
+```typescript
+const revenueOrders = getRevenueOrders(orders);
+```
+
+**3c. Ticket medio real (L101-110):** Filtrar por venda E produto real
+
+```typescript
+const pedidosReais = revenueOrders.filter(order => {
+  return order.produtos.some(p => p.descricaoAjustada !== 'Kit de Amostras');
+});
+const receitaReal = pedidosReais.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
+```
+
+**3d. Faturamento e frete (L122-123):** Usar `revenueOrders`
+
+```typescript
+const faturamentoTotal = revenueOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
+const freteTotal = revenueOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
+```
+
+**3e. Clientes (L151-160):** Separar contagem (todos) de receita (vendas)
+
+```typescript
+const clientesUnicos = new Map<string, { pedidos: number; valorTotal: number }>();
+
+// Contagem comportamental: todos os pedidos
+orders.forEach(order => {
+  const existing = clientesUnicos.get(order.cpfCnpj);
+  if (existing) {
+    existing.pedidos += 1;
+  } else {
+    clientesUnicos.set(order.cpfCnpj, { pedidos: 1, valorTotal: 0 });
+  }
+});
+
+// Receita fiscal: apenas vendas
+revenueOrders.forEach(order => {
+  const existing = clientesUnicos.get(order.cpfCnpj);
+  if (existing) {
+    existing.valorTotal += getOfficialRevenue(order);
+  }
+});
+```
+
+**3f. Produtos (L176-189):** Usar `revenueOrders`
+
+```typescript
+revenueOrders.forEach(order => {
+  order.produtos.forEach(produto => { ... });
+});
+```
+
+---
+
+## 4. `src/pages/PerformanceFinanceira.tsx` (L183-186)
+
+Substituir soma manual de `o.valorTotal` por `getOfficialRevenue` com filtro de tipo.
+
+```typescript
+// Adicionar import
+import { getOfficialRevenue, getRevenueOrders } from "@/utils/revenue";
+
+// L183-186
+const revenueFilteredOrders = getRevenueOrders(filteredOrders);
+const faturamentoTotal = revenueFilteredOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
+const freteTotal = revenueFilteredOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
+const faturamentoExFrete = faturamentoTotal - freteTotal;
+```
+
+---
+
+## O que NAO muda neste bloco
+
+- Tipos (`ExecutiveMetrics`, `ROASMetrics`) -- sem mudanca de interface
+- Churn (`analyzeChurn`) -- usa todos os pedidos (comportamento)
+- Operacoes (NF, envio) -- usam todos os pedidos
+- `samplesAnalyzer.ts` -- contexto comercial, nao fiscal
+- Card de devolucoes -- bloco futuro separado
+
+## Modelo economico adotado
+
+```text
+RECEITA FISCAL      -> getRevenueOrders(orders) + getOfficialRevenue(order)
+VOLUME OPERACIONAL  -> orders.length (todos)
+COMPORTAMENTO       -> orders (todos, incluindo brindes)
+DEVOLUCOES          -> metrica operacional separada (bloco futuro)
+```
+
+## Total: 4 arquivos, ~12 pontos de correcao
 
