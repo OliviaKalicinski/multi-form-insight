@@ -30,6 +30,7 @@ import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
 import Clientes from "./pages/Clientes";
 import ClientePerfil from "./pages/ClientePerfil";
 import Reclamacoes from "./pages/Reclamacoes";
+import ReclamacaoNova from "./pages/ReclamacaoNova";
 import RadarOperacional from "./pages/RadarOperacional";
 import NotFound from "./pages/NotFound";
 import { format, isToday, isYesterday } from "date-fns";
@@ -250,6 +251,14 @@ const App = () => (
             <ProtectedRoute>
               <AuthenticatedLayout>
                 <ClientePerfil />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/reclamacoes/nova" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ReclamacaoNova />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />
