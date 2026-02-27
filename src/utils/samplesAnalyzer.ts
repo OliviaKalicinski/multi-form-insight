@@ -198,12 +198,18 @@ export const calculateSampleVolume = (
     .filter(p => isSampleProduct(p))
     .reduce((sum, p) => sum + Number(p.quantidade || 1), 0);
 
+  // Total de pedidos distintos que contêm pelo menos um produto amostra
+  const sampleOrders = revenueOrders
+    .filter(o => (o.produtos || []).some(p => isSampleProduct(p)))
+    .length;
+
   return {
     totalSamples: totalSampleOrders, // Número de CLIENTES qualificados
     uniqueCustomers,                  // Mesmo valor
     totalCustomersWithSamples,        // Total de clientes com amostras
     percentageOfTotal,                // % sobre total de clientes
     totalSampleUnits,                 // Unidades individuais distribuídas
+    sampleOrders,                     // Pedidos distintos com amostra
   };
 };
 
