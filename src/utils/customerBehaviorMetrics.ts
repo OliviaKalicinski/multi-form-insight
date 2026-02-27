@@ -3,6 +3,9 @@ import { format, differenceInDays, startOfWeek, endOfWeek } from "date-fns";
 import { getOfficialRevenue } from "./revenue";
 
 /**
+ * @deprecated Churn agora vem da view `customer_full`. Use `useCustomerData` hook.
+ * Mantido apenas para `executiveMetricsCalculator.ts` (migração posterior).
+ *
  * Analisa churn de clientes
  * Clientes com última compra há mais de 90 dias
  */
@@ -239,6 +242,8 @@ export const analyzeSalesPeaks = (orders: ProcessedOrder[]): SalesPeak[] => {
 };
 
 /**
+ * @deprecated Segmentos agora vêm da tabela `customer`. Use `useCustomerData` hook.
+ *
  * Segmenta clientes por comportamento de compra
  */
 export const segmentCustomers = (orders: ProcessedOrder[]): CustomerSegment[] => {
@@ -311,6 +316,9 @@ export const segmentCustomers = (orders: ProcessedOrder[]): CustomerSegment[] =>
 };
 
 /**
+ * @deprecated Substituído por `useCustomerData` hook que lê de `customer_full`.
+ * Mantido apenas para `executiveMetricsCalculator.ts` (migração posterior).
+ *
  * Calcula métricas consolidadas de comportamento
  */
 export const calculateCustomerBehaviorMetrics = (orders: ProcessedOrder[]): CustomerBehaviorMetrics => {
