@@ -11,3 +11,15 @@ export const getOfficialRevenue = (order: ProcessedOrder): number => {
   if (order.totalFaturado != null) return order.totalFaturado;
   return (order.valorTotal || 0) + (order.valorFrete || 0);
 };
+
+/**
+ * Filtro econômico: apenas pedidos do tipo 'venda' geram receita.
+ * Brindes, bonificações, doações, ajustes e devoluções são excluídos.
+ */
+export const isRevenueOrder = (order: ProcessedOrder): boolean => {
+  const tipo = order.tipoMovimento || 'venda';
+  return tipo === 'venda';
+};
+
+export const getRevenueOrders = (orders: ProcessedOrder[]): ProcessedOrder[] =>
+  orders.filter(isRevenueOrder);
