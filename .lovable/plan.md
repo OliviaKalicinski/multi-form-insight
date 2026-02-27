@@ -1,139 +1,192 @@
 
+# Classificacao Economica de NFs (`tipo_movimento`) -- Plano Final
 
-# Chave Deterministica `numero_pedido_plataforma` -- Plano de Implementacao
+## Problema
 
-## Resumo
+A tabela `sales_data` mistura vendas reais com movimentos promocionais (brindes, bonificacoes, doacoes), distorcendo receita, ticket medio, ROAS e cobertura de `numero_pedido_plataforma`.
 
-Extrair o ID da plataforma de e-commerce do campo Observacoes da NF, armazena-lo como `numero_pedido_plataforma`, e fornecer metadados de cobertura para alerta na UI. O parser tem um unico consumidor (`SalesUploader.tsx`), confirmado via busca no codebase.
+## Principio Central
+
+**Natureza da Operacao manda. Observacoes apenas complementa.** Como "Remessa de Bonificacao" e um campo fiscal estruturado, a classificacao e deterministica -- nao heuristica.
 
 ---
 
 ## Etapa 1: Migracao SQL
 
-Adicionar coluna e indice simples (sem UNIQUE):
+Duas colunas novas em `sales_data`:
 
 ```sql
-ALTER TABLE sales_data ADD COLUMN numero_pedido_plataforma TEXT;
-
-CREATE INDEX idx_sales_pedido_plataforma
-  ON sales_data (numero_pedido_plataforma)
-  WHERE numero_pedido_plataforma IS NOT NULL;
+ALTER TABLE sales_data ADD COLUMN tipo_movimento TEXT DEFAULT 'venda';
+ALTER TABLE sales_data ADD COLUMN observacoes_nf TEXT;
 ```
 
 ---
 
-## Etapa 2: Tipo `ProcessedOrder` (`src/types/marketing.ts`, linha 218)
+## Etapa 2: Tipo ProcessedOrder (`src/types/marketing.ts`, apos linha 219)
 
 Adicionar antes do fechamento da interface:
 
-```
-numeroPedidoPlataforma?: string;
+```typescript
+tipoMovimento?: 'venda' | 'brinde' | 'bonificacao' | 'doacao' | 'ajuste' | 'devolucao';
+observacoesNF?: string;
 ```
 
 ---
 
-## Etapa 3: Parser (`src/utils/invoiceParser.ts`)
+## Etapa 3: Classificador no Parser (`src/utils/invoiceParser.ts`)
 
-### 3a. Nova funcao `extractNumeroPedidoPlataforma`
+### 3a. Funcao `classifyMovementType`
 
-Regex com precedencia estrita (para no primeiro match valido):
-
-1. `Ref\.?\s*a[lo]?\s*pedido\s*n[uú]mero\s*(\d+)` -- prioridade maxima
-2. `OC:\s*(\d+)`
-3. `(?:pedido|ped\.?)\s*(?:n[uú]mero|n[º°]|no\.?)?\s*:?\s*(\d+)` -- fallback (ignoreCase)
-
-Defesas:
-- Rejeitar numeros com 44 digitos (chave de acesso)
-- Rejeitar numeros com mais de 12 digitos
-- Normalizar: `.trim().replace(/\D/g, '')`
-- Retorna `undefined` se nenhum match
-
-### 3b. Iterar TODAS as linhas da nota agrupada
-
-Percorrer `rows` (nao apenas `first`) para encontrar o primeiro valor valido.
-
-### 3c. Mudar retorno para objeto com metadados
+Prioridade absoluta para `natureza_operacao` (campo estruturado). Fallback para `observacoes` (campo livre) apenas quando natureza nao classifica.
 
 ```typescript
-interface InvoiceProcessingResult {
-  orders: ProcessedOrder[];
-  coberturaPedidoPlataforma: number; // 0-100
-  totalComPlataforma: number;
-  totalSemPlataforma: number;
-  alertaCobertura: boolean; // true se < 90%
-}
+const normalizeText = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+const NATUREZA_RULES = [
+  { type: 'devolucao',   pattern: /devol/ },
+  { type: 'bonificacao', pattern: /remessa.*bonifica|bonifica/ },
+  { type: 'brinde',      pattern: /remessa.*brinde|brinde/ },
+  { type: 'doacao',      pattern: /doacao|remessa gratuita/ },
+  { type: 'ajuste',      pattern: /nota complementar|complementar|ajuste/ },
+];
+
+const OBSERVACOES_RULES = [
+  { type: 'brinde', pattern: /influenciador/ },
+];
 ```
 
-O parser continua retornando `ProcessedOrder[]` internamente via `consolidateSampleKits`, mas a funcao `processInvoiceData` envolve o resultado com metadados de cobertura.
+Ordem: natureza primeiro, observacoes depois, default `'venda'`.
 
-Niveis de alerta:
-- < 90%: `alertaCobertura = true` (warning forte)
-- 90-95%: log de aviso no console
-- >= 95%: OK
+### 3b. Aplicar no loop de construcao de pedidos (linha ~219)
 
-### 3d. Log detalhado no console
+- Chamar `classifyMovementType(first["Natureza da operacao"], first["Observacoes"])`
+- Atribuir `tipoMovimento` e persistir `observacoesNF`
+
+### 3c. Recalcular cobertura apenas sobre vendas
+
+Filtrar `consolidated` para `tipoMovimento === 'venda'` antes de calcular cobertura. Expandir `InvoiceProcessingResult`:
+
+```typescript
+classificacao: Record<string, number>;
+coberturaApenasVendas: number;
+vendasComId: number;
+vendasSemId: number;
+```
+
+### 3d. Logs enriquecidos
 
 ```text
-[NF] Cobertura pedido_plataforma: X/Y (Z%)
+[NF] Classificacao: venda=X, brinde=Y, bonificacao=Z, doacao=W, ajuste=A, devolucao=D
+[NF] Cobertura pedido_plataforma (apenas vendas): X/Y (Z%)
 ```
 
 ---
 
-## Etapa 4: Consumidor (`src/components/dashboard/SalesUploader.tsx`)
+## Etapa 4: Persistencia (`src/hooks/useDataPersistence.ts`)
 
-Unico consumidor confirmado (linha 116). Ajustar para:
-
-```typescript
-const result = processInvoiceData(results.data);
-processedData = result.orders;
-
-if (result.alertaCobertura) {
-  toast({
-    title: "Alerta de cobertura",
-    description: `Apenas ${result.coberturaPedidoPlataforma.toFixed(1)}% das NFs tem numero_pedido_plataforma. Verificar padroes de Observacoes.`,
-    variant: "destructive",
-  });
-}
-```
-
----
-
-## Etapa 5: Persistencia (`src/hooks/useDataPersistence.ts`)
-
-### 5a. Save (linha ~321, no mapeamento NF)
+### Save (linha ~322, mapeamento NF)
 
 Adicionar ao objeto de rows:
 
 ```
-numero_pedido_plataforma: order.numeroPedidoPlataforma || null,
+tipo_movimento: order.tipoMovimento || 'venda',
+observacoes_nf: order.observacoesNF || null,
 ```
 
-### 5b. Load (linha ~175, no mapeamento de leitura)
+### Load (linha ~176, mapeamento de leitura)
 
 Adicionar:
 
 ```
-numeroPedidoPlataforma: row.numero_pedido_plataforma || undefined,
+tipoMovimento: row.tipo_movimento || 'venda',
+observacoesNF: row.observacoes_nf || undefined,
 ```
+
+---
+
+## Etapa 5: Filtro centralizado (`src/utils/revenue.ts`)
+
+Adicionar ao arquivo existente (sem alterar `getOfficialRevenue`):
+
+```typescript
+export const isRevenueOrder = (order: ProcessedOrder): boolean => {
+  const tipo = order.tipoMovimento || 'venda';
+  return tipo === 'venda';
+};
+
+export const getRevenueOrders = (orders: ProcessedOrder[]): ProcessedOrder[] =>
+  orders.filter(isRevenueOrder);
+```
+
+---
+
+## Etapa 6: Filtragem dentro de `calculateRevenue` (Opcao B)
+
+Em `src/utils/salesCalculator.ts` (linha 191), alterar para filtrar internamente:
+
+```typescript
+export const calculateRevenue = (orders: ProcessedOrder[]): number => {
+  return getRevenueOrders(orders).reduce((sum, order) => sum + getOfficialRevenue(order), 0);
+};
+```
+
+Unico ponto de filtragem economica. `calculateAverageTicket` herda automaticamente.
+
+---
+
+## Etapa 7: UI (`src/components/dashboard/SalesUploader.tsx`)
+
+### 7a. Toast atualizado (linhas 119-125)
+
+Usar `coberturaApenasVendas` e mostrar resumo de classificacao:
+
+```
+"Rastreabilidade vendas: 96.2% (248/258).
+ Classificadas: 48 brindes, 12 bonificacoes."
+```
+
+Toast destrutivo apenas se cobertura de vendas < 90%.
+
+### 7b. Indicador permanente
+
+Badge discreto abaixo do resultado de upload mostrando rastreabilidade.
 
 ---
 
 ## O que NAO muda
 
-- `numero_pedido` continua como ID interno / fallback
+- `getOfficialRevenue` inalterado (fiscal puro)
 - Constraint `uq_sales_nota_serie` intacta
-- Upsert NF via `onConflict: "numero_nota,serie"` inalterado
 - RPC `nf_snapshot_and_purge` inalterada
-- Dados ecommerce nao alterados
-- Nenhuma UNIQUE constraint
-- Dashboard inalterado
-- Nenhum outro consumidor do parser afetado (apenas SalesUploader)
+- Trigger `enforce_nf_precedence` inalterado
+- Dados ecommerce recebem default `'venda'` automaticamente
 
-## Pos-implementacao (manual)
+---
 
-1. Re-upload completo do arquivo NF (purge automatico via `nf_snapshot_and_purge`)
-2. Verificar toast de cobertura na UI + log no console
-3. Rodar queries de validacao no SQL editor (cobertura, cardinalidade, match)
-4. Amostragem manual de 20 registros
-5. Decisoes sobre UNIQUE e VIEW baseadas nos dados reais
+## Arquivos modificados
 
+1. **Nova migracao SQL** -- 2 colunas
+2. **`src/types/marketing.ts`** -- 2 campos em `ProcessedOrder`
+3. **`src/utils/invoiceParser.ts`** -- `classifyMovementType`, cobertura recalculada, `InvoiceProcessingResult` expandido
+4. **`src/hooks/useDataPersistence.ts`** -- mapeamento save/load
+5. **`src/utils/revenue.ts`** -- `isRevenueOrder` + `getRevenueOrders`
+6. **`src/utils/salesCalculator.ts`** -- `calculateRevenue` filtra internamente
+7. **`src/components/dashboard/SalesUploader.tsx`** -- toast + indicador
+
+## Validacao pos-deploy
+
+1. Re-upload completo de NFs
+2. Verificar classificacao no toast
+3. Rodar queries de validacao:
+
+```sql
+SELECT tipo_movimento, COUNT(*) FROM sales_data WHERE fonte_dados = 'nf' GROUP BY tipo_movimento;
+
+SELECT COUNT(*) total_vendas, COUNT(numero_pedido_plataforma) com_plataforma,
+  ROUND(COUNT(numero_pedido_plataforma)*100.0/COUNT(*),2) cobertura_pct
+FROM sales_data WHERE fonte_dados = 'nf' AND tipo_movimento = 'venda';
+```
+
+4. Comparar receita, ticket medio e ROAS antes/depois
+5. Amostragem manual de 10 registros classificados como brinde/bonificacao
