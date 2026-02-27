@@ -107,7 +107,7 @@ export const extractNumeroPedidoPlataforma = (obs: string | undefined): string |
     const match = obs.match(pattern);
     if (match && match[1]) {
       const digits = match[1].trim().replace(/\D/g, '');
-      if (digits.length === 44 || digits.length > 12 || digits.length === 0) continue;
+      if (digits.length === 44 || digits.length > 20 || digits.length === 0) continue;
       return digits;
     }
   }
