@@ -307,6 +307,7 @@ export type Database = {
           lote: string | null
           natureza_pedido: string | null
           nf_produto: string | null
+          order_id: string | null
           produto: string | null
           status: string
           tipo_reclamacao: string | null
@@ -333,6 +334,7 @@ export type Database = {
           lote?: string | null
           natureza_pedido?: string | null
           nf_produto?: string | null
+          order_id?: string | null
           produto?: string | null
           status?: string
           tipo_reclamacao?: string | null
@@ -359,6 +361,7 @@ export type Database = {
           lote?: string | null
           natureza_pedido?: string | null
           nf_produto?: string | null
+          order_id?: string | null
           produto?: string | null
           status?: string
           tipo_reclamacao?: string | null
@@ -378,6 +381,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customer_full"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_complaint_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_data"
             referencedColumns: ["id"]
           },
         ]

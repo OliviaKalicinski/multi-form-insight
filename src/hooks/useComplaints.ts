@@ -29,6 +29,7 @@ export interface Complaint {
 
 export interface NewComplaint {
   customer_id: string;
+  order_id?: string;
   atendimento_numero?: string;
   canal?: string;
   atendente?: string;
