@@ -114,29 +114,26 @@ export const SalesUploader = ({
         console.log(`🔍 Formato detectado: ${format === "nf" ? "Nota Fiscal" : "E-commerce"}`);
 
         let processedData: ProcessedOrder[] | null = null;
+        let nfSummary = "";
+        let nfAlerta = false;
+        let nfCobertura = 0;
+
         if (format === "nf") {
           const result = processInvoiceData(results.data);
           processedData = result.orders;
           setNfResult(result);
 
-          // Resumo de classificação para o toast
           const naoVendas = Object.entries(result.classificacao)
             .filter(([k]) => k !== 'venda')
             .map(([k, v]) => `${v} ${k}${v > 1 ? 's' : ''}`)
             .join(', ');
 
-          if (result.alertaCobertura) {
-            toast({
-              title: "Alerta de rastreabilidade",
-              description: `Rastreabilidade vendas: ${result.coberturaApenasVendas.toFixed(1)}% (${result.vendasComId}/${result.vendasComId + result.vendasSemId}).${naoVendas ? ` Classificadas: ${naoVendas}.` : ''}`,
-              variant: "destructive",
-            });
-          } else if (naoVendas) {
-            toast({
-              title: "NFs classificadas",
-              description: `Rastreabilidade vendas: ${result.coberturaApenasVendas.toFixed(1)}%. Classificadas: ${naoVendas}.`,
-            });
+          nfCobertura = result.coberturaApenasVendas;
+          nfSummary = `Rastreabilidade: ${nfCobertura.toFixed(1)}%.`;
+          if (naoVendas) {
+            nfSummary += ` Classificadas: ${naoVendas}.`;
           }
+          nfAlerta = result.alertaCobertura;
         } else {
           processedData = validateEcommerceData(results.data);
         }
@@ -147,9 +144,21 @@ export const SalesUploader = ({
             const result = await persistSalesData(processedData, file.name);
             if (onDataLoaded) onDataLoaded(processedData, file.name);
             setUploadedFile(file.name);
+
+            // Toast destrutivo separado para alerta crítico
+            if (nfAlerta) {
+              toast({
+                title: "Alerta de rastreabilidade",
+                description: `Cobertura abaixo de 90% (${nfCobertura.toFixed(1)}%).`,
+                variant: "destructive",
+              });
+            }
+
+            // Toast principal (sempre)
+            const unitLabel = format === "nf" ? "notas salvas" : "pedidos salvos";
             toast({
               title: "Dados salvos com sucesso!",
-              description: `${result.inserted} ${format === "nf" ? "notas" : "pedidos"} salvos no banco. Total: ${processedData.length}`,
+              description: `${result.inserted} ${unitLabel} no banco.${nfSummary ? ` ${nfSummary}` : ""}`,
             });
           } catch (error) {
             console.error("Erro ao salvar:", error);
