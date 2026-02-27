@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, Search, ExternalLink } from "lucide-react";
+import { Download, Search, ExternalLink, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -114,9 +114,14 @@ export default function Reclamacoes() {
           <h1 className="text-2xl font-bold">Reclamações</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} reclamações</p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportCSV}>
-          <Download className="h-4 w-4 mr-2" /> Exportar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="h-4 w-4 mr-2" /> Exportar CSV
+          </Button>
+          <Button size="sm" onClick={() => navigate('/reclamacoes/nova')}>
+            <Plus className="h-4 w-4 mr-2" /> Nova Reclamação
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
