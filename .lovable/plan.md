@@ -1,287 +1,157 @@
 
 
-# CRM Operacional: Infraestrutura Completa
+# Radar Operacional -- Implementacao
 
 ## Visao geral
 
-Construir o modulo CRM operacional em 3 blocos sequenciais:
-1. Infraestrutura de banco (tabelas, funcoes, RLS)
-2. Paginas e navegacao (lista, perfil, reclamacoes)
-3. Merge e deteccao de duplicados
+Criar o hook `useRadarOperacional` com logica estatistica completa, a pagina `RadarOperacional.tsx` com 4 blocos diretivos, e registrar rota + sidebar. Nenhuma migracao SQL necessaria -- todos os dados ja existem.
 
 ---
 
-## BLOCO 1: Banco de Dados
+## Arquivo 1: `src/hooks/useRadarOperacional.ts`
 
-### 1a. Tabela `customer_identifier`
+### Queries (campos minimos, paralelas via useQuery)
 
-Nova tabela para separar identidade do cliente dos identificadores.
+1. **customer_complaint**: `id, customer_id, produto, lote, transportador, tipo_reclamacao, data_contato, data_fechamento, status, gravidade`
+2. **customer_contact_log**: `id, data_contato`
+3. **sales_data**: `data_venda, cliente_email, forma_envio, produtos` filtrado por `tipo_movimento = 'venda'` e ultimos 180 dias (evitar limite 1000 rows; usar `.gte('data_venda', date180dAgo)`)
+4. **customer_full**: `id, cpf_cnpj, segment` (para lookup VIP, feito em memoria)
 
-```text
-customer_identifier
-  id              uuid PK
-  customer_id     uuid NOT NULL FK -> customer(id) ON DELETE CASCADE
-  type            text NOT NULL CHECK (cpf, cnpj, email, telefone, pedido, marketplace)
-  value           text NOT NULL
-  is_primary      boolean DEFAULT false
-  created_at      timestamptz DEFAULT now()
-
-UNIQUE INDEX on (type, value)
-INDEX on (value)
-INDEX on (customer_id)
-```
-
-RLS: SELECT para authenticated, INSERT/UPDATE para authenticated, DELETE para admins.
-
-### 1b. Migrar dados existentes para `customer_identifier`
-
-Script SQL que popula `customer_identifier` a partir dos registros existentes em `customer` que tem `cpf_cnpj` preenchido:
-- Insere como `type = 'cpf'` e `is_primary = true`
-
-### 1c. Campos de merge na tabela `customer`
+### Constantes congeladas (hardcoded)
 
 ```text
-ALTER TABLE customer
-  ADD COLUMN merged_into uuid REFERENCES customer(id),
-  ADD COLUMN is_active boolean DEFAULT true;
+SIGMA_WARNING = 0.5
+SIGMA_DANGER = 1.0
+TREND_WARNING_PERCENT = 15
+SLA_GREEN_DAYS = 3
+SLA_YELLOW_DAYS = 7
+REPURCHASE_GREEN_PCT = 40
+REPURCHASE_YELLOW_PCT = 20
+REPURCHASE_WINDOW_DAYS = 90
+MIN_COMPLAINT_THRESHOLD = 5
+HISTORICAL_WINDOW_DAYS = 180
+MIN_ORDERS_FOR_FRICTION = 20
+FREEZE_DATE = '2026-02-27'
+REVIEW_DATE = '2026-05-27'
 ```
 
-### 1d. Tabela `customer_contact_log`
+### Helpers matematicos (funcoes puras no mesmo arquivo)
+
+- `mean(values: number[]): number` -- media aritmetica
+- `stddev(values: number[]): number` -- desvio padrao populacional
+- `buildWindows(dates: Date[], windowDays: number, totalDays: number, referenceDate: Date): number[]` -- agrupa datas em janelas e retorna array de contagens
+
+### Logica de calculo (useMemo)
+
+**KPI 1 -- Reclamacoes 30d:**
+- Valor: count complaints ultimos 30 dias
+- Baseline: construir 3 janelas moveis de 30 dias dentro dos ultimos 90 dias (dias 0-30, 31-60, 61-90). Usar esses 3 pontos para media e sigma. Dimensionalmente consistente (30d vs 30d).
+- Tendencia: variacao percentual entre janela atual (0-30) e janela anterior (31-60)
+- Semaforo:
+  - success: valor <= media + 0.5 * sigma
+  - warning: valor > media + 0.5 * sigma OU tendencia >= +15%
+  - danger: valor > media + 1 * sigma
+
+**KPI 2 -- Indice de Friccao:**
+- Formula: `(contatos_30d + reclamacoes_30d) / (totalPedidos90d / 3)`
+- Se `totalPedidos90d / 3 < 20`: status = 'neutral' com interpretacao "Volume insuficiente para calculo"
+- Baseline: mesma logica de 3 janelas de 30d, calculando indice para cada janela
+- Semaforo: mesma logica sigma
+
+**KPI 3 -- SLA Medio:**
+- Media de dias entre `data_contato` e `data_fechamento` para complaints com status 'resolvida' ou 'fechada' nos ultimos 90 dias
+- Semaforo fixo: success <= 3, warning <= 7, danger > 7
+
+**KPI 4 -- Recompra Pos-Reclamacao:**
+- Para cada customer_id com reclamacao: pegar reclamacao mais recente
+- Ignorar clientes cuja reclamacao mais recente foi ha menos de 90 dias (janela aberta)
+- Verificar se existe pedido de venda em sales_data (via `cliente_email` join com `customer_full.cpf_cnpj`) com `data_venda` posterior a `data_contato`, dentro de 90 dias
+- Formula: clientes_com_recompra / clientes_elegiveis * 100 (so contar 1 por cliente)
+- Semaforo fixo: success >= 40%, warning >= 20%, danger < 20%
+
+**Status Geral:**
+- Se qualquer KPI = danger -> "desvio"
+- Se >= 2 KPIs = warning -> "indicio"
+- Caso contrario -> "estavel"
+
+**Bloco 2 -- Principal Fonte de Problema:**
+- Analisa 4 eixos nos ultimos 90 dias: produto, lote, transportador, tipo_reclamacao
+- Ignora itens com < 5 reclamacoes
+- Normalizacao:
+  - Transportador: count_reclamacoes / count_pedidos_com_mesmo_forma_envio (sales_data)
+  - Produto: count_reclamacoes / count_pedidos_contendo_produto (parsing produtos jsonb, usando `standardizeProductName` de `productNormalizer.ts` para consistencia)
+  - Lote e tipo_reclamacao: contagem bruta
+- Comparar taxa 90d (dias 0-90) vs baseline (dias 91-180). NAO auto-incluir periodo atual.
+- Eixo com maior desvio percentual positivo = "Principal Fonte"
+- Se nenhum atinge threshold: null
+
+**Bloco 3 -- Ranking Critico:**
+- Top 5 itens do MESMO eixo do Bloco 2
+- Tendencia: count ultimos 30d vs count dias 31-60
+
+**Bloco 4 -- Recomendacao:**
+- Texto fixo por eixo + contexto numerico + lista VIPs afetados (join em memoria)
+
+### Retorno do hook
 
 ```text
-customer_contact_log
-  id              uuid PK
-  customer_id     uuid NOT NULL FK -> customer(id)
-  data_contato    timestamptz NOT NULL DEFAULT now()
-  tipo            text CHECK (ligacao, whatsapp, email, sac, outro)
-  motivo          text
-  resumo          text NOT NULL
-  responsavel     text
-  resultado       text
-  created_at      timestamptz DEFAULT now()
-  created_by      uuid DEFAULT auth.uid()
+{
+  kpis: Array<{ label, value, formattedValue, status, detail, trend }>
+  overallStatus: 'estavel' | 'indicio' | 'desvio'
+  mainProblemSource: { axis, axisLabel, item, count, rate?, deviation, deviationPercent } | null
+  criticalRanking: Array<{ item, count, rate?, trend: 'up'|'down'|'stable' }>
+  recommendation: { text, context, affectedVips: string[] } | null
+  parameters: { freezeDate, reviewDate, sigmaWarning, sigmaDanger, ... }
+  isLoading: boolean
+}
 ```
-
-RLS: SELECT para authenticated, INSERT para authenticated, UPDATE para authenticated, DELETE para admins.
-
-### 1e. Tabela `customer_complaint`
-
-```text
-customer_complaint
-  id                  uuid PK
-  customer_id         uuid NOT NULL FK -> customer(id)
-  atendimento_numero  text
-  data_contato        timestamptz DEFAULT now()
-  canal               text
-  atendente           text
-
-  -- Produto
-  produto             text
-  lote                text
-  data_fabricacao     date
-  local_compra        text
-  transportador       text
-  nf_produto          text
-  natureza_pedido     text
-
-  -- Reclamacao
-  tipo_reclamacao     text
-  descricao           text NOT NULL
-  link_reclamacao     text
-  acao_orientacao     text
-  status              text DEFAULT 'aberta' CHECK (aberta, em_andamento, resolvida, fechada)
-  gravidade           text CHECK (baixa, media, alta, critica)
-  custo_estimado      numeric(14,2)
-  data_fechamento     timestamptz
-
-  -- Controle
-  created_at          timestamptz DEFAULT now()
-  updated_at          timestamptz DEFAULT now()
-  created_by          uuid DEFAULT auth.uid()
-```
-
-RLS: SELECT para authenticated, INSERT para authenticated, UPDATE para authenticated, DELETE para admins.
-
-### 1f. Tabela `customer_merge_log`
-
-```text
-customer_merge_log
-  id                      uuid PK
-  primary_customer_id     uuid NOT NULL
-  secondary_customer_id   uuid NOT NULL
-  merged_by               uuid DEFAULT auth.uid()
-  merged_at               timestamptz DEFAULT now()
-```
-
-RLS: SELECT para authenticated, INSERT para authenticated.
-
-### 1g. Funcao SQL `merge_customers(p_primary uuid, p_secondary uuid)`
-
-Funcao `SECURITY DEFINER` que executa em transacao:
-1. Valida que ambos existem e sao ativos
-2. Move identificadores de secondary para primary (skip conflitos)
-3. Move complaints: `UPDATE customer_complaint SET customer_id = p_primary WHERE customer_id = p_secondary`
-4. Move contact_logs: `UPDATE customer_contact_log SET customer_id = p_primary WHERE customer_id = p_secondary`
-5. Marca secondary: `is_active = false`, `merged_into = p_primary`
-6. Insere registro em `customer_merge_log`
-7. Chama `recalculate_customer` para o primary (recalcula metricas consolidadas)
-
-### 1h. Funcao SQL `find_customer_by_identifier(p_value text)`
-
-Retorna `customer.*` buscando por `customer_identifier.value ILIKE p_value` onde `customer.is_active = true`. Usada pela busca inteligente do front.
-
-### 1i. Atualizar `recalculate_customer`
-
-Ajustar para considerar `is_active` -- nao recalcular clientes inativos (merged). A funcao continua usando `cliente_email` para lookup em `sales_data` (nao muda o fluxo de ingestao agora).
-
-### 1j. Atualizar view `customer_full`
-
-Adicionar colunas `merged_into` e `is_active` na view. Filtrar `WHERE is_active = true` para que o hook `useCustomerData` automaticamente ignore clientes mergeados.
 
 ---
 
-## BLOCO 2: Paginas e Navegacao
+## Arquivo 2: `src/pages/RadarOperacional.tsx`
 
-### 2a. Sidebar -- nova secao "CRM"
+Layout fixo, sem filtros, 4 blocos verticais. Usa componentes existentes (Card, Badge, Table, Accordion, StatusMetricCard).
 
-Adicionar grupo no `AppSidebar.tsx` apos "Inteligencia":
-- Titulo: "CRM"
-- Icone: `Headset`
-- Items:
-  - "Clientes" -> `/clientes` (icone: `Users`)
-  - "Reclamacoes" -> `/reclamacoes` (icone: `MessageSquareWarning`)
-
-### 2b. Rotas no `App.tsx`
-
-Adicionar:
-- `/clientes` -> `ProtectedRoute > Clientes`
-- `/clientes/:cpfCnpj` -> `ProtectedRoute > ClientePerfil`
-- `/reclamacoes` -> `ProtectedRoute > Reclamacoes`
-
-### 2c. Pagina `/clientes` -- Lista Operacional
-
-Arquivo: `src/pages/Clientes.tsx`
-
-Usa `useCustomerData()` para lista completa.
-
-**Busca:** Input que filtra por `nome` ou `cpf_cnpj` (client-side).
-
-**Filtros (dropdowns):**
-- `churn_status`: active, at_risk, inactive, churned
-- `segment`: Primeira Compra, Recorrente, Fiel, VIP
-- `responsavel`: valores unicos dos dados
-- `prioridade`: valores unicos dos dados
-
-**Colunas da tabela:**
-- Nome, CPF/CNPJ (truncado), Segmento (badge), Churn Status (badge), Receita total, Total pedidos, Responsavel, Dias sem comprar
-- Botao "Abrir" navega para `/clientes/:cpfCnpj`
-
-**Ordenacao:** Por receita, dias sem comprar, ultima compra, nome.
-
-**Paginacao:** Client-side, 25 por pagina.
-
-### 2d. Hooks auxiliares
-
-- `src/hooks/useCustomerProfile.ts`: Busca um cliente por `cpf_cnpj` da `customer_full`, seus pedidos de `sales_data`, e permite update de campos operacionais (`responsavel`, `tags`, `observacoes`, `prioridade`).
-- `src/hooks/useContactLogs.ts`: CRUD de `customer_contact_log` por `customer_id`.
-- `src/hooks/useComplaints.ts`: CRUD de `customer_complaint` por `customer_id` (perfil) ou todos (pagina geral).
-
-### 2e. Pagina `/clientes/:cpfCnpj` -- Perfil 360
-
-Arquivo: `src/pages/ClientePerfil.tsx`
-
-**Header:**
-- Nome, CPF/CNPJ, Segmento (badge), Churn status (badge)
-- Receita total, Total pedidos, Ticket medio, Dias sem comprar
-- Responsavel (editavel inline), Tags (editaveis), Prioridade (select)
-- Botao "Mesclar Cliente" (abre modal de merge)
-
-**Tabs:**
-1. **Pedidos**: Tabela com historico de `sales_data` filtrado por `cliente_email = cpfCnpj`
-2. **Atendimentos**: Lista cronologica de `customer_contact_log` + botao "Novo Contato" (modal com form)
-3. **Reclamacoes**: Lista de `customer_complaint` + botao "Nova Reclamacao" (formulario com auto-preenchimento de customer_id, nome, responsavel)
-
-**Duplicados:**
-- Banner discreto se encontrar possiveis duplicados via `customer_identifier.value` matching
-- Botao "Revisar" abre comparacao lado a lado
-
-### 2f. Pagina `/reclamacoes` -- Planilha Viva
-
-Arquivo: `src/pages/Reclamacoes.tsx`
-
-Query: todas as complaints com lookup do nome do cliente.
-
-**Filtros:** status, categoria/tipo_reclamacao, gravidade, responsavel, busca texto.
-
-**Colunas:** Data, Cliente, Tipo, Gravidade (badge), Status (badge), Atendente, Acoes.
-
-**Funcionalidades:**
-- Inline status update (dropdown na tabela)
-- Botao "Nova Reclamacao" (busca cliente primeiro, depois formulario)
-- Export CSV dos dados filtrados
+1. **Header**: "Radar Operacional" + Badge status geral (cores: green/amber/red)
+2. **Bloco 1**: Grid `md:grid-cols-4` com 4 `StatusMetricCard` (componente existente em `src/components/dashboard/StatusMetricCard.tsx`)
+3. **Bloco 2**: Card "Principal Fonte de Problema" -- mostra eixo, item, contagem, desvio %. Se nulo: CheckCircle + "Nenhum desvio significativo"
+4. **Bloco 3**: Tabela compacta com ranking (componentes Table existentes). So aparece se mainProblemSource != null
+5. **Bloco 4**: Card alerta com recomendacao + VIPs. So aparece se mainProblemSource != null
+6. **Rodape**: Accordion "Como o Radar calcula" com criterios + datas de congelamento + "Dados analisados ate: [data atual]"
+7. **Loading**: Skeleton cards + skeleton table
 
 ---
 
-## BLOCO 3: Merge e Duplicados
+## Arquivo 3: `src/components/AppSidebar.tsx`
 
-### 3a. Modal de Merge
+Importar `Activity` de lucide-react. Adicionar como primeiro item do grupo CRM:
 
-Componente: `src/components/crm/MergeCustomerModal.tsx`
-
-Fluxo:
-1. Busca outro cliente por nome/CPF/email/telefone
-2. Mostra comparacao lado a lado (receita, pedidos, identificadores, reclamacoes)
-3. Botao "Mesclar B em A" com confirmacao forte (digitar nome do cliente principal)
-4. Chama RPC `merge_customers(primary_id, secondary_id)`
-5. Invalida cache do React Query
-
-### 3b. Deteccao de Duplicados
-
-**No perfil:** Ao carregar, busca `customer_identifier` com mesmos valores do cliente atual. Se encontrar outros `customer_id`, mostra banner.
-
-**Pagina dedicada `/clientes/duplicados` (fase 2):** Lista global de possiveis duplicados por match exato de identificadores. Nao implementada nesta fase -- apenas o banner no perfil.
+```text
+{ title: "Radar Operacional", url: "/radar-operacional", icon: Activity }
+```
 
 ---
 
-## Componentes novos
+## Arquivo 4: `src/App.tsx`
 
-| Arquivo | Descricao |
-|---|---|
-| `src/pages/Clientes.tsx` | Lista operacional |
-| `src/pages/ClientePerfil.tsx` | Perfil 360 |
-| `src/pages/Reclamacoes.tsx` | Planilha viva |
-| `src/components/crm/CustomerFilters.tsx` | Barra de filtros |
-| `src/components/crm/CustomerProfileHeader.tsx` | Header editavel |
-| `src/components/crm/ContactLogList.tsx` | Lista de logs |
-| `src/components/crm/ContactLogForm.tsx` | Modal novo contato |
-| `src/components/crm/ComplaintForm.tsx` | Formulario reclamacao |
-| `src/components/crm/ComplaintList.tsx` | Lista reclamacoes |
-| `src/components/crm/MergeCustomerModal.tsx` | Modal de merge |
-| `src/components/crm/DuplicateBanner.tsx` | Banner de duplicados |
-| `src/hooks/useCustomerProfile.ts` | Dados de um cliente |
-| `src/hooks/useContactLogs.ts` | CRUD logs |
-| `src/hooks/useComplaints.ts` | CRUD complaints |
+Importar `RadarOperacional` e adicionar rota:
+
+```text
+/radar-operacional -> ProtectedRoute > AuthenticatedLayout > RadarOperacional
+```
 
 ---
 
 ## Sequencia de implementacao
 
-1. Migracao SQL: criar tabelas + funcoes + RLS + popular `customer_identifier`
-2. Atualizar view `customer_full` (adicionar `is_active`, `merged_into`, filtrar inativos)
-3. Sidebar + rotas
-4. Pagina `/clientes` (lista operacional)
-5. Hooks (`useCustomerProfile`, `useContactLogs`, `useComplaints`)
-6. Pagina `/clientes/:cpfCnpj` (perfil com tabs)
-7. Pagina `/reclamacoes` (planilha viva com filtros e export)
-8. Modal de merge + banner de duplicados
+1. Criar `src/hooks/useRadarOperacional.ts`
+2. Criar `src/pages/RadarOperacional.tsx`
+3. Atualizar `AppSidebar.tsx` (novo item CRM)
+4. Atualizar `App.tsx` (nova rota)
 
-## O que fica para fase posterior
+## Dividas tecnicas documentadas
 
-- Pagina `/clientes/duplicados` (lista global de duplicados)
-- Fuzzy matching (trigram similarity)
-- Kanban por status de reclamacao
-- Pipeline comercial
-- Importacao em massa de reclamacoes de planilha
-- Automacoes e alertas
-- Audit log de alteracoes
+- Parsing de `sales_data.produtos` jsonb client-side para normalizacao por produto -- migrar para SQL view se volume crescer
+- Sigma com 3 pontos de 30 dias e minimo viavel -- reavaliar apos 90 dias
+- Query de sales_data limitada a 180 dias para evitar limite de 1000 rows
 
