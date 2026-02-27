@@ -354,6 +354,7 @@ export type Database = {
           numero_nota: string | null
           numero_pedido: string | null
           numero_pedido_plataforma: string | null
+          observacoes_nf: string | null
           peso_bruto: number | null
           peso_liquido: number | null
           produtos: Json
@@ -361,6 +362,7 @@ export type Database = {
           segmento_cliente: string | null
           serie: string | null
           status: string | null
+          tipo_movimento: string | null
           total_faturado: number | null
           uf: string | null
           upload_id: string | null
@@ -394,6 +396,7 @@ export type Database = {
           numero_nota?: string | null
           numero_pedido?: string | null
           numero_pedido_plataforma?: string | null
+          observacoes_nf?: string | null
           peso_bruto?: number | null
           peso_liquido?: number | null
           produtos: Json
@@ -401,6 +404,7 @@ export type Database = {
           segmento_cliente?: string | null
           serie?: string | null
           status?: string | null
+          tipo_movimento?: string | null
           total_faturado?: number | null
           uf?: string | null
           upload_id?: string | null
@@ -434,6 +438,7 @@ export type Database = {
           numero_nota?: string | null
           numero_pedido?: string | null
           numero_pedido_plataforma?: string | null
+          observacoes_nf?: string | null
           peso_bruto?: number | null
           peso_liquido?: number | null
           produtos?: Json
@@ -441,6 +446,7 @@ export type Database = {
           segmento_cliente?: string | null
           serie?: string | null
           status?: string | null
+          tipo_movimento?: string | null
           total_faturado?: number | null
           uf?: string | null
           upload_id?: string | null

@@ -1,5 +1,5 @@
 
-# Classificacao Economica de NFs (`tipo_movimento`) -- Plano Final
+# Classificacao Economica de NFs (`tipo_movimento`) -- IMPLEMENTADO
 
 ## Problema
 

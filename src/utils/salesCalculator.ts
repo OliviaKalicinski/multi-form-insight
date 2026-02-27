@@ -2,7 +2,7 @@ import { format, parse } from "date-fns";
 import { SalesData, ProcessedOrder, SalesMetrics } from "@/types/marketing";
 
 import { standardizeProductName } from './productNormalizer';
-import { getOfficialRevenue } from './revenue';
+import { getOfficialRevenue, getRevenueOrders } from './revenue';
 
 /**
  * Consolida múltiplos kits de amostras em um único kit por pedido
@@ -189,7 +189,7 @@ export const filterOrdersByMonth = (
  * Calcula faturamento total
  */
 export const calculateRevenue = (orders: ProcessedOrder[]): number => {
-  return orders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
+  return getRevenueOrders(orders).reduce((sum, order) => sum + getOfficialRevenue(order), 0);
 };
 
 /**

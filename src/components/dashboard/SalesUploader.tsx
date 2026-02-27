@@ -10,6 +10,7 @@ import { processInvoiceData, detectCSVFormat, InvoiceProcessingResult } from "@/
 import { ProcessedOrder } from "@/types/marketing";
 import { useDashboard } from "@/contexts/DashboardContext";
 
+
 interface SalesUploaderProps {
   onDataLoaded?: (data?: ProcessedOrder[], fileName?: string) => void | Promise<void>;
   title?: string;
@@ -45,6 +46,7 @@ export const SalesUploader = ({
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<"nf" | "ecommerce" | null>(null);
+  const [nfResult, setNfResult] = useState<InvoiceProcessingResult | null>(null);
   const { toast } = useToast();
   const { persistSalesData, setSalesData } = useDashboard();
 
@@ -115,12 +117,24 @@ export const SalesUploader = ({
         if (format === "nf") {
           const result = processInvoiceData(results.data);
           processedData = result.orders;
+          setNfResult(result);
+
+          // Resumo de classificação para o toast
+          const naoVendas = Object.entries(result.classificacao)
+            .filter(([k]) => k !== 'venda')
+            .map(([k, v]) => `${v} ${k}${v > 1 ? 's' : ''}`)
+            .join(', ');
 
           if (result.alertaCobertura) {
             toast({
-              title: "Alerta de cobertura",
-              description: `Apenas ${result.coberturaPedidoPlataforma.toFixed(1)}% das NFs têm numero_pedido_plataforma. Verificar padrões de Observações.`,
+              title: "Alerta de rastreabilidade",
+              description: `Rastreabilidade vendas: ${result.coberturaApenasVendas.toFixed(1)}% (${result.vendasComId}/${result.vendasComId + result.vendasSemId}).${naoVendas ? ` Classificadas: ${naoVendas}.` : ''}`,
               variant: "destructive",
+            });
+          } else if (naoVendas) {
+            toast({
+              title: "NFs classificadas",
+              description: `Rastreabilidade vendas: ${result.coberturaApenasVendas.toFixed(1)}%. Classificadas: ${naoVendas}.`,
             });
           }
         } else {
@@ -206,20 +220,30 @@ export const SalesUploader = ({
           <input id="sales-file-input" type="file" accept=".csv" className="hidden" onChange={handleFileInput} />
         </div>
       ) : (
-        <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-lg">
-          <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-primary" />
-            <span className="text-sm font-medium">{uploadedFile}</span>
-            {detectedFormat && (
-              <Badge variant={detectedFormat === "nf" ? "default" : "secondary"}>
-                {detectedFormat === "nf" ? "Nota Fiscal" : "E-commerce"}
-              </Badge>
-            )}
-            <span className="text-xs text-primary">Salvo no banco</span>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">{uploadedFile}</span>
+              {detectedFormat && (
+                <Badge variant={detectedFormat === "nf" ? "default" : "secondary"}>
+                  {detectedFormat === "nf" ? "Nota Fiscal" : "E-commerce"}
+                </Badge>
+              )}
+              <span className="text-xs text-primary">Salvo no banco</span>
+            </div>
+            <Button variant="ghost" size="sm" onClick={clearFile}>
+              <X className="w-4 h-4" />
+            </Button>
           </div>
-          <Button variant="ghost" size="sm" onClick={clearFile}>
-            <X className="w-4 h-4" />
-          </Button>
+          {nfResult && detectedFormat === "nf" && (
+            <div className="flex items-center gap-2 px-4">
+              <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">
+                Rastreabilidade plataforma: {nfResult.coberturaApenasVendas.toFixed(1)}% das vendas NF
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

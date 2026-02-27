@@ -41,6 +41,39 @@ const invoiceRowSchema = z.object({
   "CPF/CNPJ Cliente": z.string().optional(),
 });
 
+// ── Classificador econômico de NFs ──────────────────────────────
+type TipoMovimento = 'venda' | 'brinde' | 'bonificacao' | 'doacao' | 'ajuste' | 'devolucao';
+
+const normalizeText = (s: string): string =>
+  s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+const NATUREZA_RULES: { type: TipoMovimento; pattern: RegExp }[] = [
+  { type: 'devolucao',   pattern: /devol/ },
+  { type: 'bonificacao', pattern: /remessa.*bonifica|bonifica/ },
+  { type: 'brinde',      pattern: /remessa.*brinde|brinde/ },
+  { type: 'doacao',      pattern: /doacao|remessa gratuita/ },
+  { type: 'ajuste',      pattern: /nota complementar|complementar|ajuste/ },
+];
+
+const OBSERVACOES_RULES: { type: TipoMovimento; pattern: RegExp }[] = [
+  { type: 'brinde', pattern: /influenciador/ },
+];
+
+export const classifyMovementType = (
+  naturezaOperacao?: string,
+  observacoes?: string
+): TipoMovimento => {
+  const n = normalizeText(naturezaOperacao ?? '');
+  for (const rule of NATUREZA_RULES) {
+    if (rule.pattern.test(n)) return rule.type;
+  }
+  const o = normalizeText(observacoes ?? '');
+  for (const rule of OBSERVACOES_RULES) {
+    if (rule.pattern.test(o)) return rule.type;
+  }
+  return 'venda';
+};
+
 /** Converte valor monetário BR ("1.234,56") para number */
 export const parseBRL = (v: string | undefined): number => {
   if (!v) return 0;
@@ -74,7 +107,6 @@ export const extractNumeroPedidoPlataforma = (obs: string | undefined): string |
     const match = obs.match(pattern);
     if (match && match[1]) {
       const digits = match[1].trim().replace(/\D/g, '');
-      // Rejeitar chave de acesso NF (44 dígitos) e números > 12 dígitos
       if (digits.length === 44 || digits.length > 12 || digits.length === 0) continue;
       return digits;
     }
@@ -90,6 +122,11 @@ export interface InvoiceProcessingResult {
   totalComPlataforma: number;
   totalSemPlataforma: number;
   alertaCobertura: boolean; // true se < 90%
+  // Classificação econômica
+  classificacao: Record<string, number>;
+  coberturaApenasVendas: number; // 0-100
+  vendasComId: number;
+  vendasSemId: number;
 }
 
 /** Parse de data no formato DD/MM/YYYY ou YYYY-MM-DD */
@@ -250,6 +287,9 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
       fonteDados: "nf",
       segmentoCliente,
       numeroPedidoPlataforma,
+      // Classificação econômica
+      tipoMovimento: classifyMovementType(first["Natureza da operacao"], first["Observacoes"]),
+      observacoesNF: first["Observacoes"] || undefined,
     };
 
     orders.push(order);
@@ -265,20 +305,36 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
   });
   console.log(`📊 [NF] Segmentação: B2C=${segCounts.b2c}, B2B2C=${segCounts.b2b2c}, B2B=${segCounts.b2b}`);
 
-  // 5. Calcular cobertura de numero_pedido_plataforma
+  // 5. Classificação econômica
+  const classificacao: Record<string, number> = {};
+  consolidated.forEach(o => {
+    const tipo = o.tipoMovimento || 'venda';
+    classificacao[tipo] = (classificacao[tipo] || 0) + 1;
+  });
+
+  const classEntries = Object.entries(classificacao).map(([k, v]) => `${k}=${v}`).join(', ');
+  console.log(`📋 [NF] Classificação: ${classEntries}`);
+
+  // 6. Cobertura de numero_pedido_plataforma (total)
   const totalComPlataforma = consolidated.filter(o => o.numeroPedidoPlataforma).length;
   const totalSemPlataforma = consolidated.length - totalComPlataforma;
   const coberturaPedidoPlataforma = consolidated.length > 0
     ? (totalComPlataforma / consolidated.length) * 100
     : 0;
 
-  const alertaCobertura = coberturaPedidoPlataforma < 90;
+  // 7. Cobertura apenas sobre vendas
+  const vendas = consolidated.filter(o => (o.tipoMovimento || 'venda') === 'venda');
+  const vendasComId = vendas.filter(o => o.numeroPedidoPlataforma).length;
+  const vendasSemId = vendas.length - vendasComId;
+  const coberturaApenasVendas = vendas.length > 0
+    ? (vendasComId / vendas.length) * 100
+    : 0;
 
-  console.log(`🔑 [NF] Cobertura pedido_plataforma: ${totalComPlataforma}/${consolidated.length} (${coberturaPedidoPlataforma.toFixed(1)}%)`);
+  const alertaCobertura = coberturaApenasVendas < 90;
+
+  console.log(`🔑 [NF] Cobertura pedido_plataforma (apenas vendas): ${vendasComId}/${vendas.length} (${coberturaApenasVendas.toFixed(1)}%)`);
   if (alertaCobertura) {
-    console.warn(`⚠️ [NF] ALERTA: Cobertura pedido_plataforma abaixo de 90% (${coberturaPedidoPlataforma.toFixed(1)}%). Verificar padrões de Observações.`);
-  } else if (coberturaPedidoPlataforma < 95) {
-    console.warn(`⚠️ [NF] Aviso: Cobertura pedido_plataforma entre 90-95% (${coberturaPedidoPlataforma.toFixed(1)}%).`);
+    console.warn(`⚠️ [NF] ALERTA: Cobertura pedido_plataforma abaixo de 90% (${coberturaApenasVendas.toFixed(1)}%). Verificar padrões de Observações.`);
   }
 
   return {
@@ -287,6 +343,10 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
     totalComPlataforma,
     totalSemPlataforma,
     alertaCobertura,
+    classificacao,
+    coberturaApenasVendas,
+    vendasComId,
+    vendasSemId,
   };
 };
 
