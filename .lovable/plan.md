@@ -1,52 +1,51 @@
 
-# Reconciliação de Identidade NF -- Implementação Final
 
-## Problema
-3.101 pedidos NF entram com `cpfCnpj = ""` (mapeado de `cliente_email` no banco). Todos colapsam em um único "cliente fantasma" no `groupOrdersByCustomer()`, causando ~613 clientes qualificados quando deveriam ser 800+.
+# Adicionar "Total de Amostras Distribuidas" + Reorganizar Bloco Volume
 
-## Arquivo: `src/hooks/useDataPersistence.ts`
+## Resumo
 
-### 1. Adicionar função `reconcileNFIdentity` (antes do hook, linha 104)
+Adicionar KPI de unidades de amostra distribuidas na pagina de Analise de Amostras, com nomenclatura correta e calculo alinhado ao paradigma economico do sistema.
 
-Função pura que:
-- Indexa pedidos e-commerce por `numeroPedido` e `numeroPedidoPlataforma` (com `trim()`) em um Map
-- Para cada pedido NF com `cpfCnpj` vazio:
-  - Tenta match via `numeroPedidoPlataforma` do NF contra o Map
-  - Se match com `cpfCnpj` válido: herda `cpfCnpj` e `nomeCliente`
-  - Senão: atribui ID sintético `nf-{numeroPedido}`
-- Log auditável com: total órfãos, reconciliados, sintéticos, taxa
+## Alteracoes
 
-### 2. Chamar reconciliação dentro de `loadAllData` (entre linhas 179 e 237)
+### 1. Tipo -- `src/types/marketing.ts`
 
-Após construir `salesData` (linha 179), antes de `setStats` (linha 237):
+Adicionar campo ao bloco `volume` de `SampleMetrics`:
+
+- `totalSampleUnits: number` -- unidades individuais de amostra distribuidas (soma de quantidades)
+
+### 2. Calculo -- `src/utils/samplesAnalyzer.ts`
+
+Na funcao `calculateSampleVolume` (linha ~169), adicionar calculo:
 
 ```text
-const reconciledSalesData = reconcileNFIdentity(salesData);
+// Usa getRevenueOrders para alinhar com paradigma economico
+const revenueOrders = orders.filter(isRevenueOrder);
+const totalSampleUnits = revenueOrders
+  .flatMap(o => o.produtos || [])
+  .filter(p => isSampleProduct(p))
+  .reduce((sum, p) => sum + Number(p.quantidade || 1), 0);
 ```
 
-Substituir `salesData` por `reconciledSalesData` em:
-- `setStats` (linha 237): `salesCount: reconciledSalesData.length`
-- `console.log` (linha 245): `vendas: reconciledSalesData.length`
-- `return` (linha 252): `salesData: reconciledSalesData`
+Retornar `totalSampleUnits` junto com os campos existentes no objeto de retorno.
 
-## Campos confirmados no código
+### 3. UI -- `src/pages/AnaliseSamples.tsx`
 
-- `fonteDados` (linha 174): `'nf' | 'ecommerce'` -- correto
-- `cpfCnpj` (linha 146): vem de `row.cliente_email` -- é o campo de identidade
-- `numeroPedidoPlataforma` (linha 176): chave de reconciliação
-- `numeroPedido` (linha 144): chave secundária
+Adicionar novo `StatusMetricCard` como primeiro item do grid de satelites (linha ~381):
 
-## O que NÃO muda
+- Titulo: **"Amostras Distribuidas"**
+- Valor: `metrics.volume.totalSampleUnits` formatado com `toLocaleString('pt-BR')`
+- Icone: `Package`
+- Status: neutral
+- Interpretacao: razao entre unidades e clientes qualificados (ex: "2.4 amostras/cliente")
+- Size: compact
 
-- Nenhuma deduplicação
-- Nenhuma alteração no banco
-- Campos fiscais intocados
-- Total de pedidos e receita permanecem idênticos
-- Nenhum outro arquivo é modificado
+Importar `Package` de `lucide-react` se ainda nao estiver importado.
 
-## Resultado esperado
+## O que NAO muda
 
-- Zero pedidos com `cpfCnpj = ""`
-- Clientes qualificados: ~613 para ~800+
-- Nov/2025: ~3 para ~38 clientes visíveis
-- Log no console com taxa de reconciliação para validação
+- Nenhuma alteracao no banco
+- Nenhuma alteracao na reconciliacao de identidade
+- Nenhuma alteracao nos demais KPIs
+- Logica de `isSampleProduct` permanece identica
+
