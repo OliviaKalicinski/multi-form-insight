@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, Target, Calendar, Percent, ArrowRight, Info, AlertTriangle, Dog, Cat } from "lucide-react";
+import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, ShoppingBag, Target, Calendar, Percent, ArrowRight, Info, AlertTriangle, Dog, Cat } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const AnaliseSamples = () => {
@@ -383,8 +383,18 @@ const AnaliseSamples = () => {
               value={metrics.volume.totalSampleUnits.toLocaleString('pt-BR')}
               icon={<Package className="h-3 w-3" />}
               status="neutral"
+              interpretation={metrics.volume.sampleOrders > 0
+                ? `${(metrics.volume.totalSampleUnits / metrics.volume.sampleOrders).toFixed(1)} unidades/pedido`
+                : 'Sem pedidos'}
+              size="compact"
+            />
+            <StatusMetricCard
+              title="Pedidos com Amostra"
+              value={metrics.volume.sampleOrders.toLocaleString('pt-BR')}
+              icon={<ShoppingBag className="h-3 w-3" />}
+              status="neutral"
               interpretation={metrics.volume.uniqueCustomers > 0
-                ? `${(metrics.volume.totalSampleUnits / metrics.volume.uniqueCustomers).toFixed(1)} amostras/cliente`
+                ? `${(metrics.volume.sampleOrders / metrics.volume.uniqueCustomers).toFixed(1)} pedidos/cliente`
                 : 'Sem clientes qualificados'}
               size="compact"
             />
