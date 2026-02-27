@@ -1,61 +1,81 @@
 
 
-# Nova Reclamacao Page
+# Reclamacao vinculada a Pedido -- Implementacao
 
-## Summary
-Create a standalone page at `/reclamacoes/nova` for registering complaints. Simple, functional, no overengineering. Three blocks: customer identification, complaint data, submit button.
+## Resumo
 
-## Files to Create
+Reestruturar a pagina "Nova Reclamacao" para o fluxo **Cliente -> Pedido -> Reclamacao**. Adicionar `order_id` no banco, substituir autocomplete por query dedicada, carregar pedidos do cliente selecionado, auto-preencher campos a partir do pedido, e validar campos obrigatorios.
 
-### 1. `src/pages/ReclamacaoNova.tsx`
-Full-page form with:
+## 1. Migration: adicionar `order_id` em `customer_complaint`
 
-**Block 1 - Customer Identification**
-- Toggle between "Cliente existente" and "Novo cliente"
-- Existing: search input that filters customers by name/cpf_cnpj, clickable list showing top 20 matches, selected customer confirmation
-- New: name + email fields, creates customer on submit with `cpf_cnpj = email` and `observacoes = 'Cliente criado via formulário de reclamação'`
+```sql
+ALTER TABLE customer_complaint
+ADD COLUMN order_id uuid REFERENCES sales_data(id) ON DELETE SET NULL;
 
-**Block 2 - Complaint Data**
-All fields from the schema, organized in a clean grid:
-- Canal (select: WhatsApp, E-mail, SAC, Instagram, Telefone, Reclame Aqui, Outro)
-- Gravidade (select: Baixa, Media, Alta, Critica)
-- Tipo de Reclamacao (select: Qualidade, Entrega, Atendimento, Produto Errado, Falta de Produto, Validade, Embalagem, Outro)
-- Data do Contato (date input, default: today)
-- Descricao (textarea, required)
-- Produto, Lote, NF do Produto, Local da Compra, Transportador, Natureza do Pedido, Atendente (text inputs)
-- Link da Reclamacao (URL input)
-- Acao/Orientacao (textarea)
+CREATE INDEX idx_complaint_order_id ON customer_complaint(order_id);
+```
 
-**Block 3 - Submit**
-- Single "Salvar Reclamacao" button
-- Loading state while saving
-- Toast success/error
-- Redirects to `/reclamacoes` on success
+Nullable para manter compatibilidade com reclamacoes historicas.
 
-**Mutation logic (inline, no separate hook needed for MVP)**
-- If "new customer" mode: INSERT into `customer` first, get `id`
-- INSERT into `customer_complaint` with all fields, `status = 'aberta'`
-- Invalidate `complaints` and `complaints-all` query keys
-- No edge function needed -- authenticated user passes RLS
+## 2. Reescrever `src/pages/ReclamacaoNova.tsx`
 
-## Files to Modify
+### Remocoes
+- Modo "novo cliente" (toggle, campos nome/email, `UserPlus` button)
+- Dependencia de `useCustomerData` -- substituida por query dedicada na tabela `customer`
 
-### 2. `src/App.tsx`
-- Import `ReclamacaoNova`
-- Add route: `/reclamacoes/nova` with same ProtectedRoute + AuthenticatedLayout wrapper
-- Place it BEFORE the `/reclamacoes` route to avoid route matching issues
+### Novo fluxo
 
-### 3. `src/pages/Reclamacoes.tsx`
-- Add a "Nova Reclamacao" button in the header (next to Export CSV)
-- `onClick={() => navigate('/reclamacoes/nova')}`
+**Etapa 1 -- Selecionar Cliente**
+- Query dedicada: `customer` table, select `id, nome, cpf_cnpj`, filtro `is_active = true`, `.limit(5000)`
+- Query key: `['customers-autocomplete']`, staleTime 10min
+- Busca client-side por nome + cpf_cnpj (case-insensitive), top 20 resultados
+- Ao trocar cliente: resetar pedido selecionado e todos campos auto-preenchidos
 
-## Technical Details
+**Etapa 2 -- Selecionar Pedido** (aparece apos selecionar cliente)
+- Query: `sales_data` filtrado por `cliente_email = customer.cpf_cnpj`
+- Seleciona: `id, numero_pedido, numero_nota, data_venda, forma_envio, natureza_operacao, status, produtos`
+- `.order('data_venda', { ascending: false }).limit(50)`
+- Tabela compacta com radio buttons: Numero Pedido, Data, NF, Forma Envio, Status
+- Badge "Exibindo ultimos 50 pedidos" quando houver 50 resultados
+- Loading state, mensagem vazia se nao ha pedidos
 
-- Uses existing `useCustomerData` hook for customer list
-- Uses `useMutation` from tanstack-react-query directly (no new hook file)
-- Customer search filters by `nome` and `cpf_cnpj` (case-insensitive), limited to 20 results
-- Date field sends ISO string with noon time to avoid timezone issues
-- Empty string fields sent as `null` to keep database clean
-- Validation: requires `descricao` + valid customer (selected or new with name+email)
-- No schema changes needed -- all fields already exist in `customer_complaint`
+**Etapa 3 -- Auto-preenchimento ao selecionar pedido**
+- `nf_produto` <- `numero_nota`
+- `transportador` <- `forma_envio`
+- `natureza_pedido` <- `natureza_operacao`
+- `produto` <- Se multiplos produtos no JSON, renderizar Select com `descricaoAjustada || descricao` de cada produto. Se unico, preencher direto. Campo editavel.
+- Todos campos auto-preenchidos permanecem editaveis
+
+**Campos manuais restantes:**
+Canal, Gravidade, Tipo de Reclamacao, Data do Contato, Descricao, Lote, Atendente, Link, Local da Compra, Acao/Orientacao
+
+**Validacao para submit (todos obrigatorios):**
+- `customer_id` + `order_id` + `descricao` + `tipo_reclamacao` + `gravidade` + `data_contato`
+
+**Mutation:** salva `order_id` junto com todos os campos. Invalida queries de complaints.
+
+## 3. Fix `src/hooks/useCustomerData.ts`
+
+Adicionar `.limit(5000)` na query de `customer_full` para corrigir o bug de 1000 rows que afeta outras paginas (Clientes, Segmentacao, Churn).
+
+```typescript
+.from('customer_full')
+.select('*')
+.limit(5000)
+```
+
+## Arquivos modificados
+
+1. **Migration SQL** -- `order_id` em `customer_complaint`
+2. **`src/pages/ReclamacaoNova.tsx`** -- reescrita completa do fluxo (cliente -> pedido -> reclamacao)
+3. **`src/hooks/useCustomerData.ts`** -- adicionar `.limit(5000)`
+
+## Detalhes tecnicos
+
+- Join: `customer.cpf_cnpj = sales_data.cliente_email` (confirmado que ambos armazenam CPF/CNPJ)
+- JSON `produtos` usa campos `descricaoAjustada` (prioritario) e `descricao` (fallback)
+- Lote permanece manual (nao existe no JSON dos pedidos)
+- `data_contato` default = hoje, obrigatorio
+- Pedidos cancelados/devolvidos sao exibidos (decisao operacional)
+- Ao trocar cliente, pedido selecionado e campos auto-preenchidos sao resetados para evitar vinculo cruzado
 
