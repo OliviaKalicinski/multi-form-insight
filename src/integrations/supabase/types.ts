@@ -196,6 +196,75 @@ export type Database = {
         }
         Relationships: []
       }
+      customer: {
+        Row: {
+          average_days_between_purchases: number | null
+          cpf_cnpj: string
+          created_at: string | null
+          first_order_date: string | null
+          id: string
+          last_contact_date: string | null
+          last_order_date: string | null
+          nome: string | null
+          observacoes: string | null
+          prioridade: string | null
+          recalculated_at: string | null
+          responsavel: string | null
+          segment: string | null
+          status_manual: string | null
+          tags: Json | null
+          ticket_medio: number | null
+          total_orders_all: number
+          total_orders_revenue: number
+          total_revenue: number
+          updated_at: string | null
+        }
+        Insert: {
+          average_days_between_purchases?: number | null
+          cpf_cnpj: string
+          created_at?: string | null
+          first_order_date?: string | null
+          id?: string
+          last_contact_date?: string | null
+          last_order_date?: string | null
+          nome?: string | null
+          observacoes?: string | null
+          prioridade?: string | null
+          recalculated_at?: string | null
+          responsavel?: string | null
+          segment?: string | null
+          status_manual?: string | null
+          tags?: Json | null
+          ticket_medio?: number | null
+          total_orders_all?: number
+          total_orders_revenue?: number
+          total_revenue?: number
+          updated_at?: string | null
+        }
+        Update: {
+          average_days_between_purchases?: number | null
+          cpf_cnpj?: string
+          created_at?: string | null
+          first_order_date?: string | null
+          id?: string
+          last_contact_date?: string | null
+          last_order_date?: string | null
+          nome?: string | null
+          observacoes?: string | null
+          prioridade?: string | null
+          recalculated_at?: string | null
+          responsavel?: string | null
+          segment?: string | null
+          status_manual?: string | null
+          tags?: Json | null
+          ticket_medio?: number | null
+          total_orders_all?: number
+          total_orders_revenue?: number
+          total_revenue?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       decision_events: {
         Row: {
           based_on_metric: string
@@ -570,7 +639,81 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      customer_full: {
+        Row: {
+          average_days_between_purchases: number | null
+          churn_status: string | null
+          cpf_cnpj: string | null
+          created_at: string | null
+          days_since_last_purchase: number | null
+          first_order_date: string | null
+          id: string | null
+          last_contact_date: string | null
+          last_order_date: string | null
+          nome: string | null
+          observacoes: string | null
+          prioridade: string | null
+          recalculated_at: string | null
+          responsavel: string | null
+          segment: string | null
+          status_manual: string | null
+          tags: Json | null
+          ticket_medio: number | null
+          total_orders_all: number | null
+          total_orders_revenue: number | null
+          total_revenue: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          average_days_between_purchases?: number | null
+          churn_status?: never
+          cpf_cnpj?: string | null
+          created_at?: string | null
+          days_since_last_purchase?: never
+          first_order_date?: string | null
+          id?: string | null
+          last_contact_date?: string | null
+          last_order_date?: string | null
+          nome?: string | null
+          observacoes?: string | null
+          prioridade?: string | null
+          recalculated_at?: string | null
+          responsavel?: string | null
+          segment?: string | null
+          status_manual?: string | null
+          tags?: Json | null
+          ticket_medio?: number | null
+          total_orders_all?: number | null
+          total_orders_revenue?: number | null
+          total_revenue?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          average_days_between_purchases?: number | null
+          churn_status?: never
+          cpf_cnpj?: string | null
+          created_at?: string | null
+          days_since_last_purchase?: never
+          first_order_date?: string | null
+          id?: string | null
+          last_contact_date?: string | null
+          last_order_date?: string | null
+          nome?: string | null
+          observacoes?: string | null
+          prioridade?: string | null
+          recalculated_at?: string | null
+          responsavel?: string | null
+          segment?: string | null
+          status_manual?: string | null
+          tags?: Json | null
+          ticket_medio?: number | null
+          total_orders_all?: number | null
+          total_orders_revenue?: number | null
+          total_revenue?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       expire_old_decisions: { Args: never; Returns: number }
@@ -592,6 +735,8 @@ export type Database = {
         }
         Returns: number
       }
+      recalculate_all_customers: { Args: never; Returns: number }
+      recalculate_customer: { Args: { p_cpf_cnpj: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "viewer"
