@@ -1,86 +1,40 @@
 
 
-# Importacao Unica de Reclamacoes SAC
+# Fix: Radar Operacional stuck on loading
 
-## Resumo
+## Root Cause
 
-Importar ~47 registros de reclamacao do CSV para `customer_complaint`. Criar ~30 clientes faltantes na tabela `customer`. Usar edge function temporaria para executar os inserts com seguranca (RLS exige autenticacao).
+In `src/hooks/useRadarOperacional.ts`, line 112-113:
 
-## Dados mapeados do CSV
-
-**47 linhas validas** (excluindo linhas vazias 42-45 e placeholders SAC_37 a SAC_49 sem dados).
-
-**17 clientes ja existem no banco** (match por nome):
-- Ana Teresa Miranda, Liza Tormena, Keury Costa, Claudia Groposo, Vivian De Sordi, Cintia Bezerra (nao encontrada -- verificar), Alice Taquita, Fatima Ismail, Caroline Iwamura, Lara Daroque, Anna Lwowski, Erika Pacheco, Bianca Barrocas, Patricia Queiroz, Tablis Costa, Thamires Carvalho, Marcelo de Souza Costa, Jessica de Freitas
-
-**~30 clientes precisam ser criados**, com:
-- `cpf_cnpj = email` (identificador temporario)
-- `nome = CONTATO` do CSV
-- `observacoes = 'Cliente criado via importacao SAC historica - fev/2026'`
-
-## Abordagem tecnica
-
-### Edge function `import-sac-data`
-
-Funcao temporaria que:
-
-1. Recebe POST com array de registros parseados do CSV
-2. Para cada registro:
-   - Tenta encontrar customer existente por nome (case-insensitive)
-   - Se nao encontrar, cria novo customer com email como cpf_cnpj
-   - Insere complaint vinculada ao customer_id correto
-3. Retorna contagem de customers criados + complaints inseridas
-
-### Mapeamento de campos
-
-| CSV | customer_complaint |
-|-----|-------------------|
-| N DO ATENDIMENTO | atendimento_numero |
-| DATA DO CONTATO | data_contato (DD/MM/YYYY -> ISO) |
-| CANAL DE COMUNICACAO | canal |
-| ATENDENTE | atendente |
-| PRODUTO RECLAMADO | produto |
-| LOTE | lote |
-| DATA DE FABRICACAO | data_fabricacao (DD/MM/YYYY -> ISO date) |
-| LOCAL DA COMPRA | local_compra |
-| TRANSPORTADOR | transportador |
-| NF DO PRODUTO | nf_produto |
-| NATUREZA DE PEDIDO | natureza_pedido |
-| TIPO DE RECLAMACAO | tipo_reclamacao |
-| DESCRICAO DA RECLAMACAO | descricao |
-| LINK DA RECLAMACAO | link_reclamacao |
-| ACAO/ORIENTACAO | acao_orientacao |
-| STATUS DO ATENDIMENTO | status (Concluido->fechada, Em andamento->aberta, Aguardando...->aberta, vazio->aberta) |
-
-### Tratamento de dados
-
-- **Data invalida** (ex: "26/20/2025" linha SAC_06): tratar como NULL
-- **Linhas sem descricao**: usar tipo_reclamacao ou "Sem descricao registrada"
-- **Status "Concluido"**: mapear para "fechada" + preencher data_fechamento = data_contato
-- **Linhas vazias** (42-45) e placeholders (SAC_37 a SAC_49): ignorar
-
-### Sequencia
-
-1. Criar edge function `import-sac-data` com os dados hardcoded no corpo da funcao (evita parsing CSV no edge)
-2. Deploy e executar via curl
-3. Validar com SELECT count
-4. Deletar edge function apos confirmacao
-
-### Validacao pos-import
-
-```sql
-SELECT count(*) FROM customer_complaint; -- espera ~47
-SELECT count(*) FROM customer WHERE observacoes ILIKE '%importacao SAC%'; -- espera ~30
+```typescript
+const now = new Date();
+const date180dAgo = daysAgo(HISTORICAL_WINDOW_DAYS, now).toISOString();
 ```
 
-## Arquivos
+Every render creates a new `Date` with different milliseconds. Since `date180dAgo` is used in the query key (`['radar-sales', date180dAgo]`), React Query treats it as a brand new query every render. This prevents any query from completing, causing infinite loading.
 
-1. **Criar**: `supabase/functions/import-sac-data/index.ts` -- edge function com dados hardcoded e logica de upsert
-2. **Deletar apos uso**: mesma edge function (temporaria)
+## Fix
 
-## Riscos controlados
+1. **Stabilize `now` with `useMemo`** -- recalculate only once per day (or per mount):
 
-- Usar `ON CONFLICT` no customer para evitar duplicatas se executar 2x
-- Cada complaint tem `atendimento_numero` unico -- verificar antes de inserir
-- Edge function usa service role key para bypass de RLS (importacao administrativa)
+```typescript
+const now = useMemo(() => new Date(), []);
+const date180dAgo = useMemo(
+  () => daysAgo(HISTORICAL_WINDOW_DAYS, now).toISOString().split('T')[0],
+  [now]
+);
+```
 
+Using `.split('T')[0]` gives a stable date-only string (`2025-08-31`) for the query key, and `useMemo(() => new Date(), [])` ensures `now` is stable across renders.
+
+2. **Also stabilize the `useMemo` dependency** on line 598:
+
+Change `now.toDateString()` to just use the memoized `now` directly since it's already stable.
+
+## Files Changed
+
+- `src/hooks/useRadarOperacional.ts` -- stabilize `now` and `date180dAgo` with `useMemo`
+
+## Secondary Concern: 1000 Row Limit
+
+The `sales_data` query for the last 180 days might hit the 1000 row limit (4105 total rows in the table). Will add `.limit(5000)` or use pagination if needed after fixing the primary loading bug.
