@@ -191,11 +191,19 @@ export const calculateSampleVolume = (
     ? (uniqueCustomers / allCustomers) * 100 
     : 0;
   
+  // Total de unidades de amostra distribuídas (alinhado com paradigma econômico)
+  const revenueOrders = orders.filter(isRevenueOrder);
+  const totalSampleUnits = revenueOrders
+    .flatMap(o => o.produtos || [])
+    .filter(p => isSampleProduct(p))
+    .reduce((sum, p) => sum + Number(p.quantidade || 1), 0);
+
   return {
     totalSamples: totalSampleOrders, // Número de CLIENTES qualificados
     uniqueCustomers,                  // Mesmo valor
     totalCustomersWithSamples,        // Total de clientes com amostras
     percentageOfTotal,                // % sobre total de clientes
+    totalSampleUnits,                 // Unidades individuais distribuídas
   };
 };
 

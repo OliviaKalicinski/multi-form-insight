@@ -492,6 +492,7 @@ export interface SampleMetrics {
     uniqueCustomers: number;
     totalCustomersWithSamples: number; // Total de clientes que compraram amostras (qualquer momento)
     percentageOfTotal: number;
+    totalSampleUnits: number; // Unidades individuais de amostra distribuídas (soma de quantidades)
   };
   repurchase: {
     repurchaseRate: number;

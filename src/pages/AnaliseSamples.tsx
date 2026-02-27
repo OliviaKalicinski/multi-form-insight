@@ -379,6 +379,16 @@ const AnaliseSamples = () => {
           {/* Grid de 6 Satélites (60% = 3 colunas, 2 linhas) */}
           <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-2">
             <StatusMetricCard
+              title="Amostras Distribuídas"
+              value={metrics.volume.totalSampleUnits.toLocaleString('pt-BR')}
+              icon={<Package className="h-3 w-3" />}
+              status="neutral"
+              interpretation={metrics.volume.uniqueCustomers > 0
+                ? `${(metrics.volume.totalSampleUnits / metrics.volume.uniqueCustomers).toFixed(1)} amostras/cliente`
+                : 'Sem clientes qualificados'}
+              size="compact"
+            />
+            <StatusMetricCard
               title="Clientes Qualificados"
               value={metrics.volume.uniqueCustomers.toLocaleString('pt-BR')}
               icon={<Users className="h-3 w-3" />}
