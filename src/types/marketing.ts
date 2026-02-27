@@ -449,8 +449,30 @@ export interface CustomerSegment {
   count: number;
   percentage: number;
   totalRevenue: number;
-  averageTicket: number;
+  totalOrders: number;
+  ticketMedio: number;    // totalRevenue / totalOrders (receita por pedido)
+  arpu: number;           // totalRevenue / count (receita por cliente)
   criteria: string;
+}
+
+export interface CustomerSnapshot {
+  cpfCnpj: string;
+  nome: string;
+  totalOrdersRevenue: number;
+  totalOrdersAll: number;
+  totalRevenue: number;
+  firstOrderDate: Date;
+  lastOrderDate: Date;
+  averageDaysBetweenPurchases: number | null;
+  segment: 'Primeira Compra' | 'Recorrente' | 'Fiel' | 'VIP';
+  ticketMedio: number;
+  // Calculados dinamicamente (da view, não persistidos)
+  daysSinceLastPurchase?: number;
+  churnStatus?: 'active' | 'at_risk' | 'inactive' | 'churned';
+  // CRM (operacionais)
+  tags?: string[];
+  observacoes?: string;
+  responsavel?: string;
 }
 
 export interface ChurnRiskCustomer {
