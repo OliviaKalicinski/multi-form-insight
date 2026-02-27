@@ -156,7 +156,7 @@ const AnaliseSamples = () => {
         : 0,
       totalRevenue: 0,
       averageTicket: 0,
-      criteria: '2 compras',
+      criteria: '1-2 recompras regulares',
     },
     {
       segment: 'VIP' as const,
