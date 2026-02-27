@@ -109,8 +109,11 @@ const AXIS_RECOMMENDATIONS: Record<AxisType, (item: string) => string> = {
 
 // ── Hook ──
 export function useRadarOperacional() {
-  const now = new Date();
-  const date180dAgo = daysAgo(HISTORICAL_WINDOW_DAYS, now).toISOString();
+  const now = useMemo(() => new Date(), []);
+  const date180dAgo = useMemo(
+    () => daysAgo(HISTORICAL_WINDOW_DAYS, now).toISOString().split('T')[0],
+    [now]
+  );
 
   // Query 1: complaints (all — they're relatively few)
   const { data: complaints, isLoading: loadingComplaints } = useQuery({
@@ -595,7 +598,7 @@ export function useRadarOperacional() {
         minOrdersForFriction: MIN_ORDERS_FOR_FRICTION,
       },
     };
-  }, [complaints, contactLogs, salesData, customers, now.toDateString()]);
+  }, [complaints, contactLogs, salesData, customers, now]);
 
   return {
     kpis: result?.kpis ?? [],
