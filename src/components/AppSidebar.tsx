@@ -28,6 +28,7 @@ import {
   Megaphone,
   Brain,
   AlertTriangle,
+  Activity,
   Upload,
   ChevronDown,
   Settings,
@@ -110,6 +111,7 @@ const navSections: NavSection[] = [
     title: "CRM",
     icon: Headset,
     items: [
+      { title: "Radar Operacional", url: "/radar-operacional", icon: Activity },
       { title: "Clientes", url: "/clientes", icon: Users },
       { title: "Reclamações", url: "/reclamacoes", icon: MessageSquareWarning },
     ],

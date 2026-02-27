@@ -30,6 +30,7 @@ import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
 import Clientes from "./pages/Clientes";
 import ClientePerfil from "./pages/ClientePerfil";
 import Reclamacoes from "./pages/Reclamacoes";
+import RadarOperacional from "./pages/RadarOperacional";
 import NotFound from "./pages/NotFound";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -257,6 +258,14 @@ const App = () => (
             <ProtectedRoute>
               <AuthenticatedLayout>
                 <Reclamacoes />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/radar-operacional" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <RadarOperacional />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />
