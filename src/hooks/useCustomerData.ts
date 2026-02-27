@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { CustomerSegment, ChurnRiskCustomer } from "@/types/marketing";
 
 interface CustomerRow {
+  id: string | null;
   cpf_cnpj: string | null;
   nome: string | null;
   segment: string | null;
@@ -16,6 +17,8 @@ interface CustomerRow {
   average_days_between_purchases: number | null;
   days_since_last_purchase: number | null;
   churn_status: string | null;
+  responsavel: string | null;
+  prioridade: string | null;
 }
 
 export interface ChurnMetrics {

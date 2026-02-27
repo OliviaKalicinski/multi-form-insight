@@ -34,6 +34,8 @@ import {
   LogOut,
   Shield,
   Truck,
+  Headset,
+  MessageSquareWarning,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
@@ -102,6 +104,14 @@ const navSections: NavSection[] = [
     icon: Brain,
     items: [
       { title: "Análise Crítica", url: "/analise-critica", icon: AlertTriangle },
+    ],
+  },
+  {
+    title: "CRM",
+    icon: Headset,
+    items: [
+      { title: "Clientes", url: "/clientes", icon: Users },
+      { title: "Reclamações", url: "/reclamacoes", icon: MessageSquareWarning },
     ],
   },
 ];
