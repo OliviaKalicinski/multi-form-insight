@@ -1,22 +1,28 @@
-import { useMemo } from "react";
-import { useDashboard } from "@/contexts/DashboardContext";
 import { PieChart } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
 import { SegmentRevenueChart } from "@/components/dashboard/SegmentRevenueChart";
 import { SegmentDetailTable } from "@/components/dashboard/SegmentDetailTable";
-import { calculateCustomerBehaviorMetrics } from "@/utils/customerBehaviorMetrics";
+import { useCustomerData } from "@/hooks/useCustomerData";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SegmentacaoClientes() {
-  const { salesData } = useDashboard();
+  const { segments, isLoading } = useCustomerData();
 
-  // ALWAYS use all data for segmentation - ignore month filter
-  const behaviorMetrics = useMemo(() => {
-    if (salesData.length === 0) return null;
-    return calculateCustomerBehaviorMetrics(salesData);
-  }, [salesData]);
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-6 py-8 space-y-8">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-80" />
+          <Skeleton className="h-80" />
+        </div>
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
 
-  if (salesData.length === 0) {
+  if (segments.length === 0) {
     return (
       <div className="container mx-auto px-6 py-8">
         <Card>
@@ -51,7 +57,7 @@ export default function SegmentacaoClientes() {
       <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
         <CardContent className="py-3">
           <p className="text-sm text-blue-800 dark:text-blue-200">
-            💡 <strong>Período:</strong> Exibindo dados de <strong>todo o histórico</strong>.
+            💡 <strong>Período:</strong> Exibindo dados de <strong>todo o histórico</strong> (fonte: banco de dados).
           </p>
         </CardContent>
       </Card>
@@ -66,9 +72,7 @@ export default function SegmentacaoClientes() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <CustomerSegmentationChart
-              segments={behaviorMetrics?.customerSegmentation || []}
-            />
+            <CustomerSegmentationChart segments={segments} />
           </CardContent>
         </Card>
 
@@ -80,9 +84,7 @@ export default function SegmentacaoClientes() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SegmentRevenueChart
-              segments={behaviorMetrics?.customerSegmentation || []}
-            />
+            <SegmentRevenueChart segments={segments} />
           </CardContent>
         </Card>
       </div>
@@ -96,9 +98,7 @@ export default function SegmentacaoClientes() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SegmentDetailTable
-            segments={behaviorMetrics?.customerSegmentation || []}
-          />
+          <SegmentDetailTable segments={segments} />
         </CardContent>
       </Card>
     </div>

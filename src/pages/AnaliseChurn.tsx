@@ -1,47 +1,40 @@
-import { useMemo } from "react";
-import { useDashboard } from "@/contexts/DashboardContext";
-import { calculateCustomerBehaviorMetrics } from "@/utils/customerBehaviorMetrics";
+import { useCustomerData } from "@/hooks/useCustomerData";
 import { EmptyState } from "@/components/EmptyState";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChurnFunnelChart } from "@/components/dashboard/ChurnFunnelChart";
 import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, Users, UserMinus, DollarSign, FileWarning, TrendingDown } from "lucide-react";
 
 export default function AnaliseChurn() {
-  const { salesData } = useDashboard();
+  const { churnMetrics, churnRiskCustomers, isLoading } = useCustomerData();
 
-  // ALWAYS use all data for churn analysis - ignore month filter
-  const behaviorMetrics = useMemo(() => {
-    if (salesData.length === 0) return null;
-    return calculateCustomerBehaviorMetrics(salesData);
-  }, [salesData]);
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+        </div>
+        <Skeleton className="h-80" />
+      </div>
+    );
+  }
 
-  if (salesData.length === 0) {
+  if (churnMetrics.totalClientes === 0) {
     return (
       <div className="p-6 space-y-6">
         <EmptyState
           icon={<FileWarning className="h-8 w-8 text-muted-foreground" />}
-          title="Sem dados de vendas"
+          title="Sem dados de clientes"
           description="Faça upload de dados de vendas para visualizar a análise de churn."
         />
       </div>
     );
   }
 
-  if (!behaviorMetrics) {
-    return (
-      <div className="p-6 space-y-6">
-        <EmptyState
-          icon={<AlertTriangle className="h-8 w-8 text-muted-foreground" />}
-          title="Dados insuficientes"
-          description="Não há dados suficientes para o período selecionado."
-        />
-      </div>
-    );
-  }
-
-  const { totalClientes, clientesAtivos, clientesEmRisco, clientesInativos, clientesChurn, taxaChurn, churnRiskCustomers } = behaviorMetrics;
+  const { totalClientes, clientesAtivos, clientesEmRisco, clientesInativos, clientesChurn, taxaChurn } = churnMetrics;
   const valorEmRisco = churnRiskCustomers.reduce((sum, c) => sum + c.valorTotal, 0);
 
   return (
@@ -63,7 +56,7 @@ export default function AnaliseChurn() {
         {/* Period indicator */}
         <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
           <p className="text-sm text-blue-800 dark:text-blue-200">
-            📅 <strong>Período:</strong> Todo o histórico
+            📅 <strong>Período:</strong> Todo o histórico (fonte: banco de dados)
           </p>
         </div>
       </div>
@@ -102,7 +95,7 @@ export default function AnaliseChurn() {
                 {clientesAtivos.toLocaleString('pt-BR')}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {((clientesAtivos / totalClientes) * 100).toFixed(1)}% da base
+                {totalClientes > 0 ? ((clientesAtivos / totalClientes) * 100).toFixed(1) : 0}% da base
               </p>
             </CardContent>
           </Card>
@@ -121,7 +114,7 @@ export default function AnaliseChurn() {
                 {clientesEmRisco.toLocaleString('pt-BR')}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {((clientesEmRisco / totalClientes) * 100).toFixed(1)}% da base
+                {totalClientes > 0 ? ((clientesEmRisco / totalClientes) * 100).toFixed(1) : 0}% da base
               </p>
             </CardContent>
           </Card>
@@ -140,7 +133,7 @@ export default function AnaliseChurn() {
                 {clientesInativos.toLocaleString('pt-BR')}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {((clientesInativos / totalClientes) * 100).toFixed(1)}% da base
+                {totalClientes > 0 ? ((clientesInativos / totalClientes) * 100).toFixed(1) : 0}% da base
               </p>
             </CardContent>
           </Card>
@@ -203,7 +196,7 @@ export default function AnaliseChurn() {
             <ChurnRiskTable customers={churnRiskCustomers} />
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              Nenhum cliente em risco identificado no período selecionado.
+              Nenhum cliente em risco identificado.
             </div>
           )}
         </CardContent>

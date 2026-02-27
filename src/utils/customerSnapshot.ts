@@ -8,12 +8,19 @@ import { differenceInDays } from "date-fns";
  * NÃO calcula churn — responsabilidade da view SQL customer_full.
  */
 export const buildCustomerSnapshot = (orders: ProcessedOrder[]): CustomerSnapshot[] => {
+  // Guard: filtrar identidades fracas antes de qualquer agrupamento
+  const validOrders = orders.filter(o =>
+    o.cpfCnpj &&
+    !o.cpfCnpj.startsWith('nf-') &&
+    o.cpfCnpj.trim().length > 3
+  );
+
   // Separar pedidos de venda dos demais
-  const revenueOrders = orders.filter(isRevenueOrder);
+  const revenueOrders = validOrders.filter(isRevenueOrder);
 
   // Agrupar TODOS os pedidos por cpfCnpj para totalOrdersAll
   const allOrdersMap = new Map<string, number>();
-  orders.forEach(order => {
+  validOrders.forEach(order => {
     allOrdersMap.set(order.cpfCnpj, (allOrdersMap.get(order.cpfCnpj) || 0) + 1);
   });
 
@@ -51,7 +58,7 @@ export const buildCustomerSnapshot = (orders: ProcessedOrder[]): CustomerSnapsho
   });
 
   // Incluir clientes que NÃO têm pedidos de venda (só brinde/bonificação etc.)
-  orders.forEach(order => {
+  validOrders.forEach(order => {
     if (!clientesMap.has(order.cpfCnpj)) {
       clientesMap.set(order.cpfCnpj, {
         nome: order.nomeCliente,
