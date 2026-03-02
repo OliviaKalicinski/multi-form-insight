@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useComplaints } from "@/hooks/useComplaints";
 import { useCustomerData } from "@/hooks/useCustomerData";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, Search, ExternalLink, Plus } from "lucide-react";
+import { Download, Search, ExternalLink, Plus, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -33,6 +33,12 @@ const gravidadeLabels: Record<string, string> = {
   baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica',
 };
 
+const gravidadeOrder: Record<string, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
+const statusOrder: Record<string, number> = { aberta: 0, em_andamento: 1, resolvida: 2, fechada: 3 };
+
+type SortColumn = 'data' | 'cliente' | 'tipo' | 'gravidade' | 'status' | 'atendente';
+type SortDirection = 'asc' | 'desc';
+
 export default function Reclamacoes() {
   const navigate = useNavigate();
   const { complaints, isLoading, updateComplaintStatus } = useComplaints();
@@ -41,6 +47,8 @@ export default function Reclamacoes() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [gravidadeFilter, setGravidadeFilter] = useState("all");
+  const [sortColumn, setSortColumn] = useState<SortColumn>('data');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const customerMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -48,15 +56,30 @@ export default function Reclamacoes() {
     return map;
   }, [customers]);
 
-  // Build cpfCnpj lookup for navigation
   const customerCpfMap = useMemo(() => {
     const map = new Map<string, string>();
     customers.forEach(c => { if (c.id && c.cpf_cnpj) map.set(c.id, c.cpf_cnpj); });
     return map;
   }, [customers]);
 
+  const handleSort = useCallback((col: SortColumn) => {
+    if (sortColumn === col) {
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(col);
+      setSortDirection(col === 'data' ? 'desc' : 'asc');
+    }
+  }, [sortColumn]);
+
+  const SortIcon = ({ col }: { col: SortColumn }) => {
+    if (sortColumn !== col) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDirection === 'asc'
+      ? <ArrowUp className="h-3 w-3 ml-1" />
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
   const filtered = useMemo(() => {
-    let list = complaints;
+    let list = [...complaints];
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(c => {
@@ -66,8 +89,43 @@ export default function Reclamacoes() {
     }
     if (statusFilter !== 'all') list = list.filter(c => c.status === statusFilter);
     if (gravidadeFilter !== 'all') list = list.filter(c => c.gravidade === gravidadeFilter);
+
+    const dir = sortDirection === 'asc' ? 1 : -1;
+
+    list.sort((a, b) => {
+      // Nulls always last for date column
+      if (sortColumn === 'data') {
+        if (!a.data_contato && !b.data_contato) return 0;
+        if (!a.data_contato) return 1;
+        if (!b.data_contato) return -1;
+        return dir * (new Date(a.data_contato).getTime() - new Date(b.data_contato).getTime());
+      }
+      if (sortColumn === 'cliente') {
+        const na = (customerMap.get(a.customer_id) ?? '').toLowerCase();
+        const nb = (customerMap.get(b.customer_id) ?? '').toLowerCase();
+        return dir * na.localeCompare(nb);
+      }
+      if (sortColumn === 'tipo') {
+        return dir * (a.tipo_reclamacao ?? '').localeCompare(b.tipo_reclamacao ?? '');
+      }
+      if (sortColumn === 'gravidade') {
+        const ga = gravidadeOrder[a.gravidade ?? ''] ?? 99;
+        const gb = gravidadeOrder[b.gravidade ?? ''] ?? 99;
+        return dir * (ga - gb);
+      }
+      if (sortColumn === 'status') {
+        const sa = statusOrder[a.status] ?? 99;
+        const sb = statusOrder[b.status] ?? 99;
+        return dir * (sa - sb);
+      }
+      if (sortColumn === 'atendente') {
+        return dir * (a.atendente ?? '').localeCompare(b.atendente ?? '');
+      }
+      return 0;
+    });
+
     return list;
-  }, [complaints, search, statusFilter, gravidadeFilter, customerMap]);
+  }, [complaints, search, statusFilter, gravidadeFilter, customerMap, sortColumn, sortDirection]);
 
   const exportCSV = () => {
     const headers = ['Data', 'Cliente', 'Tipo', 'Gravidade', 'Status', 'Atendente', 'Descrição'];
@@ -156,12 +214,24 @@ export default function Reclamacoes() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Gravidade</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Atendente</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('data')}>
+                  <span className="flex items-center">Data <SortIcon col="data" /></span>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('cliente')}>
+                  <span className="flex items-center">Cliente <SortIcon col="cliente" /></span>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('tipo')}>
+                  <span className="flex items-center">Tipo <SortIcon col="tipo" /></span>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('gravidade')}>
+                  <span className="flex items-center">Gravidade <SortIcon col="gravidade" /></span>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('status')}>
+                  <span className="flex items-center">Status <SortIcon col="status" /></span>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => handleSort('atendente')}>
+                  <span className="flex items-center">Atendente <SortIcon col="atendente" /></span>
+                </TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -208,3 +278,4 @@ export default function Reclamacoes() {
     </div>
   );
 }
+

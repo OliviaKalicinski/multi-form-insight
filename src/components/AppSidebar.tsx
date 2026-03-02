@@ -62,7 +62,7 @@ const navSections: NavSection[] = [
     title: "Dashboard",
     icon: LayoutDashboard,
     items: [
-      { title: "Visão Executiva V2", url: "/visao-executiva-v2", icon: LayoutDashboard },
+      { title: "Fotografia Operacional", url: "/visao-executiva-v2", icon: LayoutDashboard },
       { title: "Visão Executiva", url: "/dashboard", icon: LayoutDashboard },
     ],
   },
