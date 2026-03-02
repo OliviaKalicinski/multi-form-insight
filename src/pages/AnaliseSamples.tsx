@@ -224,22 +224,6 @@ const AnaliseSamples = () => {
             Período curto: {dataPeriod.totalMonths} {dataPeriod.totalMonths === 1 ? 'mês' : 'meses'}
           </Badge>
         )}
-        {metrics.maturity && (
-          <Badge 
-            variant="outline" 
-            className={cn(
-              metrics.maturity.isReliableAnalysis 
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                : "bg-amber-50 text-amber-700 border-amber-200"
-            )}
-          >
-            {metrics.maturity.isReliableAnalysis ? (
-              <><Target className="h-3 w-3 mr-1" /> Análise confiável</>
-            ) : (
-              <><Clock className="h-3 w-3 mr-1" /> {metrics.maturity.percentageWith60Days.toFixed(0)}% com 60+ dias</>
-            )}
-          </Badge>
-        )}
       </div>
 
       {/* LINHA 1: Card Principal (40%) + Satélites (60%) */}
@@ -304,7 +288,7 @@ const AnaliseSamples = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Percent className="h-5 w-5 text-primary" />
-                    <span className="text-sm font-medium text-muted-foreground">Taxa de Conversão (amostra → regular)</span>
+                    <span className="text-sm font-medium text-muted-foreground">Taxa de Conversão (amostra → regular) — base total</span>
                   </div>
                   <Badge 
                     variant="outline"
@@ -447,12 +431,11 @@ const AnaliseSamples = () => {
               tooltipKey="ltv_medio_samples"
             />
             <StatusMetricCard
-              title="% Conversão 60d"
-              value={`${metrics.conversionByTime.days60.toFixed(1)}%`}
-              icon={<Target className="h-3 w-3" />}
-              status={metrics.repurchase.conversionToRegularProduct >= 50 ? 'success' : 'warning'}
+              title="Receita Recompras"
+              value={formatCurrency(metrics.quality.avgLTV * metrics.repurchase.customersWhoRepurchased)}
+              icon={<DollarSign className="h-3 w-3" />}
+              status="neutral"
               size="compact"
-              tooltipKey="conversao_60d"
             />
           </div>
         </div>
@@ -570,7 +553,7 @@ const AnaliseSamples = () => {
       <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Calendar className="h-4 w-4" />
-          Taxa por Período
+          Conversão dentro de X dias (informacional)
         </div>
         <div className="flex items-center gap-4">
           <div className="text-center">
