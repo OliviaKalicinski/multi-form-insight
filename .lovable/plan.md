@@ -1,94 +1,96 @@
 
 
-# Batch Resiliente -- syncIdentifiers
+# Deduplicacao NF + E-commerce: Trigger Fix + Purge + Defesa
 
-## Problema confirmado
+## Contexto confirmado por query
 
-Linhas 213-216: lookup unico `.in('cpf_cnpj', allCpfs)` com ~2500+ CPFs. Linhas 218-221 e 255-257: `return` silencioso em caso de erro. Resultado: email/telefone nunca chega a `customer_identifier`.
+- `sales_data`: 3185 NF + 931 ecommerce
+- **919 pares duplicados** (98.7% dos ecommerce tem NF correspondente)
+- Bug no trigger: `enforce_nf_precedence` compara `numero_pedido = NEW.numero_pedido` (numero interno da NF), mas deveria usar `NEW.numero_pedido_plataforma` (link para ecommerce)
+- Indices existentes: `idx_sales_pedido_plataforma` (partial) e `uq_sales_pedido_fonte_ecommerce` -- suficientes para as operacoes
 
-## Arquivo modificado
+## Sequencia de execucao
 
-`src/hooks/useDataPersistence.ts` -- funcao `syncIdentifiers` (linhas 186-266)
+### Migracao 1: Snapshot + Purge dos 919 duplicados
 
-## Mudancas
-
-### 1. Helper `normalizeCpf`
-
-```text
-const normalizeCpf = (cpf: string) => cpf.replace(/\D/g, '').trim();
-```
-
-Usado em dois pontos:
-- Na deduplicacao local (emailMap/phoneMap usam CPF normalizado como chave)
-- No matching com resultados do banco (normalizar `c.cpf_cnpj` do resultado antes de inserir no Map)
-
-Isso resolve o risco de formato divergente entre planilha e banco.
-
-### 2. Filtrar CPFs sinteticos
-
-Antes do loop de deduplicacao, pular CPFs que comecem com `nf-`. Contar quantos foram filtrados.
-
-### 3. Batch lookup em lotes de 200
-
-Substituir linhas 213-224 por loop:
+Arquivar os 919 registros ecommerce em `sales_data_log` (com motivo `dedup_nf_precedence`) e depois deletar de `sales_data`.
 
 ```text
-const LOOKUP_BATCH = 200;
-for cada chunk de allCpfs (200 por vez):
-  query .in('cpf_cnpj', chunk)
-  se erro: logar "[NF-IDENTIFIERS] Erro batch lookup N", incrementar lookupErrors, continuar
-  se ok: para cada resultado, cpfToId.set(normalizeCpf(c.cpf_cnpj), c.id)
+-- 1. Snapshot para audit
+INSERT INTO sales_data_log (id_original, numero_nota, serie, numero_pedido, payload_completo, motivo)
+SELECT ec.id, ec.numero_nota, ec.serie, ec.numero_pedido, to_jsonb(ec), 'dedup_nf_precedence'
+FROM sales_data ec
+JOIN sales_data nf ON nf.fonte_dados = 'nf'
+  AND nf.numero_pedido_plataforma IS NOT NULL
+  AND ec.fonte_dados = 'ecommerce'
+  AND ec.numero_pedido = nf.numero_pedido_plataforma
+  AND ec.cliente_email = nf.cliente_email;
+
+-- 2. Delete
+DELETE FROM sales_data ec
+USING sales_data nf
+WHERE nf.fonte_dados = 'nf'
+  AND nf.numero_pedido_plataforma IS NOT NULL
+  AND ec.fonte_dados = 'ecommerce'
+  AND ec.numero_pedido = nf.numero_pedido_plataforma
+  AND ec.cliente_email = nf.cliente_email;
 ```
 
-O `.in()` continua usando o CPF original (como esta no banco), mas o Map usa CPF normalizado como chave para matching robusto. Para isso, cada chunk contem os CPFs originais (mascarados) correspondentes aos normalizados, obtidos via um Map reverso `normalizedToOriginal`.
+### Migracao 2: Corrigir trigger `enforce_nf_precedence`
 
-### 4. Batch upsert em lotes de 500
-
-Substituir linhas 251-258 por loop:
+Reescrever a funcao para usar o campo correto (`numero_pedido_plataforma`):
 
 ```text
-const UPSERT_BATCH = 500;
-for cada chunk de identifiers (500 por vez):
-  upsert com onConflict: 'type,value', ignoreDuplicates: true
-  se erro: logar "[NF-IDENTIFIERS] Erro batch upsert N", incrementar upsertErrors, continuar
-  se ok: incrementar upsertedCount
+-- Quando NF chega com numero_pedido_plataforma:
+--   deletar ecommerce cujo numero_pedido == NEW.numero_pedido_plataforma
+-- Quando ecommerce chega:
+--   bloquear se ja existe NF com numero_pedido_plataforma == NEW.numero_pedido
 ```
 
-### 5. Telemetria consolidada com tempo
+Isso garante que novos uploads NF auto-eliminam ecommerce duplicado.
 
-Substituir linhas 260-262 por relatorio completo:
+### Migracao 3: CTE defensiva em `recalculate_customer`
+
+Adicionar CTE que exclui ecommerce quando NF correspondente existe (via `EXISTS`). Isso protege contra duplicatas residuais (NFs sem `numero_pedido_plataforma` ou dados importados fora de ordem).
+
+A CTE `deduplicated` substitui todas as referencias diretas a `sales_data` dentro da funcao (COUNT, SUM, MIN, MAX, ARRAY_AGG).
+
+### Migracao 4: Adicionar indice composto para performance do trigger
 
 ```text
-const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
-console.log(`[NF-IDENTIFIERS] Relatorio:
-  - CPFs totais: ${allCpfs.length}
-  - CPFs sinteticos ignorados: ${syntheticCount}
-  - Batches lookup: ${lookupBatches} (${lookupErrors} erros)
-  - CPFs encontrados: ${cpfToId.size}
-  - CPFs nao encontrados: ${notFound}
-  - Emails candidatos: ${emailCount}
-  - Telefones candidatos: ${phoneCount}
-  - Batches upsert: ${upsertBatches} (${upsertErrors} erros)
-  - Identificadores sincronizados: ${upsertedCount}
-  - Tempo total: ${elapsed}s`);
+CREATE INDEX IF NOT EXISTS idx_sales_fonte_pedido_email
+ON sales_data (fonte_dados, numero_pedido, cliente_email);
 ```
 
-### 6. Nunca abortar
+Garante que o DELETE dentro do trigger seja eficiente em volumes maiores.
 
-Remover todos os `return` em caso de erro (linhas 220, 257). Substituir por acumulacao de contadores de erro. Manter o `return` da linha 209 (nenhum dado = noop legitimo).
+### Codigo: Deduplicar orders no perfil do cliente
+
+**`src/hooks/useCustomerProfile.ts`**:
+- Adicionar `fonte_dados` e `numero_pedido_plataforma` ao select
+- Funcao `deduplicateOrders`: dado o array de orders, remove ecommerce cujo `numero_pedido` esta no Set de `numero_pedido_plataforma` das NFs. Para NFs mantidas, herda `canal` do ecommerce correspondente (fallback: canal da propria NF)
+- Retornar orders deduplicados
+
+**`src/pages/ClientePerfil.tsx`**:
+- Coluna "Fonte" na tabela com badge (NF / Ecommerce)
+- Tab "Pedidos" usa contagem deduplicada
+
+### Pos-migracao: Recalcular todos os clientes
+
+Executar `recalculate_all_customers()` para corrigir metricas persistidas (receita, ticket medio, contagem, segmento).
 
 ## O que NAO muda
 
-- Assinatura da funcao permanece `async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void>`
-- Chamada em `saveSalesData` nao muda
-- Schema do banco nao muda
-- Nenhum outro arquivo modificado
-- Logica de `onConflict: 'type,value'` permanece (politica existente mantida)
+- Nenhum dado NF e deletado
+- Pipeline de ingestao NF e ecommerce continuam independentes
+- `syncIdentifiers` batch resiliente nao e afetado
+- Schema de tabelas nao muda (apenas funcoes, trigger e indice)
 
 ## Resultado esperado
 
-Apos reimportar planilha NF:
-- Logs `[NF-IDENTIFIERS]` com contagens coerentes e tempo de execucao
-- `customer_identifier` com novos registros de email e phone
-- Perfil do cliente exibe email e telefone no `CustomerProfileHeader`
+- Adriana (011.034.726-90): 4 pedidos reais (nao 8)
+- ~919 registros ecommerce duplicados removidos (com audit trail)
+- Metricas recalculadas refletindo transacoes reais
+- Novos uploads NF auto-eliminam ecommerce via trigger corrigido
+- Perfil mostra badge "Fonte" para transparencia
 
