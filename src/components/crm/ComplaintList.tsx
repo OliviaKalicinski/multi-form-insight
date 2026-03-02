@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
+import { ComplaintEditForm } from "./ComplaintEditForm";
 import type { Complaint } from "@/hooks/useComplaints";
 
 const statusColors: Record<string, string> = {
@@ -25,36 +29,61 @@ const gravidadeLabels: Record<string, string> = {
   baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica',
 };
 
-export function ComplaintList({ complaints }: { complaints: Complaint[] }) {
+interface ComplaintListProps {
+  complaints: Complaint[];
+  onUpdateComplaint?: (data: { id: string } & Record<string, any>) => void;
+  isUpdating?: boolean;
+}
+
+export function ComplaintList({ complaints, onUpdateComplaint, isUpdating }: ComplaintListProps) {
+  const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(null);
+
   if (complaints.length === 0) {
     return <p className="text-sm text-muted-foreground py-8 text-center">Nenhuma reclamação registrada.</p>;
   }
 
   return (
-    <div className="space-y-3">
-      {complaints.map(c => (
-        <div key={c.id} className="p-3 rounded-lg border bg-card">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            {c.gravidade && (
-              <Badge variant="outline" className={gravidadeColors[c.gravidade] ?? ''}>
-                {gravidadeLabels[c.gravidade] ?? c.gravidade}
+    <>
+      <div className="space-y-3">
+        {complaints.map(c => (
+          <div key={c.id} className="p-3 rounded-lg border bg-card">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {c.gravidade && (
+                <Badge variant="outline" className={gravidadeColors[c.gravidade] ?? ''}>
+                  {gravidadeLabels[c.gravidade] ?? c.gravidade}
+                </Badge>
+              )}
+              <Badge variant="outline" className={statusColors[c.status] ?? ''}>
+                {statusLabels[c.status] ?? c.status}
               </Badge>
-            )}
-            <Badge variant="outline" className={statusColors[c.status] ?? ''}>
-              {statusLabels[c.status] ?? c.status}
-            </Badge>
-            {c.tipo_reclamacao && (
-              <Badge variant="secondary" className="text-[10px]">{c.tipo_reclamacao}</Badge>
-            )}
-            <span className="text-xs text-muted-foreground ml-auto">
-              {c.data_contato ? format(new Date(c.data_contato), "dd/MM/yyyy", { locale: ptBR }) : '—'}
-            </span>
+              {c.tipo_reclamacao && (
+                <Badge variant="secondary" className="text-[10px]">{c.tipo_reclamacao}</Badge>
+              )}
+              <span className="text-xs text-muted-foreground ml-auto">
+                {c.data_contato ? format(new Date(c.data_contato), "dd/MM/yyyy", { locale: ptBR }) : '—'}
+              </span>
+              {onUpdateComplaint && (
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditingComplaint(c)}>
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+            <p className="text-sm line-clamp-2">{c.descricao}</p>
+            {c.produto && <p className="text-xs text-muted-foreground mt-1">Produto: {c.produto}</p>}
+            {c.atendente && <p className="text-xs text-muted-foreground">Atendente: {c.atendente}</p>}
           </div>
-          <p className="text-sm line-clamp-2">{c.descricao}</p>
-          {c.produto && <p className="text-xs text-muted-foreground mt-1">Produto: {c.produto}</p>}
-          {c.atendente && <p className="text-xs text-muted-foreground">Atendente: {c.atendente}</p>}
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+
+      {editingComplaint && onUpdateComplaint && (
+        <ComplaintEditForm
+          open={!!editingComplaint}
+          onOpenChange={open => { if (!open) setEditingComplaint(null); }}
+          onSubmit={onUpdateComplaint}
+          complaint={editingComplaint}
+          isLoading={isUpdating}
+        />
+      )}
+    </>
   );
 }
