@@ -1,6 +1,7 @@
 import { ProcessedOrder, ProductOperationsMetrics, ProductRanking, SKUPerformance, ProductCombination, FreebieProduct, ShippingMethodStat, NFIssuanceDistribution } from "@/types/marketing";
 import { differenceInDays } from "date-fns";
 import { breakdownOrders } from './orderBreakdown';
+import { getOfficialRevenue } from './revenue';
 
 /**
  * KPI 12: Analisa produtos mais vendidos por quantidade
@@ -159,11 +160,11 @@ export const analyzeProductCombinations = (orders: ProcessedOrder[], minFrequenc
               sku1: first.sku,
               sku2: second.sku,
               count: 1,
-              faturamentos: [order.valorTotal]
+              faturamentos: [getOfficialRevenue(order)]
             });
           } else {
             existing.count++;
-            existing.faturamentos.push(order.valorTotal);
+            existing.faturamentos.push(getOfficialRevenue(order));
           }
         }
       }
@@ -245,11 +246,11 @@ export const analyzeShippingMethods = (orders: ProcessedOrder[]): ShippingMethod
     if (!existing) {
       shippingMap.set(forma, {
         count: 1,
-        faturamento: order.valorTotal
+        faturamento: getOfficialRevenue(order)
       });
     } else {
       existing.count++;
-      existing.faturamento += order.valorTotal;
+      existing.faturamento += getOfficialRevenue(order);
     }
   });
 
