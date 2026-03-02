@@ -1,107 +1,94 @@
 
 
-# Adaptador Tolerante -- Normalizacao de Headers + Telemetria de Ingestao
+# Batch Resiliente -- syncIdentifiers
 
-## Resumo
+## Problema confirmado
 
-Implementar normalizacao robusta de headers no parser de NF para aceitar variacoes reais de planilha humana, com protecao contra colisao, telemetria estruturada e relatorio visual ao usuario.
+Linhas 213-216: lookup unico `.in('cpf_cnpj', allCpfs)` com ~2500+ CPFs. Linhas 218-221 e 255-257: `return` silencioso em caso de erro. Resultado: email/telefone nunca chega a `customer_identifier`.
 
-## Arquivos modificados
+## Arquivo modificado
 
-1. `src/utils/invoiceParser.ts`
-2. `src/components/dashboard/SalesUploader.tsx`
+`src/hooks/useDataPersistence.ts` -- funcao `syncIdentifiers` (linhas 186-266)
 
----
+## Mudancas
 
-## 1. `src/utils/invoiceParser.ts`
-
-### 1.1 Constante HEADER_ALIASES
-
-Mapa explicito de variantes conhecidas para nomes canonicos do Zod schema:
+### 1. Helper `normalizeCpf`
 
 ```text
-"Contato"           -> "Nome Cliente"
-"CPF / CNPJ"        -> "CPF/CNPJ Cliente"
-"Natureza"          -> "Natureza da operacao"
-"Item UN"           -> "Item Unidade"
-"Item Valor"        -> "Item Valor Unitario"
-"Item Total"        -> "Item Valor Total"
-"Chave de acesso"   -> "Chave de Acesso"
-"Peso líquido"      -> "Peso Liquido"
-"Peso bruto"        -> "Peso Bruto"
-"Data saída"        -> "Data saida"
+const normalizeCpf = (cpf: string) => cpf.replace(/\D/g, '').trim();
 ```
 
-### 1.2 Funcao `normalizeHeaderKey(key: string): string`
+Usado em dois pontos:
+- Na deduplicacao local (emailMap/phoneMap usam CPF normalizado como chave)
+- No matching com resultados do banco (normalizar `c.cpf_cnpj` do resultado antes de inserir no Map)
 
-Reutiliza a funcao `normalizeText` existente (linha 65): lowercase + remove acentos + trim. Usada para comparar chaves do CSV contra chaves do mapa de aliases de forma tolerante.
+Isso resolve o risco de formato divergente entre planilha e banco.
 
-### 1.3 Funcao `normalizeRow(row: Record<string, any>): { normalized: Record<string, any>, applied: string[] }`
+### 2. Filtrar CPFs sinteticos
 
-- Itera sobre cada chave do objeto CSV
-- Para cada chave, compara versao normalizada contra aliases normalizados
-- Se alias encontrado E chave canonica **nao existe** no objeto: copia valor, registra alias aplicado
-- Se alias encontrado E chave canonica **ja existe** (colisao): loga conflito, **nao sobrescreve** (chave original tem prioridade)
-- Retorna objeto normalizado + lista de aliases aplicados (ex: `["Contato->Nome Cliente"]`)
+Antes do loop de deduplicacao, pular CPFs que comecem com `nf-`. Contar quantos foram filtrados.
 
-### 1.4 Atualizar `InvoiceProcessingResult`
+### 3. Batch lookup em lotes de 200
 
-Adicionar tres campos:
+Substituir linhas 213-224 por loop:
 
 ```text
-aliasesAplicados: string[]     // ex: ["Contato->Nome Cliente", "CPF / CNPJ->CPF/CNPJ Cliente"]
-emailsCapturados: number
-telefonesCapturados: number
+const LOOKUP_BATCH = 200;
+for cada chunk de allCpfs (200 por vez):
+  query .in('cpf_cnpj', chunk)
+  se erro: logar "[NF-IDENTIFIERS] Erro batch lookup N", incrementar lookupErrors, continuar
+  se ok: para cada resultado, cpfToId.set(normalizeCpf(c.cpf_cnpj), c.id)
 ```
 
-### 1.5 Atualizar `processInvoiceData`
+O `.in()` continua usando o CPF original (como esta no banco), mas o Map usa CPF normalizado como chave para matching robusto. Para isso, cada chunk contem os CPFs originais (mascarados) correspondentes aos normalizados, obtidos via um Map reverso `normalizedToOriginal`.
 
-- **Antes do loop Zod** (linha 198): aplicar `normalizeRow` em cada linha. Coletar aliases unicos (Set) -- alias e por header, nao por linha.
-- **Apos construir orders**: contar emails e telefones validos (`emailCliente` e `telefoneCliente` nao-undefined).
-- **Log de telemetria alias** (se aliases aplicados > 0):
-  ```text
-  [NF-ALIAS] 4 headers normalizados: Contato->Nome Cliente, CPF / CNPJ->CPF/CNPJ Cliente, ...
-  ```
-- **Log consolidado de ingestao** (sempre, ao final):
-  ```text
-  [NF-INGEST] Relatorio:
-    - 1.243 linhas processadas
-    - 12 linhas rejeitadas
-    - 4 headers normalizados via alias
-    - 38 emails capturados
-    - 31 telefones capturados
-  ```
-- Retornar os tres novos campos no resultado.
+### 4. Batch upsert em lotes de 500
 
-### 1.6 Atualizar `detectCSVFormat`
+Substituir linhas 251-258 por loop:
 
-Normalizar headers antes de checar (lowercase + remove acentos) para que variantes de caixa/acento nao causem falha na deteccao.
-
----
-
-## 2. `src/components/dashboard/SalesUploader.tsx`
-
-### 2.1 Exibir resumo de ingestao apos upload NF
-
-No bloco que ja mostra `nfResult` (linha 248-256), adicionar informacoes extras quando disponiveis:
-
-- Se `aliasesAplicados.length > 0`: mostrar badge ou texto "X headers adaptados"
-- Mostrar emails e telefones capturados: "38 emails | 31 telefones"
-
-Exemplo visual no card do arquivo enviado:
 ```text
-[Nota Fiscal] planilha_nf.csv  [Salvo no banco]
-Rastreabilidade plataforma: 85.2% das vendas NF
-4 headers adaptados | 38 emails | 31 telefones
+const UPSERT_BATCH = 500;
+for cada chunk de identifiers (500 por vez):
+  upsert com onConflict: 'type,value', ignoreDuplicates: true
+  se erro: logar "[NF-IDENTIFIERS] Erro batch upsert N", incrementar upsertErrors, continuar
+  se ok: incrementar upsertedCount
 ```
 
----
+### 5. Telemetria consolidada com tempo
 
-## Principios mantidos
+Substituir linhas 260-262 por relatorio completo:
 
-- **Tolerante na forma**: aceita variacoes de header, acento, caixa
-- **Rigido no nucleo**: Zod continua exigindo campos estruturais (ID Nota, Numero Nota, Serie, Data emissao, Total Faturado, Item Descricao)
-- **Observavel**: aliases retornados como dados estruturados (nao apenas console)
-- **Controlado**: aliases explicitos, colisoes logadas, nunca sobrescrita silenciosa
-- **Educativo**: usuario ve quais adaptacoes foram feitas
+```text
+const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+console.log(`[NF-IDENTIFIERS] Relatorio:
+  - CPFs totais: ${allCpfs.length}
+  - CPFs sinteticos ignorados: ${syntheticCount}
+  - Batches lookup: ${lookupBatches} (${lookupErrors} erros)
+  - CPFs encontrados: ${cpfToId.size}
+  - CPFs nao encontrados: ${notFound}
+  - Emails candidatos: ${emailCount}
+  - Telefones candidatos: ${phoneCount}
+  - Batches upsert: ${upsertBatches} (${upsertErrors} erros)
+  - Identificadores sincronizados: ${upsertedCount}
+  - Tempo total: ${elapsed}s`);
+```
+
+### 6. Nunca abortar
+
+Remover todos os `return` em caso de erro (linhas 220, 257). Substituir por acumulacao de contadores de erro. Manter o `return` da linha 209 (nenhum dado = noop legitimo).
+
+## O que NAO muda
+
+- Assinatura da funcao permanece `async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void>`
+- Chamada em `saveSalesData` nao muda
+- Schema do banco nao muda
+- Nenhum outro arquivo modificado
+- Logica de `onConflict: 'type,value'` permanece (politica existente mantida)
+
+## Resultado esperado
+
+Apos reimportar planilha NF:
+- Logs `[NF-IDENTIFIERS]` com contagens coerentes e tempo de execucao
+- `customer_identifier` com novos registros de email e phone
+- Perfil do cliente exibe email e telefone no `CustomerProfileHeader`
 
