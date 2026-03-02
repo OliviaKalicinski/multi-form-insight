@@ -1,101 +1,64 @@
 
 
-# Revisao de Filtro Global + Renomear V2 + Ordenacao em Reclamacoes
+# Correcao: Clientes ausentes na lista de reclamacoes por truncamento de query
 
 ## Diagnostico
 
-O `GlobalFilter` (barra de meses) aparece em TODAS as paginas autenticadas, mesmo naquelas que nao usam filtragem por data. Isso confunde o usuario.
+A tabela `customer_full` tem **2608 registros validos**. O hook `useCustomerData` usa `.limit(5000)`, mas o PostgREST do Supabase impoe um limite maximo de **1000 linhas** no servidor (`max_rows`). Os 3 clientes que aparecem como "---" na lista de reclamacoes estao nas posicoes 1590, 1708 e 1737 — ou seja, fora do corte de 1000 linhas.
 
-### Paginas que USAM filtragem por data (manter filtro):
-| Pagina | Rota |
-|---|---|
-| Visao Executiva (V1) | `/dashboard` |
-| Performance Financeira | `/performance-financeira` |
-| Produtos | `/produtos` |
-| Operacoes | `/operacoes` |
-| Analise de Amostras | `/analise-samples` |
-| Comportamento Cliente | `/comportamento-cliente` |
-| Seguidores (Instagram) | `/seguidores` |
-| Anuncios | `/ads` |
-| Publico | `/publico` |
-| Analise Critica | `/analise-critica` |
+O `customer_id` esta correto no banco. O problema e que o mapa de nomes (`customerMap`) e construido a partir de dados truncados.
 
-### Paginas que NAO usam filtragem (esconder filtro):
-| Pagina | Rota | Motivo |
-|---|---|---|
-| Fotografia Operacional (V2) | `/visao-executiva-v2` | Tem filtro proprio (7d/1d) |
-| Reclamacoes | `/reclamacoes` | Dados CRM, sem relacao com meses |
-| Nova Reclamacao | `/reclamacoes/nova` | Formulario |
-| Clientes (lista) | `/clientes` | Lista CRM |
-| Perfil do Cliente | `/clientes/:cpfCnpj` | Perfil individual |
-| Radar Operacional | `/radar-operacional` | Dados CRM em tempo real |
-| Upload | `/upload` | Area administrativa |
-| Metas | `/metas` | Configuracao |
-| Settings | `/settings` | Configuracao |
+## Solucao
 
-### Paginas que mostram filtro desabilitado (com aviso amarelo):
-| Pagina | Rota | Acao |
-|---|---|---|
-| Segmentacao Clientes | `/segmentacao-clientes` | Esconder filtro em vez de mostrar desabilitado |
-| Analise de Churn | `/analise-churn` | Esconder filtro em vez de mostrar desabilitado |
+### 1. Implementar paginacao no `useCustomerData` para buscar todos os registros
 
----
+**Arquivo**: `src/hooks/useCustomerData.ts`
 
-## Plano de Implementacao
-
-### 1. Esconder GlobalFilter nas paginas que nao precisam
-
-**Arquivo: `src/components/GlobalFilter.tsx`**
-
-Trocar a logica de `disabledRoutes` (que mostra desabilitado) por `hiddenRoutes` (que esconde completamente). Adicionar todas as rotas que nao usam filtragem:
+Substituir a query unica com `.limit(5000)` por um loop de paginacao que busca 1000 registros por vez ate esgotar a tabela:
 
 ```text
-const hiddenRoutes = [
-  '/visao-executiva-v2',
-  '/reclamacoes',
-  '/reclamacoes/nova',
-  '/clientes',
-  '/radar-operacional',
-  '/upload',
-  '/metas',
-  '/settings',
-  '/segmentacao-clientes',
-  '/analise-churn',
-];
+queryFn: async () => {
+  const pageSize = 1000;
+  let allData: CustomerRow[] = [];
+  let from = 0;
+  let hasMore = true;
 
-// Esconder tambem para rotas dinamicas como /clientes/:cpfCnpj
-const isHidden = hiddenRoutes.includes(location.pathname)
-  || location.pathname.startsWith('/clientes/');
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('customer_full')
+      .select('*')
+      .range(from, from + pageSize - 1);
 
-if (isHidden) return null;
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allData = allData.concat(data);
+      if (data.length < pageSize) hasMore = false;
+      from += pageSize;
+    }
+  }
+
+  return allData as CustomerRow[];
+}
 ```
 
-Remover a logica de `disabledRoutes`, o aviso amarelo de `AlertTriangle`, e o `opacity-50 pointer-events-none`.
+Isso garante que todos os 2608+ clientes sejam carregados independente do limite do servidor.
 
-### 2. Renomear "Visao Executiva V2" para "Fotografia Operacional"
+### 2. Alternativa: Resolver apenas para a pagina de reclamacoes
 
-**Arquivo: `src/components/AppSidebar.tsx`**
+Se a paginacao no hook global for considerada pesada, uma alternativa mais cirurgica e fazer a pagina `/reclamacoes` buscar os nomes dos clientes diretamente via JOIN na query de reclamacoes, usando uma edge function ou query separada. Porem isso fragmenta a logica.
 
-Alterar o titulo no array `navSections`:
-- De: `"Visao Executiva V2"` 
-- Para: `"Fotografia Operacional"`
+**Recomendacao**: a paginacao no hook e a solucao mais limpa porque resolve o problema para todas as paginas que dependem do mapa de clientes (reclamacoes, perfil, CRM).
 
-### 3. Adicionar ordenacao por coluna na tabela de Reclamacoes
+## Impacto
 
-**Arquivo: `src/pages/Reclamacoes.tsx`**
+- **Nenhuma migracao de banco**
+- **Nenhuma mudanca de UI**
+- **Um unico arquivo modificado**: `src/hooks/useCustomerData.ts`
+- Todas as paginas que usam `useCustomerData` passam a ver a base completa
+- Performance: 3 requests de 1000 linhas em vez de 1 request truncado (impacto minimo)
 
-Adicionar estado de ordenacao (`sortColumn`, `sortDirection`) e logica de sort:
+## Resultado esperado
 
-- Colunas ordenaveis: Data, Cliente, Tipo, Gravidade, Status, Atendente
-- Clique no titulo da coluna alterna entre ascendente/descendente
-- Icone de seta no header indica direcao atual
-- **Regra especial para Data**: registros sem `data_contato` (valor `null`) vao sempre para o final da lista, independente da direcao de ordenacao
-- Ordenacao padrao: Data descendente (mais recentes primeiro, sem data por ultimo)
-
-Implementacao:
-- Headers da tabela ganham `cursor-pointer` e icone `ArrowUpDown` / `ArrowUp` / `ArrowDown`
-- O `filtered` memo ganha uma etapa adicional de `.sort()` apos os filtros
-- Para a coluna "Cliente", ordenar pelo nome resolvido via `customerMap`
-- Para gravidade, usar ordem semantica: critica > alta > media > baixa
-- Para status, usar ordem semantica: aberta > em_andamento > resolvida > fechada
-
+Apos a correcao, todas as reclamacoes mostrarao o nome do cliente corretamente, incluindo as 3 que hoje aparecem como "---".
