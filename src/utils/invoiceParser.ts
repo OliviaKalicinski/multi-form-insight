@@ -133,6 +133,54 @@ export const extractNumeroPedidoPlataforma = (obs: string | undefined): string |
   return undefined;
 };
 
+// ── Mapa de aliases de headers ──────────────────────────────────
+// Variantes conhecidas de planilha humana → nomes canônicos do schema Zod
+const HEADER_ALIASES: Record<string, string> = {
+  "Contato": "Nome Cliente",
+  "CPF / CNPJ": "CPF/CNPJ Cliente",
+  "Natureza": "Natureza da operacao",
+  "Item UN": "Item Unidade",
+  "Item Valor": "Item Valor Unitario",
+  "Item Total": "Item Valor Total",
+  "Chave de acesso": "Chave de Acesso",
+  "Peso líquido": "Peso Liquido",
+  "Peso bruto": "Peso Bruto",
+  "Data saída": "Data saida",
+};
+
+// Pré-computa mapa normalizado para matching tolerante
+const NORMALIZED_ALIAS_MAP: Map<string, { alias: string; canonical: string }> = new Map();
+for (const [alias, canonical] of Object.entries(HEADER_ALIASES)) {
+  NORMALIZED_ALIAS_MAP.set(normalizeText(alias), { alias, canonical });
+}
+
+/**
+ * Normaliza as chaves de uma linha CSV aplicando aliases conhecidos.
+ * - Se alias encontrado e chave canônica NÃO existe: copia valor
+ * - Se alias encontrado e chave canônica JÁ existe (colisão): loga conflito, NÃO sobrescreve
+ * Retorna objeto normalizado + lista de aliases aplicados (ex: ["Contato->Nome Cliente"])
+ */
+const normalizeRow = (row: Record<string, any>): { normalized: Record<string, any>; applied: string[] } => {
+  const normalized = { ...row };
+  const applied: string[] = [];
+
+  for (const key of Object.keys(row)) {
+    const normKey = normalizeText(key);
+    const match = NORMALIZED_ALIAS_MAP.get(normKey);
+    if (match) {
+      if (normalized[match.canonical] !== undefined && normalized[match.canonical] !== '') {
+        // Colisão: chave canônica já existe, não sobrescrever
+        console.warn(`⚠️ [NF-ALIAS] Colisão: "${key}" mapeia para "${match.canonical}" mas já existe. Valor original mantido.`);
+      } else {
+        normalized[match.canonical] = row[key];
+        applied.push(`${match.alias}->${match.canonical}`);
+      }
+    }
+  }
+
+  return { normalized, applied };
+};
+
 /** Resultado do processamento de NFs com metadados de cobertura */
 export interface InvoiceProcessingResult {
   orders: ProcessedOrder[];
@@ -145,6 +193,10 @@ export interface InvoiceProcessingResult {
   coberturaApenasVendas: number; // 0-100
   vendasComId: number;
   vendasSemId: number;
+  // Telemetria de ingestão
+  aliasesAplicados: string[];
+  emailsCapturados: number;
+  telefonesCapturados: number;
 }
 
 /** Parse de data no formato DD/MM/YYYY ou YYYY-MM-DD */
@@ -191,17 +243,25 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
   // substituicao idempotente pode apagar historico fiscal real.
   console.log(`📥 [NF] Total de linhas no CSV: ${rawData.length}`);
 
-  // 1. Validar e filtrar
+  // 1. Normalizar headers via alias + validar com Zod
   const validRows: InvoiceRawData[] = [];
   const invalidRows: any[] = [];
+  const aliasSet = new Set<string>();
 
   rawData.forEach((row, index) => {
     try {
-      validRows.push(invoiceRowSchema.parse(row) as InvoiceRawData);
+      const { normalized, applied } = normalizeRow(row);
+      applied.forEach(a => aliasSet.add(a));
+      validRows.push(invoiceRowSchema.parse(normalized) as InvoiceRawData);
     } catch (error) {
       invalidRows.push({ index, row, error });
     }
   });
+
+  const aliasesAplicados = Array.from(aliasSet);
+  if (aliasesAplicados.length > 0) {
+    console.log(`🔄 [NF-ALIAS] ${aliasesAplicados.length} headers normalizados: ${aliasesAplicados.join(', ')}`);
+  }
 
   console.log(`✅ [NF] Linhas válidas: ${validRows.length}`);
   console.log(`❌ [NF] Linhas rejeitadas: ${invalidRows.length}`);
@@ -358,6 +418,20 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
     console.warn(`⚠️ [NF] ALERTA: Cobertura pedido_plataforma abaixo de 90% (${coberturaApenasVendas.toFixed(1)}%). Verificar padrões de Observações.`);
   }
 
+  // 8. Contagem de emails e telefones capturados
+  const emailsCapturados = consolidated.filter(o => o.emailCliente).length;
+  const telefonesCapturados = consolidated.filter(o => o.telefoneCliente).length;
+
+  // Log consolidado de ingestão
+  console.log(
+    `📊 [NF-INGEST] Relatório:\n` +
+    `  - ${rawData.length} linhas processadas\n` +
+    `  - ${invalidRows.length} linhas rejeitadas\n` +
+    `  - ${aliasesAplicados.length} headers normalizados via alias\n` +
+    `  - ${emailsCapturados} emails capturados\n` +
+    `  - ${telefonesCapturados} telefones capturados`
+  );
+
   return {
     orders: consolidated,
     coberturaPedidoPlataforma,
@@ -368,6 +442,9 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
     coberturaApenasVendas,
     vendasComId,
     vendasSemId,
+    aliasesAplicados,
+    emailsCapturados,
+    telefonesCapturados,
   };
 };
 
@@ -377,7 +454,14 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
  */
 export const detectCSVFormat = (headers: string[]): "nf" | "ecommerce" | null => {
   const headerSet = new Set(headers.map((h) => h.trim()));
+  const normalizedSet = new Set(headers.map((h) => normalizeText(h)));
+
+  // Checagem exata primeiro, depois normalizada
   if (headerSet.has("ID Nota") && headerSet.has("Numero Nota")) return "nf";
+  if (normalizedSet.has(normalizeText("ID Nota")) && normalizedSet.has(normalizeText("Numero Nota"))) return "nf";
+
   if (headerSet.has("Número do pedido no e-commerce")) return "ecommerce";
+  if (normalizedSet.has(normalizeText("Número do pedido no e-commerce"))) return "ecommerce";
+
   return null;
 };
