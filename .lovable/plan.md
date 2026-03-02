@@ -1,80 +1,106 @@
 
-# CRM: Editar Reclamacoes, Selecao de Pedido e Contato do Cliente
+
+# Extrair E-mail e Fone da planilha fiscal e salvar como identificadores
 
 ## Resumo
+Capturar "E-mail" e "Fone" do CSV de NF, sanitizar rigorosamente, e persistir na `customer_identifier` apos upload. Re-importar a planilha popula os dados automaticamente.
 
-Tres melhorias no perfil do cliente (aba CRM):
+## Decisoes de design
 
-1. **Editar reclamacoes existentes** -- hoje so da para criar, nao editar
-2. **Selecao automatica de pedido** ao criar reclamacao (igual ja funciona na pagina `/reclamacoes/nova`)
-3. **Mostrar telefone e email** no header do perfil do cliente
+**Constraint existente**: `UNIQUE(type, value)` -- ou seja, um email so pode pertencer a um cliente. Se casal compartilha email, o segundo e ignorado silenciosamente (ignoreDuplicates). Isso e aceitavel para o caso de uso atual.
 
----
+**Multiplos emails por CPF**: Se o mesmo CPF aparece com emails diferentes na planilha, ambos serao salvos (um por insert). Usaremos `Map<string, Set<string>>` para coletar todos os valores unicos por CPF.
 
 ## Mudancas
 
-### 1. Adicionar funcao `updateComplaint` no hook `useComplaints.ts`
+### 1. `src/types/marketing.ts`
 
-Criar uma mutation `updateComplaint` que faz UPDATE em `customer_complaint` com todos os campos editaveis (descricao, gravidade, status, tipo_reclamacao, produto, lote, nf_produto, canal, atendente, acao_orientacao, local_compra, transportador, link_reclamacao).
-
-### 2. Criar componente `ComplaintEditForm.tsx`
-
-Modal de edicao similar ao `ComplaintForm.tsx`, mas pre-populado com os dados da reclamacao existente. Campos editaveis: canal, gravidade, tipo_reclamacao, descricao, produto, lote, nf_produto, local_compra, atendente, acao_orientacao, link_reclamacao, status.
-
-### 3. Atualizar `ComplaintList.tsx` com botao de editar
-
-Adicionar um botao de edicao (icone Pencil) em cada card de reclamacao. Ao clicar, abre o `ComplaintEditForm` com os dados pre-preenchidos.
-
-### 4. Refatorar `ComplaintForm.tsx` para selecao de pedido
-
-Substituir o campo de texto livre "NF do Produto" por um fluxo de selecao de pedido:
-- Buscar os pedidos do cliente via `sales_data` (query por `cliente_email = cpf_cnpj`)
-- Exibir um Select/dropdown com os pedidos do cliente (numero_pedido + data)
-- Ao selecionar um pedido, auto-preencher NF, transportador e produto (mesmo padrao do `ReclamacaoNova.tsx`)
-
-Para isso, o `ComplaintForm` precisara receber o `cpfCnpj` do cliente como prop (alem do `customerId`).
-
-### 5. Mostrar email e telefone no `CustomerProfileHeader.tsx`
-
-- Buscar dados da tabela `customer_identifier` onde `customer_id = customer.id`
-- Exibir email (se existir) e telefone (se existir) no header, abaixo do CPF/CNPJ
-- Como telefone nao existe no banco atualmente (apenas 27 emails e 924 CPFs registrados), o campo aparecera como "--" mas estara pronto para quando o dado for inserido
-
-### 6. Atualizar `ClientePerfil.tsx`
-
-- Passar `cpfCnpj` para o `ComplaintForm`
-- Passar a funcao `updateComplaint` do hook para o `ComplaintList`
-- Passar os identificadores (email/telefone) para o `CustomerProfileHeader`
-
----
-
-## Detalhes tecnicos
-
-### Busca de identificadores
+Adicionar ao `InvoiceRawData` (linha ~253):
 ```text
-SELECT type, value FROM customer_identifier WHERE customer_id = ?
+"E-mail"?: string;
+"Fone"?: string;
 ```
-Filtrando por `type IN ('email', 'phone')` para exibir no header.
 
-### Selecao de pedido no ComplaintForm
-Reutilizar a mesma logica do `ReclamacaoNova.tsx`:
-- Query: `sales_data` filtrado por `cliente_email = cpfCnpj`, ordenado por data desc, limit 50
-- Ao selecionar pedido: auto-fill NF, transportador, natureza, produto
-- Enviar `order_id` junto com a reclamacao
+Adicionar ao `ProcessedOrder` (linha ~221):
+```text
+emailCliente?: string;
+telefoneCliente?: string;
+```
 
-### Edicao de reclamacao
-- UPDATE na tabela `customer_complaint` (RLS ja permite: "Authenticated can update complaints")
-- Campos editaveis: todos exceto `customer_id`, `created_at`, `created_by`
+### 2. `src/utils/invoiceParser.ts`
 
-### Nenhuma mudanca no banco de dados necessaria
-- A tabela `customer_complaint` ja suporta UPDATE via RLS
-- A tabela `customer_identifier` ja tem os dados de email
-- O campo `order_id` ja existe na tabela `customer_complaint`
+**Zod schema** -- adicionar campos opcionais:
+```text
+"E-mail": z.string().optional()
+"Fone": z.string().optional()
+```
+
+**Funcoes de sanitizacao**:
+
+`sanitizeEmail(raw)`:
+- `trim().toLowerCase()`
+- Rejeitar: vazio, `"N/A"`, `"--"`, `"0"`, so espacos
+- Rejeitar se nao contem `@`, nao contem `.`, comeca com `@`, termina com `@`
+- Retornar `undefined` se invalido
+
+`sanitizePhone(raw)`:
+- `replace(/\D/g, '')` -- apenas digitos
+- Rejeitar se menos de 8 digitos
+- Rejeitar `"0"`, strings vazias
+- Retornar `undefined` se invalido
+
+**Mapeamento** no `processInvoiceData`:
+```text
+emailCliente: sanitizeEmail(first["E-mail"])
+telefoneCliente: sanitizePhone(first["Fone"])
+```
+
+### 3. `src/hooks/useDataPersistence.ts`
+
+Apos o upsert de NF em `sales_data` (linha ~453), adicionar funcao `syncIdentifiers(orders)`:
+
+**Etapa 1 -- Deduplicar localmente**:
+- `emailMap: Map<cpfCnpj, Set<email>>` -- permite multiplos emails por CPF
+- `phoneMap: Map<cpfCnpj, Set<phone>>` -- permite multiplos telefones por CPF
+- Ignorar orders sem cpfCnpj, sem email/phone valido
+
+**Etapa 2 -- Batch lookup de customer.id**:
+- Coletar todos os CPFs unicos
+- Uma unica query: `SELECT id, cpf_cnpj FROM customer WHERE cpf_cnpj IN (...)`
+- Montar `cpfToId: Map<string, uuid>`
+- CPFs nao encontrados: ignorar silenciosamente + logar contagem
+
+**Etapa 3 -- Montar e inserir identificadores**:
+- Para cada par (cpf, email/phone) valido com customer_id encontrado, criar objeto:
+  ```text
+  { customer_id, type: 'email'|'phone', value }
+  ```
+- Inserir em batch com `upsert` usando `onConflict: 'type,value'` + `ignoreDuplicates: true`
+- Isso respeita a constraint `UNIQUE(type, value)` e e idempotente
+
+**Log de auditoria**:
+```text
+[NF-IDENTIFIERS] 45 emails e 38 telefones sincronizados
+[NF-IDENTIFIERS] 3 CPFs nao encontrados na tabela customer (ignorados)
+```
+
+### 4. `src/components/crm/CustomerProfileHeader.tsx`
+
+Nenhuma mudanca -- ja busca e exibe identificadores de tipo `email` e `phone`.
+
+## Fluxo de dados
+```text
+CSV NF ("E-mail", "Fone")
+  -> invoiceParser (sanitizeEmail, sanitizePhone)
+  -> ProcessedOrder (emailCliente, telefoneCliente)
+  -> saveSalesData -> syncIdentifiers (dedup -> batch lookup -> upsert customer_identifier)
+  -> CustomerProfileHeader (query existente exibe automaticamente)
+```
 
 ## Arquivos modificados
-1. `src/hooks/useComplaints.ts` -- adicionar mutation updateComplaint
-2. `src/components/crm/ComplaintForm.tsx` -- adicionar selecao de pedido
-3. `src/components/crm/ComplaintList.tsx` -- adicionar botao editar + modal
-4. `src/components/crm/ComplaintEditForm.tsx` -- novo componente
-5. `src/components/crm/CustomerProfileHeader.tsx` -- mostrar email/telefone
-6. `src/pages/ClientePerfil.tsx` -- passar props adicionais
+1. `src/types/marketing.ts` -- adicionar emailCliente/telefoneCliente aos tipos
+2. `src/utils/invoiceParser.ts` -- extrair e sanitizar E-mail e Fone
+3. `src/hooks/useDataPersistence.ts` -- syncIdentifiers apos upload NF
+
+## Observacao
+Usuario precisara re-importar a planilha fiscal para popular os dados. Processo e idempotente -- pode reimportar quantas vezes quiser sem duplicacao.
