@@ -1,70 +1,101 @@
 
 
-# NF como Fonte Primaria: Triggers + Recovery + Revenue Consistency
+# Revisao de Filtro Global + Renomear V2 + Ordenacao em Reclamacoes
 
-## Validacoes confirmadas
+## Diagnostico
 
-- `sales_data_log` payload usa chaves corretas: `numero_pedido`, `canal`, `forma_envio` -- UPDATE funcionara
-- `getOfficialRevenue` ja faz fallback: `totalFaturado ?? (valorTotal + valorFrete)` -- 19 ecommerce sem NF continuam seguros
+O `GlobalFilter` (barra de meses) aparece em TODAS as paginas autenticadas, mesmo naquelas que nao usam filtragem por data. Isso confunde o usuario.
 
-## Sequencia de execucao
+### Paginas que USAM filtragem por data (manter filtro):
+| Pagina | Rota |
+|---|---|
+| Visao Executiva (V1) | `/dashboard` |
+| Performance Financeira | `/performance-financeira` |
+| Produtos | `/produtos` |
+| Operacoes | `/operacoes` |
+| Analise de Amostras | `/analise-samples` |
+| Comportamento Cliente | `/comportamento-cliente` |
+| Seguidores (Instagram) | `/seguidores` |
+| Anuncios | `/ads` |
+| Publico | `/publico` |
+| Analise Critica | `/analise-critica` |
 
-### 1. SQL Migration: Substituir trigger monolitico por 3 triggers
+### Paginas que NAO usam filtragem (esconder filtro):
+| Pagina | Rota | Motivo |
+|---|---|---|
+| Fotografia Operacional (V2) | `/visao-executiva-v2` | Tem filtro proprio (7d/1d) |
+| Reclamacoes | `/reclamacoes` | Dados CRM, sem relacao com meses |
+| Nova Reclamacao | `/reclamacoes/nova` | Formulario |
+| Clientes (lista) | `/clientes` | Lista CRM |
+| Perfil do Cliente | `/clientes/:cpfCnpj` | Perfil individual |
+| Radar Operacional | `/radar-operacional` | Dados CRM em tempo real |
+| Upload | `/upload` | Area administrativa |
+| Metas | `/metas` | Configuracao |
+| Settings | `/settings` | Configuracao |
 
-Dropar `enforce_nf_precedence` (funcao + trigger) e criar:
+### Paginas que mostram filtro desabilitado (com aviso amarelo):
+| Pagina | Rota | Acao |
+|---|---|---|
+| Segmentacao Clientes | `/segmentacao-clientes` | Esconder filtro em vez de mostrar desabilitado |
+| Analise de Churn | `/analise-churn` | Esconder filtro em vez de mostrar desabilitado |
 
-- **`inherit_ecommerce_metadata`** (BEFORE INSERT): Se NF chega com `numero_pedido_plataforma`, copia `canal` e `forma_envio` do ecommerce correspondente para a NF (somente se NF nao traz esses campos)
-- **`block_ecommerce_if_nf_exists`** (BEFORE INSERT): Se ecommerce chega e ja existe NF com `numero_pedido_plataforma` correspondente, RAISE EXCEPTION
-- **`delete_ecommerce_if_nf`** (AFTER INSERT): Se NF chega com `numero_pedido_plataforma`, deleta ecommerce duplicado
+---
 
-### 2. SQL Data Update: Recuperar canal/forma_envio das 919 NFs
+## Plano de Implementacao
+
+### 1. Esconder GlobalFilter nas paginas que nao precisam
+
+**Arquivo: `src/components/GlobalFilter.tsx`**
+
+Trocar a logica de `disabledRoutes` (que mostra desabilitado) por `hiddenRoutes` (que esconde completamente). Adicionar todas as rotas que nao usam filtragem:
 
 ```text
-UPDATE sales_data nf
-SET canal = log.payload_completo->>'canal',
-    forma_envio = log.payload_completo->>'forma_envio'
-FROM sales_data_log log
-WHERE log.motivo = 'dedup_nf_precedence'
-  AND nf.fonte_dados = 'nf'
-  AND nf.numero_pedido_plataforma IS NOT NULL
-  AND nf.numero_pedido_plataforma = log.payload_completo->>'numero_pedido'
-  AND nf.cliente_email = log.payload_completo->>'cliente_email'
-  AND (nf.canal IS NULL OR nf.canal = '');
+const hiddenRoutes = [
+  '/visao-executiva-v2',
+  '/reclamacoes',
+  '/reclamacoes/nova',
+  '/clientes',
+  '/radar-operacional',
+  '/upload',
+  '/metas',
+  '/settings',
+  '/segmentacao-clientes',
+  '/analise-churn',
+];
+
+// Esconder tambem para rotas dinamicas como /clientes/:cpfCnpj
+const isHidden = hiddenRoutes.includes(location.pathname)
+  || location.pathname.startsWith('/clientes/');
+
+if (isHidden) return null;
 ```
 
-### 3. SQL: Recalcular todos os clientes
+Remover a logica de `disabledRoutes`, o aviso amarelo de `AlertTriangle`, e o `opacity-50 pointer-events-none`.
 
-Executar `recalculate_all_customers()` para atualizar metricas persistidas.
+### 2. Renomear "Visao Executiva V2" para "Fotografia Operacional"
 
-### 4. Codigo: Corrigir calculadores para usar getOfficialRevenue
+**Arquivo: `src/components/AppSidebar.tsx`**
 
-Pontos que usam `order.valorTotal` onde deveriam usar `getOfficialRevenue(order)`:
+Alterar o titulo no array `navSections`:
+- De: `"Visao Executiva V2"` 
+- Para: `"Fotografia Operacional"`
 
-**`src/utils/financialMetrics.ts`** (linhas 384-391):
-- `getOrderValueDistribution`: filtro de faixas e soma de receita usam `order.valorTotal`
+### 3. Adicionar ordenacao por coluna na tabela de Reclamacoes
 
-**`src/utils/customerBehaviorMetrics.ts`**:
-- Linha 33, 38: `analyzeChurn` acumula `order.valorTotal`
-- Linhas 111, 136, 152, 169: `analyzeOrderVolume` (daily/weekly/monthly/quarterly revenue)
+**Arquivo: `src/pages/Reclamacoes.tsx`**
 
-**`src/utils/productOperationsMetrics.ts`**:
-- Linhas 162, 166: combinacoes de produto usam `order.valorTotal`
-- Linhas 248, 252: shipping methods usam `order.valorTotal`
+Adicionar estado de ordenacao (`sortColumn`, `sortDirection`) e logica de sort:
 
-Cada ponto sera substituido por `getOfficialRevenue(order)` com import adicionado no topo do arquivo.
+- Colunas ordenaveis: Data, Cliente, Tipo, Gravidade, Status, Atendente
+- Clique no titulo da coluna alterna entre ascendente/descendente
+- Icone de seta no header indica direcao atual
+- **Regra especial para Data**: registros sem `data_contato` (valor `null`) vao sempre para o final da lista, independente da direcao de ordenacao
+- Ordenacao padrao: Data descendente (mais recentes primeiro, sem data por ultimo)
 
-## O que NAO muda
+Implementacao:
+- Headers da tabela ganham `cursor-pointer` e icone `ArrowUpDown` / `ArrowUp` / `ArrowDown`
+- O `filtered` memo ganha uma etapa adicional de `.sort()` apos os filtros
+- Para a coluna "Cliente", ordenar pelo nome resolvido via `customerMap`
+- Para gravidade, usar ordem semantica: critica > alta > media > baixa
+- Para status, usar ordem semantica: aberta > em_andamento > resolvida > fechada
 
-- Schema de tabelas (nenhuma coluna nova)
-- `useCustomerProfile.ts` (deduplicacao defensiva permanece como esta)
-- `recalculate_customer` (CTE defensiva permanece)
-- Pipeline de ingestao NF e ecommerce
-- Arquivos ja corretos: `revenue.ts`, `roasCalculator.ts`, `executiveMetricsCalculator.ts`, `salesCalculator.ts`
-
-## Resultado esperado
-
-- Dashboard de plataforma mostra Shopify/ML/Base corretamente (919 NFs com canal restaurado)
-- Receita total inalterada (baseada em `totalFaturado`)
-- Futuros uploads NF herdam canal/forma_envio automaticamente via trigger
-- `getOfficialRevenue` e a unica funcao de receita em todo o sistema
-- Triggers separados, auditaveis, cada um com responsabilidade unica
