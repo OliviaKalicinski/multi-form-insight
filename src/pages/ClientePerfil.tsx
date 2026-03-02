@@ -28,7 +28,7 @@ export default function ClientePerfil() {
 
   const { customer, orders, isLoading, updateCustomer } = useCustomerProfile(decoded);
   const { logs, isLoading: logsLoading, addLog } = useContactLogs(customer?.id);
-  const { complaints, isLoading: complaintsLoading, addComplaint } = useComplaints(customer?.id);
+  const { complaints, isLoading: complaintsLoading, addComplaint, updateComplaint } = useComplaints(customer?.id);
 
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [complaintFormOpen, setComplaintFormOpen] = useState(false);
@@ -162,7 +162,18 @@ export default function ClientePerfil() {
               </Button>
             </CardHeader>
             <CardContent>
-              {complaintsLoading ? <Skeleton className="h-32" /> : <ComplaintList complaints={complaints} />}
+              {complaintsLoading ? <Skeleton className="h-32" /> : (
+                <ComplaintList
+                  complaints={complaints}
+                  onUpdateComplaint={(data) => {
+                    updateComplaint.mutate(data, {
+                      onSuccess: () => toast.success("Reclamação atualizada"),
+                      onError: () => toast.error("Erro ao atualizar reclamação"),
+                    });
+                  }}
+                  isUpdating={updateComplaint.isPending}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -182,6 +193,7 @@ export default function ClientePerfil() {
         onOpenChange={setComplaintFormOpen}
         onSubmit={handleAddComplaint}
         customerId={customer.id}
+        cpfCnpj={decoded}
         defaultAtendente={customer.responsavel ?? undefined}
         isLoading={addComplaint.isPending}
       />

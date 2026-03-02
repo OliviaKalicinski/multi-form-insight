@@ -1,13 +1,16 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Pencil, Check, X } from "lucide-react";
+import { Pencil, Check, X, Mail, Phone } from "lucide-react";
 
 interface Props {
   customer: {
+    id: string;
     nome: string | null;
     cpf_cnpj: string;
     segment: string | null;
@@ -47,6 +50,23 @@ export function CustomerProfileHeader({ customer, onUpdate }: Props) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  const { data: identifiers } = useQuery({
+    queryKey: ['customer-identifiers', customer.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customer_identifier')
+        .select('type, value')
+        .eq('customer_id', customer.id)
+        .in('type', ['email', 'phone']);
+      if (error) throw error;
+      return data as { type: string; value: string }[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const email = identifiers?.find(i => i.type === 'email')?.value ?? null;
+  const phone = identifiers?.find(i => i.type === 'phone')?.value ?? null;
+
   const startEdit = (field: string, currentValue: string) => {
     setEditingField(field);
     setEditValue(currentValue);
@@ -64,6 +84,14 @@ export function CustomerProfileHeader({ customer, onUpdate }: Props) {
           <div>
             <h1 className="text-2xl font-bold">{customer.nome || 'Sem nome'}</h1>
             <p className="text-sm text-muted-foreground font-mono mt-1">{customer.cpf_cnpj}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Mail className="h-3 w-3" /> {email ?? '—'}
+              </span>
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Phone className="h-3 w-3" /> {phone ?? '—'}
+              </span>
+            </div>
             <div className="flex gap-2 mt-2">
               {customer.segment && (
                 <Badge variant="outline" className={segmentColors[customer.segment] ?? ''}>

@@ -101,5 +101,20 @@ export function useComplaints(customerId?: string) {
     },
   });
 
-  return { complaints: complaints ?? [], isLoading, addComplaint, updateComplaintStatus };
+  const updateComplaint = useMutation({
+    mutationFn: async ({ id, ...fields }: { id: string } & Partial<Omit<Complaint, 'id' | 'customer_id' | 'created_at' | 'created_by'>>) => {
+      const { error } = await supabase
+        .from('customer_complaint')
+        .update({ ...fields, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['complaints'] });
+      queryClient.invalidateQueries({ queryKey: ['complaints-all'] });
+      if (customerId) queryClient.invalidateQueries({ queryKey: ['complaints', customerId] });
+    },
+  });
+
+  return { complaints: complaints ?? [], isLoading, addComplaint, updateComplaintStatus, updateComplaint };
 }
