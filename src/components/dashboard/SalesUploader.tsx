@@ -246,11 +246,27 @@ export const SalesUploader = ({
             </Button>
           </div>
           {nfResult && detectedFormat === "nf" && (
-            <div className="flex items-center gap-2 px-4">
-              <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">
-                Rastreabilidade plataforma: {nfResult.coberturaApenasVendas.toFixed(1)}% das vendas NF
-              </span>
+            <div className="flex flex-col gap-1 px-4">
+              <div className="flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">
+                  Rastreabilidade plataforma: {nfResult.coberturaApenasVendas.toFixed(1)}% das vendas NF
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {nfResult.aliasesAplicados && nfResult.aliasesAplicados.length > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    {nfResult.aliasesAplicados.length} headers adaptados
+                  </Badge>
+                )}
+                {(nfResult.emailsCapturados > 0 || nfResult.telefonesCapturados > 0) && (
+                  <span className="text-xs text-muted-foreground">
+                    {nfResult.emailsCapturados > 0 && `${nfResult.emailsCapturados} emails`}
+                    {nfResult.emailsCapturados > 0 && nfResult.telefonesCapturados > 0 && ' | '}
+                    {nfResult.telefonesCapturados > 0 && `${nfResult.telefonesCapturados} telefones`}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
