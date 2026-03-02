@@ -219,6 +219,8 @@ export interface ProcessedOrder {
   numeroPedidoPlataforma?: string;
   tipoMovimento?: 'venda' | 'brinde' | 'bonificacao' | 'doacao' | 'ajuste' | 'devolucao';
   observacoesNF?: string;
+  emailCliente?: string;
+  telefoneCliente?: string;
 }
 
 // Raw invoice data from CSV (before processing)
@@ -251,6 +253,8 @@ export interface InvoiceRawData {
   "Observacoes"?: string;
   "Nome Cliente"?: string;
   "CPF/CNPJ Cliente"?: string;
+  "E-mail"?: string;
+  "Fone"?: string;
 }
 
 // Sales Metrics

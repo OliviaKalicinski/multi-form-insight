@@ -182,6 +182,89 @@ Taxa de reconciliação:    ${rate}%
   return reconciled;
 }
 
+// ── Sync de identificadores NF → customer_identifier ────────────────
+async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
+  try {
+    // Etapa 1: Deduplicar localmente — Map<cpf, Set<value>>
+    const emailMap = new Map<string, Set<string>>();
+    const phoneMap = new Map<string, Set<string>>();
+
+    for (const order of orders) {
+      const cpf = order.cpfCnpj?.trim();
+      if (!cpf) continue;
+
+      if (order.emailCliente) {
+        if (!emailMap.has(cpf)) emailMap.set(cpf, new Set());
+        emailMap.get(cpf)!.add(order.emailCliente);
+      }
+      if (order.telefoneCliente) {
+        if (!phoneMap.has(cpf)) phoneMap.set(cpf, new Set());
+        phoneMap.get(cpf)!.add(order.telefoneCliente);
+      }
+    }
+
+    const allCpfs = [...new Set([...emailMap.keys(), ...phoneMap.keys()])];
+    if (allCpfs.length === 0) {
+      console.log('[NF-IDENTIFIERS] Nenhum email/telefone válido encontrado');
+      return;
+    }
+
+    // Etapa 2: Batch lookup de customer.id
+    const { data: customers, error: lookupError } = await supabase
+      .from('customer')
+      .select('id, cpf_cnpj')
+      .in('cpf_cnpj', allCpfs);
+
+    if (lookupError) {
+      console.error('[NF-IDENTIFIERS] Erro no lookup:', lookupError);
+      return;
+    }
+
+    const cpfToId = new Map<string, string>();
+    (customers || []).forEach(c => cpfToId.set(c.cpf_cnpj, c.id));
+
+    const notFound = allCpfs.length - cpfToId.size;
+    if (notFound > 0) {
+      console.log(`[NF-IDENTIFIERS] ${notFound} CPFs não encontrados na tabela customer (ignorados)`);
+    }
+
+    // Etapa 3: Montar e inserir identificadores
+    const identifiers: { customer_id: string; type: string; value: string }[] = [];
+
+    emailMap.forEach((emails, cpf) => {
+      const customerId = cpfToId.get(cpf);
+      if (!customerId) return;
+      emails.forEach(email => identifiers.push({ customer_id: customerId, type: 'email', value: email }));
+    });
+
+    phoneMap.forEach((phones, cpf) => {
+      const customerId = cpfToId.get(cpf);
+      if (!customerId) return;
+      phones.forEach(phone => identifiers.push({ customer_id: customerId, type: 'phone', value: phone }));
+    });
+
+    if (identifiers.length === 0) {
+      console.log('[NF-IDENTIFIERS] Nenhum identificador para sincronizar (CPFs sem match)');
+      return;
+    }
+
+    const { error: upsertError } = await supabase
+      .from('customer_identifier')
+      .upsert(identifiers, { onConflict: 'type,value', ignoreDuplicates: true });
+
+    if (upsertError) {
+      console.error('[NF-IDENTIFIERS] Erro no upsert:', upsertError);
+      return;
+    }
+
+    const emailCount = identifiers.filter(i => i.type === 'email').length;
+    const phoneCount = identifiers.filter(i => i.type === 'phone').length;
+    console.log(`[NF-IDENTIFIERS] ${emailCount} emails e ${phoneCount} telefones sincronizados`);
+  } catch (err) {
+    console.error('[NF-IDENTIFIERS] Erro inesperado:', err);
+  }
+}
+
 export const useDataPersistence = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [stats, setStats] = useState<DataStats>({
@@ -452,6 +535,10 @@ export const useDataPersistence = () => {
 
         const result = { inserted: data?.length || 0, updated: 0, total: orders.length };
         setStats((prev) => ({ ...prev, salesCount: prev.salesCount + result.inserted, lastUpdated: new Date() }));
+
+        // ── Sync identificadores (email/phone) para customer_identifier ──
+        await syncIdentifiers(orders);
+
         return result;
 
       } else {
