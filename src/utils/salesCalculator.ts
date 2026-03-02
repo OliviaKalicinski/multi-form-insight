@@ -236,10 +236,11 @@ export const countUniqueCustomers = (orders: ProcessedOrder[]): number => {
  * Calcula todas as métricas de vendas
  */
 export const calculateSalesMetrics = (orders: ProcessedOrder[]): SalesMetrics => {
+  const revenueOrderCount = getRevenueOrders(orders).length;
   return {
     faturamentoTotal: calculateRevenue(orders),
     ticketMedio: calculateAverageTicket(orders),
-    totalPedidos: orders.length,
+    totalPedidos: revenueOrderCount,
     totalClientes: countUniqueCustomers(orders),
     taxaRecompra: calculateRepurchaseRate(orders),
   };
