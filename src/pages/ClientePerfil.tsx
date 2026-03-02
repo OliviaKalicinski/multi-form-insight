@@ -110,6 +110,7 @@ export default function ClientePerfil() {
                   <TableRow>
                     <TableHead>Data</TableHead>
                     <TableHead>Tipo</TableHead>
+                    <TableHead>Fonte</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Nº Pedido</TableHead>
                     <TableHead>Canal</TableHead>
@@ -118,7 +119,7 @@ export default function ClientePerfil() {
                 <TableBody>
                   {orders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhum pedido encontrado.</TableCell>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhum pedido encontrado.</TableCell>
                     </TableRow>
                   ) : orders.map(o => (
                     <TableRow key={o.id}>
@@ -126,6 +127,11 @@ export default function ClientePerfil() {
                       <TableCell>
                         <Badge variant="secondary" className="text-[10px]">
                           {o.tipo_movimento ?? 'venda'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={o.fonte_dados === 'nf' ? 'default' : 'outline'} className="text-[10px]">
+                          {o.fonte_dados === 'nf' ? 'NF' : 'Ecommerce'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">{fmtVal(o.total_faturado ?? (o.valor_total + (o.valor_frete ?? 0)))}</TableCell>
