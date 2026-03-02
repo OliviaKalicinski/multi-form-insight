@@ -1,96 +1,70 @@
 
 
-# Deduplicacao NF + E-commerce: Trigger Fix + Purge + Defesa
+# NF como Fonte Primaria: Triggers + Recovery + Revenue Consistency
 
-## Contexto confirmado por query
+## Validacoes confirmadas
 
-- `sales_data`: 3185 NF + 931 ecommerce
-- **919 pares duplicados** (98.7% dos ecommerce tem NF correspondente)
-- Bug no trigger: `enforce_nf_precedence` compara `numero_pedido = NEW.numero_pedido` (numero interno da NF), mas deveria usar `NEW.numero_pedido_plataforma` (link para ecommerce)
-- Indices existentes: `idx_sales_pedido_plataforma` (partial) e `uq_sales_pedido_fonte_ecommerce` -- suficientes para as operacoes
+- `sales_data_log` payload usa chaves corretas: `numero_pedido`, `canal`, `forma_envio` -- UPDATE funcionara
+- `getOfficialRevenue` ja faz fallback: `totalFaturado ?? (valorTotal + valorFrete)` -- 19 ecommerce sem NF continuam seguros
 
 ## Sequencia de execucao
 
-### Migracao 1: Snapshot + Purge dos 919 duplicados
+### 1. SQL Migration: Substituir trigger monolitico por 3 triggers
 
-Arquivar os 919 registros ecommerce em `sales_data_log` (com motivo `dedup_nf_precedence`) e depois deletar de `sales_data`.
+Dropar `enforce_nf_precedence` (funcao + trigger) e criar:
+
+- **`inherit_ecommerce_metadata`** (BEFORE INSERT): Se NF chega com `numero_pedido_plataforma`, copia `canal` e `forma_envio` do ecommerce correspondente para a NF (somente se NF nao traz esses campos)
+- **`block_ecommerce_if_nf_exists`** (BEFORE INSERT): Se ecommerce chega e ja existe NF com `numero_pedido_plataforma` correspondente, RAISE EXCEPTION
+- **`delete_ecommerce_if_nf`** (AFTER INSERT): Se NF chega com `numero_pedido_plataforma`, deleta ecommerce duplicado
+
+### 2. SQL Data Update: Recuperar canal/forma_envio das 919 NFs
 
 ```text
--- 1. Snapshot para audit
-INSERT INTO sales_data_log (id_original, numero_nota, serie, numero_pedido, payload_completo, motivo)
-SELECT ec.id, ec.numero_nota, ec.serie, ec.numero_pedido, to_jsonb(ec), 'dedup_nf_precedence'
-FROM sales_data ec
-JOIN sales_data nf ON nf.fonte_dados = 'nf'
+UPDATE sales_data nf
+SET canal = log.payload_completo->>'canal',
+    forma_envio = log.payload_completo->>'forma_envio'
+FROM sales_data_log log
+WHERE log.motivo = 'dedup_nf_precedence'
+  AND nf.fonte_dados = 'nf'
   AND nf.numero_pedido_plataforma IS NOT NULL
-  AND ec.fonte_dados = 'ecommerce'
-  AND ec.numero_pedido = nf.numero_pedido_plataforma
-  AND ec.cliente_email = nf.cliente_email;
-
--- 2. Delete
-DELETE FROM sales_data ec
-USING sales_data nf
-WHERE nf.fonte_dados = 'nf'
-  AND nf.numero_pedido_plataforma IS NOT NULL
-  AND ec.fonte_dados = 'ecommerce'
-  AND ec.numero_pedido = nf.numero_pedido_plataforma
-  AND ec.cliente_email = nf.cliente_email;
+  AND nf.numero_pedido_plataforma = log.payload_completo->>'numero_pedido'
+  AND nf.cliente_email = log.payload_completo->>'cliente_email'
+  AND (nf.canal IS NULL OR nf.canal = '');
 ```
 
-### Migracao 2: Corrigir trigger `enforce_nf_precedence`
+### 3. SQL: Recalcular todos os clientes
 
-Reescrever a funcao para usar o campo correto (`numero_pedido_plataforma`):
+Executar `recalculate_all_customers()` para atualizar metricas persistidas.
 
-```text
--- Quando NF chega com numero_pedido_plataforma:
---   deletar ecommerce cujo numero_pedido == NEW.numero_pedido_plataforma
--- Quando ecommerce chega:
---   bloquear se ja existe NF com numero_pedido_plataforma == NEW.numero_pedido
-```
+### 4. Codigo: Corrigir calculadores para usar getOfficialRevenue
 
-Isso garante que novos uploads NF auto-eliminam ecommerce duplicado.
+Pontos que usam `order.valorTotal` onde deveriam usar `getOfficialRevenue(order)`:
 
-### Migracao 3: CTE defensiva em `recalculate_customer`
+**`src/utils/financialMetrics.ts`** (linhas 384-391):
+- `getOrderValueDistribution`: filtro de faixas e soma de receita usam `order.valorTotal`
 
-Adicionar CTE que exclui ecommerce quando NF correspondente existe (via `EXISTS`). Isso protege contra duplicatas residuais (NFs sem `numero_pedido_plataforma` ou dados importados fora de ordem).
+**`src/utils/customerBehaviorMetrics.ts`**:
+- Linha 33, 38: `analyzeChurn` acumula `order.valorTotal`
+- Linhas 111, 136, 152, 169: `analyzeOrderVolume` (daily/weekly/monthly/quarterly revenue)
 
-A CTE `deduplicated` substitui todas as referencias diretas a `sales_data` dentro da funcao (COUNT, SUM, MIN, MAX, ARRAY_AGG).
+**`src/utils/productOperationsMetrics.ts`**:
+- Linhas 162, 166: combinacoes de produto usam `order.valorTotal`
+- Linhas 248, 252: shipping methods usam `order.valorTotal`
 
-### Migracao 4: Adicionar indice composto para performance do trigger
-
-```text
-CREATE INDEX IF NOT EXISTS idx_sales_fonte_pedido_email
-ON sales_data (fonte_dados, numero_pedido, cliente_email);
-```
-
-Garante que o DELETE dentro do trigger seja eficiente em volumes maiores.
-
-### Codigo: Deduplicar orders no perfil do cliente
-
-**`src/hooks/useCustomerProfile.ts`**:
-- Adicionar `fonte_dados` e `numero_pedido_plataforma` ao select
-- Funcao `deduplicateOrders`: dado o array de orders, remove ecommerce cujo `numero_pedido` esta no Set de `numero_pedido_plataforma` das NFs. Para NFs mantidas, herda `canal` do ecommerce correspondente (fallback: canal da propria NF)
-- Retornar orders deduplicados
-
-**`src/pages/ClientePerfil.tsx`**:
-- Coluna "Fonte" na tabela com badge (NF / Ecommerce)
-- Tab "Pedidos" usa contagem deduplicada
-
-### Pos-migracao: Recalcular todos os clientes
-
-Executar `recalculate_all_customers()` para corrigir metricas persistidas (receita, ticket medio, contagem, segmento).
+Cada ponto sera substituido por `getOfficialRevenue(order)` com import adicionado no topo do arquivo.
 
 ## O que NAO muda
 
-- Nenhum dado NF e deletado
-- Pipeline de ingestao NF e ecommerce continuam independentes
-- `syncIdentifiers` batch resiliente nao e afetado
-- Schema de tabelas nao muda (apenas funcoes, trigger e indice)
+- Schema de tabelas (nenhuma coluna nova)
+- `useCustomerProfile.ts` (deduplicacao defensiva permanece como esta)
+- `recalculate_customer` (CTE defensiva permanece)
+- Pipeline de ingestao NF e ecommerce
+- Arquivos ja corretos: `revenue.ts`, `roasCalculator.ts`, `executiveMetricsCalculator.ts`, `salesCalculator.ts`
 
 ## Resultado esperado
 
-- Adriana (011.034.726-90): 4 pedidos reais (nao 8)
-- ~919 registros ecommerce duplicados removidos (com audit trail)
-- Metricas recalculadas refletindo transacoes reais
-- Novos uploads NF auto-eliminam ecommerce via trigger corrigido
-- Perfil mostra badge "Fonte" para transparencia
-
+- Dashboard de plataforma mostra Shopify/ML/Base corretamente (919 NFs com canal restaurado)
+- Receita total inalterada (baseada em `totalFaturado`)
+- Futuros uploads NF herdam canal/forma_envio automaticamente via trigger
+- `getOfficialRevenue` e a unica funcao de receita em todo o sistema
+- Triggers separados, auditaveis, cada um com responsabilidade unica
