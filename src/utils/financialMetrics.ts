@@ -4,7 +4,7 @@ import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistri
 import { extractDailyOrders } from './salesCalculator';
 import { breakdownOrders } from './orderBreakdown';
 import { isOnlySampleOrder } from './samplesAnalyzer';
-import { getOfficialRevenue } from './revenue';
+import { getOfficialRevenue, getRevenueOrders } from './revenue';
 
 // ======= TYPES =======
 
@@ -526,7 +526,10 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
     return 0;
   }
 
-  const currentMonthOrders = orders.filter(
+  // Base fiscal: somente vendas
+  const revenueOrders = getRevenueOrders(orders);
+
+  const currentMonthOrders = revenueOrders.filter(
     (order) => format(order.dataVenda, "yyyy-MM") === selectedMonth
   );
   
@@ -538,7 +541,7 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
   previousDate.setMonth(previousDate.getMonth() - 1);
   const previousMonth = format(previousDate, "yyyy-MM");
 
-  const previousMonthOrders = orders.filter(
+  const previousMonthOrders = revenueOrders.filter(
     (order) => format(order.dataVenda, "yyyy-MM") === previousMonth
   );
   
@@ -602,15 +605,18 @@ export const calculateFinancialMetrics = (
   // Detectar se é período multi-mês
   const isMultiMonth = selectedMonth === "last-12-months" || !selectedMonth;
   
-  // ===== CÁLCULOS DE FRETE =====
-  const freteTotal = orders.reduce((sum, order) => sum + order.valorFrete, 0);
+  // ===== FILTRO FISCAL: somente pedidos tipo 'venda' =====
+  const revenueOrders = getRevenueOrders(orders);
   
-  // ===== CÁLCULOS GERAIS (todos os pedidos) =====
+  // ===== CÁLCULOS DE FRETE (somente vendas - frete de bonificação é custo operacional) =====
+  const freteTotal = revenueOrders.reduce((sum, order) => sum + order.valorFrete, 0);
+  
+  // ===== CÁLCULOS FISCAIS (somente vendas) =====
   // Receita fiscal: já inclui frete via getOfficialRevenue
-  const totalRevenue = orders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
+  const totalRevenue = revenueOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
   
   // [AUDIT] Comparação legada vs fiscal
-  const receitaLegada = orders.reduce((s, o) => s + (o.valorTotal || 0), 0);
+  const receitaLegada = revenueOrders.reduce((s, o) => s + (o.valorTotal || 0), 0);
   const delta = receitaLegada > 0
     ? ((totalRevenue - receitaLegada) / receitaLegada) * 100 : 0;
   console.log(`[AUDIT] Legada=${receitaLegada.toFixed(2)} | Fiscal=${totalRevenue.toFixed(2)} | Delta=${delta.toFixed(2)}%`);
@@ -619,12 +625,13 @@ export const calculateFinancialMetrics = (
   const faturamentoLiquido = totalRevenue - freteTotal; // ex-frete
   const percentualFrete = totalRevenue > 0 ? (freteTotal / totalRevenue) * 100 : 0;
   
-  const totalOrders = orders.length;
-  const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-  const ticketMedioBruto = totalOrders > 0 ? faturamentoBruto / totalOrders : 0;
+  // Denominador fiscal: somente vendas (nunca base operacional)
+  const totalRevenueOrders = revenueOrders.length;
+  const averageTicket = totalRevenueOrders > 0 ? totalRevenue / totalRevenueOrders : 0;
+  const ticketMedioBruto = totalRevenueOrders > 0 ? faturamentoBruto / totalRevenueOrders : 0;
   
-  // ===== CÁLCULOS REAIS (sem pedidos de apenas samples) =====
-  const realOrders = filterRealOrders(orders);
+  // ===== CÁLCULOS REAIS (sem pedidos de apenas samples, dentro da base fiscal) =====
+  const realOrders = filterRealOrders(revenueOrders);
   const realRevenue = realOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
   const totalRealOrders = realOrders.length;
   const realAverageTicket = totalRealOrders > 0 ? realRevenue / totalRealOrders : 0;
@@ -646,14 +653,16 @@ export const calculateFinancialMetrics = (
   // Calcular média de produtos individuais por pedido REAL
   const produtoMedio = totalRealOrders > 0 ? totalIndividualItems / totalRealOrders : 0;
 
-  const revenueEvolution = calculateRevenueEvolution(orders);
-  const revenueByMonth = calculateRevenueByPeriod(orders, 'month').map((item) => ({
+  // ===== SUB-CÁLCULOS FINANCEIROS (base fiscal: revenueOrders) =====
+  const revenueEvolution = calculateRevenueEvolution(revenueOrders);
+  const revenueByMonth = calculateRevenueByPeriod(revenueOrders, 'month').map((item) => ({
     month: item.period,
     revenue: item.revenue,
-    orders: orders.filter((o) => format(o.dataVenda, "yyyy-MM") === item.period).length,
+    orders: revenueOrders.filter((o) => format(o.dataVenda, "yyyy-MM") === item.period).length,
   }));
 
-  // Calcular pedidos diários
+  // ===== SUB-CÁLCULOS OPERACIONAIS (base completa: orders) =====
+  // Volume de pedidos no tempo = contexto operacional, inclui todos os registros
   const ordersByDay = extractDailyOrders(orders).map(item => ({
     date: item.date,
     orders: item.value
@@ -661,17 +670,17 @@ export const calculateFinancialMetrics = (
   
   // Calcular pedidos e faturamento semanais
   const ordersByWeek = calculateWeeklyOrders(orders);
-  const revenueByWeek = calculateWeeklyRevenue(orders);
+  const revenueByWeek = calculateWeeklyRevenue(revenueOrders);
   
-  // Calcular pedidos por mês (agregado)
+  // Calcular pedidos por mês (agregado) - operacional
   const ordersByMonth = calculateMonthlyOrders(orders);
   
-  // Calcular faturamento por produto
-  const revenueByProduct = calculateAccumulatedRevenueByProduct(orders, 15);
+  // ===== SUB-CÁLCULOS FINANCEIROS (base fiscal) =====
+  const revenueByProduct = calculateAccumulatedRevenueByProduct(revenueOrders, 15);
 
-  const seasonality = analyzeSeasonality(orders);
-  const orderDistribution = getOrderValueDistribution(orders);
-  const platformPerformance = getPlatformPerformance(orders);
+  const seasonality = analyzeSeasonality(revenueOrders);
+  const orderDistribution = getOrderValueDistribution(revenueOrders);
+  const platformPerformance = getPlatformPerformance(revenueOrders);
   const topPlatform = platformPerformance[0]?.platform || "N/A";
 
   // Calcular crescimento apenas se um mês específico foi selecionado
@@ -686,9 +695,9 @@ export const calculateFinancialMetrics = (
     ticketMedio: averageTicket,
     ticketMedioReal: realAverageTicket,
     ticketMedioBruto,
-    totalPedidos: totalOrders,
+    totalPedidos: totalRevenueOrders,
     totalPedidosReais: totalRealOrders,
-    totalPedidosApenasAmostras: totalOrders - totalRealOrders,
+    totalPedidosApenasAmostras: totalRevenueOrders - totalRealOrders,
     produtoMedio,
     revenueByDay: revenueEvolution,
     ordersByDay,
