@@ -30,12 +30,12 @@ export const analyzeChurn = (
       clientesMap.set(order.cpfCnpj, {
         ultimaCompra: order.dataVenda,
         pedidos: (existing?.pedidos || 0) + 1,
-        valorTotal: (existing?.valorTotal || 0) + order.valorTotal,
+        valorTotal: (existing?.valorTotal || 0) + getOfficialRevenue(order),
         nome: order.nomeCliente
       });
     } else {
       existing.pedidos += 1;
-      existing.valorTotal += order.valorTotal;
+      existing.valorTotal += getOfficialRevenue(order);
     }
   });
 
@@ -108,7 +108,7 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     const existing = dailyMap.get(date) || { orders: 0, revenue: 0 };
     dailyMap.set(date, {
       orders: existing.orders + 1,
-      revenue: existing.revenue + order.valorTotal
+      revenue: existing.revenue + getOfficialRevenue(order)
     });
   });
 
@@ -133,7 +133,7 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     weeklyMap.set(weekKey, {
       ...existing,
       orders: existing.orders + 1,
-      revenue: existing.revenue + order.valorTotal
+      revenue: existing.revenue + getOfficialRevenue(order)
     });
   });
 
@@ -148,7 +148,7 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     const existing = monthlyMap.get(month) || { orders: 0, revenue: 0 };
     monthlyMap.set(month, {
       orders: existing.orders + 1,
-      revenue: existing.revenue + order.valorTotal
+      revenue: existing.revenue + getOfficialRevenue(order)
     });
   });
 
@@ -166,7 +166,7 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     const existing = quarterlyMap.get(quarterKey) || { orders: 0, revenue: 0 };
     quarterlyMap.set(quarterKey, {
       orders: existing.orders + 1,
-      revenue: existing.revenue + order.valorTotal
+      revenue: existing.revenue + getOfficialRevenue(order)
     });
   });
 
@@ -210,7 +210,7 @@ export const analyzeSalesPeaks = (orders: ProcessedOrder[]): SalesPeak[] => {
     const existing = dailyMap.get(date) || { orders: 0, revenue: 0 };
     dailyMap.set(date, {
       orders: existing.orders + 1,
-      revenue: existing.revenue + order.valorTotal
+      revenue: existing.revenue + getOfficialRevenue(order)
     });
   });
 

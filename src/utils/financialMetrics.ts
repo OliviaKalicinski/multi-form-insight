@@ -382,13 +382,13 @@ export const getOrderValueDistribution = (orders: ProcessedOrder[]): OrderValueD
 
   const distribution = ranges.map((range) => {
     const ordersInRange = orders.filter(
-      (order) => order.valorTotal >= range.min && order.valorTotal <= range.max
+      (order) => getOfficialRevenue(order) >= range.min && getOfficialRevenue(order) <= range.max
     );
     return {
       range: range.label,
       count: ordersInRange.length,
       percentage: (ordersInRange.length / orders.length) * 100,
-      totalRevenue: ordersInRange.reduce((sum, order) => sum + order.valorTotal, 0),
+      totalRevenue: ordersInRange.reduce((sum, order) => sum + getOfficialRevenue(order), 0),
     };
   });
 
