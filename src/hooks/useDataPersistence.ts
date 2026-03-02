@@ -183,83 +183,147 @@ Taxa de reconciliação:    ${rate}%
 }
 
 // ── Sync de identificadores NF → customer_identifier ────────────────
+const normalizeCpf = (cpf: string) => cpf.replace(/\D/g, '').trim();
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
 async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
+  const startTime = performance.now();
+  let syntheticCount = 0;
+  let lookupBatches = 0;
+  let lookupErrors = 0;
+  let upsertBatches = 0;
+  let upsertErrors = 0;
+  let upsertedCount = 0;
+
   try {
-    // Etapa 1: Deduplicar localmente — Map<cpf, Set<value>>
+    // Etapa 1: Deduplicar localmente — Map<normalizedCpf, Set<value>>
     const emailMap = new Map<string, Set<string>>();
     const phoneMap = new Map<string, Set<string>>();
+    // Map reverso: normalizedCpf → cpf original (para lookup no banco)
+    const normalizedToOriginal = new Map<string, string>();
 
     for (const order of orders) {
-      const cpf = order.cpfCnpj?.trim();
-      if (!cpf) continue;
+      const cpfRaw = order.cpfCnpj?.trim();
+      if (!cpfRaw) continue;
+
+      // Filtrar CPFs sintéticos
+      if (cpfRaw.startsWith('nf-')) {
+        syntheticCount++;
+        continue;
+      }
+
+      const cpfNorm = normalizeCpf(cpfRaw);
+      if (!cpfNorm) continue;
+
+      // Guardar mapeamento reverso (mantém o primeiro original encontrado)
+      if (!normalizedToOriginal.has(cpfNorm)) {
+        normalizedToOriginal.set(cpfNorm, cpfRaw);
+      }
 
       if (order.emailCliente) {
-        if (!emailMap.has(cpf)) emailMap.set(cpf, new Set());
-        emailMap.get(cpf)!.add(order.emailCliente);
+        if (!emailMap.has(cpfNorm)) emailMap.set(cpfNorm, new Set());
+        emailMap.get(cpfNorm)!.add(order.emailCliente);
       }
       if (order.telefoneCliente) {
-        if (!phoneMap.has(cpf)) phoneMap.set(cpf, new Set());
-        phoneMap.get(cpf)!.add(order.telefoneCliente);
+        if (!phoneMap.has(cpfNorm)) phoneMap.set(cpfNorm, new Set());
+        phoneMap.get(cpfNorm)!.add(order.telefoneCliente);
       }
     }
 
-    const allCpfs = [...new Set([...emailMap.keys(), ...phoneMap.keys()])];
-    if (allCpfs.length === 0) {
+    const allNormalizedCpfs = [...new Set([...emailMap.keys(), ...phoneMap.keys()])];
+    if (allNormalizedCpfs.length === 0) {
       console.log('[NF-IDENTIFIERS] Nenhum email/telefone válido encontrado');
       return;
     }
 
-    // Etapa 2: Batch lookup de customer.id
-    const { data: customers, error: lookupError } = await supabase
-      .from('customer')
-      .select('id, cpf_cnpj')
-      .in('cpf_cnpj', allCpfs);
+    // Coletar todos os CPFs originais únicos para lookup no banco
+    const allOriginalCpfs = [...new Set(allNormalizedCpfs.map(n => normalizedToOriginal.get(n)!))];
 
-    if (lookupError) {
-      console.error('[NF-IDENTIFIERS] Erro no lookup:', lookupError);
-      return;
+    // Etapa 2: Batch lookup de customer.id em lotes de 200
+    const LOOKUP_BATCH = 200;
+    const cpfToId = new Map<string, string>(); // normalizedCpf → customer.id
+    const lookupChunks = chunkArray(allOriginalCpfs, LOOKUP_BATCH);
+    lookupBatches = lookupChunks.length;
+
+    for (let i = 0; i < lookupChunks.length; i++) {
+      const chunk = lookupChunks[i];
+      const { data: customers, error: lookupError } = await supabase
+        .from('customer')
+        .select('id, cpf_cnpj')
+        .in('cpf_cnpj', chunk);
+
+      if (lookupError) {
+        console.error(`[NF-IDENTIFIERS] Erro batch lookup ${i + 1}/${lookupBatches}:`, lookupError);
+        lookupErrors++;
+        continue;
+      }
+
+      (customers || []).forEach(c => {
+        cpfToId.set(normalizeCpf(c.cpf_cnpj), c.id);
+      });
     }
 
-    const cpfToId = new Map<string, string>();
-    (customers || []).forEach(c => cpfToId.set(c.cpf_cnpj, c.id));
+    const notFound = allNormalizedCpfs.length - cpfToId.size;
 
-    const notFound = allCpfs.length - cpfToId.size;
-    if (notFound > 0) {
-      console.log(`[NF-IDENTIFIERS] ${notFound} CPFs não encontrados na tabela customer (ignorados)`);
-    }
-
-    // Etapa 3: Montar e inserir identificadores
+    // Etapa 3: Montar identificadores
     const identifiers: { customer_id: string; type: string; value: string }[] = [];
 
-    emailMap.forEach((emails, cpf) => {
-      const customerId = cpfToId.get(cpf);
+    emailMap.forEach((emails, cpfNorm) => {
+      const customerId = cpfToId.get(cpfNorm);
       if (!customerId) return;
       emails.forEach(email => identifiers.push({ customer_id: customerId, type: 'email', value: email }));
     });
 
-    phoneMap.forEach((phones, cpf) => {
-      const customerId = cpfToId.get(cpf);
+    phoneMap.forEach((phones, cpfNorm) => {
+      const customerId = cpfToId.get(cpfNorm);
       if (!customerId) return;
       phones.forEach(phone => identifiers.push({ customer_id: customerId, type: 'phone', value: phone }));
     });
 
-    if (identifiers.length === 0) {
-      console.log('[NF-IDENTIFIERS] Nenhum identificador para sincronizar (CPFs sem match)');
-      return;
-    }
-
-    const { error: upsertError } = await supabase
-      .from('customer_identifier')
-      .upsert(identifiers, { onConflict: 'type,value', ignoreDuplicates: true });
-
-    if (upsertError) {
-      console.error('[NF-IDENTIFIERS] Erro no upsert:', upsertError);
-      return;
-    }
-
     const emailCount = identifiers.filter(i => i.type === 'email').length;
     const phoneCount = identifiers.filter(i => i.type === 'phone').length;
-    console.log(`[NF-IDENTIFIERS] ${emailCount} emails e ${phoneCount} telefones sincronizados`);
+
+    // Etapa 4: Batch upsert em lotes de 500
+    if (identifiers.length > 0) {
+      const UPSERT_BATCH = 500;
+      const upsertChunks = chunkArray(identifiers, UPSERT_BATCH);
+      upsertBatches = upsertChunks.length;
+
+      for (let i = 0; i < upsertChunks.length; i++) {
+        const chunk = upsertChunks[i];
+        const { error: upsertError } = await supabase
+          .from('customer_identifier')
+          .upsert(chunk, { onConflict: 'type,value', ignoreDuplicates: true });
+
+        if (upsertError) {
+          console.error(`[NF-IDENTIFIERS] Erro batch upsert ${i + 1}/${upsertBatches}:`, upsertError);
+          upsertErrors++;
+          continue;
+        }
+        upsertedCount += chunk.length;
+      }
+    }
+
+    // Etapa 5: Relatório consolidado
+    const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+    console.log(`[NF-IDENTIFIERS] Relatório:
+  - CPFs totais: ${allNormalizedCpfs.length}
+  - CPFs sintéticos ignorados: ${syntheticCount}
+  - Batches lookup: ${lookupBatches} (${lookupErrors} erros)
+  - CPFs encontrados: ${cpfToId.size}
+  - CPFs não encontrados: ${notFound}
+  - Emails candidatos: ${emailCount}
+  - Telefones candidatos: ${phoneCount}
+  - Batches upsert: ${upsertBatches} (${upsertErrors} erros)
+  - Identificadores sincronizados: ${upsertedCount}
+  - Tempo total: ${elapsed}s`);
   } catch (err) {
     console.error('[NF-IDENTIFIERS] Erro inesperado:', err);
   }
