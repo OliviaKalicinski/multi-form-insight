@@ -39,7 +39,25 @@ const invoiceRowSchema = z.object({
   "Observacoes": z.string().optional(),
   "Nome Cliente": z.string().optional(),
   "CPF/CNPJ Cliente": z.string().optional(),
+  "E-mail": z.string().optional(),
+  "Fone": z.string().optional(),
 });
+
+// ── Sanitização de identificadores ──────────────────────────────
+export const sanitizeEmail = (raw?: string): string | undefined => {
+  if (!raw) return undefined;
+  const email = raw.trim().toLowerCase();
+  if (!email || email === 'n/a' || email === '--' || email === '0' || !email.replace(/\s/g, '')) return undefined;
+  if (!email.includes('@') || !email.includes('.') || email.startsWith('@') || email.endsWith('@')) return undefined;
+  return email;
+};
+
+export const sanitizePhone = (raw?: string): string | undefined => {
+  if (!raw) return undefined;
+  const digits = raw.replace(/\D/g, '');
+  if (!digits || digits === '0' || digits.length < 8) return undefined;
+  return digits;
+};
 
 // ── Classificador econômico de NFs ──────────────────────────────
 type TipoMovimento = 'venda' | 'brinde' | 'bonificacao' | 'doacao' | 'ajuste' | 'devolucao';
@@ -258,7 +276,7 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
       nomeCliente: first["Nome Cliente"] || "",
       cpfCnpj: first["CPF/CNPJ Cliente"] || "",
       ecommerce: "",
-      valorTotal: valorProdutos, // Legado: valorTotal = valorProdutos
+      valorTotal: valorProdutos,
       totalItens: produtos.reduce((sum, p) => sum + p.quantidade, 0),
       produtos,
       dataVenda: parseDate(first["Data emissao"]),
@@ -290,6 +308,9 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
       // Classificação econômica
       tipoMovimento: classifyMovementType(first["Natureza da operacao"], first["Observacoes"]),
       observacoesNF: first["Observacoes"] || undefined,
+      // Identificadores de contato
+      emailCliente: sanitizeEmail(first["E-mail"]),
+      telefoneCliente: sanitizePhone(first["Fone"]),
     };
 
     orders.push(order);
