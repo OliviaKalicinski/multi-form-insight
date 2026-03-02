@@ -44,12 +44,28 @@ export function useCustomerData() {
   const { data: rawCustomers, isLoading, error } = useQuery({
     queryKey: ['customer-data'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customer_full')
-        .select('*')
-        .limit(5000);
-      if (error) throw error;
-      return data as CustomerRow[];
+      const pageSize = 1000;
+      let allData: CustomerRow[] = [];
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('customer_full')
+          .select('*')
+          .range(from, from + pageSize - 1);
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          allData = allData.concat(data);
+          if (data.length < pageSize) hasMore = false;
+          from += pageSize;
+        }
+      }
+
+      return allData as CustomerRow[];
     },
     staleTime: 5 * 60 * 1000,
   });
