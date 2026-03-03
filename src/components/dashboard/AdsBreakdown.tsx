@@ -337,11 +337,11 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
-          <Table>
+          <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow>
-                <TableHead>Anúncio</TableHead>
-                <TableHead className="text-right">
+                <TableHead className="w-[30%]">Anúncio</TableHead>
+                <TableHead className="text-right w-[8%]">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -355,7 +355,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                     </div>
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-right w-[8%]">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -368,7 +368,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                     </div>
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-right w-[8%]">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -382,7 +382,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                     </div>
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-right w-[8%]">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -396,7 +396,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                     </div>
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-right w-[8%]">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -409,7 +409,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                     </div>
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-right w-[8%]">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -422,7 +422,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                     </div>
                   </Button>
                 </TableHead>
-                <TableHead className="text-center">
+                <TableHead className="text-center w-[10%]">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -435,8 +435,8 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                     </div>
                   </Button>
                 </TableHead>
-                <TableHead>Tipo de Resultado</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="w-[10%]">Tipo de Resultado</TableHead>
+                <TableHead className="w-[6%]">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -463,7 +463,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
 
                 return (
                   <TableRow key={index}>
-                    <TableCell className="font-medium max-w-[300px] truncate">
+                    <TableCell className="font-medium whitespace-normal break-words min-w-[200px]">
                       {ad["Nome do anúncio"]}
                     </TableCell>
                     <TableCell className="text-right font-semibold">
