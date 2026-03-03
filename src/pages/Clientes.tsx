@@ -27,7 +27,7 @@ const churnLabels: Record<string, string> = {
   'active': 'Ativo', 'at_risk': 'Em Risco', 'inactive': 'Inativo', 'churned': 'Churn',
 };
 
-type SortKey = 'nome' | 'total_revenue' | 'days_since_last_purchase' | 'last_order_date';
+type SortKey = 'nome' | 'total_revenue' | 'days_since_last_purchase' | 'last_order_date' | 'segment' | 'churn_status' | 'total_orders_revenue' | 'responsavel';
 
 const PAGE_SIZE = 25;
 
@@ -73,6 +73,10 @@ export default function Clientes() {
         case 'total_revenue': va = a.total_revenue ?? 0; vb = b.total_revenue ?? 0; break;
         case 'days_since_last_purchase': va = a.days_since_last_purchase ?? 9999; vb = b.days_since_last_purchase ?? 9999; break;
         case 'last_order_date': va = a.last_order_date ?? ''; vb = b.last_order_date ?? ''; break;
+        case 'segment': va = a.segment ?? ''; vb = b.segment ?? ''; break;
+        case 'churn_status': va = a.churn_status ?? ''; vb = b.churn_status ?? ''; break;
+        case 'total_orders_revenue': va = a.total_orders_revenue ?? 0; vb = b.total_orders_revenue ?? 0; break;
+        case 'responsavel': va = a.responsavel ?? ''; vb = b.responsavel ?? ''; break;
       }
       if (va < vb) return sortAsc ? -1 : 1;
       if (va > vb) return sortAsc ? 1 : -1;
@@ -125,13 +129,21 @@ export default function Clientes() {
                   <span className="flex items-center gap-1">Nome <ArrowUpDown className="h-3 w-3" /></span>
                 </TableHead>
                 <TableHead>CPF/CNPJ</TableHead>
-                <TableHead>Segmento</TableHead>
-                <TableHead>Churn</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort('segment')}>
+                  <span className="flex items-center gap-1">Segmento <ArrowUpDown className="h-3 w-3" /></span>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort('churn_status')}>
+                  <span className="flex items-center gap-1">Churn <ArrowUpDown className="h-3 w-3" /></span>
+                </TableHead>
                 <TableHead className="cursor-pointer text-right" onClick={() => toggleSort('total_revenue')}>
                   <span className="flex items-center gap-1 justify-end">Receita <ArrowUpDown className="h-3 w-3" /></span>
                 </TableHead>
-                <TableHead className="text-right">Pedidos</TableHead>
-                <TableHead>Responsável</TableHead>
+                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort('total_orders_revenue')}>
+                  <span className="flex items-center gap-1 justify-end">Pedidos <ArrowUpDown className="h-3 w-3" /></span>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort('responsavel')}>
+                  <span className="flex items-center gap-1">Responsável <ArrowUpDown className="h-3 w-3" /></span>
+                </TableHead>
                 <TableHead className="cursor-pointer text-right" onClick={() => toggleSort('days_since_last_purchase')}>
                   <span className="flex items-center gap-1 justify-end">Dias s/ compra <ArrowUpDown className="h-3 w-3" /></span>
                 </TableHead>

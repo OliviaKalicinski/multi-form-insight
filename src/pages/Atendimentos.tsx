@@ -2,6 +2,8 @@ import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAllContactLogs } from "@/hooks/useAllContactLogs";
 import { useCustomerData } from "@/hooks/useCustomerData";
+import { ContactLogFormWithCustomerSelect } from "@/components/crm/ContactLogFormWithCustomerSelect";
+import { ContactLogEditForm } from "@/components/crm/ContactLogEditForm";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, Search, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Download, Search, ExternalLink, ArrowUp, ArrowDown, ArrowUpDown, Plus, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import type { ContactLog } from "@/hooks/useContactLogs";
 
 const tipoLabels: Record<string, string> = {
   ligacao: 'Ligação',
@@ -27,7 +30,7 @@ type SortDirection = 'asc' | 'desc';
 
 export default function Atendimentos() {
   const navigate = useNavigate();
-  const { logs, isLoading } = useAllContactLogs();
+  const { logs, isLoading, addLog, updateLog } = useAllContactLogs();
   const { customers } = useCustomerData();
 
   const [search, setSearch] = useState("");
@@ -35,6 +38,8 @@ export default function Atendimentos() {
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [sortColumn, setSortColumn] = useState<SortColumn>('data');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [newOpen, setNewOpen] = useState(false);
+  const [editingLog, setEditingLog] = useState<ContactLog | null>(null);
 
   const customerMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -145,9 +150,14 @@ export default function Atendimentos() {
           <h1 className="text-2xl font-bold">Atendimentos</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} atendimentos</p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportCSV}>
-          <Download className="h-4 w-4 mr-2" /> Exportar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="h-4 w-4 mr-2" /> Exportar CSV
+          </Button>
+          <Button size="sm" onClick={() => setNewOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Novo Atendimento
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -217,13 +227,18 @@ export default function Atendimentos() {
                   <TableCell className="text-sm">{l.responsavel ?? '—'}</TableCell>
                   <TableCell className="text-sm">{l.resultado ?? '—'}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-7 w-7"
-                      onClick={() => {
-                        const cpf = customerCpfMap.get(l.customer_id);
-                        if (cpf) navigate(`/clientes/${encodeURIComponent(cpf)}`);
-                      }}>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingLog(l)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7"
+                        onClick={() => {
+                          const cpf = customerCpfMap.get(l.customer_id);
+                          if (cpf) navigate(`/clientes/${encodeURIComponent(cpf)}`);
+                        }}>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -231,6 +246,34 @@ export default function Atendimentos() {
           </Table>
         </CardContent>
       </Card>
+
+      <ContactLogFormWithCustomerSelect
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        customers={customers}
+        isLoading={addLog.isPending}
+        onSubmit={(data) => {
+          addLog.mutate(data, {
+            onSuccess: () => toast.success("Atendimento registrado"),
+            onError: () => toast.error("Erro ao registrar atendimento"),
+          });
+        }}
+      />
+
+      {editingLog && (
+        <ContactLogEditForm
+          open={!!editingLog}
+          onOpenChange={(open) => { if (!open) setEditingLog(null); }}
+          log={editingLog}
+          isLoading={updateLog.isPending}
+          onSubmit={(data) => {
+            updateLog.mutate(data, {
+              onSuccess: () => { toast.success("Atendimento atualizado"); setEditingLog(null); },
+              onError: () => toast.error("Erro ao atualizar atendimento"),
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
