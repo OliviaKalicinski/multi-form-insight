@@ -31,6 +31,18 @@ export interface OperationalOrder {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Destinatário
+  destinatario_nome: string | null;
+  destinatario_documento: string | null;
+  destinatario_email: string | null;
+  destinatario_telefone: string | null;
+  destinatario_endereco: string | null;
+  destinatario_bairro: string | null;
+  destinatario_cidade: string | null;
+  destinatario_cep: string | null;
+  // Fiscal
+  tipo_nf: string | null;
+  nf_pendente: boolean;
   // Joined
   customer?: { id: string; nome: string | null; cpf_cnpj: string } | null;
   items: OrderItem[];
@@ -44,6 +56,17 @@ interface CreateOrderInput {
   responsavel?: string | null;
   observacoes?: string | null;
   items: OrderItem[];
+  // Destinatário
+  destinatario_nome?: string | null;
+  destinatario_documento?: string | null;
+  destinatario_email?: string | null;
+  destinatario_telefone?: string | null;
+  destinatario_endereco?: string | null;
+  destinatario_bairro?: string | null;
+  destinatario_cidade?: string | null;
+  destinatario_cep?: string | null;
+  // Fiscal
+  tipo_nf?: string | null;
 }
 
 interface UpdateOrderInput {
@@ -60,11 +83,22 @@ interface UpdateOrderInput {
   codigo_rastreio?: string | null;
   numero_nf?: string | null;
   items?: OrderItem[];
+  // Destinatário
+  destinatario_nome?: string | null;
+  destinatario_documento?: string | null;
+  destinatario_email?: string | null;
+  destinatario_telefone?: string | null;
+  destinatario_endereco?: string | null;
+  destinatario_bairro?: string | null;
+  destinatario_cidade?: string | null;
+  destinatario_cep?: string | null;
+  // Fiscal
+  tipo_nf?: string | null;
 }
 
 function calcIsFiscalExempt(items: OrderItem[]): boolean {
   if (items.length === 0) return false;
-  return items.every((i) => i.produto === "Frass");
+  return items.every((i) => i.produto === "LF_FRASS");
 }
 
 export function useOperationalOrders(statusFilter?: string, naturezaFilter?: string) {
@@ -99,7 +133,12 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
 
   const createOrder = useMutation({
     mutationFn: async (input: CreateOrderInput) => {
+      if (input.valor_total_informado <= 0) {
+        throw new Error("Valor total deve ser maior que zero");
+      }
+
       const isFiscalExempt = calcIsFiscalExempt(input.items);
+      const nfPendente = true; // new order never has NF yet
 
       const { data: order, error: orderError } = await supabase
         .from("operational_orders")
@@ -111,6 +150,16 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
           responsavel: input.responsavel || null,
           observacoes: input.observacoes || null,
           is_fiscal_exempt: isFiscalExempt,
+          nf_pendente: nfPendente,
+          tipo_nf: input.tipo_nf || null,
+          destinatario_nome: input.destinatario_nome || null,
+          destinatario_documento: input.destinatario_documento || null,
+          destinatario_email: input.destinatario_email || null,
+          destinatario_telefone: input.destinatario_telefone || null,
+          destinatario_endereco: input.destinatario_endereco || null,
+          destinatario_bairro: input.destinatario_bairro || null,
+          destinatario_cidade: input.destinatario_cidade || null,
+          destinatario_cep: input.destinatario_cep || null,
         })
         .select()
         .single();
@@ -146,6 +195,10 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
     mutationFn: async (input: UpdateOrderInput) => {
       const { id, items, ...fields } = input;
 
+      if (fields.valor_total_informado !== undefined && fields.valor_total_informado <= 0) {
+        throw new Error("Valor total deve ser maior que zero");
+      }
+
       // Uppercase numero_nf
       if (fields.numero_nf) {
         fields.numero_nf = fields.numero_nf.toUpperCase();
@@ -157,6 +210,11 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
         updateFields.is_fiscal_exempt = calcIsFiscalExempt(items);
       }
 
+      // nf_pendente universal
+      if ("numero_nf" in fields) {
+        updateFields.nf_pendente = !fields.numero_nf;
+      }
+
       const { error: orderError } = await supabase
         .from("operational_orders")
         .update(updateFields)
@@ -165,7 +223,6 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       if (orderError) throw orderError;
 
       if (items) {
-        // Delete existing items and re-insert
         await supabase
           .from("operational_order_items")
           .delete()
@@ -197,9 +254,18 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, newStatus, order }: { id: string; newStatus: string; order: OperationalOrder }) => {
-      // Validate transitions
+      const isSeeding = order.natureza_pedido === "Seeding";
+
       if (newStatus === "aguardando_expedicao") {
-        if (!order.customer_id) throw new Error("Cliente é obrigatório para mover para expedição");
+        // Seeding: exigir destinatário se sem customer_id
+        if (isSeeding && !order.customer_id) {
+          if (!order.destinatario_nome) throw new Error("Nome do destinatário é obrigatório para Seeding");
+          if (!order.destinatario_endereco) throw new Error("Endereço do destinatário é obrigatório para Seeding");
+          if (!order.destinatario_cidade) throw new Error("Cidade do destinatário é obrigatória para Seeding");
+          if (!order.destinatario_cep) throw new Error("CEP do destinatário é obrigatório para Seeding");
+        } else if (!isSeeding) {
+          if (!order.customer_id) throw new Error("Cliente é obrigatório para mover para expedição");
+        }
         if (!order.items || order.items.length === 0) throw new Error("Pedido precisa de pelo menos 1 item");
       }
       if (newStatus === "fechado") {
@@ -210,13 +276,23 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       if (newStatus === "enviado") {
         if (!order.codigo_rastreio) throw new Error("Código de rastreio é obrigatório para enviar");
         if (!order.is_fiscal_exempt && !order.numero_nf) {
-          throw new Error("Número da NF é obrigatório (exceto pedidos 100% Frass)");
+          // For seeding, allow sending without NF but set nf_pendente
+          if (!isSeeding) {
+            throw new Error("Número da NF é obrigatório (exceto pedidos 100% Frass)");
+          }
         }
+      }
+
+      const updateData: any = { status_operacional: newStatus };
+
+      // Universal nf_pendente on send
+      if (newStatus === "enviado" && !order.numero_nf) {
+        updateData.nf_pendente = true;
       }
 
       const { error } = await supabase
         .from("operational_orders")
-        .update({ status_operacional: newStatus })
+        .update(updateData)
         .eq("id", id);
 
       if (error) throw error;

@@ -6,6 +6,7 @@ import { KanbanColumn } from "@/components/kanban/KanbanColumn";
 import { OrderCard } from "@/components/kanban/OrderCard";
 import { NewOrderForm } from "@/components/kanban/NewOrderForm";
 import { EditOrderForm } from "@/components/kanban/EditOrderForm";
+import { getProductDisplayName } from "@/data/operationalProducts";
 import { Download, Plus } from "lucide-react";
 import { format } from "date-fns";
 
@@ -15,6 +16,13 @@ const columns = [
   { key: "fechado", title: "Fechado", color: "bg-emerald-500/10 text-emerald-700" },
   { key: "enviado", title: "Enviado", color: "bg-purple-500/10 text-purple-700" },
 ];
+
+const tipoNfLabels: Record<string, string> = {
+  venda: "Venda",
+  bonificacao: "Bonificação",
+  remessa: "Remessa",
+  nao_aplicavel: "N/A",
+};
 
 export default function KanbanOperacional() {
   const [naturezaFilter, setNaturezaFilter] = useState<string>("all");
@@ -33,14 +41,16 @@ export default function KanbanOperacional() {
   }, [orders]);
 
   const handleExportCSV = () => {
-    const headers = ["Cliente", "Natureza", "Produtos", "Valor (R$)", "Status", "NF", "Reconciliado", "Divergência", "Responsável", "Data Criação"];
+    const headers = ["Cliente", "Natureza", "Produtos", "Valor (R$)", "Status", "NF", "Tipo NF", "NF Pendente", "Reconciliado", "Divergência", "Responsável", "Data Criação"];
     const rows = orders.map((o) => [
-      o.customer?.nome || "Sem cliente",
+      o.customer?.nome || o.destinatario_nome || "Sem cliente",
       o.natureza_pedido,
-      o.items.map((i) => `${i.produto} x ${i.quantidade}${i.unidade}`).join(", "),
+      o.items.map((i) => `${getProductDisplayName(i.produto)} x ${i.quantidade}${i.unidade}`).join(", "),
       o.valor_total_informado.toFixed(2),
       o.status_operacional,
       o.numero_nf || "",
+      o.tipo_nf ? (tipoNfLabels[o.tipo_nf] || o.tipo_nf) : "",
+      o.nf_pendente ? "Sim" : "Não",
       o.reconciliado ? "Sim" : "Não",
       o.divergencia || "",
       o.responsavel || "",
@@ -72,6 +82,7 @@ export default function KanbanOperacional() {
               <SelectItem value="B2C">B2C</SelectItem>
               <SelectItem value="B2B">B2B</SelectItem>
               <SelectItem value="B2B2C">B2B2C</SelectItem>
+              <SelectItem value="Seeding">Seeding</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="outline" size="sm" onClick={handleExportCSV}>

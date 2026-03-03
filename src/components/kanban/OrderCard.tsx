@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { OperationalOrder } from "@/hooks/useOperationalOrders";
+import { getProductDisplayName } from "@/data/operationalProducts";
 import { ChevronRight, Edit, MoreVertical, X } from "lucide-react";
 import { differenceInDays } from "date-fns";
 
@@ -30,14 +31,19 @@ const naturezaColors: Record<string, string> = {
   B2C: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   B2B: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
   B2B2C: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  Seeding: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
 };
 
 export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
   const daysOpen = differenceInDays(new Date(), new Date(order.created_at));
   const nextStatus = statusFlow[order.status_operacional];
 
+  const customerLabel = order.customer?.nome
+    || order.destinatario_nome
+    || "Sem cliente";
+
   const itemsSummary = order.items
-    .map((i) => `${i.produto} x ${i.quantidade}${i.unidade}`)
+    .map((i) => `${getProductDisplayName(i.produto)} x ${i.quantidade}${i.unidade}`)
     .join(", ");
 
   return (
@@ -50,6 +56,11 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
               <Badge className={naturezaColors[order.natureza_pedido] || ""} variant="outline">
                 {order.natureza_pedido}
               </Badge>
+              {order.nf_pendente && (
+                <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-[10px]">
+                  ⚠ NF Pendente
+                </Badge>
+              )}
               {order.reconciliado && (
                 <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-[10px]">
                   Reconciliado
@@ -67,7 +78,7 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
               )}
             </div>
             <p className="text-sm font-medium mt-1 truncate">
-              {order.customer?.nome || "Sem cliente"}
+              {customerLabel}
             </p>
           </div>
           <DropdownMenu>
