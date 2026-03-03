@@ -682,6 +682,7 @@ export type Database = {
       }
       operational_orders: {
         Row: {
+          boleto_file_path: string | null
           codigo_rastreio: string | null
           created_at: string
           created_by: string | null
@@ -695,12 +696,14 @@ export type Database = {
           destinatario_nome: string | null
           destinatario_telefone: string | null
           divergencia: string | null
+          documentos_atualizados_em: string | null
           forma_pagamento: string | null
           id: string
           is_fiscal_exempt: boolean
           lote: string | null
           medidas: string | null
           natureza_pedido: string
+          nf_file_path: string | null
           nf_pendente: boolean | null
           numero_nf: string | null
           observacoes: string | null
@@ -715,6 +718,7 @@ export type Database = {
           valor_total_informado: number
         }
         Insert: {
+          boleto_file_path?: string | null
           codigo_rastreio?: string | null
           created_at?: string
           created_by?: string | null
@@ -728,12 +732,14 @@ export type Database = {
           destinatario_nome?: string | null
           destinatario_telefone?: string | null
           divergencia?: string | null
+          documentos_atualizados_em?: string | null
           forma_pagamento?: string | null
           id?: string
           is_fiscal_exempt?: boolean
           lote?: string | null
           medidas?: string | null
           natureza_pedido?: string
+          nf_file_path?: string | null
           nf_pendente?: boolean | null
           numero_nf?: string | null
           observacoes?: string | null
@@ -748,6 +754,7 @@ export type Database = {
           valor_total_informado?: number
         }
         Update: {
+          boleto_file_path?: string | null
           codigo_rastreio?: string | null
           created_at?: string
           created_by?: string | null
@@ -761,12 +768,14 @@ export type Database = {
           destinatario_nome?: string | null
           destinatario_telefone?: string | null
           divergencia?: string | null
+          documentos_atualizados_em?: string | null
           forma_pagamento?: string | null
           id?: string
           is_fiscal_exempt?: boolean
           lote?: string | null
           medidas?: string | null
           natureza_pedido?: string
+          nf_file_path?: string | null
           nf_pendente?: boolean | null
           numero_nf?: string | null
           observacoes?: string | null

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { productsByBrandAndCategory, findProductById } from "@/data/operationalProducts";
-import { Plus, Trash2 } from "lucide-react";
-import { OperationalOrder, OrderItem } from "@/hooks/useOperationalOrders";
+import { Plus, Trash2, FileText, Receipt, CheckCircle2, Upload, ExternalLink } from "lucide-react";
+import { OperationalOrder, OrderItem, useOperationalOrders, getSignedUrl } from "@/hooks/useOperationalOrders";
 import { toast } from "sonner";
 
 interface EditOrderFormProps {
@@ -75,6 +75,11 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
   const [destCidade, setDestCidade] = useState("");
   const [destCep, setDestCep] = useState("");
 
+  // Document upload
+  const nfInputRef = useRef<HTMLInputElement>(null);
+  const boletoInputRef = useRef<HTMLInputElement>(null);
+  const { uploadDocument } = useOperationalOrders();
+
   const isSeeding = natureza === "Seeding";
   const showDestinatario = isSeeding && !selectedCustomer;
 
@@ -128,6 +133,24 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
   const addItem = () => setItems([...items, { produto: "", quantidade: 1, unidade: "un" }]);
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
 
+  const handleFileUpload = async (file: File, type: "nf" | "boleto") => {
+    if (!order) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Apenas arquivos PDF são permitidos");
+      return;
+    }
+    uploadDocument.mutate({ orderId: order.id, file, type });
+  };
+
+  const handleViewDocument = async (filePath: string) => {
+    try {
+      const url = await getSignedUrl(filePath);
+      window.open(url, "_blank");
+    } catch {
+      toast.error("Erro ao gerar URL do documento");
+    }
+  };
+
   if (!order) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -163,6 +186,62 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
       destinatario_cep: destCep || null,
     });
   };
+
+  const renderDocumentRow = (
+    label: string,
+    icon: React.ReactNode,
+    filePath: string | null,
+    type: "nf" | "boleto",
+    inputRef: React.RefObject<HTMLInputElement>
+  ) => (
+    <div className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/20">
+      <div className="flex items-center gap-2 min-w-0">
+        {icon}
+        <span className="text-sm font-medium">{label}</span>
+        {filePath ? (
+          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+        ) : (
+          <span className="text-xs text-muted-foreground">Não anexado</span>
+        )}
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {filePath && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => handleViewDocument(filePath)}
+          >
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Visualizar
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          disabled={uploadDocument.isPending}
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload className="h-3 w-3 mr-1" />
+          {filePath ? "Substituir" : "Anexar"}
+        </Button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFileUpload(file, type);
+            e.target.value = "";
+          }}
+        />
+      </div>
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -365,6 +444,25 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
               <Label>Número NF</Label>
               <Input value={numeroNf} onChange={(e) => setNumeroNf(e.target.value)} />
             </div>
+          </div>
+
+          {/* Documentos */}
+          <div className="border-t pt-4 space-y-3">
+            <h4 className="font-semibold text-sm text-muted-foreground">Documentos</h4>
+            {renderDocumentRow(
+              "Nota Fiscal (PDF)",
+              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />,
+              order.nf_file_path,
+              "nf",
+              nfInputRef
+            )}
+            {renderDocumentRow(
+              "Boleto (PDF)",
+              <Receipt className="h-4 w-4 text-muted-foreground shrink-0" />,
+              order.boleto_file_path,
+              "boleto",
+              boletoInputRef
+            )}
           </div>
 
           <Button type="submit" className="w-full" disabled={isLoading}>
