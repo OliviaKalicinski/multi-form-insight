@@ -1,64 +1,59 @@
 
 
-# Correcao: Clientes ausentes na lista de reclamacoes por truncamento de query
+# Pagina de Atendimentos — Centralizada como Reclamacoes
 
-## Diagnostico
+## Contexto
 
-A tabela `customer_full` tem **2608 registros validos**. O hook `useCustomerData` usa `.limit(5000)`, mas o PostgREST do Supabase impoe um limite maximo de **1000 linhas** no servidor (`max_rows`). Os 3 clientes que aparecem como "---" na lista de reclamacoes estao nas posicoes 1590, 1708 e 1737 — ou seja, fora do corte de 1000 linhas.
+Hoje os registros de contato (`customer_contact_log`) so aparecem dentro do perfil individual do cliente. O pedido e criar uma pagina `/atendimentos` que centraliza todos os atendimentos de todos os clientes em uma unica tabela, exatamente como `/reclamacoes` faz para `customer_complaint`.
 
-O `customer_id` esta correto no banco. O problema e que o mapa de nomes (`customerMap`) e construido a partir de dados truncados.
+A tabela `customer_contact_log` tem 3 registros e os campos: `id`, `customer_id`, `data_contato`, `tipo`, `motivo`, `resumo`, `responsavel`, `resultado`.
 
-## Solucao
+## Plano
 
-### 1. Implementar paginacao no `useCustomerData` para buscar todos os registros
+### 1. Criar hook `useAllContactLogs` (`src/hooks/useAllContactLogs.ts`)
 
-**Arquivo**: `src/hooks/useCustomerData.ts`
+O hook atual (`useContactLogs`) filtra por `customerId`. Criar um novo hook que busca todos os registros sem filtro, com paginacao (mesmo pattern do `useCustomerData` corrigido — loop de 1000 em 1000, embora com 3 registros hoje nao seja necessario, mas para consistencia).
 
-Substituir a query unica com `.limit(5000)` por um loop de paginacao que busca 1000 registros por vez ate esgotar a tabela:
+Retorna array de `ContactLog[]` ordenado por `data_contato DESC`.
 
-```text
-queryFn: async () => {
-  const pageSize = 1000;
-  let allData: CustomerRow[] = [];
-  let from = 0;
-  let hasMore = true;
+### 2. Criar pagina `Atendimentos` (`src/pages/Atendimentos.tsx`)
 
-  while (hasMore) {
-    const { data, error } = await supabase
-      .from('customer_full')
-      .select('*')
-      .range(from, from + pageSize - 1);
+Seguindo exatamente o pattern de `Reclamacoes.tsx`:
 
-    if (error) throw error;
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allData = allData.concat(data);
-      if (data.length < pageSize) hasMore = false;
-      from += pageSize;
-    }
-  }
+- Header com titulo "Atendimentos" + contagem
+- Botao "Exportar CSV"
+- Filtros: busca por texto, filtro por tipo (ligacao/whatsapp/email/sac/outro), filtro por responsavel
+- Tabela com colunas sortable: **Data**, **Cliente**, **Tipo**, **Motivo**, **Resumo** (truncado), **Responsavel**, **Resultado**, **Acao** (link para perfil do cliente)
+- Mapa de clientes via `useCustomerData` para resolver nomes (mesmo pattern de Reclamacoes)
+- Sorting com nulls-last para data
+- Navegacao para perfil do cliente ao clicar no link
 
-  return allData as CustomerRow[];
-}
-```
+### 3. Registrar rota em `App.tsx`
 
-Isso garante que todos os 2608+ clientes sejam carregados independente do limite do servidor.
+Adicionar rota `/atendimentos` protegida com `AuthenticatedLayout`, no mesmo bloco das rotas CRM.
 
-### 2. Alternativa: Resolver apenas para a pagina de reclamacoes
+### 4. Adicionar link no sidebar (`AppSidebar.tsx`)
 
-Se a paginacao no hook global for considerada pesada, uma alternativa mais cirurgica e fazer a pagina `/reclamacoes` buscar os nomes dos clientes diretamente via JOIN na query de reclamacoes, usando uma edge function ou query separada. Porem isso fragmenta a logica.
+Dentro da secao "CRM", adicionar item:
+- Titulo: "Atendimentos"
+- URL: `/atendimentos`
+- Icone: `Headset` (ja importado)
 
-**Recomendacao**: a paginacao no hook e a solucao mais limpa porque resolve o problema para todas as paginas que dependem do mapa de clientes (reclamacoes, perfil, CRM).
+Posicao: entre "Clientes" e "Reclamacoes" no menu CRM.
+
+## Arquivos
+
+| Arquivo | Acao |
+|---------|------|
+| `src/hooks/useAllContactLogs.ts` | Criar (novo hook) |
+| `src/pages/Atendimentos.tsx` | Criar (nova pagina) |
+| `src/App.tsx` | Adicionar rota |
+| `src/components/AppSidebar.tsx` | Adicionar item no menu CRM |
 
 ## Impacto
 
-- **Nenhuma migracao de banco**
-- **Nenhuma mudanca de UI**
-- **Um unico arquivo modificado**: `src/hooks/useCustomerData.ts`
-- Todas as paginas que usam `useCustomerData` passam a ver a base completa
-- Performance: 3 requests de 1000 linhas em vez de 1 request truncado (impacto minimo)
+- 0 migracoes de banco
+- 0 componentes novos (usa Table, Badge, Button, Select, Input existentes)
+- 0 alteracoes em calculos
+- Mesmo pattern visual de Reclamacoes
 
-## Resultado esperado
-
-Apos a correcao, todas as reclamacoes mostrarao o nome do cliente corretamente, incluindo as 3 que hoje aparecem como "---".
