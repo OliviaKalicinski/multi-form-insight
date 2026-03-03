@@ -33,6 +33,7 @@ import Reclamacoes from "./pages/Reclamacoes";
 import Atendimentos from "./pages/Atendimentos";
 import ReclamacaoNova from "./pages/ReclamacaoNova";
 import RadarOperacional from "./pages/RadarOperacional";
+import KanbanOperacional from "./pages/KanbanOperacional";
 import NotFound from "./pages/NotFound";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -284,6 +285,14 @@ const App = () => (
             <ProtectedRoute>
               <AuthenticatedLayout>
                 <RadarOperacional />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/kanban-operacional" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <KanbanOperacional />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />

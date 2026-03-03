@@ -645,6 +645,128 @@ export type Database = {
           },
         ]
       }
+      operational_order_items: {
+        Row: {
+          created_at: string
+          id: string
+          operational_order_id: string
+          produto: string
+          quantidade: number
+          unidade: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          operational_order_id: string
+          produto: string
+          quantidade?: number
+          unidade?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          operational_order_id?: string
+          produto?: string
+          quantidade?: number
+          unidade?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_order_items_operational_order_id_fkey"
+            columns: ["operational_order_id"]
+            isOneToOne: false
+            referencedRelation: "operational_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operational_orders: {
+        Row: {
+          codigo_rastreio: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          divergencia: string | null
+          forma_pagamento: string | null
+          id: string
+          is_fiscal_exempt: boolean
+          lote: string | null
+          medidas: string | null
+          natureza_pedido: string
+          numero_nf: string | null
+          observacoes: string | null
+          pedido_origem_id: string | null
+          pedido_origem_tipo: string | null
+          peso_total: number | null
+          reconciliado: boolean
+          responsavel: string | null
+          status_operacional: string
+          updated_at: string
+          valor_total_informado: number
+        }
+        Insert: {
+          codigo_rastreio?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          divergencia?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          is_fiscal_exempt?: boolean
+          lote?: string | null
+          medidas?: string | null
+          natureza_pedido?: string
+          numero_nf?: string | null
+          observacoes?: string | null
+          pedido_origem_id?: string | null
+          pedido_origem_tipo?: string | null
+          peso_total?: number | null
+          reconciliado?: boolean
+          responsavel?: string | null
+          status_operacional?: string
+          updated_at?: string
+          valor_total_informado?: number
+        }
+        Update: {
+          codigo_rastreio?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          divergencia?: string | null
+          forma_pagamento?: string | null
+          id?: string
+          is_fiscal_exempt?: boolean
+          lote?: string | null
+          medidas?: string | null
+          natureza_pedido?: string
+          numero_nf?: string | null
+          observacoes?: string | null
+          pedido_origem_id?: string | null
+          pedido_origem_tipo?: string | null
+          peso_total?: number | null
+          reconciliado?: boolean
+          responsavel?: string | null
+          status_operacional?: string
+          updated_at?: string
+          valor_total_informado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_full"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_data: {
         Row: {
           canal: string | null
