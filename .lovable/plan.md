@@ -1,56 +1,94 @@
 
 
-# Kanban Operacional — Fase 1: Plano de Implementacao
+# Catálogo Operacional + Seeding — Plano Final
 
-## Resumo
+## Estado atual do banco (confirmado)
 
-Criar modulo Kanban Operacional completo: 2 tabelas (operational_orders + operational_order_items), 1 storage bucket, hook CRUD, pagina com board de 4 colunas, formularios de criacao/edicao, rota e sidebar.
+- Constraint `chk_natureza`: `CHECK (natureza_pedido IN ('B2C','B2B','B2B2C'))` -- uppercase
+- Constraint `chk_status`: inclui `cancelado`
+- 1 pedido existente com `valor_total_informado = 0`
+- `operational_order_items` sem DELETE policy (RLS ativo)
+- Coluna `valor_total_informado`: NOT NULL DEFAULT 0
 
-## 1. Migracao SQL
+## Execução
 
-Uma migracao com:
+### Passo 1 — Data fix (via insert tool)
+```sql
+UPDATE operational_orders SET valor_total_informado = 0.01 WHERE valor_total_informado = 0;
+```
 
-- **`operational_orders`**: header com `valor_total_informado NOT NULL DEFAULT 0`, constraints de status/natureza/pagamento, `pedido_origem_tipo` + `pedido_origem_id` com constraint de integridade (`chk_origem_integridade`), `is_fiscal_exempt`, `reconciliado`, `divergencia`, `responsavel`, `observacoes`, `created_by`
-- **`operational_order_items`**: `produto`, `quantidade`, `unidade` (un/kg), FK cascade
-- **Indices**: `idx_operational_orders_numero_nf`, `idx_operational_orders_natureza`, `idx_operational_orders_status`, `idx_operational_order_items_order_id`
-- **Trigger**: `set_updated_at` reutilizavel, aplicado em `operational_orders`
-- **Storage bucket**: `operational-documents`
-- **RLS**: authenticated SELECT/INSERT/UPDATE em ambas tabelas. Sem policy DELETE.
+### Passo 2 — Migração SQL
+```sql
+-- Natureza: renomear constraint + adicionar Seeding
+ALTER TABLE operational_orders DROP CONSTRAINT chk_natureza;
+ALTER TABLE operational_orders ADD CONSTRAINT chk_operational_orders_natureza
+  CHECK (natureza_pedido IN ('B2C','B2B','B2B2C','Seeding'));
 
-## 2. Arquivos novos
+-- Valor: default seguro + CHECK > 0
+ALTER TABLE operational_orders ALTER COLUMN valor_total_informado SET DEFAULT 0.01;
+ALTER TABLE operational_orders ADD CONSTRAINT chk_valor_total_positive
+  CHECK (valor_total_informado > 0);
 
-| Arquivo | Funcao |
-|---|---|
-| `src/data/operationalProducts.ts` | Constantes agrupadas: 7 placeholders Comida de Dragao (un) + 5 Lets Fly (kg) incluindo Frass |
-| `src/hooks/useOperationalOrders.ts` | Fetch orders com join em customer + items. Mutations: create (order + items), update, updateStatus (com validacao de transicao), cancel. Auto-calc `is_fiscal_exempt`. `numero_nf` sempre UPPER |
-| `src/pages/KanbanOperacional.tsx` | Board 4 colunas (pedidos, aguardando_expedicao, fechado, enviado). Filtro natureza. Botao CSV export (1 linha/pedido, produtos concatenados). Badge "aberto ha X dias" se >7d |
-| `src/components/kanban/KanbanColumn.tsx` | Coluna com titulo, contagem, lista de OrderCards |
-| `src/components/kanban/OrderCard.tsx` | Card com badge natureza (B2C/B2B/B2B2C), itens resumidos, badges (reconciliado verde, divergente vermelho, dias aberto azul), botoes mover/editar/cancelar |
-| `src/components/kanban/NewOrderForm.tsx` | Dialog: customer autocomplete (query `customer` table), natureza select, multi-item (dropdown agrupado por marca, quantidade, unidade auto), valor_total_informado, forma_pagamento, responsavel, observacoes |
-| `src/components/kanban/EditOrderForm.tsx` | Dialog: todos campos editaveis em qualquer status, incluindo lote/peso/medidas/rastreio/NF + itens |
+-- Destinatário (coexiste com customer_id)
+ALTER TABLE operational_orders
+  ADD COLUMN destinatario_nome text,
+  ADD COLUMN destinatario_documento text,
+  ADD COLUMN destinatario_email text,
+  ADD COLUMN destinatario_telefone text,
+  ADD COLUMN destinatario_endereco text,
+  ADD COLUMN destinatario_bairro text,
+  ADD COLUMN destinatario_cidade text,
+  ADD COLUMN destinatario_cep text;
 
-## 3. Arquivos editados
+-- Fiscal
+ALTER TABLE operational_orders
+  ADD COLUMN tipo_nf text CHECK (tipo_nf IN ('venda','bonificacao','remessa','nao_aplicavel')),
+  ADD COLUMN nf_pendente boolean DEFAULT false;
 
-| Arquivo | Mudanca |
-|---|---|
-| `src/App.tsx` | Rota `/kanban-operacional` com ProtectedRoute + AuthenticatedLayout (mesmo pattern das outras rotas, linha ~289) |
-| `src/components/AppSidebar.tsx` | Item "Kanban" com icone `ClipboardList` na secao "Produtos & Ops", apos Operacoes |
+-- DELETE policy em items (para edit flow)
+CREATE POLICY "Authenticated can delete operational_order_items"
+  ON operational_order_items FOR DELETE TO authenticated USING (true);
+```
 
-## 4. Regras de negocio
+### Passo 3 — 6 arquivos de codigo
 
-- **Transicao para `aguardando_expedicao`**: requer `customer_id` + minimo 1 item
-- **Transicao para `fechado`**: requer `lote`, `peso_total`, `medidas`
-- **Transicao para `enviado`**: requer `codigo_rastreio`; requer `numero_nf` exceto se `is_fiscal_exempt` (todos itens = "Frass")
-- **Cancelar**: seta `status_operacional = 'cancelado'` (sem delete)
-- **CSV**: 1 linha/pedido, produtos concatenados com quantidade e unidade ("Farinha BSF x 300kg, Frass x 100kg"). Sem coluna "quantidade total" generica
+**1. `src/data/operationalProducts.ts`** — reescrever completo
 
-## 5. Nao implementar agora
+Interface com `id`, `nome`, `unidade`, `marca`, `categoria` (produto/kit/amostra/material). 33 produtos conforme catálogo aprovado. Helpers: `findProductById(id)` e `productsByBrandAndCategory` (agrupamento duplo).
 
-Upload documentos, drag-and-drop, reconciliacao automatica, historico de edicoes
+**2. `src/hooks/useOperationalOrders.ts`**
+
+- Interfaces: adicionar 8 campos destinatario + `tipo_nf` + `nf_pendente` em `OperationalOrder`, `CreateOrderInput`, `UpdateOrderInput`
+- `calcIsFiscalExempt`: comparar `item.produto === "LF_FRASS"`
+- `nf_pendente` universal: `= !numero_nf` em create/update
+- Validar `valor > 0` no hook
+- `updateStatus` para Seeding: exigir destinatario (nome/endereco/cidade/cep) se sem customer_id; para `enviado` sem NF, setar `nf_pendente = true` sem bloquear
+
+**3. `src/components/kanban/NewOrderForm.tsx`**
+
+- Natureza: adicionar "Seeding"
+- Dropdown: gravar `product.id`, exibir `product.nome (unidade)`, agrupar marca → categoria
+- Campos destinatario condicionais (Seeding sem cliente)
+- Campo `tipo_nf` (default "bonificacao" para Seeding)
+- Validar valor > 0
+
+**4. `src/components/kanban/EditOrderForm.tsx`** — mesmas mudanças
+
+**5. `src/components/kanban/OrderCard.tsx`**
+
+- `findProductById` para nomes amigaveis nos itens
+- Badge "SEEDING" roxo
+- Badge "⚠ NF PENDENTE" amarelo quando `nf_pendente === true`
+
+**6. `src/pages/KanbanOperacional.tsx`**
+
+- Filtro natureza: adicionar "Seeding"
+- CSV: `findProductById` para nomes, colunas Tipo NF / NF Pendente
 
 ## Impacto
 
-- 2 tabelas + 1 bucket + 4 indices + 1 trigger
-- 7 arquivos novos, 2 editados
-- 0 alteracoes em calculos financeiros ou sales_data
+- 1 data fix + 1 migração (10 colunas, 2 constraints alteradas, 1 RLS policy)
+- 1 arquivo reescrito, 5 editados
+- `operational_order_items.produto` passa a gravar ID tecnico
+- `nf_pendente` universal, sem logica por natureza
 
