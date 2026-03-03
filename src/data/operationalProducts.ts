@@ -3,58 +3,50 @@ export interface OperationalProduct {
   nome: string;
   unidade: "un" | "kg";
   marca: string;
-  categoria: "produto" | "kit" | "amostra" | "material";
+  categoria: "produto" | "kit" | "amostra" | "material" | "insumo";
 }
 
 export const operationalProducts: OperationalProduct[] = [
-  // ── Comida de Dragão — Produtos ──
-  { id: "CD_FARINHA_GRILO", nome: "Farinha de Grilo", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
-  { id: "CD_FARINHA_TENEBRIO", nome: "Farinha de Tenébrio", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
-  { id: "CD_FARINHA_BSF", nome: "Farinha de BSF", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
-  { id: "CD_BARRA_GRILO", nome: "Barra Proteica Grilo", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
-  { id: "CD_BARRA_TENEBRIO", nome: "Barra Proteica Tenébrio", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
-  { id: "CD_SNACK_GRILO", nome: "Snack de Grilo", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
-  { id: "CD_MIX_PROTEICO", nome: "Mix Proteico", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
-  { id: "CD_MORDIDA_LEGUMES", nome: "Mordida de Dragão Legumes", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
-  { id: "CD_MORDIDA_SPIRULINA", nome: "Mordida de Dragão Spirulina", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
-  { id: "CD_ORIGINAL_90G", nome: "Comida de Dragão Original 90g", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
+  // ── Comida de Dragão — Produtos (7) ──
+  { id: "CD_ORIGINAL_90G",              nome: "Comida de Dragão - Original (90g)",        unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
+  { id: "CD_MORDIDA_LEGUMES_180G",      nome: "Mordida de Dragão - Legumes (180g)",       unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
+  { id: "CD_MORDIDA_SPIRULINA_180G",    nome: "Mordida de Dragão - Spirulina (180g)",     unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
+  { id: "CD_SUPLEMENTO_INTEGRAL_180G",  nome: "Suplemento Integral para Cães (180g)",     unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
+  { id: "CD_SUPLEMENTO_CONCENTRADO_200G", nome: "Suplemento Concentrado para Cães (200g)", unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
+  { id: "CD_SUPLEMENTO_GATOS_180G",     nome: "Suplemento para Gatos (180g)",             unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
+  { id: "CD_GRUB_120G",                 nome: "Grub (120g)",                               unidade: "un", marca: "Comida de Dragão", categoria: "produto" },
 
-  // ── Comida de Dragão — Kits ──
-  { id: "CD_KIT_DEGUSTACAO", nome: "Kit Degustação", unidade: "un", marca: "Comida de Dragão", categoria: "kit" },
-  { id: "CD_KIT_FARINHAS", nome: "Kit Farinhas", unidade: "un", marca: "Comida de Dragão", categoria: "kit" },
-  { id: "CD_KIT_BARRAS", nome: "Kit Barras", unidade: "un", marca: "Comida de Dragão", categoria: "kit" },
-  { id: "CD_KIT_COMPLETO", nome: "Kit Completo", unidade: "un", marca: "Comida de Dragão", categoria: "kit" },
+  // ── Comida de Dragão — Kits (5) ──
+  { id: "CD_KIT_COMPLETO",      nome: "Kit Completo (3 produtos)",                  unidade: "un", marca: "Comida de Dragão", categoria: "kit" },
+  { id: "CD_KIT_ORIGINAL_3X",   nome: "Kit Comida de Dragão - Original (3x90g)",    unidade: "un", marca: "Comida de Dragão", categoria: "kit" },
+  { id: "CD_KIT_LEGUMES_3X",    nome: "Kit Mordida de Dragão - Legumes (3x180g)",   unidade: "un", marca: "Comida de Dragão", categoria: "kit" },
+  { id: "CD_KIT_SPIRULINA_3X",  nome: "Kit Mordida de Dragão - Spirulina (3x180g)", unidade: "un", marca: "Comida de Dragão", categoria: "kit" },
+  { id: "CD_KIT_GATOS",         nome: "Kit Comida de Dragão para Gatos",            unidade: "un", marca: "Comida de Dragão", categoria: "kit" },
 
-  // ── Comida de Dragão — Amostras ──
-  { id: "CD_AMOSTRA_FARINHA", nome: "Amostra Farinha", unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
-  { id: "CD_AMOSTRA_BARRA", nome: "Amostra Barra", unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
-  { id: "CD_AMOSTRA_SNACK", nome: "Amostra Snack", unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
-  { id: "CD_AMOSTRA_MIX", nome: "Amostra Mix", unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
+  // ── Comida de Dragão — Amostras (8) ──
+  { id: "CD_KIT_AMOSTRAS",                  nome: "Kit de Amostras",                          unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
+  { id: "CD_AMOSTRA_ORIGINAL",              nome: "Amostra Original",                         unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
+  { id: "CD_AMOSTRA_LEGUMES",               nome: "Amostra Legumes",                          unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
+  { id: "CD_AMOSTRA_SPIRULINA",             nome: "Amostra Spirulina",                        unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
+  { id: "CD_AMOSTRA_SUPLEMENTO_INTEGRAL",   nome: "Amostra Suplemento Integral",              unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
+  { id: "CD_AMOSTRA_SUPLEMENTO_CONCENTRADO", nome: "Amostra Suplemento Concentrado",          unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
+  { id: "CD_AMOSTRA_GATOS",                 nome: "Amostra Gatos",                            unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
+  { id: "CD_AMOSTRA_GRUB",                  nome: "Amostra Grub",                             unidade: "un", marca: "Comida de Dragão", categoria: "amostra" },
 
-  // ── Comida de Dragão — Material ──
-  { id: "CD_MATERIAL_DISPLAY", nome: "Display PDV", unidade: "un", marca: "Comida de Dragão", categoria: "material" },
-  { id: "CD_MATERIAL_FOLDER", nome: "Folder Institucional", unidade: "un", marca: "Comida de Dragão", categoria: "material" },
+  // ── Comida de Dragão — Materiais (5) ──
+  { id: "CD_INFOGRAFICO",    nome: "Infográfico",    unidade: "un", marca: "Comida de Dragão", categoria: "material" },
+  { id: "CD_QR_CODE",        nome: "QR Code",        unidade: "un", marca: "Comida de Dragão", categoria: "material" },
+  { id: "CD_CAIXA_SEEDING",  nome: "Caixa Seeding",  unidade: "un", marca: "Comida de Dragão", categoria: "material" },
+  { id: "CD_CANECA",         nome: "Caneca",         unidade: "un", marca: "Comida de Dragão", categoria: "material" },
+  { id: "CD_ADESIVO",        nome: "Adesivo",        unidade: "un", marca: "Comida de Dragão", categoria: "material" },
 
-  // ── Lets Fly — Produtos ──
-  { id: "LF_FARINHA_BSF", nome: "Farinha BSF", unidade: "kg", marca: "Lets Fly", categoria: "produto" },
-  { id: "LF_OLEO_BSF", nome: "Óleo BSF", unidade: "kg", marca: "Lets Fly", categoria: "produto" },
-  { id: "LF_LARVA_DESIDRATADA", nome: "Larva Desidratada", unidade: "kg", marca: "Lets Fly", categoria: "produto" },
-  { id: "LF_LARVA_VIVA", nome: "Larva Viva", unidade: "kg", marca: "Lets Fly", categoria: "produto" },
-  { id: "LF_FRASS", nome: "Frass", unidade: "kg", marca: "Lets Fly", categoria: "produto" },
-
-  // ── Lets Fly — Kits ──
-  { id: "LF_KIT_AMOSTRA_PET", nome: "Kit Amostra Pet", unidade: "un", marca: "Lets Fly", categoria: "kit" },
-  { id: "LF_KIT_AMOSTRA_AGRO", nome: "Kit Amostra Agro", unidade: "un", marca: "Lets Fly", categoria: "kit" },
-
-  // ── Lets Fly — Amostras ──
-  { id: "LF_AMOSTRA_FARINHA", nome: "Amostra Farinha BSF", unidade: "kg", marca: "Lets Fly", categoria: "amostra" },
-  { id: "LF_AMOSTRA_OLEO", nome: "Amostra Óleo BSF", unidade: "kg", marca: "Lets Fly", categoria: "amostra" },
-  { id: "LF_AMOSTRA_LARVA", nome: "Amostra Larva Desidratada", unidade: "kg", marca: "Lets Fly", categoria: "amostra" },
-  { id: "LF_AMOSTRA_FRASS", nome: "Amostra Frass", unidade: "kg", marca: "Lets Fly", categoria: "amostra" },
-
-  // ── Lets Fly — Material ──
-  { id: "LF_MATERIAL_FICHA", nome: "Ficha Técnica", unidade: "un", marca: "Lets Fly", categoria: "material" },
-  { id: "LF_MATERIAL_LAUDO", nome: "Laudo Laboratorial", unidade: "un", marca: "Lets Fly", categoria: "material" },
+  // ── Lets Fly — Insumos (6) ──
+  { id: "LF_FARINHA_BSF_INTEGRAL",       nome: "Farinha BSF Integral (kg)",       unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+  { id: "LF_FARINHA_BSF_DESENGORDURADA", nome: "Farinha BSF Desengordurada (kg)", unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+  { id: "LF_FARINHA_BSF_DESIDRATADA",    nome: "Farinha BSF Desidratada (kg)",    unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+  { id: "LF_LARVA_IN_NATURA",            nome: "Larva in Natura de BSF (kg)",     unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+  { id: "LF_OLEO_BSF",                   nome: "Óleo de BSF (kg)",               unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+  { id: "LF_FRASS",                      nome: "Frass (kg)",                      unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
 ];
 
 const categoriaLabels: Record<string, string> = {
@@ -62,6 +54,7 @@ const categoriaLabels: Record<string, string> = {
   kit: "Kits",
   amostra: "Amostras",
   material: "Material",
+  insumo: "Insumos",
 };
 
 export function findProductById(id: string): OperationalProduct | undefined {
