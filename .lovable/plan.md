@@ -1,94 +1,72 @@
 
 
-# Catálogo Operacional + Seeding — Plano Final
+# Normalização Fiscal Determinística — Plano Revisado
 
-## Estado atual do banco (confirmado)
+## Contagem correta: 31 produtos
 
-- Constraint `chk_natureza`: `CHECK (natureza_pedido IN ('B2C','B2B','B2B2C'))` -- uppercase
-- Constraint `chk_status`: inclui `cancelado`
-- 1 pedido existente com `valor_total_informado = 0`
-- `operational_order_items` sem DELETE policy (RLS ativo)
-- Coluna `valor_total_informado`: NOT NULL DEFAULT 0
+Recontagem da lista aprovada:
+- CD Produtos: 7
+- CD Kits: 5
+- CD Amostras: 8
+- CD Materiais: 5
+- LF Insumos: 6
 
-## Execução
+**Total: 31** (o LF original listava 7 no titulo mas so 6 itens). O assertion sera `=== 31`.
 
-### Passo 1 — Data fix (via insert tool)
-```sql
-UPDATE operational_orders SET valor_total_informado = 0.01 WHERE valor_total_informado = 0;
+## Arquivos alterados (2)
+
+### 1. `src/data/operationalProducts.ts` — reescrever array com 31 produtos aprovados
+
+Substituir os 30 placeholders antigos (Farinha de Grilo, Barra Proteica, etc.) pelos 31 oficiais. IDs, nomes, unidades e categorias conforme lista aprovada. Helpers `findProductById`, `productsByBrandAndCategory`, `productsByBrand` permanecem iguais — apenas dados mudam.
+
+### 2. `src/utils/productNormalizer.ts` — expandir + criar `normalizeFiscalProduct`
+
+**a) Expandir `standardizeProductName`** — adicionar 11 regras faltantes (ordem: especifico antes de generico):
+
+- `grub` → `Grub (120g)`
+- `caneca` → `Caneca`
+- `infogr[aá]fico` → `Infografico`
+- `qr code` → `QR Code`
+- `caixa seeding` → `Caixa Seeding`
+- `adesivo` → `Adesivo`
+- `kit.*gatos` → `Kit Comida de Dragao para Gatos`
+- `farinha.*bsf.*desengordurada` (strip lote) → `Farinha BSF Desengordurada (kg)`
+- `farinha.*bsf.*desidratada` → `Farinha BSF Desidratada (kg)`
+- `farinha.*bsf` (integral fallback) → `Farinha BSF Integral (kg)`
+- `larva.*natura` → `Larva in Natura de BSF (kg)`
+- `[oó]leo.*bsf` → `Oleo de BSF (kg)`
+- `frass` → `Frass (kg)`
+- `kit legumes.*3` / `kit original.*3` / `kit spirulina.*3` → nomes longos
+
+**b) Criar `FRIENDLY_TO_ID`** — tabela de 31 entradas mapeando nome amigavel → ID tecnico. Gerada dinamicamente a partir de `operationalProducts` para evitar ponto de verdade duplicado.
+
+**c) Criar `normalizeFiscalProduct`**:
+```typescript
+type NormalizedFiscalProduct = {
+  friendlyName: string;
+  productId: string | null;
+  reason: 'marketplace' | 'unmapped' | 'ok';
+};
 ```
+Logica:
+1. Checar lista marketplace (petisco, biscoito) → `{ friendlyName: raw, productId: null, reason: 'marketplace' }`
+2. Chamar `standardizeProductName(raw, price)` → friendlyName
+3. Lookup no `FRIENDLY_TO_ID` → productId ou null
+4. Se null e nao marketplace → `console.warn('[FISCAL] Produto nao mapeado:', raw)` + reason `'unmapped'`
 
-### Passo 2 — Migração SQL
-```sql
--- Natureza: renomear constraint + adicionar Seeding
-ALTER TABLE operational_orders DROP CONSTRAINT chk_natureza;
-ALTER TABLE operational_orders ADD CONSTRAINT chk_operational_orders_natureza
-  CHECK (natureza_pedido IN ('B2C','B2B','B2B2C','Seeding'));
-
--- Valor: default seguro + CHECK > 0
-ALTER TABLE operational_orders ALTER COLUMN valor_total_informado SET DEFAULT 0.01;
-ALTER TABLE operational_orders ADD CONSTRAINT chk_valor_total_positive
-  CHECK (valor_total_informado > 0);
-
--- Destinatário (coexiste com customer_id)
-ALTER TABLE operational_orders
-  ADD COLUMN destinatario_nome text,
-  ADD COLUMN destinatario_documento text,
-  ADD COLUMN destinatario_email text,
-  ADD COLUMN destinatario_telefone text,
-  ADD COLUMN destinatario_endereco text,
-  ADD COLUMN destinatario_bairro text,
-  ADD COLUMN destinatario_cidade text,
-  ADD COLUMN destinatario_cep text;
-
--- Fiscal
-ALTER TABLE operational_orders
-  ADD COLUMN tipo_nf text CHECK (tipo_nf IN ('venda','bonificacao','remessa','nao_aplicavel')),
-  ADD COLUMN nf_pendente boolean DEFAULT false;
-
--- DELETE policy em items (para edit flow)
-CREATE POLICY "Authenticated can delete operational_order_items"
-  ON operational_order_items FOR DELETE TO authenticated USING (true);
+**d) Assertion de integridade**:
+```typescript
+if (Object.keys(FRIENDLY_TO_ID).length !== 31) {
+  console.error('[FISCAL] Catalogo incompleto:', Object.keys(FRIENDLY_TO_ID).length, 'de 31');
+}
 ```
-
-### Passo 3 — 6 arquivos de codigo
-
-**1. `src/data/operationalProducts.ts`** — reescrever completo
-
-Interface com `id`, `nome`, `unidade`, `marca`, `categoria` (produto/kit/amostra/material). 33 produtos conforme catálogo aprovado. Helpers: `findProductById(id)` e `productsByBrandAndCategory` (agrupamento duplo).
-
-**2. `src/hooks/useOperationalOrders.ts`**
-
-- Interfaces: adicionar 8 campos destinatario + `tipo_nf` + `nf_pendente` em `OperationalOrder`, `CreateOrderInput`, `UpdateOrderInput`
-- `calcIsFiscalExempt`: comparar `item.produto === "LF_FRASS"`
-- `nf_pendente` universal: `= !numero_nf` em create/update
-- Validar `valor > 0` no hook
-- `updateStatus` para Seeding: exigir destinatario (nome/endereco/cidade/cep) se sem customer_id; para `enviado` sem NF, setar `nf_pendente = true` sem bloquear
-
-**3. `src/components/kanban/NewOrderForm.tsx`**
-
-- Natureza: adicionar "Seeding"
-- Dropdown: gravar `product.id`, exibir `product.nome (unidade)`, agrupar marca → categoria
-- Campos destinatario condicionais (Seeding sem cliente)
-- Campo `tipo_nf` (default "bonificacao" para Seeding)
-- Validar valor > 0
-
-**4. `src/components/kanban/EditOrderForm.tsx`** — mesmas mudanças
-
-**5. `src/components/kanban/OrderCard.tsx`**
-
-- `findProductById` para nomes amigaveis nos itens
-- Badge "SEEDING" roxo
-- Badge "⚠ NF PENDENTE" amarelo quando `nf_pendente === true`
-
-**6. `src/pages/KanbanOperacional.tsx`**
-
-- Filtro natureza: adicionar "Seeding"
-- CSV: `findProductById` para nomes, colunas Tipo NF / NF Pendente
 
 ## Impacto
 
-- 1 data fix + 1 migração (10 colunas, 2 constraints alteradas, 1 RLS policy)
-- 1 arquivo reescrito, 5 editados
-- `operational_order_items.produto` passa a gravar ID tecnico
-- `nf_pendente` universal, sem logica por natureza
+- Zero breaking changes (5 arquivos que importam `standardizeProductName` continuam funcionando)
+- `normalizeFiscalProduct` fica disponivel para reconciliacao futura (nao e chamada ainda)
+- Catalogo operacional corrigido (31 reais, zero placeholders)
+- Marketplace explicitamente excluido
+- Produtos nao mapeados visiveis via console.warn
+- Nenhuma migracao SQL
 
