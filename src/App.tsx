@@ -30,6 +30,7 @@ import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
 import Clientes from "./pages/Clientes";
 import ClientePerfil from "./pages/ClientePerfil";
 import Reclamacoes from "./pages/Reclamacoes";
+import Atendimentos from "./pages/Atendimentos";
 import ReclamacaoNova from "./pages/ReclamacaoNova";
 import RadarOperacional from "./pages/RadarOperacional";
 import NotFound from "./pages/NotFound";
@@ -267,6 +268,14 @@ const App = () => (
             <ProtectedRoute>
               <AuthenticatedLayout>
                 <Reclamacoes />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/atendimentos" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <Atendimentos />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />

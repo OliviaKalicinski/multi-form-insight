@@ -113,6 +113,7 @@ const navSections: NavSection[] = [
     items: [
       { title: "Radar Operacional", url: "/radar-operacional", icon: Activity },
       { title: "Clientes", url: "/clientes", icon: Users },
+      { title: "Atendimentos", url: "/atendimentos", icon: Headset },
       { title: "Reclamações", url: "/reclamacoes", icon: MessageSquareWarning },
     ],
   },
