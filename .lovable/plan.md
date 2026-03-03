@@ -1,59 +1,49 @@
 
 
-# Pagina de Atendimentos — Centralizada como Reclamacoes
+# Two Changes: Sorting in Clientes + New/Edit in Atendimentos
 
-## Contexto
+## 1. Clientes — Add sortable columns for Segmento, Churn, Pedidos, Responsavel
 
-Hoje os registros de contato (`customer_contact_log`) so aparecem dentro do perfil individual do cliente. O pedido e criar uma pagina `/atendimentos` que centraliza todos os atendimentos de todos os clientes em uma unica tabela, exatamente como `/reclamacoes` faz para `customer_complaint`.
+Currently `SortKey` only supports `'nome' | 'total_revenue' | 'days_since_last_purchase' | 'last_order_date'`. The columns Segmento, Churn, Pedidos, and Responsavel exist in the table but are not clickable for sorting.
 
-A tabela `customer_contact_log` tem 3 registros e os campos: `id`, `customer_id`, `data_contato`, `tipo`, `motivo`, `resumo`, `responsavel`, `resultado`.
+**Changes in `src/pages/Clientes.tsx`:**
+- Expand `SortKey` type to include `'segment' | 'churn_status' | 'total_orders_revenue' | 'responsavel'`
+- Add sort logic for each: segment and churn use string compare, orders uses numeric, responsavel uses string compare
+- Add `cursor-pointer` + `onClick={() => toggleSort(...)}` + `ArrowUpDown` icon to the Segmento, Churn, Pedidos, and Responsavel `TableHead` cells (matching existing pattern of Nome and Receita)
 
-## Plano
+## 2. Atendimentos — Add "Novo Atendimento" button + Edit existing
 
-### 1. Criar hook `useAllContactLogs` (`src/hooks/useAllContactLogs.ts`)
+### 2a. "Novo Atendimento" button
 
-O hook atual (`useContactLogs`) filtra por `customerId`. Criar um novo hook que busca todos os registros sem filtro, com paginacao (mesmo pattern do `useCustomerData` corrigido — loop de 1000 em 1000, embora com 3 registros hoje nao seja necessario, mas para consistencia).
+The `ContactLogForm` component already exists but requires a `customerId`. For the centralized page, the form needs a customer selector.
 
-Retorna array de `ContactLog[]` ordenado por `data_contato DESC`.
+**Changes:**
+- Create `src/components/crm/ContactLogFormWithCustomerSelect.tsx` — wraps the existing form fields in a Dialog, but adds a customer search/select field at the top (combobox searching `customers` by name/cpf). Once a customer is selected, the `customer_id` is set. Uses same fields as `ContactLogForm`.
+- In `Atendimentos.tsx`: add a `Plus` button "Novo Atendimento" in the header (same position as Reclamacoes). Opens the new form dialog. On submit, calls `addLog` mutation and invalidates `all-contact-logs` query.
 
-### 2. Criar pagina `Atendimentos` (`src/pages/Atendimentos.tsx`)
+### 2b. Edit existing atendimento
 
-Seguindo exatamente o pattern de `Reclamacoes.tsx`:
+**Changes:**
+- Create `src/components/crm/ContactLogEditForm.tsx` — Dialog pre-populated with existing log data (tipo, motivo, resumo, responsavel, resultado). Same pattern as `ComplaintEditForm`.
+- Add `updateLog` mutation to `useAllContactLogs.ts` (or create inline in Atendimentos) — `supabase.from('customer_contact_log').update({...}).eq('id', id)`, then invalidate queries.
+- In `Atendimentos.tsx`: add a `Pencil` icon button per row. Clicking opens `ContactLogEditForm` with the selected log. On submit, calls update mutation.
 
-- Header com titulo "Atendimentos" + contagem
-- Botao "Exportar CSV"
-- Filtros: busca por texto, filtro por tipo (ligacao/whatsapp/email/sac/outro), filtro por responsavel
-- Tabela com colunas sortable: **Data**, **Cliente**, **Tipo**, **Motivo**, **Resumo** (truncado), **Responsavel**, **Resultado**, **Acao** (link para perfil do cliente)
-- Mapa de clientes via `useCustomerData` para resolver nomes (mesmo pattern de Reclamacoes)
-- Sorting com nulls-last para data
-- Navegacao para perfil do cliente ao clicar no link
+### 2c. Hook changes
 
-### 3. Registrar rota em `App.tsx`
+- Add `addLog` and `updateLog` mutations to `useAllContactLogs.ts` so the centralized page can create and edit without needing a per-customer hook.
 
-Adicionar rota `/atendimentos` protegida com `AuthenticatedLayout`, no mesmo bloco das rotas CRM.
+## Files
 
-### 4. Adicionar link no sidebar (`AppSidebar.tsx`)
+| File | Action |
+|------|--------|
+| `src/pages/Clientes.tsx` | Edit — expand SortKey, add clickable headers |
+| `src/pages/Atendimentos.tsx` | Edit — add New button, edit button per row |
+| `src/hooks/useAllContactLogs.ts` | Edit — add `addLog` and `updateLog` mutations |
+| `src/components/crm/ContactLogFormWithCustomerSelect.tsx` | Create — new atendimento form with customer selector |
+| `src/components/crm/ContactLogEditForm.tsx` | Create — edit form for existing atendimento |
 
-Dentro da secao "CRM", adicionar item:
-- Titulo: "Atendimentos"
-- URL: `/atendimentos`
-- Icone: `Headset` (ja importado)
-
-Posicao: entre "Clientes" e "Reclamacoes" no menu CRM.
-
-## Arquivos
-
-| Arquivo | Acao |
-|---------|------|
-| `src/hooks/useAllContactLogs.ts` | Criar (novo hook) |
-| `src/pages/Atendimentos.tsx` | Criar (nova pagina) |
-| `src/App.tsx` | Adicionar rota |
-| `src/components/AppSidebar.tsx` | Adicionar item no menu CRM |
-
-## Impacto
-
-- 0 migracoes de banco
-- 0 componentes novos (usa Table, Badge, Button, Select, Input existentes)
-- 0 alteracoes em calculos
-- Mesmo pattern visual de Reclamacoes
+## Impact
+- 0 database migrations (RLS already allows insert/update for authenticated)
+- 2 new components (following existing patterns)
+- No calculation changes
 
