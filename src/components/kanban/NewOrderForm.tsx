@@ -6,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { operationalProducts, productsByBrand, OperationalProduct } from "@/data/operationalProducts";
+import { productsByBrandAndCategory, findProductById } from "@/data/operationalProducts";
 import { Plus, Trash2 } from "lucide-react";
 import { OrderItem } from "@/hooks/useOperationalOrders";
+import { toast } from "sonner";
 
 interface NewOrderFormProps {
   open: boolean;
@@ -21,6 +22,15 @@ interface NewOrderFormProps {
     responsavel?: string | null;
     observacoes?: string | null;
     items: OrderItem[];
+    destinatario_nome?: string | null;
+    destinatario_documento?: string | null;
+    destinatario_email?: string | null;
+    destinatario_telefone?: string | null;
+    destinatario_endereco?: string | null;
+    destinatario_bairro?: string | null;
+    destinatario_cidade?: string | null;
+    destinatario_cep?: string | null;
+    tipo_nf?: string | null;
   }) => void;
   isLoading?: boolean;
 }
@@ -41,12 +51,27 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
   const [responsavel, setResponsavel] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [items, setItems] = useState<OrderItem[]>([{ produto: "", quantidade: 1, unidade: "un" }]);
+  const [tipoNf, setTipoNf] = useState("");
+
+  // Destinatário
+  const [destNome, setDestNome] = useState("");
+  const [destDocumento, setDestDocumento] = useState("");
+  const [destEmail, setDestEmail] = useState("");
+  const [destTelefone, setDestTelefone] = useState("");
+  const [destEndereco, setDestEndereco] = useState("");
+  const [destBairro, setDestBairro] = useState("");
+  const [destCidade, setDestCidade] = useState("");
+  const [destCep, setDestCep] = useState("");
+
+  const isSeeding = natureza === "Seeding";
+  const showDestinatario = isSeeding && !selectedCustomer;
 
   useEffect(() => {
-    if (customerSearch.length < 2) {
-      setCustomers([]);
-      return;
-    }
+    if (isSeeding && !tipoNf) setTipoNf("bonificacao");
+  }, [isSeeding, tipoNf]);
+
+  useEffect(() => {
+    if (customerSearch.length < 2) { setCustomers([]); return; }
     const timeout = setTimeout(async () => {
       const { data } = await supabase
         .from("customer")
@@ -59,12 +84,12 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
     return () => clearTimeout(timeout);
   }, [customerSearch]);
 
-  const handleProductChange = (index: number, productName: string) => {
-    const product = operationalProducts.find((p) => p.nome === productName);
+  const handleProductChange = (index: number, productId: string) => {
+    const product = findProductById(productId);
     const newItems = [...items];
     newItems[index] = {
       ...newItems[index],
-      produto: productName,
+      produto: productId,
       unidade: product?.unidade || "un",
     };
     setItems(newItems);
@@ -75,15 +100,30 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const parsedValor = parseFloat(valor) || 0;
+    if (parsedValor <= 0) {
+      toast.error("Valor total deve ser maior que zero");
+      return;
+    }
+
     const validItems = items.filter((i) => i.produto);
     onSubmit({
       customer_id: selectedCustomer?.id || null,
       natureza_pedido: natureza,
-      valor_total_informado: parseFloat(valor) || 0,
+      valor_total_informado: parsedValor,
       forma_pagamento: pagamento || null,
       responsavel: responsavel || null,
       observacoes: observacoes || null,
       items: validItems,
+      tipo_nf: tipoNf || null,
+      destinatario_nome: destNome || null,
+      destinatario_documento: destDocumento || null,
+      destinatario_email: destEmail || null,
+      destinatario_telefone: destTelefone || null,
+      destinatario_endereco: destEndereco || null,
+      destinatario_bairro: destBairro || null,
+      destinatario_cidade: destCidade || null,
+      destinatario_cep: destCep || null,
     });
     // Reset
     setSelectedCustomer(null);
@@ -94,6 +134,9 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
     setResponsavel("");
     setObservacoes("");
     setItems([{ produto: "", quantidade: 1, unidade: "un" }]);
+    setTipoNf("");
+    setDestNome(""); setDestDocumento(""); setDestEmail(""); setDestTelefone("");
+    setDestEndereco(""); setDestBairro(""); setDestCidade(""); setDestCep("");
   };
 
   return (
@@ -151,50 +194,102 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
                 <SelectItem value="B2C">B2C</SelectItem>
                 <SelectItem value="B2B">B2B</SelectItem>
                 <SelectItem value="B2B2C">B2B2C</SelectItem>
+                <SelectItem value="Seeding">Seeding</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {/* Destinatário (condicional) */}
+          {showDestinatario && (
+            <div className="border rounded-md p-3 space-y-3 bg-muted/30">
+              <h4 className="text-sm font-semibold text-muted-foreground">Destinatário</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Nome *</Label>
+                  <Input value={destNome} onChange={(e) => setDestNome(e.target.value)} placeholder="Nome completo" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Documento</Label>
+                  <Input value={destDocumento} onChange={(e) => setDestDocumento(e.target.value)} placeholder="CPF/CNPJ" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Email</Label>
+                  <Input type="email" value={destEmail} onChange={(e) => setDestEmail(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Telefone</Label>
+                  <Input value={destTelefone} onChange={(e) => setDestTelefone(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Endereço *</Label>
+                <Input value={destEndereco} onChange={(e) => setDestEndereco(e.target.value)} placeholder="Rua, número, complemento" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Bairro</Label>
+                  <Input value={destBairro} onChange={(e) => setDestBairro(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Cidade *</Label>
+                  <Input value={destCidade} onChange={(e) => setDestCidade(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">CEP *</Label>
+                  <Input value={destCep} onChange={(e) => setDestCep(e.target.value)} placeholder="00000-000" />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Items */}
           <div className="space-y-2">
             <Label>Produtos</Label>
-            {items.map((item, index) => (
-              <div key={index} className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <Select value={item.produto} onValueChange={(v) => handleProductChange(index, v)}>
-                    <SelectTrigger><SelectValue placeholder="Produto" /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(productsByBrand).map(([brand, products]) => (
-                        <div key={brand}>
-                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{brand}</div>
-                          {products.map((p) => (
-                            <SelectItem key={p.nome} value={p.nome}>{p.nome} ({p.unidade})</SelectItem>
-                          ))}
-                        </div>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            {items.map((item, index) => {
+              const product = findProductById(item.produto);
+              return (
+                <div key={index} className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Select value={item.produto} onValueChange={(v) => handleProductChange(index, v)}>
+                      <SelectTrigger><SelectValue placeholder="Produto" /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(productsByBrandAndCategory).map(([brand, categories]) => (
+                          <div key={brand}>
+                            <div className="px-2 py-1.5 text-xs font-bold text-foreground border-b">{brand}</div>
+                            {Object.entries(categories).map(([catLabel, products]) => (
+                              <div key={catLabel}>
+                                <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{catLabel}</div>
+                                {products.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>{p.nome} ({p.unidade})</SelectItem>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    className="w-24"
+                    value={item.quantidade}
+                    onChange={(e) => {
+                      const newItems = [...items];
+                      newItems[index].quantidade = parseFloat(e.target.value) || 0;
+                      setItems(newItems);
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground w-8">{product?.unidade || item.unidade}</span>
+                  {items.length > 1 && (
+                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeItem(index)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-                <Input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  className="w-24"
-                  value={item.quantidade}
-                  onChange={(e) => {
-                    const newItems = [...items];
-                    newItems[index].quantidade = parseFloat(e.target.value) || 0;
-                    setItems(newItems);
-                  }}
-                />
-                <span className="text-xs text-muted-foreground w-8">{item.unidade}</span>
-                {items.length > 1 && (
-                  <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeItem(index)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
+              );
+            })}
             <Button type="button" variant="outline" size="sm" onClick={addItem}>
               <Plus className="h-4 w-4 mr-1" /> Adicionar item
             </Button>
@@ -203,7 +298,21 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
           {/* Valor */}
           <div className="space-y-2">
             <Label>Valor Total Informado (R$)</Label>
-            <Input type="number" step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} />
+            <Input type="number" step="0.01" min="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
+          </div>
+
+          {/* Tipo NF */}
+          <div className="space-y-2">
+            <Label>Tipo NF</Label>
+            <Select value={tipoNf} onValueChange={setTipoNf}>
+              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="venda">Venda</SelectItem>
+                <SelectItem value="bonificacao">Bonificação</SelectItem>
+                <SelectItem value="remessa">Remessa</SelectItem>
+                <SelectItem value="nao_aplicavel">Não Aplicável</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Pagamento */}

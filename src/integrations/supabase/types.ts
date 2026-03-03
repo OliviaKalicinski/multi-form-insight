@@ -686,6 +686,14 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_id: string | null
+          destinatario_bairro: string | null
+          destinatario_cep: string | null
+          destinatario_cidade: string | null
+          destinatario_documento: string | null
+          destinatario_email: string | null
+          destinatario_endereco: string | null
+          destinatario_nome: string | null
+          destinatario_telefone: string | null
           divergencia: string | null
           forma_pagamento: string | null
           id: string
@@ -693,6 +701,7 @@ export type Database = {
           lote: string | null
           medidas: string | null
           natureza_pedido: string
+          nf_pendente: boolean | null
           numero_nf: string | null
           observacoes: string | null
           pedido_origem_id: string | null
@@ -701,6 +710,7 @@ export type Database = {
           reconciliado: boolean
           responsavel: string | null
           status_operacional: string
+          tipo_nf: string | null
           updated_at: string
           valor_total_informado: number
         }
@@ -709,6 +719,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          destinatario_bairro?: string | null
+          destinatario_cep?: string | null
+          destinatario_cidade?: string | null
+          destinatario_documento?: string | null
+          destinatario_email?: string | null
+          destinatario_endereco?: string | null
+          destinatario_nome?: string | null
+          destinatario_telefone?: string | null
           divergencia?: string | null
           forma_pagamento?: string | null
           id?: string
@@ -716,6 +734,7 @@ export type Database = {
           lote?: string | null
           medidas?: string | null
           natureza_pedido?: string
+          nf_pendente?: boolean | null
           numero_nf?: string | null
           observacoes?: string | null
           pedido_origem_id?: string | null
@@ -724,6 +743,7 @@ export type Database = {
           reconciliado?: boolean
           responsavel?: string | null
           status_operacional?: string
+          tipo_nf?: string | null
           updated_at?: string
           valor_total_informado?: number
         }
@@ -732,6 +752,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          destinatario_bairro?: string | null
+          destinatario_cep?: string | null
+          destinatario_cidade?: string | null
+          destinatario_documento?: string | null
+          destinatario_email?: string | null
+          destinatario_endereco?: string | null
+          destinatario_nome?: string | null
+          destinatario_telefone?: string | null
           divergencia?: string | null
           forma_pagamento?: string | null
           id?: string
@@ -739,6 +767,7 @@ export type Database = {
           lote?: string | null
           medidas?: string | null
           natureza_pedido?: string
+          nf_pendente?: boolean | null
           numero_nf?: string | null
           observacoes?: string | null
           pedido_origem_id?: string | null
@@ -747,6 +776,7 @@ export type Database = {
           reconciliado?: boolean
           responsavel?: string | null
           status_operacional?: string
+          tipo_nf?: string | null
           updated_at?: string
           valor_total_informado?: number
         }
