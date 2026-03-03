@@ -1,72 +1,56 @@
 
+# Upload de NF e Boleto — Plano de Implementação Final
 
-# Normalização Fiscal Determinística — Plano Revisado
+## 1. Migração SQL
 
-## Contagem correta: 31 produtos
+```sql
+ALTER TABLE operational_orders
+  ADD COLUMN nf_file_path text,
+  ADD COLUMN boleto_file_path text,
+  ADD COLUMN documentos_atualizados_em timestamptz DEFAULT now();
 
-Recontagem da lista aprovada:
-- CD Produtos: 7
-- CD Kits: 5
-- CD Amostras: 8
-- CD Materiais: 5
-- LF Insumos: 6
+CREATE POLICY "Allow authenticated read operational docs"
+ON storage.objects FOR SELECT TO authenticated
+USING (bucket_id = 'operational-documents');
 
-**Total: 31** (o LF original listava 7 no titulo mas so 6 itens). O assertion sera `=== 31`.
+CREATE POLICY "Allow authenticated insert operational docs"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (bucket_id = 'operational-documents');
 
-## Arquivos alterados (2)
-
-### 1. `src/data/operationalProducts.ts` — reescrever array com 31 produtos aprovados
-
-Substituir os 30 placeholders antigos (Farinha de Grilo, Barra Proteica, etc.) pelos 31 oficiais. IDs, nomes, unidades e categorias conforme lista aprovada. Helpers `findProductById`, `productsByBrandAndCategory`, `productsByBrand` permanecem iguais — apenas dados mudam.
-
-### 2. `src/utils/productNormalizer.ts` — expandir + criar `normalizeFiscalProduct`
-
-**a) Expandir `standardizeProductName`** — adicionar 11 regras faltantes (ordem: especifico antes de generico):
-
-- `grub` → `Grub (120g)`
-- `caneca` → `Caneca`
-- `infogr[aá]fico` → `Infografico`
-- `qr code` → `QR Code`
-- `caixa seeding` → `Caixa Seeding`
-- `adesivo` → `Adesivo`
-- `kit.*gatos` → `Kit Comida de Dragao para Gatos`
-- `farinha.*bsf.*desengordurada` (strip lote) → `Farinha BSF Desengordurada (kg)`
-- `farinha.*bsf.*desidratada` → `Farinha BSF Desidratada (kg)`
-- `farinha.*bsf` (integral fallback) → `Farinha BSF Integral (kg)`
-- `larva.*natura` → `Larva in Natura de BSF (kg)`
-- `[oó]leo.*bsf` → `Oleo de BSF (kg)`
-- `frass` → `Frass (kg)`
-- `kit legumes.*3` / `kit original.*3` / `kit spirulina.*3` → nomes longos
-
-**b) Criar `FRIENDLY_TO_ID`** — tabela de 31 entradas mapeando nome amigavel → ID tecnico. Gerada dinamicamente a partir de `operationalProducts` para evitar ponto de verdade duplicado.
-
-**c) Criar `normalizeFiscalProduct`**:
-```typescript
-type NormalizedFiscalProduct = {
-  friendlyName: string;
-  productId: string | null;
-  reason: 'marketplace' | 'unmapped' | 'ok';
-};
-```
-Logica:
-1. Checar lista marketplace (petisco, biscoito) → `{ friendlyName: raw, productId: null, reason: 'marketplace' }`
-2. Chamar `standardizeProductName(raw, price)` → friendlyName
-3. Lookup no `FRIENDLY_TO_ID` → productId ou null
-4. Se null e nao marketplace → `console.warn('[FISCAL] Produto nao mapeado:', raw)` + reason `'unmapped'`
-
-**d) Assertion de integridade**:
-```typescript
-if (Object.keys(FRIENDLY_TO_ID).length !== 31) {
-  console.error('[FISCAL] Catalogo incompleto:', Object.keys(FRIENDLY_TO_ID).length, 'de 31');
-}
+CREATE POLICY "Allow authenticated update operational docs"
+ON storage.objects FOR UPDATE TO authenticated
+USING (bucket_id = 'operational-documents');
 ```
 
-## Impacto
+## 2. `src/hooks/useOperationalOrders.ts`
 
-- Zero breaking changes (5 arquivos que importam `standardizeProductName` continuam funcionando)
-- `normalizeFiscalProduct` fica disponivel para reconciliacao futura (nao e chamada ainda)
-- Catalogo operacional corrigido (31 reais, zero placeholders)
-- Marketplace explicitamente excluido
-- Produtos nao mapeados visiveis via console.warn
-- Nenhuma migracao SQL
+- Add `nf_file_path`, `boleto_file_path`, `documentos_atualizados_em` to `OperationalOrder` interface
+- Export `uploadOrderDocument(orderId, file, type)` — validates PDF MIME, uploads to `{orderId}/{type}.pdf` with `upsert: true`
+- Export `getSignedUrl(filePath)` — returns 60s signed URL
+- Add `uploadDocument` mutation: upload + update file path column + `documentos_atualizados_em` + if NF: `nf_pendente = false` (never overwrite `numero_nf`)
+- Fix "enviado" validation (line 278): `!order.is_fiscal_exempt && !order.numero_nf && !order.nf_file_path` (triple condition)
+- Fix nf_pendente on send (line 289): `!order.numero_nf && !order.nf_file_path`
 
+## 3. `src/components/kanban/EditOrderForm.tsx`
+
+- Add "Documentos" section after "Expedição / Envio" with two PDF file inputs
+- Show green indicator + filename if attached, with "Visualizar" (signed URL → new tab) and "Substituir" buttons
+- Upload triggers mutation directly (independent of form submit), with toast and query invalidation
+
+## 4. `src/components/kanban/OrderCard.tsx`
+
+- Add `FileText` (NF) and `Receipt` (Boleto) icons in footer when file_path exists, clickable → signed URL
+- Badge: `order.nf_pendente && !order.nf_file_path` → yellow "NF Pendente"
+- Badge: status "enviado" + `!is_fiscal_exempt && !numero_nf && !nf_file_path` → red "Sem NF"
+
+## 5. `src/pages/KanbanOperacional.tsx`
+
+- No structural changes needed — `EditOrderForm` already receives `order` and can import the hook internally for upload
+
+## Impact
+
+- Backward compatible (nullable columns, no breaking changes)
+- Private bucket, signed URLs only (60s TTL)
+- `numero_nf` and `nf_file_path` independent
+- Audit trail via `documentos_atualizados_em`
+- PDF validation server-side (MIME check before upload)
