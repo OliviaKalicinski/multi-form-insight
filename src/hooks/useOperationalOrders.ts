@@ -43,6 +43,10 @@ export interface OperationalOrder {
   // Fiscal
   tipo_nf: string | null;
   nf_pendente: boolean;
+  // Documents
+  nf_file_path: string | null;
+  boleto_file_path: string | null;
+  documentos_atualizados_em: string | null;
   // Joined
   customer?: { id: string; nome: string | null; cpf_cnpj: string } | null;
   items: OrderItem[];
@@ -56,7 +60,6 @@ interface CreateOrderInput {
   responsavel?: string | null;
   observacoes?: string | null;
   items: OrderItem[];
-  // Destinatário
   destinatario_nome?: string | null;
   destinatario_documento?: string | null;
   destinatario_email?: string | null;
@@ -65,7 +68,6 @@ interface CreateOrderInput {
   destinatario_bairro?: string | null;
   destinatario_cidade?: string | null;
   destinatario_cep?: string | null;
-  // Fiscal
   tipo_nf?: string | null;
 }
 
@@ -83,7 +85,6 @@ interface UpdateOrderInput {
   codigo_rastreio?: string | null;
   numero_nf?: string | null;
   items?: OrderItem[];
-  // Destinatário
   destinatario_nome?: string | null;
   destinatario_documento?: string | null;
   destinatario_email?: string | null;
@@ -92,7 +93,6 @@ interface UpdateOrderInput {
   destinatario_bairro?: string | null;
   destinatario_cidade?: string | null;
   destinatario_cep?: string | null;
-  // Fiscal
   tipo_nf?: string | null;
 }
 
@@ -100,6 +100,38 @@ function calcIsFiscalExempt(items: OrderItem[]): boolean {
   if (items.length === 0) return false;
   return items.every((i) => i.produto === "LF_FRASS");
 }
+
+// --- Document utilities ---
+
+export async function uploadOrderDocument(
+  orderId: string,
+  file: File,
+  type: "nf" | "boleto"
+): Promise<string> {
+  if (file.type !== "application/pdf") {
+    throw new Error("Apenas arquivos PDF são permitidos");
+  }
+
+  const filePath = `${orderId}/${type}.pdf`;
+
+  const { error } = await supabase.storage
+    .from("operational-documents")
+    .upload(filePath, file, { upsert: true, contentType: "application/pdf" });
+
+  if (error) throw error;
+  return filePath;
+}
+
+export async function getSignedUrl(filePath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("operational-documents")
+    .createSignedUrl(filePath, 60);
+
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+// --- Hook ---
 
 export function useOperationalOrders(statusFilter?: string, naturezaFilter?: string) {
   const queryClient = useQueryClient();
@@ -138,7 +170,7 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       }
 
       const isFiscalExempt = calcIsFiscalExempt(input.items);
-      const nfPendente = true; // new order never has NF yet
+      const nfPendente = true;
 
       const { data: order, error: orderError } = await supabase
         .from("operational_orders")
@@ -199,18 +231,15 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
         throw new Error("Valor total deve ser maior que zero");
       }
 
-      // Uppercase numero_nf
       if (fields.numero_nf) {
         fields.numero_nf = fields.numero_nf.toUpperCase();
       }
 
-      // Recalc fiscal exempt if items provided
       let updateFields: any = { ...fields };
       if (items) {
         updateFields.is_fiscal_exempt = calcIsFiscalExempt(items);
       }
 
-      // nf_pendente universal
       if ("numero_nf" in fields) {
         updateFields.nf_pendente = !fields.numero_nf;
       }
@@ -252,12 +281,52 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
     },
   });
 
+  const uploadDocument = useMutation({
+    mutationFn: async ({
+      orderId,
+      file,
+      type,
+    }: {
+      orderId: string;
+      file: File;
+      type: "nf" | "boleto";
+    }) => {
+      const filePath = await uploadOrderDocument(orderId, file, type);
+
+      const updateData: any = {
+        documentos_atualizados_em: new Date().toISOString(),
+      };
+
+      if (type === "nf") {
+        updateData.nf_file_path = filePath;
+        updateData.nf_pendente = false;
+      } else {
+        updateData.boleto_file_path = filePath;
+      }
+
+      const { error } = await supabase
+        .from("operational_orders")
+        .update(updateData)
+        .eq("id", orderId);
+
+      if (error) throw error;
+      return filePath;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
+      const label = variables.type === "nf" ? "NF" : "Boleto";
+      toast.success(`${label} anexado com sucesso`);
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao anexar documento: " + err.message);
+    },
+  });
+
   const updateStatus = useMutation({
     mutationFn: async ({ id, newStatus, order }: { id: string; newStatus: string; order: OperationalOrder }) => {
       const isSeeding = order.natureza_pedido === "Seeding";
 
       if (newStatus === "aguardando_expedicao") {
-        // Seeding: exigir destinatário se sem customer_id
         if (isSeeding && !order.customer_id) {
           if (!order.destinatario_nome) throw new Error("Nome do destinatário é obrigatório para Seeding");
           if (!order.destinatario_endereco) throw new Error("Endereço do destinatário é obrigatório para Seeding");
@@ -275,18 +344,16 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       }
       if (newStatus === "enviado") {
         if (!order.codigo_rastreio) throw new Error("Código de rastreio é obrigatório para enviar");
-        if (!order.is_fiscal_exempt && !order.numero_nf) {
-          // For seeding, allow sending without NF but set nf_pendente
+        if (!order.is_fiscal_exempt && !order.numero_nf && !order.nf_file_path) {
           if (!isSeeding) {
-            throw new Error("Número da NF é obrigatório (exceto pedidos 100% Frass)");
+            throw new Error("NF obrigatória para envio (número ou PDF anexado)");
           }
         }
       }
 
       const updateData: any = { status_operacional: newStatus };
 
-      // Universal nf_pendente on send
-      if (newStatus === "enviado" && !order.numero_nf) {
+      if (newStatus === "enviado" && !order.numero_nf && !order.nf_file_path) {
         updateData.nf_pendente = true;
       }
 
@@ -331,5 +398,6 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
     updateOrder,
     updateStatus,
     cancelOrder,
+    uploadDocument,
   };
 }
