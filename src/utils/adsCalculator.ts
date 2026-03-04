@@ -41,7 +41,7 @@ export const parseAdsValue = (value: string): number => {
  * Helper para buscar valor em múltiplos nomes de coluna possíveis
  * Retorna o primeiro valor encontrado, ou 0 se nenhum existir
  */
-const getValue = (item: AdsData, keys: string[]): number => {
+export const getValue = (item: AdsData, keys: string[]): number => {
   for (const key of keys) {
     const value = (item as unknown as Record<string, string>)[key];
     if (value !== undefined && value !== "" && value !== null) {
@@ -87,6 +87,7 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
       roi: 0,
       ticketMedio: 0,
       taxaEngajamento: 0,
+      taxaConversaoResultados: 0,
       cliquesDesaida: 0,
       taxaConversao: 0,
       taxaAddCarrinho: 0,
@@ -206,7 +207,11 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
   const custoPorResultadoMedio = resultadosTotal > 0 ? investimentoTotal / resultadosTotal : 0;
 
   // Fonte de cliques consistente para funil (prioridade: saída > link > todos)
-  const clicksForFunnel = cliquesDesaida || cliquesLinkTotal || cliquesTodosTotal;
+  // Campanhas puramente de engajamento usam cliques (todos) diretamente
+  const hasEngagementOnly = engajamentosTotal > 0 && comprasTotal === 0 && cliquesLinkTotal === 0;
+  const clicksForFunnel = hasEngagementOnly
+    ? cliquesTodosTotal
+    : (cliquesDesaida || cliquesLinkTotal || cliquesTodosTotal);
 
   // Frequência = Impressões / Alcance (ponderada automaticamente)
   const frequenciaMedia = alcanceTotal > 0 ? impressoesTotal / alcanceTotal : 0;
@@ -226,9 +231,10 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
   const roi = investimentoTotal > 0 ? ((valorConversaoTotal - investimentoTotal) / investimentoTotal) * 100 : 0;
   const ticketMedio = comprasTotal > 0 ? valorConversaoTotal / comprasTotal : 0;
   
-  // Taxa de engajamento: usar resultados OU engajamentos (o que existir)
-  const baseEngagement = resultadosTotal > 0 ? resultadosTotal : engajamentosTotal;
-  const taxaEngajamento = alcanceTotal > 0 ? (baseEngagement / alcanceTotal) * 100 : 0;
+  // Taxa de engajamento pura (engajamentos / alcance)
+  const taxaEngajamento = alcanceTotal > 0 ? (engajamentosTotal / alcanceTotal) * 100 : 0;
+  // Taxa de conversão por resultados (resultados / alcance)
+  const taxaConversaoResultados = alcanceTotal > 0 ? (resultadosTotal / alcanceTotal) * 100 : 0;
   
   // Taxa de conversão consistente com CTR/CPC (usa clicksForFunnel)
   const taxaConversao = clicksForFunnel > 0 ? (comprasTotal / clicksForFunnel) * 100 : 0;
@@ -259,6 +265,7 @@ export const calculateAdsMetrics = (data: AdsData[]): AdsMetrics => {
     roi,
     ticketMedio,
     taxaEngajamento,
+    taxaConversaoResultados,
     cliquesDesaida,
     taxaConversao,
     taxaAddCarrinho,
@@ -279,9 +286,9 @@ export const extractDailyAdsMetrics = (
     const startDate = item["Início dos relatórios"];
     
     switch(metric) {
-      case 'investimento': value = parseAdsValue(item["Valor usado (BRL)"]); break;
-      case 'compras': value = parseAdsValue(item["Compras"]); break;
-      case 'roas': value = parseAdsValue(item["ROAS de resultados"]); break;
+      case 'investimento': value = getValue(item, ["Valor usado (BRL)", "Amount spent (BRL)", "Amount spent", "Amount Spent", "Valor gasto", "Spent"]); break;
+      case 'compras': value = getValue(item, ["Compras", "Purchases", "Purchase"]); break;
+      case 'roas': value = getValue(item, ["ROAS de resultados", "ROAS (results)", "Result ROAS"]); break;
     }
     
     return { date: startDate?.substring(0, 10) || "", value };
