@@ -373,7 +373,7 @@ export const useDataPersistence = () => {
       const salesData: ProcessedOrder[] = (salesRaw || []).map((row: any) => ({
         numeroPedido: row.numero_pedido || "",
         nomeCliente: row.cliente_nome || "",
-        cpfCnpj: row.cliente_email || "",
+        cpfCnpj: row.cpf_cnpj || row.cliente_email || "",
         ecommerce: row.canal || "",
         valorTotal: Number(row.valor_total),
         totalItens: row.produtos?.length || 0,
