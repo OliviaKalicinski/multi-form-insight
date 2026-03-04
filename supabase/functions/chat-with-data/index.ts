@@ -62,7 +62,7 @@ async function fetchDataContext(supabase: any) {
   const [salesRaw, adsRaw, followersRaw, marketingRaw, uploadMeta] = await Promise.all([
     fetchAll(
       supabase, "sales_data",
-      "data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom, cliente_email",
+      "data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom, cliente_email, cpf_cnpj",
       "data_venda", "", "data_venda",
     ),
     fetchAll(
@@ -226,7 +226,7 @@ function aggregateSales(rows: any[]) {
   // ── Customer aggregation ──────────────────────────────────────────────
   const customerMap: Record<string, { orders: number; revenue: number; firstOrder: string; lastOrder: string }> = {};
   for (const r of rows) {
-    const key = (r.cliente_email || "").toLowerCase().trim();
+    const key = (r.cpf_cnpj || r.cliente_email || "").toLowerCase().trim();
     if (!key) continue;
 
     if (!customerMap[key]) {

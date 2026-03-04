@@ -899,6 +899,7 @@ export type Database = {
           cidade: string | null
           cliente_email: string | null
           cliente_nome: string | null
+          cpf_cnpj: string | null
           created_at: string | null
           cupom: string | null
           data_emissao_nf: string | null
@@ -941,6 +942,7 @@ export type Database = {
           cidade?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
+          cpf_cnpj?: string | null
           created_at?: string | null
           cupom?: string | null
           data_emissao_nf?: string | null
@@ -983,6 +985,7 @@ export type Database = {
           cidade?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
+          cpf_cnpj?: string | null
           created_at?: string | null
           cupom?: string | null
           data_emissao_nf?: string | null
