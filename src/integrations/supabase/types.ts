@@ -645,6 +645,53 @@ export type Database = {
           },
         ]
       }
+      nf_extracted_data: {
+        Row: {
+          cliente_nome: string | null
+          created_at: string
+          id: string
+          numero_nf: string | null
+          numero_pedido_ref: string | null
+          order_id: string
+          produtos: Json | null
+          raw_text: string | null
+          serie: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          cliente_nome?: string | null
+          created_at?: string
+          id?: string
+          numero_nf?: string | null
+          numero_pedido_ref?: string | null
+          order_id: string
+          produtos?: Json | null
+          raw_text?: string | null
+          serie?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          cliente_nome?: string | null
+          created_at?: string
+          id?: string
+          numero_nf?: string | null
+          numero_pedido_ref?: string | null
+          order_id?: string
+          produtos?: Json | null
+          raw_text?: string | null
+          serie?: string | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nf_extracted_data_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "operational_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operational_order_items: {
         Row: {
           created_at: string
@@ -695,7 +742,7 @@ export type Database = {
           destinatario_endereco: string | null
           destinatario_nome: string | null
           destinatario_telefone: string | null
-          divergencia: string | null
+          divergencia: Json | null
           documentos_atualizados_em: string | null
           forma_pagamento: string | null
           id: string
@@ -710,6 +757,7 @@ export type Database = {
           pedido_origem_id: string | null
           pedido_origem_tipo: string | null
           peso_total: number | null
+          reconciliacao_status: string | null
           reconciliado: boolean
           responsavel: string | null
           status_operacional: string
@@ -731,7 +779,7 @@ export type Database = {
           destinatario_endereco?: string | null
           destinatario_nome?: string | null
           destinatario_telefone?: string | null
-          divergencia?: string | null
+          divergencia?: Json | null
           documentos_atualizados_em?: string | null
           forma_pagamento?: string | null
           id?: string
@@ -746,6 +794,7 @@ export type Database = {
           pedido_origem_id?: string | null
           pedido_origem_tipo?: string | null
           peso_total?: number | null
+          reconciliacao_status?: string | null
           reconciliado?: boolean
           responsavel?: string | null
           status_operacional?: string
@@ -767,7 +816,7 @@ export type Database = {
           destinatario_endereco?: string | null
           destinatario_nome?: string | null
           destinatario_telefone?: string | null
-          divergencia?: string | null
+          divergencia?: Json | null
           documentos_atualizados_em?: string | null
           forma_pagamento?: string | null
           id?: string
@@ -782,6 +831,7 @@ export type Database = {
           pedido_origem_id?: string | null
           pedido_origem_tipo?: string | null
           peso_total?: number | null
+          reconciliacao_status?: string | null
           reconciliado?: boolean
           responsavel?: string | null
           status_operacional?: string
@@ -802,6 +852,41 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customer_full"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_events: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          payload: Json | null
+          tipo_evento: string
+          usuario_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          payload?: Json | null
+          tipo_evento: string
+          usuario_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          payload?: Json | null
+          tipo_evento?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "operational_orders"
             referencedColumns: ["id"]
           },
         ]

@@ -86,10 +86,27 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
                   Reconciliado
                 </Badge>
               )}
-              {order.divergencia && (
-                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">
-                  Divergente
-                </Badge>
+              {order.divergencia && typeof order.divergencia === 'object' && (
+                <>
+                  {(order.divergencia as any).valor && (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">⚠ Div. valor</Badge>
+                  )}
+                  {(order.divergencia as any).produto && (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">⚠ Div. produto</Badge>
+                  )}
+                  {(order.divergencia as any).quantidade && (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">⚠ Div. qtd</Badge>
+                  )}
+                  {(order.divergencia as any).nf_duplicada && (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">🚨 NF Duplicada</Badge>
+                  )}
+                  {(order.divergencia as any).legacy && (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">Divergente</Badge>
+                  )}
+                </>
+              )}
+              {order.reconciliacao_status === 'processando' && (
+                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-[10px]">⏳ Processando...</Badge>
               )}
               {daysOpen > 7 && (
                 <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200 text-[10px]">

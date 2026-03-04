@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logEventSilent } from "@/hooks/useOrderEvents";
 
 export interface OrderItem {
   id?: string;
@@ -25,7 +26,8 @@ export interface OperationalOrder {
   numero_nf: string | null;
   is_fiscal_exempt: boolean;
   reconciliado: boolean;
-  divergencia: string | null;
+  divergencia: Record<string, boolean> | null;
+  reconciliacao_status: string | null;
   pedido_origem_tipo: string | null;
   pedido_origem_id: string | null;
   created_by: string | null;
@@ -214,9 +216,10 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
 
       return order;
     },
-    onSuccess: () => {
+    onSuccess: (order: any) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       toast.success("Pedido criado com sucesso");
+      try { logEventSilent(order.id, "pedido_criado", { natureza: order.natureza_pedido }); } catch {}
     },
     onError: (err: any) => {
       toast.error("Erro ao criar pedido: " + err.message);
@@ -272,9 +275,10 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
         }
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       toast.success("Pedido atualizado");
+      try { logEventSilent(variables.id, "pedido_editado"); } catch {}
     },
     onError: (err: any) => {
       toast.error("Erro ao atualizar: " + err.message);
@@ -312,10 +316,32 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       if (error) throw error;
       return filePath;
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (filePath, variables) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       const label = variables.type === "nf" ? "NF" : "Boleto";
       toast.success(`${label} anexado com sucesso`);
+      const eventType = variables.type === "nf" ? "nf_anexada" : "boleto_anexado";
+      try { logEventSilent(variables.orderId, eventType); } catch {}
+
+      // Fire-and-forget: trigger NF reconciliation
+      if (variables.type === "nf") {
+        supabase.functions
+          .invoke("process-nf-pdf", {
+            body: { order_id: variables.orderId, file_path: filePath },
+          })
+          .then(({ error }) => {
+            if (error) {
+              console.error("Reconciliation error:", error);
+              toast.error("Erro na reconciliação automática");
+            } else {
+              queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
+              toast.success("Reconciliação automática concluída");
+            }
+          })
+          .catch(() => {
+            toast.error("Erro na reconciliação automática");
+          });
+      }
     },
     onError: (err: any) => {
       toast.error("Erro ao anexar documento: " + err.message);
@@ -364,9 +390,10 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       toast.success("Status atualizado");
+      try { logEventSilent(variables.id, "status_alterado", { para: variables.newStatus }); } catch {}
     },
     onError: (err: any) => {
       toast.error(err.message);
@@ -381,9 +408,10 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       toast.success("Pedido cancelado");
+      try { logEventSilent(variables, "pedido_cancelado"); } catch {}
     },
     onError: (err: any) => {
       toast.error("Erro ao cancelar: " + err.message);
