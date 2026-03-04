@@ -108,6 +108,9 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
               {order.reconciliacao_status === 'processando' && (
                 <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-[10px]">⏳ Processando...</Badge>
               )}
+              {order.reconciliacao_status === 'erro' && (
+                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]" title="Falha ao processar a nota fiscal">❌ Falha reconciliação</Badge>
+              )}
               {daysOpen > 7 && (
                 <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200 text-[10px]">
                   {daysOpen}d

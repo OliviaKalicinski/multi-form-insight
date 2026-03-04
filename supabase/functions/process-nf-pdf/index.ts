@@ -171,7 +171,7 @@ serve(async (req: Request) => {
     if (fileError || !fileData) {
       await adminClient
         .from("operational_orders")
-        .update({ reconciliacao_status: "erro" })
+        .update({ reconciliacao_status: "erro", divergencia: null })
         .eq("id", order_id);
       return new Response(JSON.stringify({ error: "Failed to download PDF" }), {
         status: 500,
@@ -182,15 +182,24 @@ serve(async (req: Request) => {
     // Extract text from PDF
     let rawText = "";
     try {
-      const pdfParse = (await import("https://esm.sh/pdf-parse@1.1.1")).default;
+      const pdfjsLib = await import(
+        "https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs?target=deno"
+      );
       const buffer = await fileData.arrayBuffer();
-      const result = await pdfParse(new Uint8Array(buffer));
-      rawText = result.text || "";
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+      const pages: string[] = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const strings = content.items.map((item: any) => item.str).filter(Boolean);
+        pages.push(strings.join(" "));
+      }
+      rawText = pages.join("\n");
     } catch (parseErr) {
       console.error("PDF parse error:", parseErr);
       await adminClient
         .from("operational_orders")
-        .update({ reconciliacao_status: "erro" })
+        .update({ reconciliacao_status: "erro", divergencia: null })
         .eq("id", order_id);
 
       // Log event
@@ -243,6 +252,11 @@ serve(async (req: Request) => {
     // Value comparison
     if (extracted.valor_total != null && orderData) {
       divergencia.valor = Math.abs(extracted.valor_total - orderData.valor_total_informado) > 0.01;
+    }
+
+    // Flag unrecognized products
+    if (extracted.produtos.some(p => p.product_id == null)) {
+      divergencia.produto = true;
     }
 
     // Product comparison
@@ -347,7 +361,7 @@ serve(async (req: Request) => {
       if (body.order_id) {
         await adminClient
           .from("operational_orders")
-          .update({ reconciliacao_status: "erro" })
+          .update({ reconciliacao_status: "erro", divergencia: null })
           .eq("id", body.order_id);
       }
     } catch {}

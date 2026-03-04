@@ -319,7 +319,7 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
     onSuccess: (filePath, variables) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       const label = variables.type === "nf" ? "NF" : "Boleto";
-      toast.success(`${label} anexado com sucesso`);
+      toast(`${label} anexado. Processando reconciliação...`);
       const eventType = variables.type === "nf" ? "nf_anexada" : "boleto_anexado";
       try { logEventSilent(variables.orderId, eventType); } catch {}
 
@@ -335,7 +335,7 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
               toast.error("Erro na reconciliação automática");
             } else {
               queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
-              toast.success("Reconciliação automática concluída");
+              queryClient.invalidateQueries({ queryKey: ["order-events"] });
             }
           })
           .catch(() => {
