@@ -39,7 +39,9 @@ export const analyzeChurn = (
     }
   });
 
-  const hoje = new Date();
+  const dataReferencia = orders.length > 0
+    ? new Date(Math.max(...orders.map(o => new Date(o.dataVenda).getTime())))
+    : new Date();
   let clientesChurn = 0;
   let clientesEmRisco = 0;
   let clientesInativos = 0;
@@ -47,7 +49,7 @@ export const analyzeChurn = (
   const churnRiskCustomers: ChurnRiskCustomer[] = [];
 
   clientesMap.forEach((cliente, cpfCnpj) => {
-    const diasSemComprar = differenceInDays(hoje, cliente.ultimaCompra);
+    const diasSemComprar = differenceInDays(dataReferencia, cliente.ultimaCompra);
     
     let riskLevel: 'low' | 'medium' | 'high' | 'critical';
     
