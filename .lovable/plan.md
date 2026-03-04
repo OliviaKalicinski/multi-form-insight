@@ -1,79 +1,83 @@
 
 
-# Fix: Remove PII from AI chat context (LGPD compliance)
-
-**File:** `supabase/functions/chat-with-data/index.ts`
+# P1 — Separate fiscal identifier from email in `sales_data`
 
 ## Problem
 
-Customer names and emails are fetched from `sales_data` and sent to the AI gateway as part of `top_clientes` (lines 247-255 output `nome` and `email`). This exposes PII to a third-party AI service — a LGPD violation.
+The column `cliente_email` in `sales_data` stores both CPF/CNPJ (for NF data) and actual emails (for e-commerce), creating identity collisions. The `recalculate_customer` function joins on this single field, merging unrelated customers.
+
+## Scope
+
+**2 changes:** 1 database migration + 1 frontend file edit.
 
 ## Changes
 
-### 1. Remove `cliente_nome` from SELECT (line 65)
+### 1. Database migration
 
-```typescript
-// Before
-"data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom, cliente_email, cliente_nome",
+Add a dedicated `cpf_cnpj` column to `sales_data` and backfill it from existing NF records:
 
-// After — keep cliente_email for grouping only
-"data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom, cliente_email",
+```sql
+-- Add column
+ALTER TABLE public.sales_data ADD COLUMN IF NOT EXISTS cpf_cnpj text;
+
+-- Backfill: copy cliente_email → cpf_cnpj for NF rows
+UPDATE public.sales_data
+SET cpf_cnpj = cliente_email
+WHERE fonte_dados = 'nf'
+  AND cliente_email IS NOT NULL
+  AND cpf_cnpj IS NULL;
+
+-- Also backfill ecommerce rows that have CPF-like values in cliente_email
+UPDATE public.sales_data
+SET cpf_cnpj = cliente_email
+WHERE fonte_dados = 'ecommerce'
+  AND cliente_email IS NOT NULL
+  AND cpf_cnpj IS NULL
+  AND cliente_email ~ '^\d';
 ```
 
-### 2. Anonymize customer aggregation (lines 227-255)
+Update `recalculate_customer` to prefer `cpf_cnpj` over `cliente_email` with a fallback for backward compatibility:
 
-Replace the block with PII-free version:
-- Remove `nome`/`email` from `customerMap` type
-- Normalize email key: `(r.cliente_email || "").toLowerCase().trim()`
-- Skip orders without email (`if (!key) continue`)
-- Output anonymous labels: `cliente: "Cliente #1"`
+```sql
+-- In recalculate_customer and recalculate_all_customers,
+-- change WHERE clause from:
+--   WHERE cliente_email = p_cpf_cnpj
+-- to:
+--   WHERE COALESCE(cpf_cnpj, cliente_email) = p_cpf_cnpj
 
-```typescript
-const customerMap: Record<string, { orders: number; revenue: number; firstOrder: string; lastOrder: string }> = {};
-for (const r of rows) {
-  const key = (r.cliente_email || "").toLowerCase().trim();
-  if (!key) continue;
-
-  if (!customerMap[key]) {
-    customerMap[key] = { orders: 0, revenue: 0, firstOrder: r.data_venda, lastOrder: r.data_venda };
-  }
-  customerMap[key].orders += 1;
-  customerMap[key].revenue += Number(r.valor_total || 0);
-  const dv = r.data_venda;
-  if (dv < customerMap[key].firstOrder) customerMap[key].firstOrder = dv;
-  if (dv > customerMap[key].lastOrder) customerMap[key].lastOrder = dv;
-}
-
-const topClientes = Object.values(customerMap)
-  .sort((a, b) => b.revenue - a.revenue)
-  .slice(0, 30)
-  .map((c, i) => ({
-    cliente: `Cliente #${i + 1}`,
-    total_pedidos: c.orders,
-    receita_total: c.revenue.toFixed(2),
-    ticket_medio: (c.revenue / c.orders).toFixed(2),
-    primeiro_pedido: c.firstOrder?.split("T")[0] || "",
-    ultimo_pedido: c.lastOrder?.split("T")[0] || "",
-  }));
+-- And recalculate_all_customers iteration:
+--   SELECT DISTINCT COALESCE(cpf_cnpj, cliente_email) ...
 ```
 
-Lines 257-263 (`allCustomers`, segment counts, `taxaRecompra`) remain unchanged — they use `customerMap` values without exposing PII.
+Also update `recalculate_all_customers` to iterate over `COALESCE(cpf_cnpj, cliente_email)` instead of just `cliente_email`.
 
-### 3. Update system prompt (line 548)
+### 2. Frontend: `src/hooks/useDataPersistence.ts`
 
+**Two insert maps** (NF flow ~line 520, ecommerce flow ~line 645) need to also write `cpf_cnpj`:
+
+- NF flow (line 520): add `cpf_cnpj: order.cpfCnpj || null`
+- Ecommerce flow (line 645): add `cpf_cnpj: order.cpfCnpj || null`
+- Read path (line 376): keep reading from `cliente_email` as fallback (no change needed since `cpf_cnpj` column will also be populated)
+
+**Also update** the edge function `chat-with-data/index.ts` (line 65) to use `COALESCE(cpf_cnpj, cliente_email)` as the grouping key for customer aggregation (line 229).
+
+### 3. Other read paths (no-change needed short term)
+
+These files query `sales_data` filtered by `cliente_email`:
+- `src/hooks/useCustomerProfile.ts` (line 101)
+- `src/components/crm/ComplaintForm.tsx` (line 66)
+- `src/pages/ReclamacaoNova.tsx` (line 107)
+- `src/hooks/useRadarOperacional.ts` (line 150)
+
+Since the backfill keeps `cliente_email` populated, these continue working. A follow-up migration can update them to use `cpf_cnpj` with a fallback.
+
+## Verification
+
+After migration:
+```sql
+SELECT COUNT(*) FROM sales_data WHERE fonte_dados = 'nf' AND cpf_cnpj IS NULL;
+-- Should return 0
 ```
-// Before
-- "top_clientes": top 30 clientes por receita, com nome, email, total de pedidos...
 
-// After
-- "top_clientes": top 30 clientes por receita (anonimizados — sem nome ou email por privacidade). Cada entrada tem: cliente (ex: "Cliente #1"), total_pedidos, receita_total, ticket_medio, primeiro_pedido, ultimo_pedido. Use para análise de concentração de receita e comportamento de compra.
-```
-
-## Data flow after fix
-
-```text
-DB → cliente_email (memory only, for grouping) → anonymous aggregation → "Cliente #1..#30" → AI
-```
-
-PII never leaves the edge function. **1 file, 3 locations changed.**
+**1 migration + 1 file edited (useDataPersistence.ts) + 1 minor edit (chat-with-data grouping key).**
 
