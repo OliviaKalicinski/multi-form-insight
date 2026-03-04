@@ -87,14 +87,12 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
     <Card
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
-      className="cursor-grab hover:shadow-md transition-shadow active:cursor-grabbing"
+      className="hover:shadow-md transition-shadow"
     >
       <CardContent className="p-3 space-y-2">
         {/* Top row: Nature + Customer */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
+          <div {...listeners} {...attributes} className="flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none select-none">
             <div className="flex items-center gap-1.5 flex-wrap">
               <Badge className={naturezaColors[order.natureza_pedido] || ""} variant="outline">
                 {order.natureza_pedido}
@@ -163,10 +161,12 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
           </DropdownMenu>
         </div>
 
-        {/* Items */}
-        {itemsSummary && (
-          <p className="text-xs text-muted-foreground line-clamp-2">{itemsSummary}</p>
-        )}
+        {/* Items — also draggable */}
+        <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing touch-none select-none">
+          {itemsSummary && (
+            <p className="text-xs text-muted-foreground line-clamp-2">{itemsSummary}</p>
+          )}
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
