@@ -62,7 +62,7 @@ async function fetchDataContext(supabase: any) {
   const [salesRaw, adsRaw, followersRaw, marketingRaw, uploadMeta] = await Promise.all([
     fetchAll(
       supabase, "sales_data",
-      "data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom, cliente_email, cliente_nome",
+      "data_venda, valor_total, valor_frete, produtos, canal, status, estado, forma_envio, cupom, cliente_email",
       "data_venda", "", "data_venda",
     ),
     fetchAll(
@@ -224,15 +224,13 @@ function aggregateSales(rows: any[]) {
   }
 
   // ── Customer aggregation ──────────────────────────────────────────────
-  const customerMap: Record<string, { nome: string; email: string; orders: number; revenue: number; firstOrder: string; lastOrder: string }> = {};
+  const customerMap: Record<string, { orders: number; revenue: number; firstOrder: string; lastOrder: string }> = {};
   for (const r of rows) {
-    const email = r.cliente_email || "";
-    const nome = r.cliente_nome || "";
-    const key = email || nome || "Anônimo";
-    if (key === "Anônimo") continue; // skip anonymous
+    const key = (r.cliente_email || "").toLowerCase().trim();
+    if (!key) continue;
 
     if (!customerMap[key]) {
-      customerMap[key] = { nome, email, orders: 0, revenue: 0, firstOrder: r.data_venda, lastOrder: r.data_venda };
+      customerMap[key] = { orders: 0, revenue: 0, firstOrder: r.data_venda, lastOrder: r.data_venda };
     }
     customerMap[key].orders += 1;
     customerMap[key].revenue += Number(r.valor_total || 0);
@@ -244,9 +242,8 @@ function aggregateSales(rows: any[]) {
   const topClientes = Object.values(customerMap)
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 30)
-    .map(c => ({
-      nome: c.nome,
-      email: c.email,
+    .map((c, i) => ({
+      cliente: `Cliente #${i + 1}`,
       total_pedidos: c.orders,
       receita_total: c.revenue.toFixed(2),
       ticket_medio: (c.revenue / c.orders).toFixed(2),
@@ -545,7 +542,7 @@ VENDAS:
 - "amostras": breakdown de pedidos somente-amostra por tipo de pet (cachorro, gato, ambos)
 
 CLIENTES:
-- "top_clientes": top 30 clientes por receita, com nome, email, total de pedidos, receita total, ticket médio, primeiro e último pedido. Use para "quais os melhores clientes?", "top 10 clientes", etc.
+- "top_clientes": top 30 clientes por receita (anonimizados — sem nome ou email por privacidade). Cada entrada tem: cliente (ex: "Cliente #1"), total_pedidos, receita_total, ticket_medio, primeiro_pedido, ultimo_pedido. Use para análise de concentração de receita e comportamento de compra.
 - "clientes_resumo": métricas gerais da base de clientes:
   - total_clientes_unicos: total de clientes identificados
   - clientes_novos_1_pedido: fizeram apenas 1 pedido
