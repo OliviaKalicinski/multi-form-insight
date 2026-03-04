@@ -112,6 +112,7 @@ export interface AdsMetrics {
   resultadosTotal: number;
   custoPorResultadoMedio: number;
   visitasPerfilTotal: number;
+  taxaConversaoResultados: number;
 }
 
 export interface MonthMetric {

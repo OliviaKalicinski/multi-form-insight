@@ -494,7 +494,7 @@ const Ads = () => {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <Target className="h-4 w-4 text-primary" />
-                                <span className="text-sm font-semibold text-foreground">ROAS do Negócio</span>
+                                <span className="text-sm font-semibold text-foreground">ROAS Ads</span>
                               </div>
                               <Badge 
                                 variant={correctedRoas >= roasGoal ? "default" : "destructive"}
@@ -509,7 +509,7 @@ const Ads = () => {
                             </p>
 
                             <p className="text-xs text-muted-foreground">
-                              Receita total ÷ investimento total em mídia
+                              Receita pixel Meta ÷ investimento total em mídia
                             </p>
 
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
