@@ -1,147 +1,97 @@
 
 
-# Fase 2 — Plano de Implementação Final (5 Blocos)
+# Production Patch: 6 Fixes across 4 Files
 
-Incorpora todos os ajustes do review arquitetural: `usuario_id DEFAULT auth.uid()`, `verify_jwt = false` + `getClaims()` (per Lovable Cloud guidelines), `divergencia` JSONB, `reconciliacao_status`, idempotencia via UNIQUE constraint, normalização NFD no parser, e `logEvent` resiliente.
+No migrations needed. All changes are surgical edits.
 
 ---
 
-## Bloco 1: Timeline do Pedido
+## Fix 1 — Replace `pdf-parse` with `pdfjs-dist` (CRITICAL)
 
-### Migration SQL
+**File:** `supabase/functions/process-nf-pdf/index.ts` — lines 184-188
 
-```sql
-CREATE TABLE order_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id uuid NOT NULL REFERENCES operational_orders(id) ON DELETE CASCADE,
-  tipo_evento text NOT NULL,
-  usuario_id uuid DEFAULT auth.uid(),
-  payload jsonb DEFAULT '{}',
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE order_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated read order_events" ON order_events FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated insert order_events" ON order_events FOR INSERT TO authenticated WITH CHECK (true);
-CREATE INDEX idx_order_events_order_id ON order_events(order_id);
+Replace:
+```typescript
+const pdfParse = (await import("https://esm.sh/pdf-parse@1.1.1")).default;
+const buffer = await fileData.arrayBuffer();
+const result = await pdfParse(new Uint8Array(buffer));
+rawText = result.text || "";
 ```
 
-### New Files
-- **`src/hooks/useOrderEvents.ts`** — `useOrderEvents(orderId)` query + `logEvent(orderId, tipo, payload)` mutation
-- **`src/components/kanban/OrderTimeline.tsx`** — chronological event list with icons per type
-
-### Modified Files
-- **`src/hooks/useOperationalOrders.ts`** — after each mutation success callback, call `logEvent` wrapped in `try/catch` (timeline never breaks main flow). Events: `pedido_criado`, `status_alterado`, `nf_anexada`, `boleto_anexado`, `pedido_editado`, `pedido_cancelado`
-- **`src/components/kanban/EditOrderForm.tsx`** — add collapsible "Historico" section at bottom with `OrderTimeline`
-
----
-
-## Bloco 2: Reconciliacao Automatica
-
-### Migration SQL
-
-```sql
-CREATE TABLE nf_extracted_data (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id uuid NOT NULL REFERENCES operational_orders(id) ON DELETE CASCADE,
-  numero_nf text,
-  serie text,
-  valor_total numeric,
-  cliente_nome text,
-  produtos jsonb DEFAULT '[]',
-  numero_pedido_ref text,
-  raw_text text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(order_id, numero_nf)
+With:
+```typescript
+const pdfjsLib = await import(
+  "https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs?target=deno"
 );
-ALTER TABLE nf_extracted_data ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated read nf_extracted_data" ON nf_extracted_data FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Authenticated insert nf_extracted_data" ON nf_extracted_data FOR INSERT TO authenticated WITH CHECK (true);
-
--- Migrate divergencia to JSONB + add reconciliation status
-ALTER TABLE operational_orders
-  ALTER COLUMN divergencia TYPE jsonb USING
-    CASE WHEN divergencia IS NOT NULL THEN jsonb_build_object('legacy', divergencia) ELSE NULL END;
-ALTER TABLE operational_orders
-  ADD COLUMN reconciliacao_status text DEFAULT NULL;
+const buffer = await fileData.arrayBuffer();
+const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+const pages: string[] = [];
+for (let i = 1; i <= pdf.numPages; i++) {
+  const page = await pdf.getPage(i);
+  const content = await page.getTextContent();
+  const strings = content.items.map((item: any) => item.str).filter(Boolean);
+  pages.push(strings.join(" "));
+}
+rawText = pages.join("\n");
 ```
 
-### New Edge Function: `supabase/functions/process-nf-pdf/index.ts`
+## Fix 2 — Flag unrecognized products
 
-Config: `[functions.process-nf-pdf] verify_jwt = false`
+**File:** `supabase/functions/process-nf-pdf/index.ts` — insert between lines 246 and 248 (after value comparison, before product comparison)
 
-Flow:
-1. Validate auth via `getClaims()`
-2. Set `reconciliacao_status = 'processando'`
-3. Download PDF from Storage via service role key
-4. Extract text using `pdf-parse` (via esm.sh import, with fallback to error status)
-5. Regex extraction from DANFE standard layout (multi-product support):
-   - `NF-e\s*N[ºo]\s*([\d.]+)` for numero_nf
-   - `VALOR TOTAL DA NOTA\s*([\d.,]+)` for valor_total
-   - Product rows from "DADOS DO PRODUTO" section (loop)
-   - `N[ºo]\s*Pedido:\s*(\d+)` for auto-linking
-6. Product normalization — inline map from `operationalProducts` catalog (31 entries), with NFD normalization (`normalize("NFD").replace(/[\u0300-\u036f]/g, "")`) before matching
-7. Duplicate NF check — query `nf_extracted_data` for same `numero_nf` on different `order_id`
-8. Compare extracted items vs `operational_order_items` (order-independent):
-   - Value: `|nf.valor - order.valor| < 0.01`
-   - Products: matched by normalized ID
-   - Quantities per product
-9. Upsert into `nf_extracted_data` (ON CONFLICT order_id, numero_nf)
-10. Update order: `reconciliado`, `divergencia` (JSONB: `{valor, produto, quantidade, nf_duplicada}`), `reconciliacao_status = 'concluido'`
-11. On any error: set `reconciliacao_status = 'erro'`
-12. Log event to `order_events`
+```typescript
+if (extracted.produtos.some(p => p.product_id == null)) {
+  divergencia.produto = true;
+}
+```
 
-### Modified Files
-- **`src/hooks/useOperationalOrders.ts`**:
-  - Update `OperationalOrder` interface: `divergencia` becomes `Record<string, boolean> | null`, add `reconciliacao_status`
-  - In `uploadDocument` mutation (type='nf'), after upload success, invoke `process-nf-pdf` (fire-and-forget with error toast)
-- **`src/integrations/supabase/types.ts`** — auto-updated after migration
+## Fix 3 — Clear divergencia on error (2 locations)
 
----
+**File:** `supabase/functions/process-nf-pdf/index.ts`
 
-## Bloco 3: Indicadores no Kanban
+- **Line 193:** change `.update({ reconciliacao_status: "erro" })` → `.update({ reconciliacao_status: "erro", divergencia: null })`
+- **Line 350:** same change `.update({ reconciliacao_status: "erro" })` → `.update({ reconciliacao_status: "erro", divergencia: null })`
 
-### Modified Files
-- **`src/components/kanban/KanbanColumn.tsx`** — add optional `indicators` prop (max 3), render as small colored badges below column title
-- **`src/pages/KanbanOperacional.tsx`** — compute per-column from `ordersByStatus`:
-  - NF pendentes (yellow): `nf_pendente && !nf_file_path && !is_fiscal_exempt`
-  - Reconciliados (green): `reconciliado === true`
-  - Divergentes (red): `divergencia` is not null
+## Fix 4 — Toast UX + invalidate timeline
 
-No backend changes.
+**File:** `src/hooks/useOperationalOrders.ts` — lines 322, 337-338
 
----
+- **Line 322:** `toast.success(\`${label} anexado com sucesso\`)` → `toast(\`${label} anexado. Processando reconciliação...\`)`
+- **Lines 337-338:** Replace:
+  ```typescript
+  queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
+  toast.success("Reconciliação automática concluída");
+  ```
+  With:
+  ```typescript
+  queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
+  queryClient.invalidateQueries({ queryKey: ["order-events"] });
+  ```
 
-## Bloco 4: Badges de Divergencia Refinados
+## Fix 5 — Error badge on OrderCard
 
-### Modified Files
-- **`src/components/kanban/OrderCard.tsx`** — replace generic "Divergente" badge with specific badges from JSONB keys:
-  - `divergencia?.valor` → "Divergencia valor"
-  - `divergencia?.produto` → "Divergencia produto"
-  - `divergencia?.quantidade` → "Divergencia qtd"
-  - `divergencia?.nf_duplicada` → "NF Duplicada" (red)
-  - Show "Processando..." spinner badge when `reconciliacao_status === 'processando'`
+**File:** `src/components/kanban/OrderCard.tsx` — insert after line 110 (after the "processando" badge)
 
----
+```tsx
+{order.reconciliacao_status === 'erro' && (
+  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]" title="Falha ao processar a nota fiscal">❌ Falha reconciliação</Badge>
+)}
+```
 
-## Bloco 5: Drag & Drop UX
+## Fix 6 — Broaden PDF MIME validation
 
-### New File
-- **`src/components/kanban/DocumentDropZone.tsx`** — reusable component with `onDragOver`/`onDrop`, visual states (idle dashed, hover blue, uploaded green), PDF MIME validation, fallback click-to-upload, filename + "Visualizar"/"Substituir" buttons
+**File:** `src/components/kanban/DocumentDropZone.tsx` — line 22
 
-### Modified Files
-- **`src/components/kanban/EditOrderForm.tsx`** — replace `renderDocumentRow` with `DocumentDropZone`
-
-No backend changes.
+Replace:
+```typescript
+if (file.type !== "application/pdf") {
+```
+With:
+```typescript
+if (!file.type.includes("pdf") && !file.name.toLowerCase().endsWith(".pdf")) {
+```
 
 ---
 
-## Implementation Order
-
-1. Bloco 1 (Timeline) — foundation for audit trail
-2. Bloco 2 (Reconciliation) — core automation + Edge Function
-3. Bloco 3 (Column indicators) — visibility
-4. Bloco 4 (Divergence badges) — detail
-5. Bloco 5 (Drag & Drop) — UX polish
-
-**Totals:** 2 new tables, 1 edge function, 3 new components/hooks, modifications to 4 existing files. Each block independently deployable.
+**Summary:** 6 edits, 4 files, 0 migrations. Critical fix is replacing `pdf-parse` with `pdfjs-dist/legacy` (`?target=deno`) to resolve the `fs.readFileSync` runtime error.
 
