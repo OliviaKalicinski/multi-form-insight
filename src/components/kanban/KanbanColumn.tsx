@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useDroppable } from "@dnd-kit/core";
 
 export interface ColumnIndicator {
   label: string;
@@ -18,15 +19,23 @@ interface KanbanColumnProps {
   title: string;
   count: number;
   color: string;
+  columnKey: string;
   indicators?: ColumnIndicator[];
   children: React.ReactNode;
 }
 
-export function KanbanColumn({ title, count, color, indicators, children }: KanbanColumnProps) {
+export function KanbanColumn({ title, count, color, columnKey, indicators, children }: KanbanColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: columnKey });
   const visibleIndicators = (indicators || []).filter((i) => i.count > 0).slice(0, 3);
 
   return (
-    <div className="flex flex-col min-w-[280px] w-full max-w-[340px] bg-muted/30 rounded-lg border">
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex flex-col min-w-[280px] w-full max-w-[340px] bg-muted/30 rounded-lg border transition-all",
+        isOver && "ring-2 ring-primary"
+      )}
+    >
       <div className="p-3 border-b space-y-1.5">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm">{title}</h3>
