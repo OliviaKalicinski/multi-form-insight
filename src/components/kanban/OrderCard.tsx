@@ -7,6 +7,9 @@ import { getProductDisplayName } from "@/data/operationalProducts";
 import { ChevronRight, Edit, MoreVertical, X, FileText, Receipt } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import { toast } from "sonner";
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import React from "react";
 
 interface OrderCardProps {
   order: OperationalOrder;
@@ -35,6 +38,13 @@ const naturezaColors: Record<string, string> = {
   Seeding: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
 };
 
+const divergenceMessages: Record<string, string> = {
+  valor: "Valor da NF diferente do pedido",
+  produto: "Produtos da NF não correspondem ao pedido",
+  quantidade: "Quantidade divergente",
+  nf_duplicada: "NF já usada em outro pedido",
+};
+
 const handleDocClick = async (filePath: string) => {
   try {
     const url = await getSignedUrl(filePath);
@@ -47,6 +57,18 @@ const handleDocClick = async (filePath: string) => {
 export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
   const daysOpen = differenceInDays(new Date(), new Date(order.created_at));
   const nextStatus = statusFlow[order.status_operacional];
+
+  const activeDivergences = order.divergencia && typeof order.divergencia === "object"
+    ? Object.entries(order.divergencia as Record<string, boolean>)
+        .filter(([k, v]) => k !== "legacy" && Boolean(v))
+        .map(([k]) => divergenceMessages[k] || k)
+    : [];
+
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: order.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+  };
 
   const customerLabel = order.customer?.nome
     || order.destinatario_nome
@@ -62,7 +84,13 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
   const nfPendenteVisual = !isEnviado && order.nf_pendente && !order.nf_file_path;
 
   return (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow">
+    <Card
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="cursor-grab hover:shadow-md transition-shadow active:cursor-grabbing"
+    >
       <CardContent className="p-3 space-y-2">
         {/* Top row: Nature + Customer */}
         <div className="flex items-start justify-between gap-2">
@@ -86,24 +114,13 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
                   Reconciliado
                 </Badge>
               )}
-              {order.divergencia && typeof order.divergencia === 'object' && (
-                <>
-                  {(order.divergencia as any).valor && (
-                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">⚠ Div. valor</Badge>
-                  )}
-                  {(order.divergencia as any).produto && (
-                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">⚠ Div. produto</Badge>
-                  )}
-                  {(order.divergencia as any).quantidade && (
-                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">⚠ Div. qtd</Badge>
-                  )}
-                  {(order.divergencia as any).nf_duplicada && (
-                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">🚨 NF Duplicada</Badge>
-                  )}
-                  {(order.divergencia as any).legacy && (
-                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]">Divergente</Badge>
-                  )}
-                </>
+              {activeDivergences.length > 0 && (
+                <Badge
+                  className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 text-[10px]"
+                  title={activeDivergences.join("\n")}
+                >
+                  ⚠ {activeDivergences.length} divergência(s)
+                </Badge>
               )}
               {order.reconciliacao_status === 'processando' && (
                 <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-[10px]">⏳ Processando...</Badge>

@@ -9,6 +9,7 @@ import { EditOrderForm } from "@/components/kanban/EditOrderForm";
 import { getProductDisplayName } from "@/data/operationalProducts";
 import { Download, Plus } from "lucide-react";
 import { format } from "date-fns";
+import { DndContext, DragOverlay, DragStartEvent, DragEndEvent, closestCenter } from "@dnd-kit/core";
 
 const columns = [
   { key: "pedidos", title: "Pedidos", color: "bg-blue-500/10 text-blue-700" },
@@ -30,6 +31,23 @@ export default function KanbanOperacional() {
 
   const [newOpen, setNewOpen] = useState(false);
   const [editOrder, setEditOrder] = useState<OperationalOrder | null>(null);
+  const [activeOrder, setActiveOrder] = useState<OperationalOrder | null>(null);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const found = orders.find((o) => o.id === event.active.id);
+    setActiveOrder(found || null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveOrder(null);
+    const { active, over } = event;
+    if (!over) return;
+    const orderId = active.id as string;
+    const newStatus = over.id as string;
+    const order = orders.find((o) => o.id === orderId);
+    if (!order || order.status_operacional === newStatus) return;
+    updateStatus.mutate({ id: orderId, newStatus, order });
+  };
 
   const ordersByStatus = useMemo(() => {
     const map: Record<string, OperationalOrder[]> = {};
@@ -111,21 +129,26 @@ export default function KanbanOperacional() {
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Carregando...</div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {columns.map((col) => (
-            <KanbanColumn key={col.key} title={col.title} count={ordersByStatus[col.key]?.length || 0} color={col.color} indicators={indicatorsByStatus[col.key]}>
-              {ordersByStatus[col.key]?.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  onEdit={setEditOrder}
-                  onMove={(id, newStatus, o) => updateStatus.mutate({ id, newStatus, order: o })}
-                  onCancel={(id) => cancelOrder.mutate(id)}
-                />
-              ))}
-            </KanbanColumn>
-          ))}
-        </div>
+        <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {columns.map((col) => (
+              <KanbanColumn key={col.key} columnKey={col.key} title={col.title} count={ordersByStatus[col.key]?.length || 0} color={col.color} indicators={indicatorsByStatus[col.key]}>
+                {ordersByStatus[col.key]?.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    onEdit={setEditOrder}
+                    onMove={(id, newStatus, o) => updateStatus.mutate({ id, newStatus, order: o })}
+                    onCancel={(id) => cancelOrder.mutate(id)}
+                  />
+                ))}
+              </KanbanColumn>
+            ))}
+          </div>
+          <DragOverlay>
+            {activeOrder && <OrderCard order={activeOrder} onEdit={() => {}} onMove={() => {}} onCancel={() => {}} />}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* Forms */}
