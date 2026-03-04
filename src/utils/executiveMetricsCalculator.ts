@@ -166,13 +166,37 @@ export const calculateExecutiveMetrics = (
   });
 
   const totalClientes = clientesUnicos.size;
-  const novosClientes = Array.from(clientesUnicos.values()).filter(c => c.pedidos === 1).length;
-  const clientesRecorrentes = totalClientes - novosClientes;
+
+  // Build first-purchase map from all orders
+  const primeiraCompraPorCliente = new Map<string, Date>();
+  orders.forEach(o => {
+    const cpf = o.cpfCnpj;
+    const data = new Date(o.dataVenda);
+    if (isNaN(data.getTime())) return;
+    if (!primeiraCompraPorCliente.has(cpf) || data < primeiraCompraPorCliente.get(cpf)!) {
+      primeiraCompraPorCliente.set(cpf, data);
+    }
+  });
+
+  // New customers = first purchase in selected period
+  let novosClientes = 0;
+  primeiraCompraPorCliente.forEach((data) => {
+    if (!month || month === "all") {
+      novosClientes++;
+      return;
+    }
+    const m = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+    if (m === month) novosClientes++;
+  });
+
+  // Recurrence = customers with >1 order (independent of period)
+  const clientesRecorrentes = Array.from(clientesUnicos.values())
+    .filter(c => c.pedidos > 1).length;
   const taxaRecompra = totalClientes > 0 ? (clientesRecorrentes / totalClientes) * 100 : 0;
-  
+
   const clientesAtivos = churnAnalysis?.clientesAtivos || totalClientes;
   const taxaChurn = churnAnalysis?.taxaChurn || 0;
-  
+
   const ltv = totalClientes > 0 ? receita / totalClientes : 0;
   const cac = novosClientes > 0 ? investimentoAds / novosClientes : 0;
 
