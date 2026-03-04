@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOperationalOrders, OperationalOrder } from "@/hooks/useOperationalOrders";
-import { KanbanColumn } from "@/components/kanban/KanbanColumn";
+import { KanbanColumn, ColumnIndicator } from "@/components/kanban/KanbanColumn";
 import { OrderCard } from "@/components/kanban/OrderCard";
 import { NewOrderForm } from "@/components/kanban/NewOrderForm";
 import { EditOrderForm } from "@/components/kanban/EditOrderForm";
@@ -39,6 +39,19 @@ export default function KanbanOperacional() {
     }
     return map;
   }, [orders]);
+
+  const indicatorsByStatus = useMemo(() => {
+    const result: Record<string, ColumnIndicator[]> = {};
+    for (const col of columns) {
+      const colOrders = ordersByStatus[col.key] || [];
+      result[col.key] = [
+        { label: "NF Pend.", count: colOrders.filter((o) => o.nf_pendente && !o.nf_file_path && !o.is_fiscal_exempt).length, variant: "warning" as const },
+        { label: "Reconcil.", count: colOrders.filter((o) => o.reconciliado).length, variant: "success" as const },
+        { label: "Diverg.", count: colOrders.filter((o) => o.divergencia != null).length, variant: "error" as const },
+      ];
+    }
+    return result;
+  }, [ordersByStatus]);
 
   const handleExportCSV = () => {
     const headers = ["Cliente", "Natureza", "Produtos", "Valor (R$)", "Status", "NF", "Tipo NF", "NF Pendente", "Reconciliado", "Divergência", "Responsável", "Data Criação"];
@@ -100,7 +113,7 @@ export default function KanbanOperacional() {
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {columns.map((col) => (
-            <KanbanColumn key={col.key} title={col.title} count={ordersByStatus[col.key]?.length || 0} color={col.color}>
+            <KanbanColumn key={col.key} title={col.title} count={ordersByStatus[col.key]?.length || 0} color={col.color} indicators={indicatorsByStatus[col.key]}>
               {ordersByStatus[col.key]?.map((order) => (
                 <OrderCard
                   key={order.id}

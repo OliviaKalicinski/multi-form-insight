@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { productsByBrandAndCategory, findProductById } from "@/data/operationalProducts";
-import { Plus, Trash2, FileText, Receipt, CheckCircle2, Upload, ExternalLink } from "lucide-react";
+import { Plus, Trash2, History, ChevronDown } from "lucide-react";
+import { OrderTimeline } from "@/components/kanban/OrderTimeline";
 import { OperationalOrder, OrderItem, useOperationalOrders, getSignedUrl } from "@/hooks/useOperationalOrders";
+import { DocumentDropZone } from "@/components/kanban/DocumentDropZone";
 import { toast } from "sonner";
 
 interface EditOrderFormProps {
@@ -76,8 +79,6 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
   const [destCep, setDestCep] = useState("");
 
   // Document upload
-  const nfInputRef = useRef<HTMLInputElement>(null);
-  const boletoInputRef = useRef<HTMLInputElement>(null);
   const { uploadDocument } = useOperationalOrders();
 
   const isSeeding = natureza === "Seeding";
@@ -187,61 +188,6 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
     });
   };
 
-  const renderDocumentRow = (
-    label: string,
-    icon: React.ReactNode,
-    filePath: string | null,
-    type: "nf" | "boleto",
-    inputRef: React.RefObject<HTMLInputElement>
-  ) => (
-    <div className="flex items-center justify-between gap-2 p-2 rounded-md border bg-muted/20">
-      <div className="flex items-center gap-2 min-w-0">
-        {icon}
-        <span className="text-sm font-medium">{label}</span>
-        {filePath ? (
-          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-        ) : (
-          <span className="text-xs text-muted-foreground">Não anexado</span>
-        )}
-      </div>
-      <div className="flex items-center gap-1 shrink-0">
-        {filePath && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => handleViewDocument(filePath)}
-          >
-            <ExternalLink className="h-3 w-3 mr-1" />
-            Visualizar
-          </Button>
-        )}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs"
-          disabled={uploadDocument.isPending}
-          onClick={() => inputRef.current?.click()}
-        >
-          <Upload className="h-3 w-3 mr-1" />
-          {filePath ? "Substituir" : "Anexar"}
-        </Button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFileUpload(file, type);
-            e.target.value = "";
-          }}
-        />
-      </div>
-    </div>
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -449,21 +395,33 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
           {/* Documentos */}
           <div className="border-t pt-4 space-y-3">
             <h4 className="font-semibold text-sm text-muted-foreground">Documentos</h4>
-            {renderDocumentRow(
-              "Nota Fiscal (PDF)",
-              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />,
-              order.nf_file_path,
-              "nf",
-              nfInputRef
-            )}
-            {renderDocumentRow(
-              "Boleto (PDF)",
-              <Receipt className="h-4 w-4 text-muted-foreground shrink-0" />,
-              order.boleto_file_path,
-              "boleto",
-              boletoInputRef
-            )}
+            <DocumentDropZone
+              label="Nota Fiscal (PDF)"
+              filePath={order.nf_file_path}
+              isUploading={uploadDocument.isPending}
+              onFileSelect={(file) => handleFileUpload(file, "nf")}
+              onView={order.nf_file_path ? () => handleViewDocument(order.nf_file_path!) : undefined}
+            />
+            <DocumentDropZone
+              label="Boleto (PDF)"
+              filePath={order.boleto_file_path}
+              isUploading={uploadDocument.isPending}
+              onFileSelect={(file) => handleFileUpload(file, "boleto")}
+              onView={order.boleto_file_path ? () => handleViewDocument(order.boleto_file_path!) : undefined}
+            />
           </div>
+
+          {/* Histórico */}
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors w-full border-t pt-4">
+              <History className="h-4 w-4" />
+              Histórico
+              <ChevronDown className="h-3 w-3 ml-auto" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">
+              <OrderTimeline orderId={order.id} />
+            </CollapsibleContent>
+          </Collapsible>
 
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? "Salvando..." : "Salvar Alterações"}
