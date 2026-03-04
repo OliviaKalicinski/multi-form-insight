@@ -161,7 +161,9 @@ function reconcileNFIdentity(orders: ProcessedOrder[]): ProcessedOrder[] {
 
     // Fallback sintético — garante ID único
     syntheticCount++;
-    const syntheticId = `nf-${normalize(order.numeroPedido) || Math.random().toString(36).slice(2)}`;
+    const rawKey = order.numeroPedido || order.numeroNota || order.idNota || `${new Date(order.dataVenda).toISOString()}-${order.valorTotal}`;
+    const encoded = btoa(unescape(encodeURIComponent(rawKey)));
+    const syntheticId = `nf-${encoded.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)}`;
     return { ...order, cpfCnpj: syntheticId };
   });
 
