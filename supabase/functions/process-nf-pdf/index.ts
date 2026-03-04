@@ -183,7 +183,7 @@ serve(async (req: Request) => {
     let rawText = "";
     try {
       const pdfjsLib = await import(
-        "https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs?target=deno"
+        "https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs?target=deno&external=canvas"
       );
       const buffer = await fileData.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
