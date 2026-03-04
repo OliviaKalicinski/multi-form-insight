@@ -19,7 +19,7 @@ export function DocumentDropZone({ label, filePath, isUploading, onFileSelect, o
 
   const handleFile = useCallback(
     (file: File) => {
-      if (file.type !== "application/pdf") {
+      if (!file.type.includes("pdf") && !file.name.toLowerCase().endsWith(".pdf")) {
         toast.error("Apenas arquivos PDF são permitidos");
         return;
       }
