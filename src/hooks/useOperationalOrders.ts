@@ -329,29 +329,9 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
     onSuccess: (filePath, variables) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       const label = variables.type === "nf" ? "NF" : "Boleto";
-      toast(`${label} anexado. Processando reconciliação...`);
+      toast(`${label} anexado com sucesso.`);
       const eventType = variables.type === "nf" ? "nf_anexada" : "boleto_anexado";
       try { logEventSilent(variables.orderId, eventType); } catch {}
-
-      // Fire-and-forget: trigger NF reconciliation
-      if (variables.type === "nf") {
-        supabase.functions
-          .invoke("process-nf-pdf", {
-            body: { order_id: variables.orderId, file_path: filePath },
-          })
-          .then(({ error }) => {
-            if (error) {
-              console.error("Reconciliation error:", error);
-              toast.error("Erro na reconciliação automática");
-            } else {
-              queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
-              queryClient.invalidateQueries({ queryKey: ["order-events"] });
-            }
-          })
-          .catch(() => {
-            toast.error("Erro na reconciliação automática");
-          });
-      }
     },
     onError: (err: any) => {
       toast.error("Erro ao anexar documento: " + err.message);
