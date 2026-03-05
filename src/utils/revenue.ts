@@ -23,3 +23,12 @@ export const isRevenueOrder = (order: ProcessedOrder): boolean => {
 
 export const getRevenueOrders = (orders: ProcessedOrder[]): ProcessedOrder[] =>
   orders.filter(isRevenueOrder);
+
+export const getComiDaDragaoOrders = (orders: ProcessedOrder[]): ProcessedOrder[] =>
+  orders.filter(o => o.segmentoCliente?.toLowerCase() !== 'b2b');
+
+export const getB2COrders = (orders: ProcessedOrder[]): ProcessedOrder[] =>
+  orders.filter(o => {
+    const seg = o.segmentoCliente?.toLowerCase();
+    return !seg || seg === 'b2c';
+  });

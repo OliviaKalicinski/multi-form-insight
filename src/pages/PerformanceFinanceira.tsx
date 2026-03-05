@@ -19,7 +19,7 @@ import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
 import { IncompleteMonthBadge } from "@/components/dashboard/IncompleteMonthBadge";
 import { calculateFinancialMetrics, analyzeSeasonality, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes, getPlatformPerformanceWithProducts } from "@/utils/financialMetrics";
 import { filterOrdersByMonth, filterOrdersByDateRange, extractDailyRevenue } from "@/utils/salesCalculator";
-import { getOfficialRevenue, getRevenueOrders } from "@/utils/revenue";
+import { getOfficialRevenue, getRevenueOrders, getComiDaDragaoOrders } from "@/utils/revenue";
 import { filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
@@ -48,13 +48,15 @@ export default function PerformanceFinanceira() {
   const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
   const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('daily');
 
+  const cdSalesData = useMemo(() => getComiDaDragaoOrders(salesData), [salesData]);
+
   const isLast12MonthsView = selectedMonth === "last-12-months";
 
   const availableSalesMonths = useMemo(() => {
     const months = new Set<string>();
-    salesData.forEach(o => months.add(format(o.dataVenda, "yyyy-MM")));
+    cdSalesData.forEach(o => months.add(format(o.dataVenda, "yyyy-MM")));
     return Array.from(months).sort();
-  }, [salesData]);
+  }, [cdSalesData]);
 
   // Detectar mês incompleto e calcular intervalos de comparação
   const { monthInfo, comparison } = useMemo(() => {
@@ -68,16 +70,16 @@ export default function PerformanceFinanceira() {
 
   // Calcular métricas do mês selecionado
   const financialMetrics = useMemo(() => {
-    if (salesData.length === 0) return null;
+    if (cdSalesData.length === 0) return null;
     const filteredOrders = selectedMonth
-      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
-      : salesData;
+      ? filterOrdersByMonth(cdSalesData, selectedMonth, availableSalesMonths)
+      : cdSalesData;
     return calculateFinancialMetrics(filteredOrders, selectedMonth || 'all');
-  }, [salesData, selectedMonth, availableSalesMonths]);
+  }, [cdSalesData, selectedMonth, availableSalesMonths]);
 
   // Calcular métricas do mês anterior para comparação (com intervalos iguais para meses incompletos)
   const previousMonthMetrics = useMemo(() => {
-    if (salesData.length === 0 || !selectedMonth || selectedMonth === 'last-12-months') return null;
+    if (cdSalesData.length === 0 || !selectedMonth || selectedMonth === 'last-12-months') return null;
     
     const currentDate = parse(selectedMonth, "yyyy-MM", new Date());
     const prevMonth = new Date(currentDate);
@@ -89,7 +91,7 @@ export default function PerformanceFinanceira() {
     // Se mês incompleto, usar intervalo igual
     if (comparison?.isIncomplete) {
       const filteredOrders = filterOrdersByDateRange(
-        salesData,
+        cdSalesData,
         comparison.comparisonPeriod.start,
         comparison.comparisonPeriod.end
       );
@@ -97,21 +99,21 @@ export default function PerformanceFinanceira() {
     }
     
     // Mês completo: usar filtro normal
-    const filteredOrders = filterOrdersByMonth(salesData, prevMonthStr, availableSalesMonths);
+    const filteredOrders = filterOrdersByMonth(cdSalesData, prevMonthStr, availableSalesMonths);
     return calculateFinancialMetrics(filteredOrders, prevMonthStr);
-  }, [salesData, selectedMonth, availableSalesMonths, comparison]);
+  }, [cdSalesData, selectedMonth, availableSalesMonths, comparison]);
 
   // Para mês incompleto, recalcular métricas do período atual também
   const currentPeriodMetrics = useMemo(() => {
-    if (!comparison?.isIncomplete || salesData.length === 0) return null;
+    if (!comparison?.isIncomplete || cdSalesData.length === 0) return null;
     
     const filteredOrders = filterOrdersByDateRange(
-      salesData,
+      cdSalesData,
       comparison.currentPeriod.start,
       comparison.currentPeriod.end
     );
     return calculateFinancialMetrics(filteredOrders, selectedMonth || '');
-  }, [salesData, comparison, selectedMonth]);
+  }, [cdSalesData, comparison, selectedMonth]);
 
   // Usar métricas do período atual para meses incompletos
   const displayMetrics = comparison?.isIncomplete ? currentPeriodMetrics : financialMetrics;
@@ -121,7 +123,7 @@ export default function PerformanceFinanceira() {
     if (!monthInfo?.isIncomplete || !financialMetrics || !previousMonthMetrics) return null;
     
     const dailyRevenue = extractDailyRevenue(
-      filterOrdersByMonth(salesData, selectedMonth!, availableSalesMonths)
+      filterOrdersByMonth(cdSalesData, selectedMonth!, availableSalesMonths)
     );
     
     return calculateProjection(
@@ -131,7 +133,7 @@ export default function PerformanceFinanceira() {
       dailyRevenue,
       (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
     );
-  }, [monthInfo, financialMetrics, previousMonthMetrics, salesData, selectedMonth, availableSalesMonths]);
+  }, [monthInfo, financialMetrics, previousMonthMetrics, cdSalesData, selectedMonth, availableSalesMonths]);
 
   // Calcular variações (agora usando métricas de intervalos iguais para meses incompletos)
   const variations = useMemo((): { revenue: number | null; ticket: number | null; orders: number | null } | null => {
@@ -150,26 +152,26 @@ export default function PerformanceFinanceira() {
 
   // Métricas de comparação (quando comparisonMode ativo)
   const comparisonMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length === 0 || salesData.length === 0) {
+    if (!comparisonMode || selectedMonths.length === 0 || cdSalesData.length === 0) {
       return null;
     }
-    return calculateComparisonMetrics(salesData, selectedMonths, availableMonths);
-  }, [comparisonMode, selectedMonths, salesData, availableMonths]);
+    return calculateComparisonMetrics(cdSalesData, selectedMonths, availableMonths);
+  }, [comparisonMode, selectedMonths, cdSalesData, availableMonths]);
 
   // Análise de sazonalidade (todos os dados)
   const seasonalityAnalysis = useMemo(() => {
-    if (salesData.length === 0) return null;
-    return analyzeSeasonality(salesData);
-  }, [salesData]);
+    if (cdSalesData.length === 0) return null;
+    return analyzeSeasonality(cdSalesData);
+  }, [cdSalesData]);
 
   // === ROAS METRICS ===
   const roasMetrics = useMemo(() => {
-    if (salesData.length === 0) return null;
+    if (cdSalesData.length === 0) return null;
     
     // Filtrar pedidos do período
     const filteredOrders = selectedMonth
-      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
-      : salesData;
+      ? filterOrdersByMonth(cdSalesData, selectedMonth, availableSalesMonths)
+      : cdSalesData;
     
     // Filtrar ads do período
     const filteredAds = selectedMonth && selectedMonth !== 'last-12-months'
@@ -199,7 +201,7 @@ export default function PerformanceFinanceira() {
       investimentoAds,
       hasAdsData: filteredAds.length > 0
     };
-  }, [salesData, adsData, selectedMonth, availableSalesMonths]);
+  }, [cdSalesData, adsData, selectedMonth, availableSalesMonths]);
 
   // Goals data para o card de metas
   const goalsData = useMemo(() => {
@@ -235,16 +237,16 @@ export default function PerformanceFinanceira() {
   // Obter pedidos do período atual para passar aos componentes
   const periodOrders = useMemo(() => {
     return selectedMonth
-      ? filterOrdersByMonth(salesData, selectedMonth, availableSalesMonths)
-      : salesData;
-  }, [salesData, selectedMonth, availableSalesMonths]);
+      ? filterOrdersByMonth(cdSalesData, selectedMonth, availableSalesMonths)
+      : cdSalesData;
+  }, [cdSalesData, selectedMonth, availableSalesMonths]);
 
   // Calcular breakdown hierárquico por canal → produtos
   const platformWithProducts = useMemo(() => {
     return getPlatformPerformanceWithProducts(periodOrders, 5);
   }, [periodOrders]);
 
-  if (salesData.length === 0) {
+  if (cdSalesData.length === 0) {
     return (
       <div className="container mx-auto px-6 py-8">
         <Card>
