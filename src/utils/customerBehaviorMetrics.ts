@@ -1,6 +1,7 @@
 import { ProcessedOrder, CustomerBehaviorMetrics, ChurnRiskCustomer, SalesPeak, OrderVolumeAnalysis, CustomerSegment } from "@/types/marketing";
 import { format, differenceInDays, startOfWeek, endOfWeek } from "date-fns";
 import { getOfficialRevenue } from "./revenue";
+import { calculateRepurchaseRate } from "./salesCalculator";
 
 /**
  * @deprecated Churn agora vem da view `customer_full`. Use `useCustomerData` hook.
@@ -329,14 +330,11 @@ export const calculateCustomerBehaviorMetrics = (orders: ProcessedOrder[]): Cust
   const peaks = analyzeSalesPeaks(orders);
   const segments = segmentCustomers(orders);
   
-  // Calcular taxa de recompra
-  const clientesMap = new Map<string, number>();
-  orders.forEach(order => {
-    clientesMap.set(order.cpfCnpj, (clientesMap.get(order.cpfCnpj) || 0) + 1);
-  });
-  const clientesRecompra = Array.from(clientesMap.values()).filter(count => count >= 2).length;
-  const totalClientes = clientesMap.size;
-  const taxaRecompra = totalClientes > 0 ? (clientesRecompra / totalClientes) * 100 : 0;
+  // Calcular taxa de recompra (definição comercial: apenas pedidos de receita)
+  const taxaRecompra = calculateRepurchaseRate(orders);
+  
+  // Total de clientes únicos (base comportamental — inclui todos os tipos de pedido)
+  const totalClientes = new Set(orders.map(o => o.cpfCnpj)).size;
 
   // CLV simplificado: receita fiscal média por cliente
   const totalRevenue = orders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);

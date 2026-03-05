@@ -1,6 +1,6 @@
 import { ExecutiveMetrics } from "@/types/executive";
 import { AdsData, ProcessedOrder } from "@/types/marketing";
-import { calculateSalesMetrics } from "./salesCalculator";
+import { calculateSalesMetrics, calculateAverageTicket, calculateRepurchaseRate } from "./salesCalculator";
 import { calculateAdsMetrics } from "./adsCalculator";
 import { analyzeChurn } from "./customerBehaviorMetrics";
 import { differenceInDays, parse, min, max } from "date-fns";
@@ -97,7 +97,7 @@ export const calculateExecutiveMetrics = (
   // ===== VENDAS =====
   const receita = salesMetrics?.faturamentoTotal || 0;
   const pedidos = salesMetrics?.totalPedidos || 0;
-  const ticketMedio = pedidos > 0 ? receita / pedidos : 0;
+  const ticketMedio = calculateAverageTicket(orders);
   
   // Ticket médio real - exclui pedidos de SOMENTE amostra E não-vendas
   const pedidosReais = revenueOrders.filter(order => {
@@ -189,10 +189,8 @@ export const calculateExecutiveMetrics = (
     if (m === month) novosClientes++;
   });
 
-  // Recurrence = customers with >1 order (independent of period)
-  const clientesRecorrentes = Array.from(clientesUnicos.values())
-    .filter(c => c.pedidos > 1).length;
-  const taxaRecompra = totalClientes > 0 ? (clientesRecorrentes / totalClientes) * 100 : 0;
+  // Recurrence: definição comercial (apenas pedidos de receita)
+  const taxaRecompra = calculateRepurchaseRate(orders);
 
   const clientesAtivos = churnAnalysis?.clientesAtivos || totalClientes;
   const taxaChurn = churnAnalysis?.taxaChurn || 0;
