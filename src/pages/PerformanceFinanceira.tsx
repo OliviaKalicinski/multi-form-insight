@@ -48,6 +48,7 @@ export default function PerformanceFinanceira() {
   const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
   const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('daily');
 
+  // Brand-level: excludes B2B (Lets Fly)
   const cdSalesData = useMemo(() => getComiDaDragaoOrders(salesData), [salesData]);
 
   const isLast12MonthsView = selectedMonth === "last-12-months";

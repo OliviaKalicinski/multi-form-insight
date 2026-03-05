@@ -15,7 +15,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar, Clock } from "lucide-react";
-import { getComiDaDragaoOrders } from "@/utils/revenue";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 const CHART_COLORS = [
@@ -114,21 +113,21 @@ const VisaoExecutivaV2 = () => {
     Record<string, number>
   >({});
 
-  const cdSalesData = useMemo(() => getComiDaDragaoOrders(salesData), [salesData]);
+  // Company-level: uses all segments (no brand filter)
 
   // Find the last date with data
   const lastDate = useMemo(() => {
-    if (cdSalesData.length === 0) return null;
-    return new Date(Math.max(...cdSalesData.map((o) => o.dataVenda.getTime())));
-  }, [cdSalesData]);
+    if (salesData.length === 0) return null;
+    return new Date(Math.max(...salesData.map((o) => o.dataVenda.getTime())));
+  }, [salesData]);
 
   // Filter orders by selected period
   const filteredOrders = useMemo(() => {
-    if (!lastDate || cdSalesData.length === 0) return [];
+    if (!lastDate || salesData.length === 0) return [];
 
     if (period === "1d") {
       const dayStr = format(lastDate, "yyyy-MM-dd");
-      return cdSalesData.filter(
+      return salesData.filter(
         (o) => format(o.dataVenda, "yyyy-MM-dd") === dayStr
       );
     }
@@ -136,8 +135,8 @@ const VisaoExecutivaV2 = () => {
     const startDate = new Date(lastDate);
     startDate.setDate(startDate.getDate() - 6);
     startDate.setHours(0, 0, 0, 0);
-    return cdSalesData.filter((o) => o.dataVenda >= startDate);
-  }, [cdSalesData, lastDate, period]);
+    return salesData.filter((o) => o.dataVenda >= startDate);
+  }, [salesData, lastDate, period]);
 
   // Separate sample-only vs product order IDs
   const { sampleOrderIds, productOrderIds } = useMemo(() => {
@@ -332,7 +331,7 @@ const VisaoExecutivaV2 = () => {
     );
   }
 
-  if (cdSalesData.length === 0) {
+  if (salesData.length === 0) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[60vh]">
         <p className="text-muted-foreground">
