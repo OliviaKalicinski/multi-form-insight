@@ -21,10 +21,7 @@ import Operacoes from "./pages/Operacoes";
 import Ads from "./pages/Ads";
 import PerformanceFinanceira from "./pages/PerformanceFinanceira";
 import ComportamentoCliente from "./pages/ComportamentoCliente";
-import SegmentacaoClientes from "./pages/SegmentacaoClientes";
 import AnaliseSamples from "./pages/AnaliseSamples";
-import AnaliseCritica from "./pages/AnaliseCritica";
-import AnaliseChurn from "./pages/AnaliseChurn";
 import Publico from "./pages/Publico";
 import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
 import Clientes from "./pages/Clientes";
@@ -201,21 +198,9 @@ const App = () => (
             </ProtectedRoute>
           } />
           
-          <Route path="/segmentacao-clientes" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <SegmentacaoClientes />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/analise-churn" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <AnaliseChurn />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
+          {/* Redirects de rotas antigas */}
+          <Route path="/segmentacao-clientes" element={<Navigate to="/comportamento-cliente" replace />} />
+          <Route path="/analise-churn" element={<Navigate to="/comportamento-cliente" replace />} />
           
           <Route path="/analise-samples" element={
             <ProtectedRoute>
@@ -233,13 +218,7 @@ const App = () => (
             </ProtectedRoute>
           } />
           
-          <Route path="/analise-critica" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <AnaliseCritica />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
+          <Route path="/analise-critica" element={<Navigate to="/dashboard" replace />} />
           
           <Route path="/clientes" element={
             <ProtectedRoute>
