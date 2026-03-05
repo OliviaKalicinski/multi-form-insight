@@ -18,6 +18,15 @@ function norm(s: string): string {
     .trim();
 }
 
+/** Collapse spaced-out characters (e.g. "C D _ O R I G I N A L" → "CD_ORIGINAL")
+ *  Only collapses sequences of 3+ single chars separated by spaces.
+ *  Does NOT collapse normal phrases like "VALOR TOTAL DA NOTA". */
+function collapseSpacedText(text: string): string {
+  return text.replace(/\b(?:[A-Z0-9] ){3,}[A-Z0-9]\b/g, (m) =>
+    m.replace(/\s+/g, "")
+  );
+}
+
 /** Map DANFE description → technical product ID */
 const PRODUCT_PATTERNS: [RegExp, string][] = [
   [/comida de drag.{0,5}original.*90/i, "CD_ORIGINAL_90G"],
@@ -70,18 +79,26 @@ interface ExtractedProduct {
 }
 
 function extractFromText(text: string) {
-  // numero_nf
-  const nfMatch = text.match(/NF-?e?\s*N[ºo°.]?\s*([\d.]+)/i) ||
-    text.match(/NÚMERO\s*([\d.]+)/i);
+  // chave de acesso (44 digits)
+  const accessKeyMatch = text.match(/\b\d{44}\b/);
+  const chave_acesso = accessKeyMatch?.[0] ?? null;
+
+  // numero_nf — tolerant regex chain
+  const nfMatch = text.match(/NF-?e?\s*N[ºo°.]?\s*([\d.]+)/i)
+    || text.match(/N[ºo°]\s*[:\-]?\s*(\d{3,})/i)
+    || text.match(/NÚMERO\s*([\d.]+)/i);
   const numero_nf = nfMatch ? nfMatch[1].replace(/\./g, "") : null;
 
   // serie
   const serieMatch = text.match(/S[ÉE]RIE\s*:?\s*(\d+)/i);
   const serie = serieMatch ? serieMatch[1] : null;
 
-  // valor_total
-  const valorMatch = text.match(/VALOR TOTAL DA NOTA\s*[:\s]*([\d.,]+)/i) ||
-    text.match(/VLR\.\s*TOTAL\s*DA\s*NF\s*[:\s]*([\d.,]+)/i);
+  // valor_total — tolerant regex chain
+  const valorMatch =
+    text.match(/VALOR\s+TOTAL\s+DA\s+NOTA\s*R?\$?\s*([\d.,]+)/i)
+    || text.match(/TOTAL\s+DA\s+NOTA\s*R?\$?\s*([\d.,]+)/i)
+    || text.match(/VALOR\s+TOTAL\s*R?\$?\s*([\d.,]+)/i)
+    || text.match(/VLR\.\s*TOTAL\s*DA\s*NF\s*[:\s]*([\d.,]+)/i);
   const valor_total = valorMatch
     ? parseFloat(valorMatch[1].replace(/\./g, "").replace(",", "."))
     : null;
@@ -94,16 +111,18 @@ function extractFromText(text: string) {
   const pedidoMatch = text.match(/N[ºo°.]?\s*Pedido\s*:?\s*(\d+)/i);
   const numero_pedido_ref = pedidoMatch ? pedidoMatch[1] : null;
 
-  // products - extract from product table rows
+  // products — try technical code regex first, then fallback to positional
   const produtos: ExtractedProduct[] = [];
-  // Pattern: code | description | unit | qty | unit_price | total_price
-  const prodRegex = /(\d{2,6})\s+(.+?)\s+(Un|Kg|un|kg|UN|KG)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)/g;
+
+  // Priority 1: Technical product codes (e.g. CD_ORIGINAL_90G 15 UN 25,66 384,94)
+  const techProdRegex =
+    /([A-Z0-9_\-]{3,})\s+(\d+(?:[.,]\d+)?)\s+(?:UN|KG|CX|PC)?\s*(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)/gi;
   let m;
-  while ((m = prodRegex.exec(text)) !== null) {
-    const descricao = m[2].trim();
-    const quantidade = parseFloat(m[4].replace(",", "."));
-    const valor_unit = parseFloat(m[5].replace(/\./g, "").replace(",", "."));
-    const valor_total_item = parseFloat(m[6].replace(/\./g, "").replace(",", "."));
+  while ((m = techProdRegex.exec(text)) !== null) {
+    const descricao = m[1].trim();
+    const quantidade = parseFloat(m[2].replace(",", "."));
+    const valor_unit = parseFloat(m[3].replace(/\./g, "").replace(",", "."));
+    const valor_total_item = parseFloat(m[4].replace(/\./g, "").replace(",", "."));
     produtos.push({
       descricao,
       quantidade,
@@ -113,7 +132,25 @@ function extractFromText(text: string) {
     });
   }
 
-  return { numero_nf, serie, valor_total, cliente_nome, numero_pedido_ref, produtos };
+  // Priority 2: Positional fallback (code | description | unit | qty | unit_price | total_price)
+  if (produtos.length === 0) {
+    const prodRegex = /(\d{2,6})\s+(.+?)\s+(Un|Kg|un|kg|UN|KG)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)/g;
+    while ((m = prodRegex.exec(text)) !== null) {
+      const descricao = m[2].trim();
+      const quantidade = parseFloat(m[4].replace(",", "."));
+      const valor_unit = parseFloat(m[5].replace(/\./g, "").replace(",", "."));
+      const valor_total_item = parseFloat(m[6].replace(/\./g, "").replace(",", "."));
+      produtos.push({
+        descricao,
+        quantidade,
+        valor_unit,
+        valor_total: valor_total_item,
+        product_id: matchProduct(descricao),
+      });
+    }
+  }
+
+  return { numero_nf, serie, valor_total, cliente_nome, numero_pedido_ref, produtos, chave_acesso };
 }
 
 serve(async (req: Request) => {
@@ -183,10 +220,17 @@ serve(async (req: Request) => {
     let rawText = "";
     try {
       const pdfjsLib = await import(
-        "https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs?target=deno&external=canvas"
+        "npm:pdfjs-dist@4.0.379/legacy/build/pdf.mjs"
       );
+      pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
+
       const buffer = await fileData.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+      const pdf = await pdfjsLib.getDocument({
+        data: new Uint8Array(buffer),
+        useWorkerFetch: false,
+        isEvalSupported: false,
+      }).promise;
+
       const pages: string[] = [];
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
@@ -195,8 +239,11 @@ serve(async (req: Request) => {
         pages.push(strings.join(" "));
       }
       rawText = pages.join("\n");
-    } catch (parseErr) {
-      console.error("PDF parse error:", parseErr);
+    } catch (parseErr: any) {
+      console.error("PDF parse failed", {
+        message: parseErr?.message,
+        stack: parseErr?.stack,
+      });
       await adminClient
         .from("operational_orders")
         .update({ reconciliacao_status: "erro", divergencia: null })
@@ -206,7 +253,7 @@ serve(async (req: Request) => {
       await adminClient.from("order_events").insert({
         order_id,
         tipo_evento: "reconciliacao_erro",
-        payload: { erro: "Falha ao extrair texto do PDF" },
+        payload: { erro: "Falha ao extrair texto do PDF", detail: parseErr?.message },
       });
 
       return new Response(JSON.stringify({ error: "Failed to parse PDF" }), {
@@ -214,6 +261,9 @@ serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Normalize spaced-out characters before extraction
+    rawText = collapseSpacedText(rawText);
 
     // Extract structured data
     const extracted = extractFromText(rawText);
@@ -296,8 +346,6 @@ serve(async (req: Request) => {
           }
         }
       }
-    } else if (extracted.produtos.length === 0 && orderItems && orderItems.length > 0) {
-      // Could not extract products — don't flag as divergence, just note
     }
 
     const hasDivergence = Object.values(divergencia).some(Boolean);
@@ -312,6 +360,7 @@ serve(async (req: Request) => {
         cliente_nome: extracted.cliente_nome,
         produtos: extracted.produtos,
         numero_pedido_ref: extracted.numero_pedido_ref,
+        chave_acesso: extracted.chave_acesso,
         raw_text: rawText.substring(0, 20000),
       },
       { onConflict: "order_id,numero_nf" }
@@ -334,6 +383,7 @@ serve(async (req: Request) => {
       tipo_evento: hasDivergence ? "reconciliacao_divergente" : "reconciliacao_ok",
       payload: {
         numero_nf: extracted.numero_nf,
+        chave_acesso: extracted.chave_acesso,
         valor_nf: extracted.valor_total,
         produtos_extraidos: extracted.produtos.length,
         divergencia,
@@ -347,6 +397,7 @@ serve(async (req: Request) => {
         divergencia,
         extracted: {
           numero_nf: extracted.numero_nf,
+          chave_acesso: extracted.chave_acesso,
           valor_total: extracted.valor_total,
           produtos_count: extracted.produtos.length,
         },
