@@ -1,65 +1,81 @@
 
 
-# M1–M4 Ads Metrics Audit Fix (final)
+# Fix: Ticket Médio DRY + Repurchase Rate Bug
 
-## M2 — Multilingual fallback + dead code removal
+## Changes
 
-**File: `src/utils/adsCalculator.ts`**
-- Line 44: `const getValue` → `export const getValue`
-- Lines 282-284: replace hardcoded keys with `getValue` + full fallback list including `"Amount Spent"`:
-  - investimento: `["Valor usado (BRL)", "Amount spent (BRL)", "Amount spent", "Amount Spent", "Valor gasto", "Spent"]`
-  - compras: `["Compras", "Purchases", "Purchase"]`
-  - roas: `["ROAS de resultados", "ROAS (results)", "Result ROAS"]`
+### 1. `src/utils/salesCalculator.ts` — Fix repurchase rate (lines 210-215)
 
-**Delete:** `src/utils/roasCalculator.ts` and `src/components/dashboard/ROASCard.tsx` (dead code, never imported).
+Replace `orders` with `getRevenueOrders(orders)` so brindes/bonificações stop inflating recurrence:
 
-## M1 — Rename ROAS label
-
-**File: `src/pages/Ads.tsx`**
-- Line 497: `"ROAS do Negócio"` → `"ROAS Ads"`
-- Line 512: `"Receita total ÷ investimento total em mídia"` → `"Receita pixel Meta ÷ investimento total em mídia"`
-
-## M3 — CTR click source heuristic (with reviewer fix)
-
-**File: `src/utils/adsCalculator.ts`** lines 208-209:
 ```typescript
-// Before
-const clicksForFunnel = cliquesDesaida || cliquesLinkTotal || cliquesTodosTotal;
-
-// After
-const hasEngagementOnly = engajamentosTotal > 0 && comprasTotal === 0 && cliquesLinkTotal === 0;
-const clicksForFunnel = hasEngagementOnly
-  ? cliquesTodosTotal
-  : (cliquesDesaida || cliquesLinkTotal || cliquesTodosTotal);
+export const calculateRepurchaseRate = (orders: ProcessedOrder[]): number => {
+  const revenueOrders = getRevenueOrders(orders);
+  if (revenueOrders.length === 0) return 0;
+  const clientesMap = new Map<string, number>();
+  revenueOrders.forEach((order) => {
+    // ...rest unchanged
 ```
 
-The extra `cliquesLinkTotal === 0` guard prevents false positives on new sales campaigns that haven't converted yet but do have link clicks.
+### 2. `src/utils/financialMetrics.ts` — DRY ticket médio (line 4, 630)
 
-## M4 — Separate engagement from conversion rate
+Add import of `calculateAverageTicket` and replace inline calculation:
 
-**File: `src/types/marketing.ts`** — add after line 114:
 ```typescript
-taxaConversaoResultados: number;
+// line 4: add to import
+import { extractDailyOrders, calculateAverageTicket } from './salesCalculator';
+
+// line 630: replace inline
+const averageTicket = calculateAverageTicket(orders);
 ```
 
-**File: `src/utils/adsCalculator.ts`**:
-- Line 89 (defaults): add `taxaConversaoResultados: 0,`
-- Lines 229-231: replace mixed metric:
-  ```typescript
-  const taxaEngajamento = alcanceTotal > 0 ? (engajamentosTotal / alcanceTotal) * 100 : 0;
-  const taxaConversaoResultados = alcanceTotal > 0 ? (resultadosTotal / alcanceTotal) * 100 : 0;
-  ```
-- Line 261 (return): add `taxaConversaoResultados,`
+### 3. `src/utils/executiveMetricsCalculator.ts` — DRY ticket médio + fix repurchase (lines 3, 100, 148-158, 192-195)
 
-No UI changes needed — `taxaEngajamento` now shows pure engagement (correct for all current consumers in Ads.tsx and Seguidores.tsx). `taxaConversaoResultados` is available for future use.
+Import `calculateAverageTicket` and `calculateRepurchaseRate`:
 
-## Summary
+```typescript
+// line 3: add imports
+import { calculateSalesMetrics, calculateAverageTicket, calculateRepurchaseRate } from "./salesCalculator";
 
-| Fix | Files | Lines changed |
-|-----|-------|---------------|
-| M2 | adsCalculator.ts | ~8 |
-| M2 | delete 2 dead files | 0 |
-| M1 | Ads.tsx | 2 |
-| M3 | adsCalculator.ts | 3 |
-| M4 | adsCalculator.ts + marketing.ts | ~6 |
+// line 100: replace inline ticket médio
+const ticketMedio = calculateAverageTicket(orders);
+
+// lines 148-158: keep clientesUnicos for customer base count (behavioral)
+// but add revenue-order tracking for recurrence
+// Add after line 158:
+const revenueClientesMap = new Map<string, number>();
+revenueOrders.forEach(order => {
+  revenueClientesMap.set(order.cpfCnpj, (revenueClientesMap.get(order.cpfCnpj) || 0) + 1);
+});
+
+// lines 192-195: replace inline recurrence
+const clientesRecorrentes = Array.from(revenueClientesMap.values())
+  .filter(c => c > 1).length;
+const taxaRecompra = totalClientes > 0 ? (clientesRecorrentes / totalClientes) * 100 : 0;
+```
+
+Note: We keep `clientesUnicos` counting ALL orders for the customer base (behavioral — a brinde recipient is still a customer), but recurrence now only counts revenue orders. This is the correct semantic split.
+
+### 4. `src/utils/customerBehaviorMetrics.ts` — DRY repurchase (lines 1, 332-339)
+
+Import and delegate:
+
+```typescript
+// line 1: add import
+import { calculateRepurchaseRate } from "./salesCalculator";
+
+// lines 332-339: replace inline with single call
+const taxaRecompra = calculateRepurchaseRate(orders);
+```
+
+## Impact
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Ticket Médio | No change (same formula) | DRY, single source |
+| Taxa Recompra | Inflated by brindes | Correct (revenue-only) |
+
+Expected repurchase rate drop: 5-20% depending on brinde volume.
+
+~18 lines changed across 4 files. No UI changes.
 
