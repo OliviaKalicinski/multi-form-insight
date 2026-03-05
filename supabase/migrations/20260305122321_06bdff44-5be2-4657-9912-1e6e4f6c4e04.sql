@@ -1,0 +1,1 @@
+ALTER TABLE nf_extracted_data ADD COLUMN IF NOT EXISTS chave_acesso text;

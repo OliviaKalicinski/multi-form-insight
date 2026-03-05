@@ -647,6 +647,7 @@ export type Database = {
       }
       nf_extracted_data: {
         Row: {
+          chave_acesso: string | null
           cliente_nome: string | null
           created_at: string
           id: string
@@ -659,6 +660,7 @@ export type Database = {
           valor_total: number | null
         }
         Insert: {
+          chave_acesso?: string | null
           cliente_nome?: string | null
           created_at?: string
           id?: string
@@ -671,6 +673,7 @@ export type Database = {
           valor_total?: number | null
         }
         Update: {
+          chave_acesso?: string | null
           cliente_nome?: string | null
           created_at?: string
           id?: string
