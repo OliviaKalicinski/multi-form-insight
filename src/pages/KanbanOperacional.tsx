@@ -64,8 +64,6 @@ export default function KanbanOperacional() {
       const colOrders = ordersByStatus[col.key] || [];
       result[col.key] = [
         { label: "NF Pend.", count: colOrders.filter((o) => o.nf_pendente && !o.nf_file_path && !o.is_fiscal_exempt).length, variant: "warning" as const },
-        { label: "Reconcil.", count: colOrders.filter((o) => o.reconciliado).length, variant: "success" as const },
-        { label: "Diverg.", count: colOrders.filter((o) => o.divergencia != null).length, variant: "error" as const },
       ];
     }
     return result;

@@ -38,12 +38,6 @@ const naturezaColors: Record<string, string> = {
   Seeding: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
 };
 
-const divergenceMessages: Record<string, string> = {
-  valor: "Valor da NF diferente do pedido",
-  produto: "Produtos da NF não correspondem ao pedido",
-  quantidade: "Quantidade divergente",
-  nf_duplicada: "NF já usada em outro pedido",
-};
 
 const handleDocClick = async (filePath: string) => {
   try {
@@ -58,11 +52,6 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
   const daysOpen = differenceInDays(new Date(), new Date(order.created_at));
   const nextStatus = statusFlow[order.status_operacional];
 
-  const activeDivergences = order.divergencia && typeof order.divergencia === "object"
-    ? Object.entries(order.divergencia as Record<string, boolean>)
-        .filter(([k, v]) => k !== "legacy" && Boolean(v))
-        .map(([k]) => divergenceMessages[k] || k)
-    : [];
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: order.id });
   const style: React.CSSProperties = {
@@ -109,25 +98,6 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
                 <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-[10px]">
                   ⚠ NF Pendente
                 </Badge>
-              )}
-              {order.reconciliado && (
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-[10px]">
-                  Reconciliado
-                </Badge>
-              )}
-              {activeDivergences.length > 0 && (
-                <Badge
-                  className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 text-[10px]"
-                  title={activeDivergences.join("\n")}
-                >
-                  ⚠ {activeDivergences.length} divergência(s)
-                </Badge>
-              )}
-              {order.reconciliacao_status === 'processando' && (
-                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-[10px]">⏳ Processando...</Badge>
-              )}
-              {order.reconciliacao_status === 'erro' && (
-                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px]" title="Falha ao processar a nota fiscal">❌ Falha reconciliação</Badge>
               )}
               {daysOpen > 7 && (
                 <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200 text-[10px]">
