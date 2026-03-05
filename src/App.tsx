@@ -31,6 +31,8 @@ import Atendimentos from "./pages/Atendimentos";
 import ReclamacaoNova from "./pages/ReclamacaoNova";
 import RadarOperacional from "./pages/RadarOperacional";
 import KanbanOperacional from "./pages/KanbanOperacional";
+import Distribuidores from "./pages/Distribuidores";
+import LetsFly from "./pages/LetsFly";
 import NotFound from "./pages/NotFound";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -272,6 +274,22 @@ const App = () => (
             <ProtectedRoute>
               <AuthenticatedLayout>
                 <KanbanOperacional />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/distribuidores" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <Distribuidores />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/lets-fly" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <LetsFly />
               </AuthenticatedLayout>
             </ProtectedRoute>
           } />

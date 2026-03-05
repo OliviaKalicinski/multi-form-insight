@@ -75,6 +75,14 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: "Canais",
+    icon: Truck,
+    items: [
+      { title: "Distribuidores", url: "/distribuidores", icon: Package },
+      { title: "Let's Fly", url: "/lets-fly", icon: Truck },
+    ],
+  },
+  {
     title: "Comida de Dragão",
     icon: Package,
     items: [

@@ -32,3 +32,9 @@ export const getB2COrders = (orders: ProcessedOrder[]): ProcessedOrder[] =>
     const seg = o.segmentoCliente?.toLowerCase();
     return !seg || seg === 'b2c';
   });
+
+export const getB2B2COrders = (orders: ProcessedOrder[]): ProcessedOrder[] =>
+  orders.filter(o => o.segmentoCliente?.toLowerCase().trim() === 'b2b2c');
+
+export const getB2BOrders = (orders: ProcessedOrder[]): ProcessedOrder[] =>
+  orders.filter(o => o.segmentoCliente?.toLowerCase().trim() === 'b2b');
