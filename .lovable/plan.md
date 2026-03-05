@@ -2,80 +2,27 @@
 
 # Fix: Ticket Médio DRY + Repurchase Rate Bug
 
-## Changes
+Patch cirúrgico em 4 arquivos, ~18 linhas. Zero impacto de UI.
 
-### 1. `src/utils/salesCalculator.ts` — Fix repurchase rate (lines 210-215)
+## Mudanças
 
-Replace `orders` with `getRevenueOrders(orders)` so brindes/bonificações stop inflating recurrence:
+### 1. `src/utils/salesCalculator.ts` (linhas 210-215)
+Adicionar filtro `getRevenueOrders` na `calculateRepurchaseRate` para que brindes/bonificações não inflem recorrência. Numerador E denominador usam apenas pedidos de receita.
 
-```typescript
-export const calculateRepurchaseRate = (orders: ProcessedOrder[]): number => {
-  const revenueOrders = getRevenueOrders(orders);
-  if (revenueOrders.length === 0) return 0;
-  const clientesMap = new Map<string, number>();
-  revenueOrders.forEach((order) => {
-    // ...rest unchanged
-```
+### 2. `src/utils/financialMetrics.ts` (linhas 4 e 630)
+- Linha 4: adicionar `calculateAverageTicket` ao import de `./salesCalculator`
+- Linha 630: substituir `totalRevenueOrders > 0 ? totalRevenue / totalRevenueOrders : 0` por `calculateAverageTicket(orders)`
 
-### 2. `src/utils/financialMetrics.ts` — DRY ticket médio (line 4, 630)
+### 3. `src/utils/executiveMetricsCalculator.ts` (linhas 3, 100, 192-195)
+- Linha 3: adicionar `calculateAverageTicket, calculateRepurchaseRate` ao import
+- Linha 100: substituir `pedidos > 0 ? receita / pedidos : 0` por `calculateAverageTicket(orders)`
+- Linhas 192-195: substituir 4 linhas de cálculo inline por `const taxaRecompra = calculateRepurchaseRate(orders);`
 
-Add import of `calculateAverageTicket` and replace inline calculation:
+### 4. `src/utils/customerBehaviorMetrics.ts` (linhas 1-3 e 332-339)
+- Adicionar import de `calculateRepurchaseRate` de `./salesCalculator`
+- Substituir 8 linhas de lógica inline por `const taxaRecompra = calculateRepurchaseRate(orders);`
 
-```typescript
-// line 4: add to import
-import { extractDailyOrders, calculateAverageTicket } from './salesCalculator';
-
-// line 630: replace inline
-const averageTicket = calculateAverageTicket(orders);
-```
-
-### 3. `src/utils/executiveMetricsCalculator.ts` — DRY ticket médio + fix repurchase (lines 3, 100, 148-158, 192-195)
-
-Import `calculateAverageTicket` and `calculateRepurchaseRate`:
-
-```typescript
-// line 3: add imports
-import { calculateSalesMetrics, calculateAverageTicket, calculateRepurchaseRate } from "./salesCalculator";
-
-// line 100: replace inline ticket médio
-const ticketMedio = calculateAverageTicket(orders);
-
-// lines 148-158: keep clientesUnicos for customer base count (behavioral)
-// but add revenue-order tracking for recurrence
-// Add after line 158:
-const revenueClientesMap = new Map<string, number>();
-revenueOrders.forEach(order => {
-  revenueClientesMap.set(order.cpfCnpj, (revenueClientesMap.get(order.cpfCnpj) || 0) + 1);
-});
-
-// lines 192-195: replace inline recurrence
-const clientesRecorrentes = Array.from(revenueClientesMap.values())
-  .filter(c => c > 1).length;
-const taxaRecompra = totalClientes > 0 ? (clientesRecorrentes / totalClientes) * 100 : 0;
-```
-
-Note: We keep `clientesUnicos` counting ALL orders for the customer base (behavioral — a brinde recipient is still a customer), but recurrence now only counts revenue orders. This is the correct semantic split.
-
-### 4. `src/utils/customerBehaviorMetrics.ts` — DRY repurchase (lines 1, 332-339)
-
-Import and delegate:
-
-```typescript
-// line 1: add import
-import { calculateRepurchaseRate } from "./salesCalculator";
-
-// lines 332-339: replace inline with single call
-const taxaRecompra = calculateRepurchaseRate(orders);
-```
-
-## Impact
-
-| Metric | Before | After |
-|--------|--------|-------|
-| Ticket Médio | No change (same formula) | DRY, single source |
-| Taxa Recompra | Inflated by brindes | Correct (revenue-only) |
-
-Expected repurchase rate drop: 5-20% depending on brinde volume.
-
-~18 lines changed across 4 files. No UI changes.
+## Impacto
+- **Ticket médio**: sem mudança (mesma fórmula, apenas DRY)
+- **Taxa de recompra**: queda esperada de 5-20% (correção de métrica inflada por brindes)
 
