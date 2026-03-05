@@ -75,7 +75,10 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
     || "Sem cliente";
 
   const itemsSummary = order.items
-    .map((i) => `${getProductDisplayName(i.produto)} x ${i.quantidade}${i.unidade}`)
+    .map((i) => {
+      const base = `${getProductDisplayName(i.produto)} x ${i.quantidade}${i.unidade}`;
+      return i.lote ? `${base} [Lote ${i.lote}]` : base;
+    })
     .join(", ");
 
   // Badge logic

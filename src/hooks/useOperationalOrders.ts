@@ -8,6 +8,8 @@ export interface OrderItem {
   produto: string;
   quantidade: number;
   unidade: "un" | "kg";
+  lote: string;
+  valor_unitario?: number;
 }
 
 export interface OperationalOrder {
@@ -160,7 +162,11 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       return (data || []).map((row: any) => ({
         ...row,
         customer: row.customer || null,
-        items: (row.items || []) as OrderItem[],
+        items: (row.items || []).map((it: any) => ({
+          ...it,
+          lote: it.lote || "",
+          valor_unitario: it.valor_unitario ?? undefined,
+        })) as OrderItem[],
       })) as OperationalOrder[];
     },
   });
@@ -209,6 +215,8 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
               produto: item.produto,
               quantidade: item.quantidade,
               unidade: item.unidade,
+              lote: item.lote?.trim() || null,
+              valor_unitario: item.valor_unitario ?? null,
             }))
           );
         if (itemsError) throw itemsError;
@@ -269,6 +277,8 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
                 produto: item.produto,
                 quantidade: item.quantidade,
                 unidade: item.unidade,
+                lote: item.lote?.trim() || null,
+                valor_unitario: item.valor_unitario ?? null,
               }))
             );
           if (itemsError) throw itemsError;
@@ -353,18 +363,17 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       const isSeeding = order.natureza_pedido === "Seeding";
 
       if (newStatus === "aguardando_expedicao") {
-        if (isSeeding && !order.customer_id) {
-          if (!order.destinatario_nome) throw new Error("Nome do destinatário é obrigatório para Seeding");
-          if (!order.destinatario_endereco) throw new Error("Endereço do destinatário é obrigatório para Seeding");
-          if (!order.destinatario_cidade) throw new Error("Cidade do destinatário é obrigatória para Seeding");
-          if (!order.destinatario_cep) throw new Error("CEP do destinatário é obrigatório para Seeding");
-        } else if (!isSeeding) {
-          if (!order.customer_id) throw new Error("Cliente é obrigatório para mover para expedição");
+        if (!order.customer_id) {
+          if (!order.destinatario_nome) throw new Error("Cliente ou destinatário é obrigatório");
+          if (!order.destinatario_endereco) throw new Error("Endereço do destinatário é obrigatório");
+          if (!order.destinatario_cidade) throw new Error("Cidade do destinatário é obrigatória");
+          if (!order.destinatario_cep) throw new Error("CEP do destinatário é obrigatório");
         }
         if (!order.items || order.items.length === 0) throw new Error("Pedido precisa de pelo menos 1 item");
       }
       if (newStatus === "fechado") {
-        if (!order.lote) throw new Error("Lote é obrigatório para fechar");
+        const missingLote = order.items.some(i => !i.lote || i.lote.trim() === "");
+        if (missingLote) throw new Error("Todos os itens precisam de lote para fechar");
         if (!order.peso_total) throw new Error("Peso total é obrigatório para fechar");
         if (!order.medidas) throw new Error("Medidas são obrigatórias para fechar");
       }

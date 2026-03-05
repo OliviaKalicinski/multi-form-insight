@@ -696,26 +696,32 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          lote: string | null
           operational_order_id: string
           produto: string
           quantidade: number
           unidade: string
+          valor_unitario: number | null
         }
         Insert: {
           created_at?: string
           id?: string
+          lote?: string | null
           operational_order_id: string
           produto: string
           quantidade?: number
           unidade?: string
+          valor_unitario?: number | null
         }
         Update: {
           created_at?: string
           id?: string
+          lote?: string | null
           operational_order_id?: string
           produto?: string
           quantidade?: number
           unidade?: string
+          valor_unitario?: number | null
         }
         Relationships: [
           {

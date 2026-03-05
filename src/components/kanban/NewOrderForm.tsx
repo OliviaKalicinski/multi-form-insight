@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { productsByBrandAndCategory, findProductById } from "@/data/operationalProducts";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, UserPlus } from "lucide-react";
 import { OrderItem } from "@/hooks/useOperationalOrders";
 import { toast } from "sonner";
 
@@ -41,6 +41,8 @@ interface CustomerOption {
   cpf_cnpj: string;
 }
 
+const defaultItem = (): OrderItem => ({ produto: "", quantidade: 1, unidade: "un", lote: "" });
+
 export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrderFormProps) {
   const [customerSearch, setCustomerSearch] = useState("");
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
@@ -50,7 +52,7 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
   const [pagamento, setPagamento] = useState("");
   const [responsavel, setResponsavel] = useState("");
   const [observacoes, setObservacoes] = useState("");
-  const [items, setItems] = useState<OrderItem[]>([{ produto: "", quantidade: 1, unidade: "un" }]);
+  const [items, setItems] = useState<OrderItem[]>([defaultItem()]);
   const [tipoNf, setTipoNf] = useState("");
 
   // Destinatário
@@ -63,12 +65,12 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
   const [destCidade, setDestCidade] = useState("");
   const [destCep, setDestCep] = useState("");
 
-  const isSeeding = natureza === "Seeding";
-  const showDestinatario = isSeeding && !selectedCustomer;
+  const showDestinatario = !selectedCustomer;
 
   useEffect(() => {
+    const isSeeding = natureza === "Seeding";
     if (isSeeding && !tipoNf) setTipoNf("bonificacao");
-  }, [isSeeding, tipoNf]);
+  }, [natureza, tipoNf]);
 
   useEffect(() => {
     if (customerSearch.length < 2) { setCustomers([]); return; }
@@ -95,8 +97,24 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
     setItems(newItems);
   };
 
-  const addItem = () => setItems([...items, { produto: "", quantidade: 1, unidade: "un" }]);
+  const updateItem = (index: number, field: keyof OrderItem, value: any) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
+  };
+
+  const addItem = () => setItems([...items, defaultItem()]);
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
+
+  const handleCadastrarNovo = () => {
+    setSelectedCustomer(null);
+    setCustomerSearch("");
+    setCustomers([]);
+  };
+
+  const suggestedTotal = items.every(i => i.valor_unitario != null)
+    ? items.reduce((s, i) => s + i.quantidade * (i.valor_unitario || 0), 0)
+    : null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,7 +151,7 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
     setPagamento("");
     setResponsavel("");
     setObservacoes("");
-    setItems([{ produto: "", quantidade: 1, unidade: "un" }]);
+    setItems([defaultItem()]);
     setTipoNf("");
     setDestNome(""); setDestDocumento(""); setDestEmail(""); setDestTelefone("");
     setDestEndereco(""); setDestBairro(""); setDestCidade(""); setDestCep("");
@@ -163,7 +181,7 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
                   value={customerSearch}
                   onChange={(e) => setCustomerSearch(e.target.value)}
                 />
-                {customers.length > 0 && (
+                {customerSearch.length >= 2 && (
                   <div className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-md max-h-40 overflow-y-auto">
                     {customers.map((c) => (
                       <button
@@ -179,6 +197,13 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
                         {c.nome || "—"} <span className="text-muted-foreground">({c.cpf_cnpj})</span>
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-accent border-t flex items-center gap-1"
+                      onClick={handleCadastrarNovo}
+                    >
+                      <UserPlus className="h-3 w-3" /> Cadastrar novo destinatário
+                    </button>
                   </div>
                 )}
               </div>
@@ -242,51 +267,76 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
             </div>
           )}
 
-          {/* Items */}
+          {/* Items — Card layout */}
           <div className="space-y-2">
             <Label>Produtos</Label>
             {items.map((item, index) => {
               const product = findProductById(item.produto);
               return (
-                <div key={index} className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <Select value={item.produto} onValueChange={(v) => handleProductChange(index, v)}>
-                      <SelectTrigger><SelectValue placeholder="Produto" /></SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(productsByBrandAndCategory).map(([brand, categories]) => (
-                          <div key={brand}>
-                            <div className="px-2 py-1.5 text-xs font-bold text-foreground border-b">{brand}</div>
-                            {Object.entries(categories).map(([catLabel, products]) => (
-                              <div key={catLabel}>
-                                <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{catLabel}</div>
-                                {products.map((p) => (
-                                  <SelectItem key={p.id} value={p.id}>{p.nome} ({p.unidade})</SelectItem>
-                                ))}
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <div key={index} className="border rounded-md p-3 space-y-2 bg-muted/20">
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <Select value={item.produto} onValueChange={(v) => handleProductChange(index, v)}>
+                        <SelectTrigger><SelectValue placeholder="Produto" /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(productsByBrandAndCategory).map(([brand, categories]) => (
+                            <div key={brand}>
+                              <div className="px-2 py-1.5 text-xs font-bold text-foreground border-b">{brand}</div>
+                              {Object.entries(categories).map(([catLabel, products]) => (
+                                <div key={catLabel}>
+                                  <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{catLabel}</div>
+                                  {products.map((p) => (
+                                    <SelectItem key={p.id} value={p.id}>{p.nome} ({p.unidade})</SelectItem>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {items.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => removeItem(index)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  <Input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    className="w-24"
-                    value={item.quantidade}
-                    onChange={(e) => {
-                      const newItems = [...items];
-                      newItems[index].quantidade = parseFloat(e.target.value) || 0;
-                      setItems(newItems);
-                    }}
-                  />
-                  <span className="text-xs text-muted-foreground w-8">{product?.unidade || item.unidade}</span>
-                  {items.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeItem(index)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Qtd</Label>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={item.quantidade}
+                        onChange={(e) => updateItem(index, "quantidade", parseFloat(e.target.value) || 0)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Un</Label>
+                      <div className="flex items-center h-10 px-3 text-sm text-muted-foreground">
+                        {product?.unidade || item.unidade}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Lote</Label>
+                      <Input
+                        value={item.lote || ""}
+                        onChange={(e) => updateItem(index, "lote", e.target.value)}
+                        placeholder="Lote"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Valor Unit. (R$)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.valor_unitario ?? ""}
+                        onChange={(e) => updateItem(index, "valor_unitario", e.target.value ? parseFloat(e.target.value) : undefined)}
+                      />
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -299,6 +349,11 @@ export function NewOrderForm({ open, onOpenChange, onSubmit, isLoading }: NewOrd
           <div className="space-y-2">
             <Label>Valor Total Informado (R$)</Label>
             <Input type="number" step="0.01" min="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
+            {suggestedTotal !== null && (
+              <p className="text-xs text-muted-foreground">
+                Sugerido: R$ {suggestedTotal.toFixed(2)}
+              </p>
+            )}
           </div>
 
           {/* Tipo NF */}
