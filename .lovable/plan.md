@@ -1,81 +1,30 @@
 
 
-# Fix parser PDF: versão final com ajustes técnicos
+# Simplificar fluxo NF: remover reconciliação automática, aceitar número manual
 
-## Arquivo: `supabase/functions/process-nf-pdf/index.ts`
+## Contexto
+A reconciliação via PDF parsing está instável no Edge Runtime. O usuário quer desbloquear o fluxo operacional: basta ter um número de NF (digitado manualmente) para mover o pedido. O upload de PDF continua como anexo documental, mas sem trigger de reconciliação.
 
-### A. Import pdfjs estabilizado (linhas ~185-189)
-```typescript
-const pdfjsLib = await import("npm:pdfjs-dist@4.0.379/legacy/build/pdf.mjs");
-pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
-const buffer = await fileData.arrayBuffer();
-const pdf = await pdfjsLib.getDocument({
-  data: new Uint8Array(buffer),
-  useWorkerFetch: false,
-  isEvalSupported: false,
-}).promise;
-```
+## Mudanças
 
-### B. Normalização segura (nova função, substituindo proposta anterior)
-Colapsa apenas sequências fragmentadas (3+ chars separados por espaço), sem destruir frases normais como "VALOR TOTAL DA NOTA":
-```typescript
-function collapseSpacedText(text: string): string {
-  return text.replace(/\b(?:[A-Z0-9] ){3,}[A-Z0-9]\b/g, (m) =>
-    m.replace(/\s+/g, "")
-  );
-}
-```
-Aplicar sobre `rawText` antes de `extractFromText`.
+### 1. `src/hooks/useOperationalOrders.ts` — Remover trigger de reconciliação no upload
+No `uploadDocument.onSuccess` (linhas 336-354), remover o bloco que chama `supabase.functions.invoke("process-nf-pdf")`. O upload de PDF continua funcionando normalmente como anexo, mas não dispara mais a Edge Function.
 
-### C. Extração de chave de acesso (novo campo no `extractFromText`)
-```typescript
-const accessKeyMatch = text.match(/\b\d{44}\b/);
-const chave_acesso = accessKeyMatch?.[0] ?? null;
-```
+### 2. `src/hooks/useOperationalOrders.ts` — Simplificar validação de envio
+Na validação de `updateStatus` para `"enviado"` (linhas 380-386), manter a exigência de NF número OU PDF anexado, mas remover qualquer check de `reconciliado`. O fluxo fica: tem número NF ou PDF? Pode enviar.
 
-### D. Regex NF mais tolerante (substituir bloco existente)
-```typescript
-const nfMatch = text.match(/NF-?e?\s*N[ºo°.]?\s*([\d.]+)/i)
-  || text.match(/N[ºo°]\s*[:\-]?\s*(\d{3,})/i)
-  || text.match(/NÚMERO\s*([\d.]+)/i);
-const numero_nf = nfMatch ? nfMatch[1].replace(/\./g, "") : null;
-```
+### 3. `src/components/kanban/OrderCard.tsx` — Limpar badges de reconciliação
+Remover os badges de "Reconciliado", "divergência(s)", "Processando..." e "Falha reconciliação" (linhas 113-131). Simplifica o card visual.
 
-### E. Regex de produtos robusta (substituir `prodRegex` existente)
-Priorizar regex com código técnico, aceitar unidade opcional:
-```typescript
-const techProdRegex =
-  /([A-Z0-9_\-]{3,})\s+(\d+(?:[.,]\d+)?)\s+(?:UN|KG|CX|PC)?\s*(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)/gi;
-```
-Tentar primeiro esta regex; fallback para a regex posicional existente se nenhum match.
+### 4. `src/components/kanban/EditOrderForm.tsx` — Manter campo NF manual
+O campo "Número NF" (linha 453-454) já existe e funciona. O upload de PDF continua como anexo documental. Sem mudanças aqui.
 
-### F. Regex de valor total mais tolerante (substituir bloco existente)
-```typescript
-const valorMatch =
-  text.match(/VALOR\s+TOTAL\s+DA\s+NOTA\s*R?\$?\s*([\d.,]+)/i)
-  || text.match(/TOTAL\s+DA\s+NOTA\s*R?\$?\s*([\d.,]+)/i)
-  || text.match(/VALOR\s+TOTAL\s*R?\$?\s*([\d.,]+)/i)
-  || text.match(/VLR\.\s*TOTAL\s*DA\s*NF\s*[:\s]*([\d.,]+)/i);
-```
+### 5. `src/components/kanban/KanbanOperacional.tsx` — Limpar indicadores de reconciliação
+Nos `indicatorsByStatus` (linhas ~56-63), remover o indicador "Reconcil." e "Diverg." que dependiam dos campos de reconciliação.
 
-### G. Logging melhorado (catch do parse)
-```typescript
-catch (parseErr: any) {
-  console.error("PDF parse failed", {
-    message: parseErr?.message,
-    stack: parseErr?.stack,
-  });
-```
-
-## Migração de banco
-
-Adicionar coluna `chave_acesso` na tabela `nf_extracted_data`:
-```sql
-ALTER TABLE nf_extracted_data ADD COLUMN IF NOT EXISTS chave_acesso text;
-```
-Persistir o valor extraído no upsert existente.
-
-## Nenhuma lógica de reconciliação alterada
-
-O fluxo de comparação (valor, produto, quantidade, NF duplicada) permanece idêntico. Apenas a extração de dados fica mais robusta.
+## Resultado
+- Digitar número NF manual → pedido pode ser movido para "Enviado"
+- Upload de PDF → anexo documental apenas (sem parsing)
+- Cards limpos, sem badges de reconciliação
+- Edge Function permanece no código mas não é chamada (pode ser reativada futuramente)
 
