@@ -1,7 +1,7 @@
 import { format, parse, startOfMonth, differenceInMonths, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance, ProductRevenueData, PlatformWithProducts, ProductContribution } from "@/types/marketing";
-import { extractDailyOrders } from './salesCalculator';
+import { extractDailyOrders, calculateAverageTicket } from './salesCalculator';
 import { breakdownOrders } from './orderBreakdown';
 import { isOnlySampleOrder } from './samplesAnalyzer';
 import { getOfficialRevenue, getRevenueOrders } from './revenue';
@@ -627,7 +627,7 @@ export const calculateFinancialMetrics = (
   
   // Denominador fiscal: somente vendas (nunca base operacional)
   const totalRevenueOrders = revenueOrders.length;
-  const averageTicket = totalRevenueOrders > 0 ? totalRevenue / totalRevenueOrders : 0;
+  const averageTicket = calculateAverageTicket(orders);
   const ticketMedioBruto = totalRevenueOrders > 0 ? faturamentoBruto / totalRevenueOrders : 0;
   
   // ===== CÁLCULOS REAIS (sem pedidos de apenas samples, dentro da base fiscal) =====

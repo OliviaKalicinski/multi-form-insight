@@ -208,11 +208,12 @@ export const calculateAverageTicket = (orders: ProcessedOrder[]): number => {
  * Calcula taxa de recompra
  */
 export const calculateRepurchaseRate = (orders: ProcessedOrder[]): number => {
-  if (orders.length === 0) return 0;
+  const revenueOrders = getRevenueOrders(orders);
+  if (revenueOrders.length === 0) return 0;
 
-  // Agrupar pedidos por cliente
+  // Agrupar pedidos de receita por cliente
   const clientesMap = new Map<string, number>();
-  orders.forEach((order) => {
+  revenueOrders.forEach((order) => {
     const cpf = order.cpfCnpj;
     clientesMap.set(cpf, (clientesMap.get(cpf) || 0) + 1);
   });
