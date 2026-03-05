@@ -22,6 +22,7 @@ import { ChurnFunnelChart } from "@/components/dashboard/ChurnFunnelChart";
 import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { EmptyState } from "@/components/EmptyState";
+import { getB2COrders } from "@/utils/revenue";
 
 export default function ComportamentoCliente() {
   const {
@@ -33,6 +34,8 @@ export default function ComportamentoCliente() {
   } = useDashboard();
 
   const { segments, churnMetrics, churnRiskCustomers, summaryMetrics, isLoading: customerLoading } = useCustomerData();
+
+  const b2cSalesData = useMemo(() => getB2COrders(salesData), [salesData]);
 
   const [volumeView, setVolumeView] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('daily');
 
@@ -48,10 +51,10 @@ export default function ComportamentoCliente() {
   };
 
   const filteredOrders = useMemo(() => {
-    if (salesData.length === 0) return [];
-    if (!selectedMonth || selectedMonth === 'last-12-months') return salesData;
-    return filterOrdersByMonth(salesData, selectedMonth, availableMonths);
-  }, [salesData, selectedMonth, availableMonths]);
+    if (b2cSalesData.length === 0) return [];
+    if (!selectedMonth || selectedMonth === 'last-12-months') return b2cSalesData;
+    return filterOrdersByMonth(b2cSalesData, selectedMonth, availableMonths);
+  }, [b2cSalesData, selectedMonth, availableMonths]);
 
   const volumeAnalysisData = useMemo(() => {
     if (filteredOrders.length === 0) return null;
@@ -64,17 +67,17 @@ export default function ComportamentoCliente() {
   }, [filteredOrders]);
 
   const volumeTrend = useMemo(() => {
-    if (salesData.length === 0 || !selectedMonth || selectedMonth === 'last-12-months') return undefined;
+    if (b2cSalesData.length === 0 || !selectedMonth || selectedMonth === 'last-12-months') return undefined;
     const monthIndex = availableMonths.indexOf(selectedMonth);
     if (monthIndex <= 0) return undefined;
     const previousMonth = availableMonths[monthIndex - 1];
-    const currentOrders = filterOrdersByMonth(salesData, selectedMonth, availableMonths);
-    const previousOrders = filterOrdersByMonth(salesData, previousMonth, availableMonths);
+    const currentOrders = filterOrdersByMonth(b2cSalesData, selectedMonth, availableMonths);
+    const previousOrders = filterOrdersByMonth(b2cSalesData, previousMonth, availableMonths);
     const currentTotal = currentOrders.length;
     const previousTotal = previousOrders.length;
     if (previousTotal === 0) return undefined;
     return ((currentTotal - previousTotal) / previousTotal) * 100;
-  }, [salesData, selectedMonth, availableMonths]);
+  }, [b2cSalesData, selectedMonth, availableMonths]);
 
   const volumeAnalysis = useMemo(() => {
     if (!volumeAnalysisData?.daily || volumeAnalysisData.daily.length === 0) {
@@ -95,13 +98,13 @@ export default function ComportamentoCliente() {
   }, [segments]);
 
   const comparisonMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length === 0 || salesData.length === 0) return null;
+    if (!comparisonMode || selectedMonths.length === 0 || b2cSalesData.length === 0) return null;
 
     const volumePorMes: any[] = [];
     const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 
     selectedMonths.forEach((month, index) => {
-      const orders = filterOrdersByMonth(salesData, month, availableMonths);
+      const orders = filterOrdersByMonth(b2cSalesData, month, availableMonths);
       const monthLabel = format(parse(month, "yyyy-MM", new Date()), "MMM yyyy", { locale: ptBR });
       const color = COLORS[index % COLORS.length];
       volumePorMes.push({ month, monthLabel, value: orders.length, color });
@@ -115,9 +118,9 @@ export default function ComportamentoCliente() {
     }
 
     return { volumePorMes };
-  }, [comparisonMode, selectedMonths, salesData, availableMonths]);
+  }, [comparisonMode, selectedMonths, b2cSalesData, availableMonths]);
 
-  if (salesData.length === 0 && !customerLoading) {
+  if (b2cSalesData.length === 0 && !customerLoading) {
     return (
       <div className="container mx-auto px-6 py-8">
         <Card>

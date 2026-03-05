@@ -32,6 +32,7 @@ import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { gerarAlertas } from "@/utils/alertSystem";
 import { gerarRecomendacoes } from "@/utils/recommendationEngine";
 import { getPlatformPerformance } from "@/utils/financialMetrics";
+import { getComiDaDragaoOrders } from "@/utils/revenue";
 import { detectIncompleteMonth, getEqualIntervalComparison } from "@/utils/incompleteMonthDetector";
 import { format, subMonths, parse } from "date-fns";
 import { ProcessedOrder } from "@/types/marketing";
@@ -55,7 +56,7 @@ export default function ExecutiveDashboard() {
   // salesData in context is already ProcessedOrder[]
   const processedOrders = useMemo(() => {
     if (!salesData || salesData.length === 0) return [];
-    return salesData as ProcessedOrder[];
+    return getComiDaDragaoOrders(salesData as ProcessedOrder[]);
   }, [salesData]);
 
   // Extrair meses disponíveis dos dados de vendas
