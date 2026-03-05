@@ -15,19 +15,15 @@ import {
 } from "@/components/ui/sidebar";
 import { 
   LayoutDashboard,
-  DollarSign,
   TrendingUp,
   Gift,
   Users,
   UserCheck,
-  PieChart,
   Package,
   BarChart3,
   Target,
   Instagram,
   Megaphone,
-  Brain,
-  AlertTriangle,
   Activity,
   Upload,
   ChevronDown,
@@ -60,63 +56,36 @@ interface NavSection {
 
 const navSections: NavSection[] = [
   {
-    title: "Dashboard",
+    title: "Visão Geral",
     icon: LayoutDashboard,
     items: [
       { title: "Fotografia Operacional", url: "/visao-executiva-v2", icon: LayoutDashboard },
       { title: "Visão Executiva", url: "/dashboard", icon: LayoutDashboard },
-    ],
-  },
-  {
-    title: "Financeiro",
-    icon: DollarSign,
-    items: [
-      { title: "Performance Financeira", url: "/performance-financeira", icon: TrendingUp },
-      { title: "Análise de Amostras", url: "/analise-samples", icon: Gift },
-    ],
-  },
-  {
-    title: "Clientes",
-    icon: Users,
-    items: [
-      { title: "Comportamento", url: "/comportamento-cliente", icon: UserCheck },
-      { title: "Segmentação", url: "/segmentacao-clientes", icon: PieChart },
-      { title: "Análise de Churn", url: "/analise-churn", icon: AlertTriangle },
-      { title: "Público", url: "/publico", icon: Users },
-    ],
-  },
-  {
-    title: "Produtos & Ops",
-    icon: Package,
-    items: [
-      { title: "Produtos", url: "/produtos", icon: BarChart3 },
-      { title: "Operações", url: "/operacoes", icon: Truck },
       { title: "Kanban", url: "/kanban-operacional", icon: ClipboardList },
-    ],
-  },
-  {
-    title: "Marketing",
-    icon: Target,
-    items: [
-      { title: "Instagram", url: "/seguidores", icon: Instagram },
-      { title: "Anúncios", url: "/ads", icon: Megaphone },
-    ],
-  },
-  {
-    title: "Inteligência",
-    icon: Brain,
-    items: [
-      { title: "Análise Crítica", url: "/analise-critica", icon: AlertTriangle },
+      { title: "Radar Operacional", url: "/radar-operacional", icon: Activity },
     ],
   },
   {
     title: "CRM",
     icon: Headset,
     items: [
-      { title: "Radar Operacional", url: "/radar-operacional", icon: Activity },
       { title: "Clientes", url: "/clientes", icon: Users },
-      { title: "Atendimentos", url: "/atendimentos", icon: Headset },
       { title: "Reclamações", url: "/reclamacoes", icon: MessageSquareWarning },
+      { title: "Atendimentos", url: "/atendimentos", icon: Headset },
+    ],
+  },
+  {
+    title: "Comida de Dragão",
+    icon: Package,
+    items: [
+      { title: "Performance Financeira", url: "/performance-financeira", icon: TrendingUp },
+      { title: "Comportamento", url: "/comportamento-cliente", icon: UserCheck },
+      { title: "Produtos", url: "/produtos", icon: BarChart3 },
+      { title: "Operações", url: "/operacoes", icon: Truck },
+      { title: "Amostras", url: "/analise-samples", icon: Gift },
+      { title: "Anúncios Meta", url: "/ads", icon: Megaphone },
+      { title: "Seguidores", url: "/seguidores", icon: Instagram },
+      { title: "Público", url: "/publico", icon: Users },
     ],
   },
 ];
