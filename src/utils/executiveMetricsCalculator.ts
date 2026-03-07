@@ -235,7 +235,7 @@ export const calculateExecutiveMetrics = (
   const taxaChurn = churnAnalysis?.taxaChurn || 0;
 
   const ltv = totalClientes > 0 ? receita / totalClientes : 0;
-  const cac = novosClientes > 0 ? investimentoAds / novosClientes : 0;
+  const cac = b2cNovosClientes > 0 ? investimentoAds / b2cNovosClientes : 0;
 
   // ===== PRODUTOS =====
   // Agrupar produtos por nome ajustado (somente vendas - receita fiscal)
