@@ -63,6 +63,7 @@ const navSections: NavSection[] = [
       { title: "Visão Executiva", url: "/dashboard", icon: LayoutDashboard },
       { title: "Kanban", url: "/kanban-operacional", icon: ClipboardList },
       { title: "Radar Operacional", url: "/radar-operacional", icon: Activity },
+      { title: "Operações", url: "/operacoes", icon: Truck },
     ],
   },
   {
@@ -89,7 +90,6 @@ const navSections: NavSection[] = [
       { title: "Performance Financeira", url: "/performance-financeira", icon: TrendingUp },
       { title: "Comportamento", url: "/comportamento-cliente", icon: UserCheck },
       { title: "Produtos", url: "/produtos", icon: BarChart3 },
-      { title: "Operações", url: "/operacoes", icon: Truck },
       { title: "Amostras", url: "/analise-samples", icon: Gift },
       { title: "Anúncios Meta", url: "/ads", icon: Megaphone },
       { title: "Seguidores", url: "/seguidores", icon: Instagram },
