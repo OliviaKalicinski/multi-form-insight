@@ -70,29 +70,44 @@ const calculateTemporalMetadataFromData = (
 export const calculateExecutiveMetrics = (
   orders: ProcessedOrder[],
   adsData: AdsData[],
-  month: string
+  month: string,
+  segment: SegmentFilter = 'all'
 ): ExecutiveMetrics | null => {
   if (orders.length === 0 && adsData.length === 0) {
     return null;
   }
 
+  // === SEGMENT FILTERING ===
+  // When a specific segment is selected, narrow orders to that segment
+  let filteredOrders = orders;
+  if (segment !== 'all') {
+    const segs = segmentOrders(orders);
+    filteredOrders = segs[segment];
+  }
+
+  // ROAS fix: Always use B2C revenue for ROAS/CAC calculation
+  const b2cOrders = getB2COrders(orders);
+  const b2cRevenueOrders = getRevenueOrders(b2cOrders);
+
+  const marketingApplicable = segment === 'all' || segment === 'b2c';
+
   // Inicializar metadados de natureza, origem, autoridade e temporal
   const _source = createDefaultSource();
   const _meta = createDefaultMeta();
   const _authority = createDefaultAuthority();
-  const _temporal = calculateTemporalMetadataFromData(orders, adsData);
+  const _temporal = calculateTemporalMetadataFromData(filteredOrders, adsData);
 
-  // Calcular métricas de vendas
-  const salesMetrics = orders.length > 0 ? calculateSalesMetrics(orders) : null;
+  // Calcular métricas de vendas (usando pedidos filtrados por segmento)
+  const salesMetrics = filteredOrders.length > 0 ? calculateSalesMetrics(filteredOrders) : null;
   
   // Calcular métricas de ads
   const adsMetrics = adsData.length > 0 ? calculateAdsMetrics(adsData) : null;
   
   // Análise de churn
-  const churnAnalysis = orders.length > 0 ? analyzeChurn(orders) : null;
+  const churnAnalysis = filteredOrders.length > 0 ? analyzeChurn(filteredOrders) : null;
 
   // Filtro fiscal: somente vendas (exclui brindes/bonificações/devoluções)
-  const revenueOrders = getRevenueOrders(orders);
+  const revenueOrders = getRevenueOrders(filteredOrders);
 
   // ===== VENDAS =====
   const receita = salesMetrics?.faturamentoTotal || 0;
