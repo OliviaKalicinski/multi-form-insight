@@ -1,15 +1,30 @@
 
-# Remover Ticket Médio da visão consolidada de Operações
 
-## Mudança
+# Simplificar fluxo NF: remover reconciliação automática, aceitar número manual
 
-No arquivo `src/pages/Operacoes.tsx`, o card "Forma de Envio Principal" (HERO card, linhas 267-313) contém um grid 2x2 com 4 sub-cards: Pedidos, Faturamento, % do Total e **Ticket Médio**.
+## Contexto
+A reconciliação via PDF parsing está instável no Edge Runtime. O usuário quer desbloquear o fluxo operacional: basta ter um número de NF (digitado manualmente) para mover o pedido. O upload de PDF continua como anexo documental, mas sem trigger de reconciliação.
 
-Como Ticket Médio não faz sentido no consolidado (mistura naturezas), vamos:
+## Mudanças
 
-1. **Linhas 305-310**: Envolver o sub-card de Ticket Médio com `{!isConsolidated && (...)}` para ocultá-lo no modo consolidado.
+### 1. `src/hooks/useOperationalOrders.ts` — Remover trigger de reconciliação no upload
+No `uploadDocument.onSuccess` (linhas 336-354), remover o bloco que chama `supabase.functions.invoke("process-nf-pdf")`. O upload de PDF continua funcionando normalmente como anexo, mas não dispara mais a Edge Function.
 
-2. **Linha 286**: Tornar o grid dinâmico — `grid-cols-2` quando há 4 items, `grid-cols-3` ou manter `grid-cols-2` com 3 items quando consolidado. Mais simples: manter `grid-cols-2` e o layout se ajusta naturalmente com 3 items.
+### 2. `src/hooks/useOperationalOrders.ts` — Simplificar validação de envio
+Na validação de `updateStatus` para `"enviado"` (linhas 380-386), manter a exigência de NF número OU PDF anexado, mas remover qualquer check de `reconciliado`. O fluxo fica: tem número NF ou PDF? Pode enviar.
 
-### Arquivo tocado
-- `src/pages/Operacoes.tsx` — condicionar exibição do sub-card Ticket Médio
+### 3. `src/components/kanban/OrderCard.tsx` — Limpar badges de reconciliação
+Remover os badges de "Reconciliado", "divergência(s)", "Processando..." e "Falha reconciliação" (linhas 113-131). Simplifica o card visual.
+
+### 4. `src/components/kanban/EditOrderForm.tsx` — Manter campo NF manual
+O campo "Número NF" (linha 453-454) já existe e funciona. O upload de PDF continua como anexo documental. Sem mudanças aqui.
+
+### 5. `src/components/kanban/KanbanOperacional.tsx` — Limpar indicadores de reconciliação
+Nos `indicatorsByStatus` (linhas ~56-63), remover o indicador "Reconcil." e "Diverg." que dependiam dos campos de reconciliação.
+
+## Resultado
+- Digitar número NF manual → pedido pode ser movido para "Enviado"
+- Upload de PDF → anexo documental apenas (sem parsing)
+- Cards limpos, sem badges de reconciliação
+- Edge Function permanece no código mas não é chamada (pode ser reativada futuramente)
+
