@@ -165,7 +165,7 @@ export const calculateExecutiveMetrics = (
   // ===== CLIENTES =====
   // Contagem comportamental: todos os pedidos (brindes mantêm cliente na base)
   const clientesUnicos = new Map<string, { pedidos: number; valorTotal: number }>();
-  orders.forEach(order => {
+  filteredOrders.forEach(order => {
     const existing = clientesUnicos.get(order.cpfCnpj);
     if (existing) {
       existing.pedidos += 1;
@@ -186,7 +186,7 @@ export const calculateExecutiveMetrics = (
 
   // Build first-purchase map from all orders
   const primeiraCompraPorCliente = new Map<string, Date>();
-  orders.forEach(o => {
+  filteredOrders.forEach(o => {
     const cpf = o.cpfCnpj;
     const data = new Date(o.dataVenda);
     if (isNaN(data.getTime())) return;
@@ -207,7 +207,29 @@ export const calculateExecutiveMetrics = (
   });
 
   // Recurrence: definição comercial (apenas pedidos de receita)
-  const taxaRecompra = calculateRepurchaseRate(orders);
+  const taxaRecompra = calculateRepurchaseRate(filteredOrders);
+
+  // CAC: use B2C new customers for denominator when in consolidated mode
+  const b2cNovosClientes = (() => {
+    if (segment === 'all' || segment === 'b2c') return novosClientes;
+    // For non-B2C segments, compute B2C new customers separately for CAC
+    const b2cFirstPurchase = new Map<string, Date>();
+    b2cOrders.forEach(o => {
+      const cpf = o.cpfCnpj;
+      const data = new Date(o.dataVenda);
+      if (isNaN(data.getTime())) return;
+      if (!b2cFirstPurchase.has(cpf) || data < b2cFirstPurchase.get(cpf)!) {
+        b2cFirstPurchase.set(cpf, data);
+      }
+    });
+    let count = 0;
+    b2cFirstPurchase.forEach((data) => {
+      if (!month || month === "all") { count++; return; }
+      const m = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+      if (m === month) count++;
+    });
+    return count;
+  })();
 
   const clientesAtivos = churnAnalysis?.clientesAtivos || totalClientes;
   const taxaChurn = churnAnalysis?.taxaChurn || 0;
