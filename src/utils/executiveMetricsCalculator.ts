@@ -125,6 +125,9 @@ export const calculateExecutiveMetrics = (
 
   // Volume em KG (relevante para B2B)
   const volumeKg = revenueOrders.reduce((sum, o) => sum + (o.pesoLiquido || 0), 0);
+
+  // Taxa de conversão (compras / cliques)
+  const compras = adsMetrics?.comprasTotal || pedidos;
   const cliques = adsMetrics?.cliquesTotal || 1;
   const conversao = (compras / cliques) * 100;
 
@@ -132,19 +135,18 @@ export const calculateExecutiveMetrics = (
   const investimentoAds = adsMetrics?.investimentoTotal || 0;
   const receitaAds = adsMetrics?.valorConversaoTotal || receita;
   
-  // Calcular faturamento fiscal e frete (somente vendas)
-  const faturamentoTotal = revenueOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
-  const freteTotal = revenueOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
-  const percentualFrete = faturamentoTotal > 0 ? freteTotal / faturamentoTotal : 0;
+  // ROAS fix: use B2C revenue only for ROAS calculation (ads target B2C)
+  const b2cFaturamentoTotal = b2cRevenueOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
+  const b2cFreteTotal = b2cRevenueOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
   
-  // === 3 ROAS ===
+  // === 3 ROAS (all based on B2C revenue) ===
   
-  // 1. ROAS Bruto: Receita Total (com frete) / Investimento
-  const roasBruto = investimentoAds > 0 ? faturamentoTotal / investimentoAds : 0;
+  // 1. ROAS Bruto: Receita B2C Total (com frete) / Investimento
+  const roasBruto = investimentoAds > 0 ? b2cFaturamentoTotal / investimentoAds : 0;
   
-  // 2. ROAS Real: Receita ex-frete / Investimento
-  const faturamentoExFrete = faturamentoTotal - freteTotal;
-  const roasReal = investimentoAds > 0 ? faturamentoExFrete / investimentoAds : 0;
+  // 2. ROAS Real: Receita B2C ex-frete / Investimento
+  const b2cFaturamentoExFrete = b2cFaturamentoTotal - b2cFreteTotal;
+  const roasReal = investimentoAds > 0 ? b2cFaturamentoExFrete / investimentoAds : 0;
   
   // 3. ROAS Meta: Valor de conversão reportado pelo Meta Ads / Investimento
   // O valor do Meta já é ex-frete (capturado pelo pixel no carrinho)
