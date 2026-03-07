@@ -34,7 +34,7 @@ import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { gerarAlertas } from "@/utils/alertSystem";
 import { gerarRecomendacoes } from "@/utils/recommendationEngine";
 import { getPlatformPerformance } from "@/utils/financialMetrics";
-import { segmentOrders, calculateRevenueMix, SEGMENT_LABELS, SEGMENT_COLORS, SEGMENT_ORDER, SegmentFilter } from "@/utils/revenue";
+import { segmentOrders, calculateRevenueMix, getRevenueOrders, getOfficialRevenue, SEGMENT_LABELS, SEGMENT_COLORS, SEGMENT_ORDER, SegmentFilter } from "@/utils/revenue";
 
 import { detectIncompleteMonth, getEqualIntervalComparison } from "@/utils/incompleteMonthDetector";
 import { format, subMonths, parse } from "date-fns";
@@ -44,6 +44,27 @@ const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 const formatPercent = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+
+function SegmentBreakdownBadges({ data, format }: {
+  data: Record<Exclude<SegmentFilter, 'all'>, number>;
+  format?: (v: number) => string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1 pt-2">
+      {SEGMENT_ORDER.map(key => {
+        const value = data[key] ?? 0;
+        if (value <= 0) return null;
+        const color = SEGMENT_COLORS[key];
+        return (
+          <Badge key={key} variant="outline" className="text-[10px]"
+            style={{ borderColor: color, color }}>
+            {SEGMENT_LABELS[key]}: {format ? format(value) : value}
+          </Badge>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
@@ -81,9 +102,9 @@ export default function ExecutiveDashboard() {
   }, [selectedMonth]);
 
   // Get current and previous month data - suporta "Todos" (selectedMonth = null)
-  const { currentMetrics, previousMetrics, platformData, topProducts } = useMemo(() => {
+  const { currentMetrics, previousMetrics, platformData, topProducts, segmentBreakdown } = useMemo(() => {
     if (processedOrders.length === 0) {
-      return { currentMetrics: null, previousMetrics: null, platformData: [], topProducts: [] };
+      return { currentMetrics: null, previousMetrics: null, platformData: [], topProducts: [], segmentBreakdown: null };
     }
 
     // Se não há mês selecionado, usar todos os pedidos
@@ -99,6 +120,17 @@ export default function ExecutiveDashboard() {
     // Apply segment filter
     const segments = segmentOrders(monthOrders);
     const filteredOrders = selectedSegment === 'all' ? monthOrders : segments[selectedSegment];
+
+    // Segment breakdown for consolidated badges
+    const segmentBreakdown = SEGMENT_ORDER.reduce((acc, key) => {
+      const revOrders = getRevenueOrders(segments[key] || []);
+      const revenue = revOrders.reduce((s, o) => s + getOfficialRevenue(o), 0);
+      acc[key] = {
+        pedidos: revOrders.length,
+        ticketMedio: revOrders.length > 0 ? revenue / revOrders.length : 0,
+      };
+      return acc;
+    }, {} as Record<Exclude<SegmentFilter, 'all'>, { pedidos: number; ticketMedio: number }>);
 
     // Para "Todos", calcular métricas agregadas
     const currentMetrics = calculateExecutiveMetrics(
@@ -158,7 +190,7 @@ export default function ExecutiveDashboard() {
       .sort((a, b) => b.receita - a.receita)
       .slice(0, 5);
 
-    return { currentMetrics, previousMetrics, platformData, topProducts };
+    return { currentMetrics, previousMetrics, platformData, topProducts, segmentBreakdown };
   }, [processedOrders, adsData, selectedMonth, comparison, selectedSegment]);
 
   // Revenue mix (always from full monthOrders, not filtered)
@@ -457,7 +489,15 @@ export default function ExecutiveDashboard() {
               trend={variations?.pedidos}
               status={getStatusFromBenchmark(currentMetrics.vendas.pedidos, previousMetrics?.vendas.pedidos || 1)}
               tooltipKey="total_pedidos"
-            />
+            >
+              {selectedSegment === 'all' && segmentBreakdown && (
+                <SegmentBreakdownBadges
+                  data={Object.fromEntries(
+                    SEGMENT_ORDER.map(k => [k, segmentBreakdown[k].pedidos])
+                  ) as Record<Exclude<SegmentFilter, 'all'>, number>}
+                />
+              )}
+            </StatusMetricCard>
 
             {/* Ticket Médio Geral */}
             <StatusMetricCard
@@ -466,7 +506,16 @@ export default function ExecutiveDashboard() {
               icon={<Receipt className="h-4 w-4" />}
               interpretation="Todos os pedidos"
               tooltipKey="ticket_medio"
-            />
+            >
+              {selectedSegment === 'all' && segmentBreakdown && (
+                <SegmentBreakdownBadges
+                  data={Object.fromEntries(
+                    SEGMENT_ORDER.map(k => [k, segmentBreakdown[k].ticketMedio])
+                  ) as Record<Exclude<SegmentFilter, 'all'>, number>}
+                  format={formatCurrency}
+                />
+              )}
+            </StatusMetricCard>
 
             {/* Ticket Médio Real */}
             <StatusMetricCard
@@ -477,7 +526,16 @@ export default function ExecutiveDashboard() {
               status={getStatusFromBenchmark(currentMetrics.vendas.ticketMedioReal, previousMetrics?.vendas.ticketMedioReal || 1)}
               interpretation="Sem amostras"
               tooltipKey="ticket_medio_real"
-            />
+            >
+              {selectedSegment === 'all' && segmentBreakdown && (
+                <SegmentBreakdownBadges
+                  data={Object.fromEntries(
+                    SEGMENT_ORDER.map(k => [k, segmentBreakdown[k].ticketMedio])
+                  ) as Record<Exclude<SegmentFilter, 'all'>, number>}
+                  format={formatCurrency}
+                />
+              )}
+            </StatusMetricCard>
 
             {/* Marketing cards - only show when applicable */}
             {currentMetrics.marketingApplicable !== false && (
