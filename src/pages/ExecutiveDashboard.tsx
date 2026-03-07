@@ -45,6 +45,27 @@ const formatCurrency = (value: number) =>
 
 const formatPercent = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
 
+function SegmentBreakdownBadges({ data, format }: {
+  data: Record<Exclude<SegmentFilter, 'all'>, number>;
+  format?: (v: number) => string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1 pt-2">
+      {SEGMENT_ORDER.map(key => {
+        const value = data[key] ?? 0;
+        if (value <= 0) return null;
+        const color = SEGMENT_COLORS[key];
+        return (
+          <Badge key={key} variant="outline" className="text-[10px]"
+            style={{ borderColor: color, color }}>
+            {SEGMENT_LABELS[key]}: {format ? format(value) : value}
+          </Badge>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
   const { salesData, adsData, selectedMonth } = useDashboard();
@@ -81,9 +102,9 @@ export default function ExecutiveDashboard() {
   }, [selectedMonth]);
 
   // Get current and previous month data - suporta "Todos" (selectedMonth = null)
-  const { currentMetrics, previousMetrics, platformData, topProducts } = useMemo(() => {
+  const { currentMetrics, previousMetrics, platformData, topProducts, segmentBreakdown } = useMemo(() => {
     if (processedOrders.length === 0) {
-      return { currentMetrics: null, previousMetrics: null, platformData: [], topProducts: [] };
+      return { currentMetrics: null, previousMetrics: null, platformData: [], topProducts: [], segmentBreakdown: null };
     }
 
     // Se não há mês selecionado, usar todos os pedidos
