@@ -8,6 +8,7 @@ export interface VendasMetrics {
   ticketMedio: number;
   ticketMedioReal: number;
   conversao: number;
+  volumeKg?: number;
 }
 
 export interface MarketingMetrics {
@@ -54,6 +55,7 @@ export interface ExecutiveMetrics {
   clientes: ClientesMetrics;
   produtos: ProdutosMetrics;
   operacoes: OperacoesMetrics;
+  marketingApplicable?: boolean; // false when segment is b2b/b2b2c (hide marketing cards)
   _meta?: ExecutiveMetricsMeta;
   _source?: ExecutiveMetricsSource;
   _authority?: ExecutiveMetricsAuthority;
