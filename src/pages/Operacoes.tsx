@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { Package, Truck, Clock, DollarSign } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,10 +7,31 @@ import { ShippingMethodsChart } from "@/components/dashboard/ShippingMethodsChar
 import { NFIssuanceChart } from "@/components/dashboard/NFIssuanceChart";
 import { LogisticsKPICards } from "@/components/dashboard/LogisticsKPICards";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
+import { SegmentBreakdownBars } from "@/components/dashboard/SegmentBreakdownBars";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
+import { analyzeNFIssuanceTime } from "@/utils/productOperationsMetrics";
 import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
+import {
+  segmentOrders,
+  getRevenueOrders,
+  getOfficialRevenue,
+  SEGMENT_LABELS,
+  SEGMENT_COLORS,
+  SEGMENT_ORDER,
+  SegmentFilter,
+} from "@/utils/revenue";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+type SegmentKey = Exclude<SegmentFilter, 'all'>;
+
+interface SegmentBreakdownEntry {
+  pedidos: number;
+  faturamento: number;
+  tempoNF: number;
+}
 
 export default function Operacoes() {
   const {
@@ -21,17 +42,59 @@ export default function Operacoes() {
     selectedMonths,
   } = useDashboard();
 
-  const productMetrics = useMemo(() => {
-    if (salesData.length === 0) return null;
-    
-    const filteredOrders = selectedMonth 
-      ? filterOrdersByMonth(salesData, selectedMonth, availableMonths) 
-      : salesData;
-    
-    return calculateProductOperationsMetrics(filteredOrders, false);
-  }, [salesData, selectedMonth, availableMonths]);
+  const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>('all');
+  const isConsolidated = selectedSegment === 'all';
 
-  // Métricas de comparação multi-mês
+  // 1. Segmentar SEMPRE primeiro, memoizado
+  const segments = useMemo(() => segmentOrders(salesData), [salesData]);
+
+  // 2. Selecionar segmento — concatenar no modo consolidado para consistência
+  const ordersForSegment = useMemo(() =>
+    isConsolidated
+      ? [...segments.b2c, ...segments.b2b2c, ...segments.b2b]
+      : segments[selectedSegment as SegmentKey],
+    [segments, selectedSegment, isConsolidated]
+  );
+
+  // 3. Filtrar por mês
+  const ordersByMonth = useMemo(() =>
+    selectedMonth
+      ? filterOrdersByMonth(ordersForSegment, selectedMonth, availableMonths)
+      : ordersForSegment,
+    [ordersForSegment, selectedMonth, availableMonths]
+  );
+
+  // FLUXO OPERACIONAL: todos os pedidos filtrados
+  const productMetrics = useMemo(() => {
+    if (ordersByMonth.length === 0) return null;
+    return calculateProductOperationsMetrics(ordersByMonth, false);
+  }, [ordersByMonth]);
+
+  // FLUXO FINANCEIRO: apenas vendas
+  const totalRevenue = useMemo(() =>
+    getRevenueOrders(ordersByMonth).reduce((sum, o) => sum + getOfficialRevenue(o), 0),
+    [ordersByMonth]
+  );
+
+  // Breakdown por segmento (modo consolidado)
+  const segmentBreakdown = useMemo(() => {
+    if (!isConsolidated) return null;
+    return SEGMENT_ORDER.reduce((acc, key) => {
+      const segOrdersByMonth = selectedMonth
+        ? filterOrdersByMonth(segments[key], selectedMonth, availableMonths)
+        : segments[key];
+      const revOrders = getRevenueOrders(segOrdersByMonth);
+      const nfStats = analyzeNFIssuanceTime(segOrdersByMonth);
+      acc[key] = {
+        pedidos: segOrdersByMonth.length,
+        faturamento: revOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0),
+        tempoNF: nfStats.averageDays,
+      };
+      return acc;
+    }, {} as Record<SegmentKey, SegmentBreakdownEntry>);
+  }, [isConsolidated, segments, selectedMonth, availableMonths]);
+
+  // Métricas de comparação multi-mês (aplicando mesmo pipeline)
   const comparisonMetrics = useMemo(() => {
     if (!comparisonMode || selectedMonths.length === 0 || salesData.length === 0) {
       return null;
@@ -45,56 +108,46 @@ export default function Operacoes() {
     const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 
     selectedMonths.forEach((month, index) => {
-      const filteredOrders = filterOrdersByMonth(salesData, month, availableMonths);
+      // Pipeline: segmentar → selecionar → filtrar mês
+      const monthOrders = isConsolidated
+        ? [...segments.b2c, ...segments.b2b2c, ...segments.b2b]
+        : segments[selectedSegment as SegmentKey];
+      const filteredOrders = filterOrdersByMonth(monthOrders, month, availableMonths);
       const metrics = calculateProductOperationsMetrics(filteredOrders, false);
-      
+
       if (metrics) {
         const monthLabel = format(
-          parse(month, "yyyy-MM", new Date()), 
-          "MMM yyyy", 
+          parse(month, "yyyy-MM", new Date()),
+          "MMM yyyy",
           { locale: ptBR }
         );
-        
+
         const color = COLORS[index % COLORS.length];
 
-        // Total de pedidos
         totalPedidos.push({
-          month,
-          monthLabel,
-          value: filteredOrders.length,
-          color,
+          month, monthLabel, value: filteredOrders.length, color,
         });
 
-        // Tempo médio NF
         tempoMedioNF.push({
-          month,
-          monthLabel,
-          value: metrics.nfStats?.averageDays || 0,
-          color,
+          month, monthLabel, value: metrics.nfStats?.averageDays || 0, color,
         });
 
-        // Forma de envio principal
         const mainShipping = metrics.shippingMethodStats[0];
         formaEnvioPrincipal.push({
-          month,
-          monthLabel,
+          month, monthLabel,
           value: mainShipping?.numeroPedidos || 0,
           color,
           shippingName: mainShipping?.formaEnvio || 'N/A',
         });
 
-        // Faturamento total do período
-        const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.valorTotal, 0);
+        // Faturamento via getRevenueOrders + getOfficialRevenue
+        const rev = getRevenueOrders(filteredOrders).reduce((sum, o) => sum + getOfficialRevenue(o), 0);
         faturamento.push({
-          month,
-          monthLabel,
-          value: totalRevenue,
-          color,
+          month, monthLabel, value: rev, color,
         });
       }
     });
 
-    // Calcular variações percentuais
     const calcVariation = (arr: any[]) => {
       if (arr.length > 1) {
         const base = arr[0].value;
@@ -112,23 +165,17 @@ export default function Operacoes() {
     calcVariation(faturamento);
 
     return { totalPedidos, tempoMedioNF, formaEnvioPrincipal, faturamento };
-  }, [comparisonMode, selectedMonths, salesData, availableMonths]);
+  }, [comparisonMode, selectedMonths, salesData, availableMonths, segments, selectedSegment, isConsolidated]);
 
-  // Calcular totais para modo normal
+  // Resumo para cards
   const summaryMetrics = useMemo(() => {
     if (!productMetrics) return null;
 
-    const filteredOrders = selectedMonth 
-      ? filterOrdersByMonth(salesData, selectedMonth, availableMonths) 
-      : salesData;
-
-    const totalOrders = filteredOrders.length;
+    const totalOrders = ordersByMonth.length;
     const totalShippingMethods = productMetrics.shippingMethodStats.length;
     const avgNFTime = productMetrics.nfStats?.averageDays || 0;
     const mainShipping = productMetrics.shippingMethodStats[0];
 
-    // Faturamento total
-    const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.valorTotal, 0);
     return {
       totalOrders,
       totalShippingMethods,
@@ -136,7 +183,7 @@ export default function Operacoes() {
       totalRevenue,
       mainShipping,
     };
-  }, [productMetrics, salesData, selectedMonth, availableMonths]);
+  }, [productMetrics, ordersByMonth, totalRevenue]);
 
   if (salesData.length === 0) {
     return (
@@ -168,6 +215,51 @@ export default function Operacoes() {
         </div>
       </div>
 
+      {/* ========== SEGMENT TOGGLE ========== */}
+      <TooltipProvider>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-muted-foreground">Segmento:</span>
+          <ToggleGroup
+            type="single"
+            value={selectedSegment}
+            onValueChange={(value) => {
+              if (value) setSelectedSegment(value as SegmentFilter);
+            }}
+            className="gap-1"
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ToggleGroupItem value="all" className="text-xs px-3">
+                  Consolidado
+                </ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent>Todos os segmentos combinados</TooltipContent>
+            </Tooltip>
+            {SEGMENT_ORDER.map(seg => (
+              <Tooltip key={seg}>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem
+                    value={seg}
+                    className="text-xs px-3"
+                    style={{
+                      borderColor: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
+                      color: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
+                    }}
+                  >
+                    {SEGMENT_LABELS[seg]}
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {seg === 'b2c' && 'Vendas diretas ao consumidor (DTC)'}
+                  {seg === 'b2b2c' && 'Vendas via distribuidores/revendedores'}
+                  {seg === 'b2b' && "Vendas Let's Fly (atacado)"}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </ToggleGroup>
+        </div>
+      </TooltipProvider>
+
       {/* Cards resumo - HERO + SATÉLITES */}
       {!comparisonMode && productMetrics && summaryMetrics && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -186,11 +278,11 @@ export default function Operacoes() {
                     </p>
                   </div>
                 </div>
-                
+
                 <h3 className="text-xl font-bold mb-4 line-clamp-2">
                   {summaryMetrics.mainShipping?.formaEnvio || 'N/A'}
                 </h3>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-background/50 rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">📦 Pedidos</p>
@@ -200,7 +292,7 @@ export default function Operacoes() {
                   </div>
                   <div className="bg-background/50 rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">💰 Faturamento</p>
-                    <p className="text-lg font-bold text-green-600">
+                    <p className="text-lg font-bold text-primary">
                       {formatCurrency(summaryMetrics.mainShipping?.faturamentoTotal || 0)}
                     </p>
                   </div>
@@ -227,12 +319,21 @@ export default function Operacoes() {
               <Card className="bg-muted/30">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Package className="h-4 w-4 text-blue-600" />
+                    <Package className="h-4 w-4 text-primary" />
                     <span className="text-xs text-muted-foreground">Total Pedidos</span>
                   </div>
-                  <p className="text-xl font-bold text-blue-600">
+                  <p className="text-xl font-bold text-primary">
                     {summaryMetrics.totalOrders.toLocaleString('pt-BR')}
                   </p>
+                  {isConsolidated && segmentBreakdown && (
+                    <SegmentBreakdownBars
+                      data={{
+                        b2c: segmentBreakdown.b2c.pedidos,
+                        b2b2c: segmentBreakdown.b2b2c.pedidos,
+                        b2b: segmentBreakdown.b2b.pedidos,
+                      }}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </KPITooltip>
@@ -241,10 +342,10 @@ export default function Operacoes() {
               <Card className="bg-muted/30">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Truck className="h-4 w-4 text-teal-600" />
+                    <Truck className="h-4 w-4 text-primary" />
                     <span className="text-xs text-muted-foreground">Formas de Envio</span>
                   </div>
-                  <p className="text-xl font-bold text-teal-600">
+                  <p className="text-xl font-bold text-primary">
                     {summaryMetrics.totalShippingMethods}
                   </p>
                 </CardContent>
@@ -261,6 +362,16 @@ export default function Operacoes() {
                   <p className={`text-xl font-bold ${summaryMetrics.avgNFTime <= 1 ? 'text-green-600' : summaryMetrics.avgNFTime <= 3 ? 'text-yellow-600' : 'text-red-600'}`}>
                     {summaryMetrics.avgNFTime.toFixed(1)} dias
                   </p>
+                  {isConsolidated && segmentBreakdown && (
+                    <SegmentBreakdownBars
+                      data={{
+                        b2c: segmentBreakdown.b2c.tempoNF,
+                        b2b2c: segmentBreakdown.b2b2c.tempoNF,
+                        b2b: segmentBreakdown.b2b.tempoNF,
+                      }}
+                      formatValue={(v) => `${v.toFixed(1)}d`}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </KPITooltip>
@@ -269,12 +380,22 @@ export default function Operacoes() {
               <Card className="bg-muted/30">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="h-4 w-4 text-green-600" />
+                    <DollarSign className="h-4 w-4 text-primary" />
                     <span className="text-xs text-muted-foreground">Faturamento</span>
                   </div>
-                  <p className="text-xl font-bold text-green-600">
+                  <p className="text-xl font-bold text-primary">
                     {formatCurrency(summaryMetrics.totalRevenue)}
                   </p>
+                  {isConsolidated && segmentBreakdown && (
+                    <SegmentBreakdownBars
+                      data={{
+                        b2c: segmentBreakdown.b2c.faturamento,
+                        b2b2c: segmentBreakdown.b2b2c.faturamento,
+                        b2b: segmentBreakdown.b2b.faturamento,
+                      }}
+                      formatValue={formatCurrency}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </KPITooltip>
@@ -314,83 +435,88 @@ export default function Operacoes() {
         </div>
       )}
 
-      {/* KPIs de Nota Fiscal */}
-      {productMetrics && productMetrics.nfStats && (
-        <LogisticsKPICards
-          averageDays={productMetrics.nfStats.averageDays}
-          medianDays={productMetrics.nfStats.medianDays}
-          minDays={productMetrics.nfStats.minDays}
-          maxDays={productMetrics.nfStats.maxDays}
-        />
-      )}
-
-      {/* Gráficos lado a lado */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>🚚 Métodos de Envio</CardTitle>
-            <CardDescription>
-              Distribuição de como os pedidos são entregues
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ShippingMethodsChart
-              data={productMetrics?.shippingMethodStats || []}
+      {/* Seções detalhadas — ocultas no modo consolidado */}
+      {!isConsolidated && (
+        <>
+          {/* KPIs de Nota Fiscal */}
+          {productMetrics && productMetrics.nfStats && (
+            <LogisticsKPICards
+              averageDays={productMetrics.nfStats.averageDays}
+              medianDays={productMetrics.nfStats.medianDays}
+              minDays={productMetrics.nfStats.minDays}
+              maxDays={productMetrics.nfStats.maxDays}
             />
-          </CardContent>
-        </Card>
+          )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>⏱️ Tempo de Emissão NF</CardTitle>
-            <CardDescription>
-              Distribuição do tempo entre venda e emissão de nota fiscal
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <NFIssuanceChart
-              distribution={productMetrics?.nfIssuanceDistribution || []}
-              averageDays={productMetrics?.averageNFIssuanceTime || 0}
-            />
-          </CardContent>
-        </Card>
-      </div>
+          {/* Gráficos lado a lado */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>🚚 Métodos de Envio</CardTitle>
+                <CardDescription>
+                  Distribuição de como os pedidos são entregues
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ShippingMethodsChart
+                  data={productMetrics?.shippingMethodStats || []}
+                />
+              </CardContent>
+            </Card>
 
-      {/* Tabela de detalhes por método de envio */}
-      <Card>
-        <CardHeader>
-          <CardTitle>📋 Detalhes por Forma de Envio</CardTitle>
-          <CardDescription>
-            Performance detalhada de cada método de entrega
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-3 font-medium">Método</th>
-                  <th className="text-right p-3 font-medium">Pedidos</th>
-                  <th className="text-right p-3 font-medium">% Total</th>
-                  <th className="text-right p-3 font-medium">Faturamento</th>
-                  <th className="text-right p-3 font-medium">Ticket Médio</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productMetrics?.shippingMethodStats.map((stat, index) => (
-                  <tr key={index} className="border-b hover:bg-muted/50">
-                    <td className="p-3 font-medium">{stat.formaEnvio}</td>
-                    <td className="p-3 text-right">{stat.numeroPedidos.toLocaleString('pt-BR')}</td>
-                    <td className="p-3 text-right">{stat.percentual.toFixed(1)}%</td>
-                    <td className="p-3 text-right font-mono">{formatCurrency(stat.faturamentoTotal)}</td>
-                    <td className="p-3 text-right font-mono">{formatCurrency(stat.ticketMedio)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <Card>
+              <CardHeader>
+                <CardTitle>⏱️ Tempo de Emissão NF</CardTitle>
+                <CardDescription>
+                  Distribuição do tempo entre venda e emissão de nota fiscal
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <NFIssuanceChart
+                  distribution={productMetrics?.nfIssuanceDistribution || []}
+                  averageDays={productMetrics?.averageNFIssuanceTime || 0}
+                />
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Tabela de detalhes por método de envio */}
+          <Card>
+            <CardHeader>
+              <CardTitle>📋 Detalhes por Forma de Envio</CardTitle>
+              <CardDescription>
+                Performance detalhada de cada método de entrega
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium">Método</th>
+                      <th className="text-right p-3 font-medium">Pedidos</th>
+                      <th className="text-right p-3 font-medium">% Total</th>
+                      <th className="text-right p-3 font-medium">Faturamento</th>
+                      <th className="text-right p-3 font-medium">Ticket Médio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productMetrics?.shippingMethodStats.map((stat, index) => (
+                      <tr key={index} className="border-b hover:bg-muted/50">
+                        <td className="p-3 font-medium">{stat.formaEnvio}</td>
+                        <td className="p-3 text-right">{stat.numeroPedidos.toLocaleString('pt-BR')}</td>
+                        <td className="p-3 text-right">{stat.percentual.toFixed(1)}%</td>
+                        <td className="p-3 text-right font-mono">{formatCurrency(stat.faturamentoTotal)}</td>
+                        <td className="p-3 text-right font-mono">{formatCurrency(stat.ticketMedio)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
