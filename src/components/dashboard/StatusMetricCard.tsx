@@ -22,6 +22,7 @@ interface StatusMetricCardProps {
   className?: string;
   invertTrend?: boolean; // For metrics where lower is better (CAC, CPA, etc.)
   tooltipKey?: string;
+  children?: React.ReactNode;
 }
 
 const statusConfig: Record<StatusType, { color: string; bgColor: string; borderColor: string; badge: string }> = {
@@ -64,6 +65,7 @@ export function StatusMetricCard({
   className,
   invertTrend = false,
   tooltipKey,
+  children,
 }: StatusMetricCardProps) {
   const config = statusConfig[status];
   
@@ -182,6 +184,13 @@ export function StatusMetricCard({
           <p className="text-xs text-muted-foreground pt-1">
             {interpretation}
           </p>
+        )}
+
+        {/* Custom children slot */}
+        {children && !isCompact && (
+          <div className="mt-2">
+            {children}
+          </div>
         )}
       </CardContent>
     </Card>
