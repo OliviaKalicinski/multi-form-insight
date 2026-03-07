@@ -6,49 +6,25 @@
 
 ### 1. Corrigir `SegmentBreakdownBars` (linhas 48-74)
 
-Aplicar todos os fixes aprovados:
+- Remove `if (value <= 0) return null` — segmentos com 0 aparecem
+- `format` → `formatValue`
+- Width: `Math.min(Math.max((value / max) * 100, 1), 100)` — mínimo de 1% (não 4%)
+- Bar container: `flex-1 min-w-[90px]`
+- Labels: `min-w-[52px]` (em vez de `w-16`)
+- Values: `min-w-[48px]` (em vez de `w-16`), mantém `tabular-nums`
+- `aria-label` com valor formatado: `formatValue ? formatValue(value) : value`
+- Sem `shadow-sm`, sem `role="img"`
+- `space-y-2` (em vez de `space-y-1.5`)
 
-- **Remover `if (value <= 0) return null`** -- segmentos com 0 devem aparecer (barra vazia + "0")
-- **`format` -> `formatValue`** -- evita shadowing do import `format` de date-fns
-- **`Math.min(Math.max(...), 100)`** -- cap de largura
-- **`min-w-[80px]`** no container da barra -- garante visibilidade em grids estreitos
-- **`min-w-[52px]`** nos labels, **`min-w-[48px]`** nos valores
-- **`aria-label`** sem `role="img"`
-- **`space-y-2`** para melhor legibilidade
-- **`shadow-sm`** na barra para contraste em dark mode
+### 2. Atualizar chamadas (linhas ~527, ~549)
 
-### 2. Atualizar chamadas (linhas 527, 549)
-
-`format={formatCurrency}` -> `formatValue={formatCurrency}`
+`format={formatCurrency}` → `formatValue={formatCurrency}`
 
 ### 3. Ocultar seções no modo consolidado
 
-Envolver com `{!isConsolidated && (...)}`:
-
-- **Marketing cards** (linhas 555-638) -- dentro do grid existente
-- **Volume card** (linhas 640-648) -- dentro do grid existente
-- **Linhas 653-924** (Separator + Canal + Produtos + Separator + Alertas + Oportunidades + Separator + Navegacao) -- um unico bloco `{!isConsolidated && (<>...</>)}` fora do grid
-
-```text
-<div grid satelites>           <- linha 491
-  Pedidos card (with bars)
-  Ticket Medio card (with bars)
-  Ticket Real card (with bars)
-  {!isConsolidated && marketing + volume cards}
-</div>                         <- linha 649
-
-{!isConsolidated && (
-  <>
-    <Separator />
-    Canal + Produtos
-    <Separator />
-    Alertas + Oportunidades
-    <Separator />
-    Navegacao Rapida
-  </>
-)}
-```
+- Marketing + Volume cards (dentro do grid): `{!isConsolidated && (...)}`
+- Tudo abaixo do grid (Separator + Canal + Produtos + Alertas + Oportunidades + Navegação): um único `{!isConsolidated && (<>...</>)}`
 
 ### Arquivo tocado
-`src/pages/ExecutiveDashboard.tsx` -- ~30 linhas modificadas
+`src/pages/ExecutiveDashboard.tsx`
 
