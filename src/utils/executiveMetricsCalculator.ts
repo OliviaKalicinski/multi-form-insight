@@ -112,7 +112,7 @@ export const calculateExecutiveMetrics = (
   // ===== VENDAS =====
   const receita = salesMetrics?.faturamentoTotal || 0;
   const pedidos = salesMetrics?.totalPedidos || 0;
-  const ticketMedio = calculateAverageTicket(orders);
+  const ticketMedio = calculateAverageTicket(filteredOrders);
   
   // Ticket médio real - exclui pedidos de SOMENTE amostra E não-vendas
   const pedidosReais = revenueOrders.filter(order => {
@@ -123,8 +123,8 @@ export const calculateExecutiveMetrics = (
     ? receitaReal / pedidosReais.length 
     : ticketMedio;
 
-  // Taxa de conversão (compras / cliques)
-  const compras = adsMetrics?.comprasTotal || pedidos;
+  // Volume em KG (relevante para B2B)
+  const volumeKg = revenueOrders.reduce((sum, o) => sum + (o.pesoLiquido || 0), 0);
   const cliques = adsMetrics?.cliquesTotal || 1;
   const conversao = (compras / cliques) * 100;
 
