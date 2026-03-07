@@ -45,21 +45,28 @@ const formatCurrency = (value: number) =>
 
 const formatPercent = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
 
-function SegmentBreakdownBadges({ data, format }: {
+function SegmentBreakdownBars({ data, format }: {
   data: Record<Exclude<SegmentFilter, 'all'>, number>;
   format?: (v: number) => string;
 }) {
+  const max = SEGMENT_ORDER.reduce((m, k) => Math.max(m, data[k] ?? 0), 1);
   return (
-    <div className="flex flex-wrap gap-1 pt-2">
+    <div className="space-y-1.5 pt-2">
       {SEGMENT_ORDER.map(key => {
         const value = data[key] ?? 0;
         if (value <= 0) return null;
         const color = SEGMENT_COLORS[key];
+        const width = Math.max((value / max) * 100, 4);
         return (
-          <Badge key={key} variant="outline" className="text-[10px]"
-            style={{ borderColor: color, color }}>
-            {SEGMENT_LABELS[key]}: {format ? format(value) : value}
-          </Badge>
+          <div key={key} className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground w-16 shrink-0">{SEGMENT_LABELS[key]}</span>
+            <div className="flex-1 h-2 bg-muted rounded overflow-hidden">
+              <div className="h-full rounded" style={{ width: `${width}%`, backgroundColor: color }} />
+            </div>
+            <span className="text-[10px] tabular-nums font-medium w-16 text-right shrink-0">
+              {format ? format(value) : value}
+            </span>
+          </div>
         );
       })}
     </div>
@@ -70,6 +77,7 @@ export default function ExecutiveDashboard() {
   const navigate = useNavigate();
   const { salesData, adsData, selectedMonth } = useDashboard();
   const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>('all');
+  const isConsolidated = selectedSegment === 'all';
   
   // Get goals from database
   const { financialGoals, sectorBenchmarks } = useAppSettings();
@@ -482,60 +490,67 @@ export default function ExecutiveDashboard() {
           {/* ===== CARDS SATÉLITES (50% dividido em 2x3 grid) ===== */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {/* Pedidos */}
-            <StatusMetricCard
-              title="Pedidos"
-              value={currentMetrics.vendas.pedidos.toString()}
-              icon={<ShoppingCart className="h-4 w-4" />}
-              trend={variations?.pedidos}
-              status={getStatusFromBenchmark(currentMetrics.vendas.pedidos, previousMetrics?.vendas.pedidos || 1)}
-              tooltipKey="total_pedidos"
-            >
-              {selectedSegment === 'all' && segmentBreakdown && (
-                <SegmentBreakdownBadges
-                  data={Object.fromEntries(
-                    SEGMENT_ORDER.map(k => [k, segmentBreakdown[k].pedidos])
-                  ) as Record<Exclude<SegmentFilter, 'all'>, number>}
-                />
-              )}
-            </StatusMetricCard>
+            {(() => {
+              const pedidosData = segmentBreakdown ? SEGMENT_ORDER.reduce((acc, k) => {
+                acc[k] = segmentBreakdown[k].pedidos; return acc;
+              }, {} as Record<Exclude<SegmentFilter, 'all'>, number>) : null;
+              return (
+                <StatusMetricCard
+                  title="Pedidos"
+                  value={isConsolidated ? "Por segmento" : currentMetrics.vendas.pedidos.toString()}
+                  icon={<ShoppingCart className="h-4 w-4" />}
+                  trend={isConsolidated ? undefined : variations?.pedidos}
+                  status={isConsolidated ? undefined : getStatusFromBenchmark(currentMetrics.vendas.pedidos, previousMetrics?.vendas.pedidos || 1)}
+                  tooltipKey="total_pedidos"
+                >
+                  {isConsolidated && pedidosData && (
+                    <SegmentBreakdownBars data={pedidosData} />
+                  )}
+                </StatusMetricCard>
+              );
+            })()}
 
             {/* Ticket Médio Geral */}
-            <StatusMetricCard
-              title="Ticket Médio"
-              value={formatCurrency(currentMetrics.vendas.ticketMedio)}
-              icon={<Receipt className="h-4 w-4" />}
-              interpretation="Todos os pedidos"
-              tooltipKey="ticket_medio"
-            >
-              {selectedSegment === 'all' && segmentBreakdown && (
-                <SegmentBreakdownBadges
-                  data={Object.fromEntries(
-                    SEGMENT_ORDER.map(k => [k, segmentBreakdown[k].ticketMedio])
-                  ) as Record<Exclude<SegmentFilter, 'all'>, number>}
-                  format={formatCurrency}
-                />
-              )}
-            </StatusMetricCard>
+            {(() => {
+              const ticketMedioData = segmentBreakdown ? SEGMENT_ORDER.reduce((acc, k) => {
+                acc[k] = segmentBreakdown[k].ticketMedio; return acc;
+              }, {} as Record<Exclude<SegmentFilter, 'all'>, number>) : null;
+              return (
+                <StatusMetricCard
+                  title="Ticket Médio"
+                  value={isConsolidated ? "Por segmento" : formatCurrency(currentMetrics.vendas.ticketMedio)}
+                  icon={<Receipt className="h-4 w-4" />}
+                  interpretation={isConsolidated ? undefined : "Todos os pedidos"}
+                  tooltipKey="ticket_medio"
+                >
+                  {isConsolidated && ticketMedioData && (
+                    <SegmentBreakdownBars data={ticketMedioData} format={formatCurrency} />
+                  )}
+                </StatusMetricCard>
+              );
+            })()}
 
             {/* Ticket Médio Real */}
-            <StatusMetricCard
-              title="Ticket Real"
-              value={formatCurrency(currentMetrics.vendas.ticketMedioReal)}
-              icon={<TrendingUp className="h-4 w-4" />}
-              trend={variations?.ticket}
-              status={getStatusFromBenchmark(currentMetrics.vendas.ticketMedioReal, previousMetrics?.vendas.ticketMedioReal || 1)}
-              interpretation="Sem amostras"
-              tooltipKey="ticket_medio_real"
-            >
-              {selectedSegment === 'all' && segmentBreakdown && (
-                <SegmentBreakdownBadges
-                  data={Object.fromEntries(
-                    SEGMENT_ORDER.map(k => [k, segmentBreakdown[k].ticketMedio])
-                  ) as Record<Exclude<SegmentFilter, 'all'>, number>}
-                  format={formatCurrency}
-                />
-              )}
-            </StatusMetricCard>
+            {(() => {
+              const ticketRealData = segmentBreakdown ? SEGMENT_ORDER.reduce((acc, k) => {
+                acc[k] = segmentBreakdown[k].ticketMedio; return acc;
+              }, {} as Record<Exclude<SegmentFilter, 'all'>, number>) : null;
+              return (
+                <StatusMetricCard
+                  title="Ticket Real"
+                  value={isConsolidated ? "Por segmento" : formatCurrency(currentMetrics.vendas.ticketMedioReal)}
+                  icon={<TrendingUp className="h-4 w-4" />}
+                  trend={isConsolidated ? undefined : variations?.ticket}
+                  status={isConsolidated ? undefined : getStatusFromBenchmark(currentMetrics.vendas.ticketMedioReal, previousMetrics?.vendas.ticketMedioReal || 1)}
+                  interpretation={isConsolidated ? undefined : "Sem amostras"}
+                  tooltipKey="ticket_medio_real"
+                >
+                  {isConsolidated && ticketRealData && (
+                    <SegmentBreakdownBars data={ticketRealData} format={formatCurrency} />
+                  )}
+                </StatusMetricCard>
+              );
+            })()}
 
             {/* Marketing cards - only show when applicable */}
             {currentMetrics.marketingApplicable !== false && (
