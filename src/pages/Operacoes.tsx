@@ -302,12 +302,14 @@ export default function Operacoes() {
                       {summaryMetrics.mainShipping?.percentual.toFixed(1) || 0}%
                     </p>
                   </div>
-                  <div className="bg-background/50 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">🎫 Ticket Médio</p>
-                    <p className="text-lg font-bold">
-                      {formatCurrency(summaryMetrics.mainShipping?.ticketMedio || 0)}
-                    </p>
-                  </div>
+                  {!isConsolidated && (
+                    <div className="bg-background/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground">🎫 Ticket Médio</p>
+                      <p className="text-lg font-bold">
+                        {formatCurrency(summaryMetrics.mainShipping?.ticketMedio || 0)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
