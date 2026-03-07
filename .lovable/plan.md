@@ -1,30 +1,72 @@
 
 
-# Simplificar fluxo NF: remover reconciliação automática, aceitar número manual
+# Modo comparativo com barras proporcionais nos cards consolidados
 
-## Contexto
-A reconciliação via PDF parsing está instável no Edge Runtime. O usuário quer desbloquear o fluxo operacional: basta ter um número de NF (digitado manualmente) para mover o pedido. O upload de PDF continua como anexo documental, mas sem trigger de reconciliação.
+## O que muda
 
-## Mudanças
+Quando `isConsolidated === true`, os 3 cards (Pedidos, Ticket Médio, Ticket Real) mostram `"Por segmento"` como valor principal e barras proporcionais com números em vez de badges. Trend, status e interpretation são removidos.
 
-### 1. `src/hooks/useOperationalOrders.ts` — Remover trigger de reconciliação no upload
-No `uploadDocument.onSuccess` (linhas 336-354), remover o bloco que chama `supabase.functions.invoke("process-nf-pdf")`. O upload de PDF continua funcionando normalmente como anexo, mas não dispara mais a Edge Function.
+## Mudanças em `src/pages/ExecutiveDashboard.tsx`
 
-### 2. `src/hooks/useOperationalOrders.ts` — Simplificar validação de envio
-Na validação de `updateStatus` para `"enviado"` (linhas 380-386), manter a exigência de NF número OU PDF anexado, mas remover qualquer check de `reconciliado`. O fluxo fica: tem número NF ou PDF? Pode enviar.
+### A. Variável semântica (linha ~72)
+```typescript
+const isConsolidated = selectedSegment === "all";
+```
 
-### 3. `src/components/kanban/OrderCard.tsx` — Limpar badges de reconciliação
-Remover os badges de "Reconciliado", "divergência(s)", "Processando..." e "Falha reconciliação" (linhas 113-131). Simplifica o card visual.
+### B. Substituir `SegmentBreakdownBadges` por `SegmentBreakdownBars` (linhas 48-67)
 
-### 4. `src/components/kanban/EditOrderForm.tsx` — Manter campo NF manual
-O campo "Número NF" (linha 453-454) já existe e funciona. O upload de PDF continua como anexo documental. Sem mudanças aqui.
+```tsx
+function SegmentBreakdownBars({ data, format }: {
+  data: Record<Exclude<SegmentFilter, 'all'>, number>;
+  format?: (v: number) => string;
+}) {
+  const max = SEGMENT_ORDER.reduce((m, k) => Math.max(m, data[k] ?? 0), 1);
+  return (
+    <div className="space-y-1.5 pt-2">
+      {SEGMENT_ORDER.map(key => {
+        const value = data[key] ?? 0;
+        if (value <= 0) return null;
+        const color = SEGMENT_COLORS[key];
+        const width = Math.max((value / max) * 100, 4);
+        return (
+          <div key={key} className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground w-16 shrink-0">{SEGMENT_LABELS[key]}</span>
+            <div className="flex-1 h-2 bg-muted rounded overflow-hidden">
+              <div className="h-full rounded" style={{ width: `${width}%`, backgroundColor: color }} />
+            </div>
+            <span className="text-[10px] tabular-nums font-medium w-16 text-right shrink-0">
+              {format ? format(value) : value}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+```
 
-### 5. `src/components/kanban/KanbanOperacional.tsx` — Limpar indicadores de reconciliação
-Nos `indicatorsByStatus` (linhas ~56-63), remover o indicador "Reconcil." e "Diverg." que dependiam dos campos de reconciliação.
+Incorporates all 3 review adjustments: `reduce` for max, `Math.max(..., 4)` for min bar width, no type cast.
 
-## Resultado
-- Digitar número NF manual → pedido pode ser movido para "Enviado"
-- Upload de PDF → anexo documental apenas (sem parsing)
-- Cards limpos, sem badges de reconciliação
-- Edge Function permanece no código mas não é chamada (pode ser reativada futuramente)
+### C. Modificar os 3 cards (linhas 485-538)
+
+Build data outside JSX to avoid casts:
+```typescript
+const pedidosData = SEGMENT_ORDER.reduce((acc, k) => {
+  acc[k] = segmentBreakdown[k].pedidos; return acc;
+}, {} as Record<Exclude<SegmentFilter, 'all'>, number>);
+
+const ticketData = SEGMENT_ORDER.reduce((acc, k) => {
+  acc[k] = segmentBreakdown[k].ticketMedio; return acc;
+}, {} as Record<Exclude<SegmentFilter, 'all'>, number>);
+```
+
+Then each card follows the pattern:
+- **value**: `isConsolidated ? "Por segmento" : <original>`
+- **trend**: `isConsolidated ? undefined : <original>`
+- **status**: `isConsolidated ? undefined : <original>`
+- **interpretation**: `isConsolidated ? undefined : <original>`
+- **children**: `{isConsolidated && <SegmentBreakdownBars data={pedidosData} />}`
+
+### Arquivo tocado
+`src/pages/ExecutiveDashboard.tsx` — ~45 linhas modificadas
 
