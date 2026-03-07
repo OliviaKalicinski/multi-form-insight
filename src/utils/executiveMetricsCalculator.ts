@@ -339,6 +339,7 @@ export const calculateExecutiveMetrics = (
       taxaEntrega,
       pedidosCancelados,
     },
+    marketingApplicable,
     _meta,
     _source,
     _authority,
