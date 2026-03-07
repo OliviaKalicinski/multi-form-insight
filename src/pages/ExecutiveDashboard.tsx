@@ -569,7 +569,7 @@ export default function ExecutiveDashboard() {
                     currentMetrics.marketing.roasBruto >= roasGoal ? 'warning' : 'danger'
                   }
                   benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
-                  interpretation={selectedSegment === 'all' ? "Receita B2C ÷ Ads" : "Receita Total ÷ Ads"}
+                  interpretation="Receita Total ÷ Ads"
                   tooltipKey="roas_bruto"
                 />
 
@@ -583,7 +583,7 @@ export default function ExecutiveDashboard() {
                     currentMetrics.marketing.roasReal >= roasGoal ? 'warning' : 'danger'
                   }
                   benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
-                  interpretation={selectedSegment === 'all' ? "Receita B2C ex-frete ÷ Ads" : "Receita ex-frete ÷ Ads"}
+                  interpretation="Receita ex-frete ÷ Ads"
                   tooltipKey="roas_real"
                 />
 
