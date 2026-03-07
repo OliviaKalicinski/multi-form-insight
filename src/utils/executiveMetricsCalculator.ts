@@ -303,6 +303,7 @@ export const calculateExecutiveMetrics = (
       ticketMedio,
       ticketMedioReal,
       conversao,
+      volumeKg,
     },
     marketing: {
       investimentoAds,
