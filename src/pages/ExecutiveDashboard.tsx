@@ -45,26 +45,30 @@ const formatCurrency = (value: number) =>
 
 const formatPercent = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
 
-function SegmentBreakdownBars({ data, format }: {
+function SegmentBreakdownBars({ data, formatValue }: {
   data: Record<Exclude<SegmentFilter, 'all'>, number>;
-  format?: (v: number) => string;
+  formatValue?: (v: number) => string;
 }) {
-  const max = SEGMENT_ORDER.reduce((m, k) => Math.max(m, data[k] ?? 0), 1);
+  const max = SEGMENT_ORDER.reduce((m, k) => Math.max(m, data[k] ?? 0), 0) || 1;
   return (
-    <div className="space-y-1.5 pt-2">
+    <div className="space-y-2 pt-2">
       {SEGMENT_ORDER.map(key => {
         const value = data[key] ?? 0;
-        if (value <= 0) return null;
         const color = SEGMENT_COLORS[key];
-        const width = Math.max((value / max) * 100, 4);
+        const ratio = value / max;
+        const width = Math.min(Math.max(ratio * 100, 1), 100);
         return (
           <div key={key} className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground w-16 shrink-0">{SEGMENT_LABELS[key]}</span>
-            <div className="flex-1 h-2 bg-muted rounded overflow-hidden">
-              <div className="h-full rounded" style={{ width: `${width}%`, backgroundColor: color }} />
+            <span className="text-[10px] text-muted-foreground min-w-[52px] shrink-0">{SEGMENT_LABELS[key]}</span>
+            <div className="flex-1 min-w-[90px] h-2 bg-muted rounded overflow-hidden">
+              <div
+                className="h-full rounded"
+                style={{ width: `${width}%`, backgroundColor: color }}
+                aria-label={`${SEGMENT_LABELS[key]}: ${formatValue ? formatValue(value) : value}`}
+              />
             </div>
-            <span className="text-[10px] tabular-nums font-medium w-16 text-right shrink-0">
-              {format ? format(value) : value}
+            <span className="text-[10px] tabular-nums font-medium min-w-[48px] text-right shrink-0">
+              {formatValue ? formatValue(value) : value}
             </span>
           </div>
         );
@@ -524,7 +528,7 @@ export default function ExecutiveDashboard() {
                   tooltipKey="ticket_medio"
                 >
                   {isConsolidated && ticketMedioData && (
-                    <SegmentBreakdownBars data={ticketMedioData} format={formatCurrency} />
+                    <SegmentBreakdownBars data={ticketMedioData} formatValue={formatCurrency} />
                   )}
                 </StatusMetricCard>
               );
@@ -546,14 +550,14 @@ export default function ExecutiveDashboard() {
                   tooltipKey="ticket_medio_real"
                 >
                   {isConsolidated && ticketRealData && (
-                    <SegmentBreakdownBars data={ticketRealData} format={formatCurrency} />
+                    <SegmentBreakdownBars data={ticketRealData} formatValue={formatCurrency} />
                   )}
                 </StatusMetricCard>
               );
             })()}
 
-            {/* Marketing cards - only show when applicable */}
-            {currentMetrics.marketingApplicable !== false && (
+            {/* Marketing cards - only show when not consolidated and applicable */}
+            {!isConsolidated && currentMetrics.marketingApplicable !== false && (
               <>
                 {/* 1. ROAS Bruto (Receita B2C / Investimento) */}
                 <StatusMetricCard
@@ -637,8 +641,8 @@ export default function ExecutiveDashboard() {
               </>
             )}
 
-            {/* Volume KG - show for B2B or when relevant */}
-            {(selectedSegment === 'b2b' || (selectedSegment === 'all' && (currentMetrics.vendas.volumeKg || 0) > 0)) && (
+            {/* Volume KG - only show when not consolidated */}
+            {!isConsolidated && (selectedSegment === 'b2b' || (currentMetrics.vendas.volumeKg || 0) > 0) && (
               <StatusMetricCard
                 title="Volume"
                 value={`${((currentMetrics.vendas.volumeKg || 0) / 1000).toFixed(1)} ton`}
@@ -650,278 +654,282 @@ export default function ExecutiveDashboard() {
         </div>
       )}
 
-      <Separator />
+      {!isConsolidated && (
+        <>
+          <Separator />
 
-      {/* ========== LINHA 2 - CONTEXTO (Performance por Canal + Top Produtos) ========== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Performance por Canal */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Performance por Canal
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {platformData.length > 0 ? (
-              <div className="space-y-4">
-                {platformData.map((platform) => (
-                  <div key={platform.platform} className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium truncate">{platform.platform}</span>
-                      <span className="font-semibold">
-                        {formatCurrency(platform.revenue)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Progress 
-                        value={platform.marketShare} 
-                        className="h-2 flex-1" 
-                      />
-                      <span className="text-xs text-muted-foreground w-10 text-right">
-                        {platform.marketShare.toFixed(0)}%
-                      </span>
-                    </div>
+          {/* ========== LINHA 2 - CONTEXTO (Performance por Canal + Top Produtos) ========== */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Performance por Canal */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Performance por Canal
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {platformData.length > 0 ? (
+                  <div className="space-y-4">
+                    {platformData.map((platform) => (
+                      <div key={platform.platform} className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="font-medium truncate">{platform.platform}</span>
+                          <span className="font-semibold">
+                            {formatCurrency(platform.revenue)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Progress 
+                            value={platform.marketShare} 
+                            className="h-2 flex-1" 
+                          />
+                          <span className="text-xs text-muted-foreground w-10 text-right">
+                            {platform.marketShare.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full mt-2"
+                      onClick={() => navigate('/performance-financeira')}
+                    >
+                      Ver análise completa
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
                   </div>
-                ))}
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    Nenhum dado de canal disponível para o período selecionado.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
+            {/* Top 5 Produtos */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Top 5 Produtos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {topProducts.length > 0 ? (
+                  <div className="space-y-3">
+                    {topProducts.map((product, index) => (
+                      <div key={product.name} className="flex items-center justify-between py-2 border-b last:border-0">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                            index === 0 ? "bg-amber-100 text-amber-700" :
+                            index === 1 ? "bg-slate-100 text-slate-600" :
+                            index === 2 ? "bg-orange-100 text-orange-700" :
+                            "bg-muted text-muted-foreground"
+                          )}>
+                            {index + 1}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium truncate max-w-[150px]">
+                              {product.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {product.quantidade} unidades
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">
+                            {formatCurrency(product.receita)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full mt-2"
+                      onClick={() => navigate('/produtos')}
+                    >
+                      Ver todos os produtos
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    Nenhum produto encontrado para o período selecionado.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Separator />
+
+          {/* ========== LINHA 3 - ALERTAS E OPORTUNIDADES ========== */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Alertas Críticos */}
+            <Card className="border-red-200 bg-red-50/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                  Alertas Críticos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {alerts && alerts.length > 0 ? (
+                  <div className="space-y-3">
+                    {alerts.slice(0, 3).map((alert) => (
+                      <div 
+                        key={alert.id} 
+                        className="p-3 bg-white rounded-lg border border-red-100"
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">
+                            {alert.severity === 'critical' ? '🔴' :
+                             alert.severity === 'warning' ? '🟡' : 'ℹ️'}
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {alert.title}
+                            </p>
+                            {alert.action && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                💡 {alert.action}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => navigate('/analise-critica')}
+                    >
+                      Ver análise completa
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-emerald-600 py-4">
+                    <span className="text-lg">✅</span>
+                    <span className="text-sm">Nenhum alerta crítico no momento.</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Oportunidades */}
+            <Card className="border-emerald-200 bg-emerald-50/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5 text-emerald-600" />
+                  Oportunidades
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {opportunities && opportunities.length > 0 ? (
+                  <div className="space-y-3">
+                    {opportunities.slice(0, 3).map((opportunity) => (
+                      <div 
+                        key={opportunity.id} 
+                        className="p-3 bg-white rounded-lg border border-emerald-100"
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">✅</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {opportunity.title}
+                            </p>
+                            {opportunity.action && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                🎯 {opportunity.action}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => navigate('/analise-critica')}
+                    >
+                      Ver todas as oportunidades
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground text-sm py-4">
+                    Nenhuma oportunidade identificada no momento.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Separator />
+
+          {/* ========== LINHA 4 - QUICK LINKS ========== */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Navegação Rápida</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-full mt-2"
+                  variant="outline" 
+                  className="h-auto py-4 flex flex-col gap-2"
                   onClick={() => navigate('/performance-financeira')}
                 >
-                  Ver análise completa
-                  <ArrowRight className="h-4 w-4 ml-1" />
+                  <DollarSign className="h-5 w-5" />
+                  <span className="text-xs font-medium">Performance</span>
+                  <span className="text-[10px] text-muted-foreground">Financeira</span>
                 </Button>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                Nenhum dado de canal disponível para o período selecionado.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Top 5 Produtos */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Top 5 Produtos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {topProducts.length > 0 ? (
-              <div className="space-y-3">
-                {topProducts.map((product, index) => (
-                  <div key={product.name} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
-                        index === 0 ? "bg-amber-100 text-amber-700" :
-                        index === 1 ? "bg-slate-100 text-slate-600" :
-                        index === 2 ? "bg-orange-100 text-orange-700" :
-                        "bg-muted text-muted-foreground"
-                      )}>
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium truncate max-w-[150px]">
-                          {product.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {product.quantidade} unidades
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">
-                        {formatCurrency(product.receita)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
 
                 <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-full mt-2"
+                  variant="outline" 
+                  className="h-auto py-4 flex flex-col gap-2"
+                  onClick={() => navigate('/comportamento-cliente')}
+                >
+                  <Users className="h-5 w-5" />
+                  <span className="text-xs font-medium">Clientes</span>
+                  <span className="text-[10px] text-muted-foreground">Comportamento</span>
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-4 flex flex-col gap-2"
                   onClick={() => navigate('/produtos')}
                 >
-                  Ver todos os produtos
-                  <ArrowRight className="h-4 w-4 ml-1" />
+                  <Package className="h-5 w-5" />
+                  <span className="text-xs font-medium">Produtos</span>
+                  <span className="text-[10px] text-muted-foreground">& Operações</span>
                 </Button>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                Nenhum produto encontrado para o período selecionado.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Separator />
-
-      {/* ========== LINHA 3 - ALERTAS E OPORTUNIDADES ========== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Alertas Críticos */}
-        <Card className="border-red-200 bg-red-50/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              Alertas Críticos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {alerts && alerts.length > 0 ? (
-              <div className="space-y-3">
-                {alerts.slice(0, 3).map((alert) => (
-                  <div 
-                    key={alert.id} 
-                    className="p-3 bg-white rounded-lg border border-red-100"
-                  >
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg">
-                        {alert.severity === 'critical' ? '🔴' :
-                         alert.severity === 'warning' ? '🟡' : 'ℹ️'}
-                      </span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          {alert.title}
-                        </p>
-                        {alert.action && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            💡 {alert.action}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
 
                 <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-full"
-                  onClick={() => navigate('/analise-critica')}
+                  variant="outline" 
+                  className="h-auto py-4 flex flex-col gap-2"
+                  onClick={() => navigate('/ads')}
                 >
-                  Ver análise completa
-                  <ArrowRight className="h-4 w-4 ml-1" />
+                  <Target className="h-5 w-5" />
+                  <span className="text-xs font-medium">Marketing</span>
+                  <span className="text-[10px] text-muted-foreground">Ads & Social</span>
                 </Button>
               </div>
-            ) : (
-              <div className="flex items-center gap-2 text-emerald-600 py-4">
-                <span className="text-lg">✅</span>
-                <span className="text-sm">Nenhum alerta crítico no momento.</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Oportunidades */}
-        <Card className="border-emerald-200 bg-emerald-50/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-emerald-600" />
-              Oportunidades
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {opportunities && opportunities.length > 0 ? (
-              <div className="space-y-3">
-                {opportunities.slice(0, 3).map((opportunity) => (
-                  <div 
-                    key={opportunity.id} 
-                    className="p-3 bg-white rounded-lg border border-emerald-100"
-                  >
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg">✅</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          {opportunity.title}
-                        </p>
-                        {opportunity.action && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            🎯 {opportunity.action}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-full"
-                  onClick={() => navigate('/analise-critica')}
-                >
-                  Ver todas as oportunidades
-                  <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            ) : (
-              <div className="text-muted-foreground text-sm py-4">
-                Nenhuma oportunidade identificada no momento.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Separator />
-
-      {/* ========== LINHA 4 - QUICK LINKS ========== */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Navegação Rápida</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex flex-col gap-2"
-              onClick={() => navigate('/performance-financeira')}
-            >
-              <DollarSign className="h-5 w-5" />
-              <span className="text-xs font-medium">Performance</span>
-              <span className="text-[10px] text-muted-foreground">Financeira</span>
-            </Button>
-
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex flex-col gap-2"
-              onClick={() => navigate('/comportamento-cliente')}
-            >
-              <Users className="h-5 w-5" />
-              <span className="text-xs font-medium">Clientes</span>
-              <span className="text-[10px] text-muted-foreground">Comportamento</span>
-            </Button>
-
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex flex-col gap-2"
-              onClick={() => navigate('/produtos')}
-            >
-              <Package className="h-5 w-5" />
-              <span className="text-xs font-medium">Produtos</span>
-              <span className="text-[10px] text-muted-foreground">& Operações</span>
-            </Button>
-
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex flex-col gap-2"
-              onClick={() => navigate('/ads')}
-            >
-              <Target className="h-5 w-5" />
-              <span className="text-xs font-medium">Marketing</span>
-              <span className="text-[10px] text-muted-foreground">Ads & Social</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
