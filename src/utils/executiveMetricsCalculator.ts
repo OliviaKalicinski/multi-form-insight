@@ -4,7 +4,7 @@ import { calculateSalesMetrics, calculateAverageTicket, calculateRepurchaseRate 
 import { calculateAdsMetrics } from "./adsCalculator";
 import { analyzeChurn } from "./customerBehaviorMetrics";
 import { differenceInDays, parse, min, max } from "date-fns";
-import { getOfficialRevenue, getRevenueOrders } from "./revenue";
+import { getOfficialRevenue, getRevenueOrders, segmentOrders, getB2COrders, SegmentFilter } from "./revenue";
 import { 
   createDefaultMeta, 
   createDefaultSource, 
