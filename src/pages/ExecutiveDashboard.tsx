@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { 
   TrendingUp, 
@@ -18,12 +20,12 @@ import {
   ArrowRight,
   AlertTriangle,
   Lightbulb,
-  Percent,
   BarChart3,
   Zap,
   Package,
   Receipt,
-  Clock
+  Clock,
+  Weight
 } from "lucide-react";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { IncompleteMonthBadge } from "@/components/dashboard/IncompleteMonthBadge";
@@ -32,6 +34,7 @@ import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { gerarAlertas } from "@/utils/alertSystem";
 import { gerarRecomendacoes } from "@/utils/recommendationEngine";
 import { getPlatformPerformance } from "@/utils/financialMetrics";
+import { segmentOrders, calculateRevenueMix, SEGMENT_LABELS, SEGMENT_COLORS, SEGMENT_ORDER, SegmentFilter } from "@/utils/revenue";
 
 import { detectIncompleteMonth, getEqualIntervalComparison } from "@/utils/incompleteMonthDetector";
 import { format, subMonths, parse } from "date-fns";
@@ -45,6 +48,7 @@ const formatPercent = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixe
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
   const { salesData, adsData, selectedMonth } = useDashboard();
+  const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>('all');
   
   // Get goals from database
   const { financialGoals, sectorBenchmarks } = useAppSettings();
@@ -75,6 +79,7 @@ export default function ExecutiveDashboard() {
     const comparison = getEqualIntervalComparison(selectedMonth);
     return { monthInfo, comparison };
   }, [selectedMonth]);
+
   // Get current and previous month data - suporta "Todos" (selectedMonth = null)
   const { currentMetrics, previousMetrics, platformData, topProducts } = useMemo(() => {
     if (processedOrders.length === 0) {
@@ -91,11 +96,16 @@ export default function ExecutiveDashboard() {
       ? adsData 
       : filterAdsByMonth(adsData, selectedMonth);
     
+    // Apply segment filter
+    const segments = segmentOrders(monthOrders);
+    const filteredOrders = selectedSegment === 'all' ? monthOrders : segments[selectedSegment];
+
     // Para "Todos", calcular métricas agregadas
     const currentMetrics = calculateExecutiveMetrics(
       monthOrders, 
       monthAds, 
-      isAllMonths ? "all" : selectedMonth
+      isAllMonths ? "all" : selectedMonth,
+      selectedSegment
     );
 
     // Previous period (apenas quando há mês específico selecionado)
@@ -119,15 +129,15 @@ export default function ExecutiveDashboard() {
       
       const prevMonthAds = filterAdsByMonth(adsData, prevMonth);
       
-      previousMetrics = calculateExecutiveMetrics(prevMonthOrders, prevMonthAds, prevMonth);
+      previousMetrics = calculateExecutiveMetrics(prevMonthOrders, prevMonthAds, prevMonth, selectedSegment);
     }
 
-    // Platform performance e Top products (usar pedidos filtrados)
-    const platformData = getPlatformPerformance(monthOrders).slice(0, 5);
+    // Platform performance e Top products (usar pedidos filtrados por segmento)
+    const platformData = getPlatformPerformance(filteredOrders).slice(0, 5);
 
     // Top products
     const productMap = new Map<string, { quantidade: number; receita: number }>();
-    monthOrders.forEach(order => {
+    filteredOrders.forEach(order => {
       order.produtos.forEach(produto => {
         if (produto.descricaoAjustada === 'Kit de Amostras') return;
         const existing = productMap.get(produto.descricaoAjustada);
@@ -149,7 +159,17 @@ export default function ExecutiveDashboard() {
       .slice(0, 5);
 
     return { currentMetrics, previousMetrics, platformData, topProducts };
-  }, [processedOrders, adsData, selectedMonth, comparison]);
+  }, [processedOrders, adsData, selectedMonth, comparison, selectedSegment]);
+
+  // Revenue mix (always from full monthOrders, not filtered)
+  const revenueMix = useMemo(() => {
+    if (processedOrders.length === 0) return null;
+    const isAllMonths = !selectedMonth;
+    const monthOrders = isAllMonths 
+      ? processedOrders 
+      : filterExecOrders(processedOrders, selectedMonth);
+    return calculateRevenueMix(monthOrders);
+  }, [processedOrders, selectedMonth]);
 
   // Calculate variations - null quando não há mês anterior (período "Todos")
   const variations = useMemo(() => {
@@ -163,13 +183,19 @@ export default function ExecutiveDashboard() {
       pedidos: calc(currentMetrics.vendas.pedidos, previousMetrics.vendas.pedidos),
       ticket: calc(currentMetrics.vendas.ticketMedioReal, previousMetrics.vendas.ticketMedioReal),
       margem: null, // Margem fixa
-      roas: currentMetrics.marketing.roasAds - previousMetrics.marketing.roasAds,
+      roas: currentMetrics.marketingApplicable !== false
+        ? currentMetrics.marketing.roasAds - previousMetrics.marketing.roasAds
+        : null,
       ltv: calc(currentMetrics.clientes.ltv, previousMetrics.clientes.ltv),
-      cac: calc(currentMetrics.clientes.cac, previousMetrics.clientes.cac),
-      ltvCac: calc(
-        currentMetrics.clientes.cac > 0 ? currentMetrics.clientes.ltv / currentMetrics.clientes.cac : 0,
-        previousMetrics.clientes.cac > 0 ? previousMetrics.clientes.ltv / previousMetrics.clientes.cac : 0
-      ),
+      cac: currentMetrics.marketingApplicable !== false
+        ? calc(currentMetrics.clientes.cac, previousMetrics.clientes.cac)
+        : null,
+      ltvCac: currentMetrics.marketingApplicable !== false
+        ? calc(
+            currentMetrics.clientes.cac > 0 ? currentMetrics.clientes.ltv / currentMetrics.clientes.cac : 0,
+            previousMetrics.clientes.cac > 0 ? previousMetrics.clientes.ltv / previousMetrics.clientes.cac : 0
+          )
+        : null,
     };
   }, [currentMetrics, previousMetrics]);
 
@@ -240,6 +266,51 @@ export default function ExecutiveDashboard() {
         )}
       </div>
 
+      {/* ========== SEGMENT TOGGLE ========== */}
+      <TooltipProvider>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-muted-foreground">Segmento:</span>
+          <ToggleGroup
+            type="single"
+            value={selectedSegment}
+            onValueChange={(value) => {
+              if (value) setSelectedSegment(value as SegmentFilter);
+            }}
+            className="gap-1"
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ToggleGroupItem value="all" className="text-xs px-3">
+                  Consolidado
+                </ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent>Todos os segmentos combinados</TooltipContent>
+            </Tooltip>
+            {SEGMENT_ORDER.map(seg => (
+              <Tooltip key={seg}>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem 
+                    value={seg} 
+                    className="text-xs px-3"
+                    style={{ 
+                      borderColor: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
+                      color: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
+                    }}
+                  >
+                    {SEGMENT_LABELS[seg]}
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {seg === 'b2c' && 'Vendas diretas ao consumidor (DTC)'}
+                  {seg === 'b2b2c' && 'Vendas via distribuidores/revendedores'}
+                  {seg === 'b2b' && "Vendas Let's Fly (atacado)"}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </ToggleGroup>
+        </div>
+      </TooltipProvider>
+
       {/* Indicator for incomplete month comparison */}
       {monthInfo?.isIncomplete && (
         <Card className="border-amber-500/50 bg-amber-500/5">
@@ -270,6 +341,7 @@ export default function ExecutiveDashboard() {
                 <DollarSign className="h-5 w-5" />
                 <span className="text-sm font-medium">
                   {selectedMonth ? "Receita do Mês" : "Receita Total"}
+                  {selectedSegment !== 'all' && ` (${SEGMENT_LABELS[selectedSegment]})`}
                 </span>
               </div>
 
@@ -284,6 +356,27 @@ export default function ExecutiveDashboard() {
                     : `Receita acumulada de ${availableSalesMonths.length} meses`}
                 </p>
               </div>
+
+              {/* Revenue Mix badges (consolidated only) */}
+              {selectedSegment === 'all' && revenueMix && (
+                <div className="flex flex-wrap gap-2">
+                  {SEGMENT_ORDER.map(seg => (
+                    revenueMix[seg].value > 0 && (
+                      <Badge
+                        key={seg}
+                        variant="outline"
+                        className="text-xs font-medium"
+                        style={{ 
+                          borderColor: SEGMENT_COLORS[seg],
+                          color: SEGMENT_COLORS[seg],
+                        }}
+                      >
+                        {SEGMENT_LABELS[seg]}: {formatCurrency(revenueMix[seg].value)} ({revenueMix[seg].percent.toFixed(0)}%)
+                      </Badge>
+                    )
+                  ))}
+                </div>
+              )}
 
               {/* Progress Goal - hide when no goal set OR in "Todos" mode */}
               {selectedMonth && hasRevenueGoal && (
@@ -386,85 +479,100 @@ export default function ExecutiveDashboard() {
               tooltipKey="ticket_medio_real"
             />
 
-            {/* 1. ROAS Bruto (Receita Total / Investimento) */}
-            <StatusMetricCard
-              title="ROAS Bruto"
-              value={`${currentMetrics.marketing.roasBruto.toFixed(2)}x`}
-              icon={<DollarSign className="h-4 w-4" />}
-              status={
-                currentMetrics.marketing.roasBruto >= roasExcelente ? 'success' :
-                currentMetrics.marketing.roasBruto >= roasGoal ? 'warning' : 'danger'
-              }
-              benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
-              interpretation="Receita Total ÷ Ads"
-              tooltipKey="roas_bruto"
-            />
+            {/* Marketing cards - only show when applicable */}
+            {currentMetrics.marketingApplicable !== false && (
+              <>
+                {/* 1. ROAS Bruto (Receita B2C / Investimento) */}
+                <StatusMetricCard
+                  title="ROAS Bruto"
+                  value={`${currentMetrics.marketing.roasBruto.toFixed(2)}x`}
+                  icon={<DollarSign className="h-4 w-4" />}
+                  status={
+                    currentMetrics.marketing.roasBruto >= roasExcelente ? 'success' :
+                    currentMetrics.marketing.roasBruto >= roasGoal ? 'warning' : 'danger'
+                  }
+                  benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
+                  interpretation={selectedSegment === 'all' ? "Receita B2C ÷ Ads" : "Receita Total ÷ Ads"}
+                  tooltipKey="roas_bruto"
+                />
 
-            {/* 2. ROAS Real (Receita ex-frete / Investimento) */}
-            <StatusMetricCard
-              title="ROAS Real"
-              value={`${currentMetrics.marketing.roasReal.toFixed(2)}x`}
-              icon={<DollarSign className="h-4 w-4" />}
-              status={
-                currentMetrics.marketing.roasReal >= roasExcelente ? 'success' :
-                currentMetrics.marketing.roasReal >= roasGoal ? 'warning' : 'danger'
-              }
-              benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
-              interpretation="Receita ex-frete ÷ Ads"
-              tooltipKey="roas_real"
-            />
+                {/* 2. ROAS Real (Receita B2C ex-frete / Investimento) */}
+                <StatusMetricCard
+                  title="ROAS Real"
+                  value={`${currentMetrics.marketing.roasReal.toFixed(2)}x`}
+                  icon={<DollarSign className="h-4 w-4" />}
+                  status={
+                    currentMetrics.marketing.roasReal >= roasExcelente ? 'success' :
+                    currentMetrics.marketing.roasReal >= roasGoal ? 'warning' : 'danger'
+                  }
+                  benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
+                  interpretation={selectedSegment === 'all' ? "Receita B2C ex-frete ÷ Ads" : "Receita ex-frete ÷ Ads"}
+                  tooltipKey="roas_real"
+                />
 
-            {/* 3. ROAS Meta (Valor Meta / Investimento - já ex-frete) */}
-            <StatusMetricCard
-              title="ROAS Meta"
-              value={`${currentMetrics.marketing.roasMeta.toFixed(2)}x`}
-              icon={<Target className="h-4 w-4" />}
-              status={
-                currentMetrics.marketing.roasMeta >= roasExcelente ? 'success' :
-                currentMetrics.marketing.roasMeta >= roasGoal ? 'warning' : 'danger'
-              }
-              benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
-              interpretation="Valor Meta ÷ Ads (ex-frete)"
-              tooltipKey="roas_meta"
-            />
+                {/* 3. ROAS Meta (Valor Meta / Investimento - já ex-frete) */}
+                <StatusMetricCard
+                  title="ROAS Meta"
+                  value={`${currentMetrics.marketing.roasMeta.toFixed(2)}x`}
+                  icon={<Target className="h-4 w-4" />}
+                  status={
+                    currentMetrics.marketing.roasMeta >= roasExcelente ? 'success' :
+                    currentMetrics.marketing.roasMeta >= roasGoal ? 'warning' : 'danger'
+                  }
+                  benchmark={{ value: roasGoal, label: `Meta: ${roasGoal.toFixed(1)}x` }}
+                  interpretation="Valor Meta ÷ Ads (ex-frete)"
+                  tooltipKey="roas_meta"
+                />
 
-            {/* CAC */}
-            <StatusMetricCard
-              title="CAC"
-              value={formatCurrency(currentMetrics.clientes.cac)}
-              icon={<Users className="h-4 w-4" />}
-              trend={variations?.cac}
-              invertTrend={true}
-              status={getStatusFromBenchmark(currentMetrics.clientes.cac, 50, { invertComparison: true })}
-              interpretation="Custo por Aquisição"
-              tooltipKey="cac"
-            />
+                {/* CAC */}
+                <StatusMetricCard
+                  title="CAC"
+                  value={formatCurrency(currentMetrics.clientes.cac)}
+                  icon={<Users className="h-4 w-4" />}
+                  trend={variations?.cac}
+                  invertTrend={true}
+                  status={getStatusFromBenchmark(currentMetrics.clientes.cac, 50, { invertComparison: true })}
+                  interpretation="Custo por Aquisição"
+                  tooltipKey="cac"
+                />
 
-            {/* LTV */}
-            <StatusMetricCard
-              title="LTV"
-              value={formatCurrency(currentMetrics.clientes.ltv)}
-              icon={<TrendingUp className="h-4 w-4" />}
-              trend={variations?.ltv}
-              status={getStatusFromBenchmark(currentMetrics.clientes.ltv, 200)}
-              interpretation="Valor do Cliente"
-              tooltipKey="ltv"
-            />
+                {/* LTV */}
+                <StatusMetricCard
+                  title="LTV"
+                  value={formatCurrency(currentMetrics.clientes.ltv)}
+                  icon={<TrendingUp className="h-4 w-4" />}
+                  trend={variations?.ltv}
+                  status={getStatusFromBenchmark(currentMetrics.clientes.ltv, 200)}
+                  interpretation="Valor do Cliente"
+                  tooltipKey="ltv"
+                />
 
-            {/* LTV/CAC Ratio */}
-            <StatusMetricCard
-              title="LTV/CAC"
-              value={`${ltvCacRatio.toFixed(2)}x`}
-              icon={<Zap className="h-4 w-4" />}
-              trend={variations?.ltvCac}
-              status={
-                ltvCacRatio >= 4 ? 'success' :
-                ltvCacRatio >= 3 ? 'warning' : 'danger'
-              }
-              benchmark={{ value: 3.0, label: 'Mínimo: 3.0x' }}
-              interpretation="Relação LTV/CAC"
-              tooltipKey="ltv_cac"
-            />
+                {/* LTV/CAC Ratio */}
+                <StatusMetricCard
+                  title="LTV/CAC"
+                  value={`${ltvCacRatio.toFixed(2)}x`}
+                  icon={<Zap className="h-4 w-4" />}
+                  trend={variations?.ltvCac}
+                  status={
+                    ltvCacRatio >= 4 ? 'success' :
+                    ltvCacRatio >= 3 ? 'warning' : 'danger'
+                  }
+                  benchmark={{ value: 3.0, label: 'Mínimo: 3.0x' }}
+                  interpretation="Relação LTV/CAC"
+                  tooltipKey="ltv_cac"
+                />
+              </>
+            )}
+
+            {/* Volume KG - show for B2B or when relevant */}
+            {(selectedSegment === 'b2b' || (selectedSegment === 'all' && (currentMetrics.vendas.volumeKg || 0) > 0)) && (
+              <StatusMetricCard
+                title="Volume"
+                value={`${((currentMetrics.vendas.volumeKg || 0) / 1000).toFixed(1)} ton`}
+                icon={<Weight className="h-4 w-4" />}
+                interpretation="Peso líquido total"
+              />
+            )}
           </div>
         </div>
       )}

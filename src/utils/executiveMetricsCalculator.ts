@@ -4,7 +4,7 @@ import { calculateSalesMetrics, calculateAverageTicket, calculateRepurchaseRate 
 import { calculateAdsMetrics } from "./adsCalculator";
 import { analyzeChurn } from "./customerBehaviorMetrics";
 import { differenceInDays, parse, min, max } from "date-fns";
-import { getOfficialRevenue, getRevenueOrders } from "./revenue";
+import { getOfficialRevenue, getRevenueOrders, segmentOrders, getB2COrders, SegmentFilter } from "./revenue";
 import { 
   createDefaultMeta, 
   createDefaultSource, 
@@ -70,34 +70,49 @@ const calculateTemporalMetadataFromData = (
 export const calculateExecutiveMetrics = (
   orders: ProcessedOrder[],
   adsData: AdsData[],
-  month: string
+  month: string,
+  segment: SegmentFilter = 'all'
 ): ExecutiveMetrics | null => {
   if (orders.length === 0 && adsData.length === 0) {
     return null;
   }
 
+  // === SEGMENT FILTERING ===
+  // When a specific segment is selected, narrow orders to that segment
+  let filteredOrders = orders;
+  if (segment !== 'all') {
+    const segs = segmentOrders(orders);
+    filteredOrders = segs[segment];
+  }
+
+  // ROAS fix: Always use B2C revenue for ROAS/CAC calculation
+  const b2cOrders = getB2COrders(orders);
+  const b2cRevenueOrders = getRevenueOrders(b2cOrders);
+
+  const marketingApplicable = segment === 'all' || segment === 'b2c';
+
   // Inicializar metadados de natureza, origem, autoridade e temporal
   const _source = createDefaultSource();
   const _meta = createDefaultMeta();
   const _authority = createDefaultAuthority();
-  const _temporal = calculateTemporalMetadataFromData(orders, adsData);
+  const _temporal = calculateTemporalMetadataFromData(filteredOrders, adsData);
 
-  // Calcular métricas de vendas
-  const salesMetrics = orders.length > 0 ? calculateSalesMetrics(orders) : null;
+  // Calcular métricas de vendas (usando pedidos filtrados por segmento)
+  const salesMetrics = filteredOrders.length > 0 ? calculateSalesMetrics(filteredOrders) : null;
   
   // Calcular métricas de ads
   const adsMetrics = adsData.length > 0 ? calculateAdsMetrics(adsData) : null;
   
   // Análise de churn
-  const churnAnalysis = orders.length > 0 ? analyzeChurn(orders) : null;
+  const churnAnalysis = filteredOrders.length > 0 ? analyzeChurn(filteredOrders) : null;
 
   // Filtro fiscal: somente vendas (exclui brindes/bonificações/devoluções)
-  const revenueOrders = getRevenueOrders(orders);
+  const revenueOrders = getRevenueOrders(filteredOrders);
 
   // ===== VENDAS =====
   const receita = salesMetrics?.faturamentoTotal || 0;
   const pedidos = salesMetrics?.totalPedidos || 0;
-  const ticketMedio = calculateAverageTicket(orders);
+  const ticketMedio = calculateAverageTicket(filteredOrders);
   
   // Ticket médio real - exclui pedidos de SOMENTE amostra E não-vendas
   const pedidosReais = revenueOrders.filter(order => {
@@ -108,6 +123,9 @@ export const calculateExecutiveMetrics = (
     ? receitaReal / pedidosReais.length 
     : ticketMedio;
 
+  // Volume em KG (relevante para B2B)
+  const volumeKg = revenueOrders.reduce((sum, o) => sum + (o.pesoLiquido || 0), 0);
+
   // Taxa de conversão (compras / cliques)
   const compras = adsMetrics?.comprasTotal || pedidos;
   const cliques = adsMetrics?.cliquesTotal || 1;
@@ -117,19 +135,18 @@ export const calculateExecutiveMetrics = (
   const investimentoAds = adsMetrics?.investimentoTotal || 0;
   const receitaAds = adsMetrics?.valorConversaoTotal || receita;
   
-  // Calcular faturamento fiscal e frete (somente vendas)
-  const faturamentoTotal = revenueOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
-  const freteTotal = revenueOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
-  const percentualFrete = faturamentoTotal > 0 ? freteTotal / faturamentoTotal : 0;
+  // ROAS fix: use B2C revenue only for ROAS calculation (ads target B2C)
+  const b2cFaturamentoTotal = b2cRevenueOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
+  const b2cFreteTotal = b2cRevenueOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
   
-  // === 3 ROAS ===
+  // === 3 ROAS (all based on B2C revenue) ===
   
-  // 1. ROAS Bruto: Receita Total (com frete) / Investimento
-  const roasBruto = investimentoAds > 0 ? faturamentoTotal / investimentoAds : 0;
+  // 1. ROAS Bruto: Receita B2C Total (com frete) / Investimento
+  const roasBruto = investimentoAds > 0 ? b2cFaturamentoTotal / investimentoAds : 0;
   
-  // 2. ROAS Real: Receita ex-frete / Investimento
-  const faturamentoExFrete = faturamentoTotal - freteTotal;
-  const roasReal = investimentoAds > 0 ? faturamentoExFrete / investimentoAds : 0;
+  // 2. ROAS Real: Receita B2C ex-frete / Investimento
+  const b2cFaturamentoExFrete = b2cFaturamentoTotal - b2cFreteTotal;
+  const roasReal = investimentoAds > 0 ? b2cFaturamentoExFrete / investimentoAds : 0;
   
   // 3. ROAS Meta: Valor de conversão reportado pelo Meta Ads / Investimento
   // O valor do Meta já é ex-frete (capturado pelo pixel no carrinho)
@@ -148,7 +165,7 @@ export const calculateExecutiveMetrics = (
   // ===== CLIENTES =====
   // Contagem comportamental: todos os pedidos (brindes mantêm cliente na base)
   const clientesUnicos = new Map<string, { pedidos: number; valorTotal: number }>();
-  orders.forEach(order => {
+  filteredOrders.forEach(order => {
     const existing = clientesUnicos.get(order.cpfCnpj);
     if (existing) {
       existing.pedidos += 1;
@@ -169,7 +186,7 @@ export const calculateExecutiveMetrics = (
 
   // Build first-purchase map from all orders
   const primeiraCompraPorCliente = new Map<string, Date>();
-  orders.forEach(o => {
+  filteredOrders.forEach(o => {
     const cpf = o.cpfCnpj;
     const data = new Date(o.dataVenda);
     if (isNaN(data.getTime())) return;
@@ -190,13 +207,35 @@ export const calculateExecutiveMetrics = (
   });
 
   // Recurrence: definição comercial (apenas pedidos de receita)
-  const taxaRecompra = calculateRepurchaseRate(orders);
+  const taxaRecompra = calculateRepurchaseRate(filteredOrders);
+
+  // CAC: use B2C new customers for denominator when in consolidated mode
+  const b2cNovosClientes = (() => {
+    if (segment === 'all' || segment === 'b2c') return novosClientes;
+    // For non-B2C segments, compute B2C new customers separately for CAC
+    const b2cFirstPurchase = new Map<string, Date>();
+    b2cOrders.forEach(o => {
+      const cpf = o.cpfCnpj;
+      const data = new Date(o.dataVenda);
+      if (isNaN(data.getTime())) return;
+      if (!b2cFirstPurchase.has(cpf) || data < b2cFirstPurchase.get(cpf)!) {
+        b2cFirstPurchase.set(cpf, data);
+      }
+    });
+    let count = 0;
+    b2cFirstPurchase.forEach((data) => {
+      if (!month || month === "all") { count++; return; }
+      const m = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+      if (m === month) count++;
+    });
+    return count;
+  })();
 
   const clientesAtivos = churnAnalysis?.clientesAtivos || totalClientes;
   const taxaChurn = churnAnalysis?.taxaChurn || 0;
 
   const ltv = totalClientes > 0 ? receita / totalClientes : 0;
-  const cac = novosClientes > 0 ? investimentoAds / novosClientes : 0;
+  const cac = b2cNovosClientes > 0 ? investimentoAds / b2cNovosClientes : 0;
 
   // ===== PRODUTOS =====
   // Agrupar produtos por nome ajustado (somente vendas - receita fiscal)
@@ -264,6 +303,7 @@ export const calculateExecutiveMetrics = (
       ticketMedio,
       ticketMedioReal,
       conversao,
+      volumeKg,
     },
     marketing: {
       investimentoAds,
@@ -299,6 +339,7 @@ export const calculateExecutiveMetrics = (
       taxaEntrega,
       pedidosCancelados,
     },
+    marketingApplicable,
     _meta,
     _source,
     _authority,
