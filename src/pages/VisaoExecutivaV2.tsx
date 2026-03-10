@@ -254,23 +254,12 @@ const VisaoExecutivaV2 = () => {
         : 0;
 
     // Sample orders breakdown by pet type
-    let samplesDog = 0;
-    let samplesCat = 0;
-    let samplesBoth = 0;
+    const samplesByProfile: Partial<Record<BuyerPetProfile, number>> = {};
 
     onlySampleOrders.forEach((o) => {
-      let hasDog = false;
-      let hasCat = false;
-      o.produtos.forEach((p) => {
-        if (isSampleProduct(p)) {
-          const petType = getSamplePetType(p);
-          if (petType === "dog") hasDog = true;
-          else hasCat = true;
-        }
-      });
-      if (hasDog && hasCat) samplesBoth++;
-      else if (hasCat) samplesCat++;
-      else samplesDog++;
+      const sampleProducts = o.produtos.filter((p) => isSampleProduct(p));
+      const profile = classifyProductsByAnimal(sampleProducts);
+      samplesByProfile[profile] = (samplesByProfile[profile] || 0) + 1;
     });
 
     // Products sold (excluding samples) with quantities
