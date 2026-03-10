@@ -193,9 +193,12 @@ function aggregateSales(rows: any[]) {
 
       if (hasSample && !hasProduct) {
         sampleOrders++;
-        if (hasDog && hasCat) sampleBoth++;
+        const signals = [hasDog, hasCat, hasExotic].filter(Boolean).length;
+        if (signals > 1) sampleMultiple++;
         else if (hasCat) sampleCat++;
-        else sampleDog++;
+        else if (hasExotic) sampleExotic++;
+        else if (hasDog) sampleDog++;
+        else sampleUnidentified++;
       }
     } catch { /* skip */ }
   }
