@@ -610,8 +610,14 @@ IMPORTANTE: NÃO existe "Mordida Original". A linha Mordida tem apenas Spirulina
 - Produto é amostra se: nome contém "amostra" OU preço entre R$ 0,01 e R$ 1,00
 - Pedido "somente amostra" = todos os produtos do pedido são amostras
 - Pedido "com produto" = tem pelo menos um produto regular (preço > R$ 1,00)
-- Tipo de pet: descrição contém "gato"/"gatos" → gato; senão → cachorro
-- Pedido com amostras de ambos tipos → "cachorro + gato"
+- Tipo de pet da amostra: classificação por keywords no nome:
+  - "gato"/"gatos" → gatos
+  - "grub" → exóticos
+  - "suplemento integral"/"suplemento concentrado" → cães
+  - Demais (original, legumes, spirulina) → sem sinal específico (não identificado)
+  - Múltiplos sinais no mesmo pedido → múltiplos
+- Conversão de amostra: cliente cujo 1º pedido foi somente amostra e depois fez pedido com produto regular
+- Janela de conversão ideal: até 45 dias após amostra
 - Conversão de amostra: cliente cujo 1º pedido foi somente amostra e depois fez pedido com produto regular
 - Janela de conversão ideal: até 45 dias após amostra
 
