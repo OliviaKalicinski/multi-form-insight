@@ -45,25 +45,7 @@ const parseReferenceDateFromCohort = (cohortOrders: ProcessedOrder[]): Date => {
   return new Date(Math.max(...cohortOrders.map(o => o.dataVenda.getTime())));
 };
 
-/**
- * Tipo de pet da amostra
- */
-export type PetType = 'dog' | 'cat';
-
-/**
- * Identifica o tipo de pet de uma amostra baseado no nome do produto
- * Por padrão, assume "dog" (histórico: antes de existir gato, eram todas de cachorro)
- */
-export const getSamplePetType = (produto: { descricao?: string; descricaoAjustada?: string }): PetType => {
-  const adjustedName = (produto.descricaoAjustada || '').toLowerCase();
-  const originalName = (produto.descricao || '').toLowerCase();
-  
-  // Verifica ambos os campos: o normalizado pode perder "gato" (ex: "Kit de Amostras")
-  const isCat = adjustedName.includes("gato") || originalName.includes("gato");
-  
-  // Histórico: antes de existir gato, todas eram para cachorro (padrão)
-  return isCat ? 'cat' : 'dog';
-};
+// PetType and getSamplePetType removed — use classifyProductsByAnimal from petProfile.ts
 
 /**
  * Identifica se um pedido contém amostra baseado nos PRODUTOS do pedido
