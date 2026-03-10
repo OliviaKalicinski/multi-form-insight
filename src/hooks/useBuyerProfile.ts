@@ -1,11 +1,9 @@
 import { useMemo } from "react";
 import { ProcessedOrder } from "@/types/marketing";
 import { getB2COrders, isRevenueOrder, getOfficialRevenue } from "@/utils/revenue";
-import { FRIENDLY_TO_ID } from "@/utils/productNormalizer";
+import { buildClientPetMap } from "@/utils/petProfile";
 import {
-  AnimalSignal,
   BuyerPetProfile,
-  PRODUCT_ANIMAL_MAP,
   PET_PROFILE_ORDER,
   PET_PROFILE_LABELS,
   PET_PROFILE_COLORS,
@@ -50,41 +48,20 @@ export function useBuyerProfile(salesData: ProcessedOrder[]): BuyerProfileData |
 
     if (b2cOrders.length === 0) return null;
 
-    // ── 1. Collect animal signals per client ──
-    const clientSignals = new Map<string, Set<AnimalSignal>>();
+    // ── 1. Use shared util for classification ──
+    const petMap = buildClientPetMap(salesData);
+
+    // ── 2. Aggregate revenue per profile ──
     const clientRevenue = new Map<string, number>();
     const clientOrderCount = new Map<string, number>();
 
-    for (const order of b2cOrders) {
-      const cpf = normalizeCpf(order.cpfCnpj);
-      if (!cpf) continue;
-
-      if (!clientSignals.has(cpf)) {
-        clientSignals.set(cpf, new Set());
-        clientRevenue.set(cpf, 0);
-        clientOrderCount.set(cpf, 0);
-      }
-
-      // Collect signals from ALL B2C orders (including non-revenue)
-      for (const p of order.produtos) {
-        const productId = FRIENDLY_TO_ID[p.descricaoAjustada];
-        if (!productId) continue;
-        const signal = PRODUCT_ANIMAL_MAP[productId];
-        if (signal) {
-          clientSignals.get(cpf)!.add(signal);
-        }
-      }
-    }
-
-    // Revenue only from revenue orders
     for (const order of b2cRevenueOrders) {
       const cpf = normalizeCpf(order.cpfCnpj);
-      if (!cpf || !clientSignals.has(cpf)) continue;
+      if (!cpf) continue;
       clientRevenue.set(cpf, (clientRevenue.get(cpf) || 0) + getOfficialRevenue(order));
       clientOrderCount.set(cpf, (clientOrderCount.get(cpf) || 0) + 1);
     }
 
-    // ── 2. Classify clients ──
     const profileCounts: Record<BuyerPetProfile, { count: number; revenue: number; orders: number }> = {
       caes: { count: 0, revenue: 0, orders: 0 },
       gatos: { count: 0, revenue: 0, orders: 0 },
@@ -93,21 +70,13 @@ export function useBuyerProfile(salesData: ProcessedOrder[]): BuyerProfileData |
       nao_identificado: { count: 0, revenue: 0, orders: 0 },
     };
 
-    for (const [cpf, signals] of clientSignals) {
-      let profile: BuyerPetProfile;
-      if (signals.size === 0) {
-        profile = "nao_identificado";
-      } else if (signals.size === 1) {
-        profile = [...signals][0];
-      } else {
-        profile = "multiplos";
-      }
+    for (const [cpf, profile] of petMap) {
       profileCounts[profile].count += 1;
       profileCounts[profile].revenue += clientRevenue.get(cpf) || 0;
       profileCounts[profile].orders += clientOrderCount.get(cpf) || 0;
     }
 
-    const totalClients = clientSignals.size;
+    const totalClients = petMap.size;
     const identifiedClients = totalClients - profileCounts.nao_identificado.count;
     const coveragePercent = totalClients > 0 ? (identifiedClients / totalClients) * 100 : 0;
     const multiPetRate = identifiedClients > 0 ? (profileCounts.multiplos.count / identifiedClients) * 100 : 0;

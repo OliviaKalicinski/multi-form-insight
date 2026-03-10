@@ -1,13 +1,21 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCustomerData } from "@/hooks/useCustomerData";
+import { useDashboard } from "@/contexts/DashboardContext";
+import { buildClientPetMap, getClientPetSpecies } from "@/utils/petProfile";
 import { CustomerFilters } from "@/components/crm/CustomerFilters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpDown, ExternalLink } from "lucide-react";
+import {
+  BuyerPetProfile,
+  PET_PROFILE_LABELS,
+  PET_PROFILE_COLORS,
+  PET_PROFILE_ORDER,
+} from "@/data/operationalProducts";
 
 const segmentColors: Record<string, string> = {
   'VIP': 'bg-amber-500/15 text-amber-700 border-amber-500/30',
@@ -27,21 +35,45 @@ const churnLabels: Record<string, string> = {
   'active': 'Ativo', 'at_risk': 'Em Risco', 'inactive': 'Inativo', 'churned': 'Churn',
 };
 
-type SortKey = 'nome' | 'total_revenue' | 'days_since_last_purchase' | 'last_order_date' | 'segment' | 'churn_status' | 'total_orders_revenue' | 'responsavel';
+type SortKey = 'nome' | 'total_revenue' | 'days_since_last_purchase' | 'last_order_date' | 'segment' | 'churn_status' | 'total_orders_revenue' | 'responsavel' | 'pet';
 
 const PAGE_SIZE = 25;
+
+const petSortIndex = Object.fromEntries(PET_PROFILE_ORDER.map((p, i) => [p, i]));
 
 export default function Clientes() {
   const navigate = useNavigate();
   const { customers, isLoading } = useCustomerData();
+  const { salesData } = useDashboard();
 
   const [search, setSearch] = useState("");
   const [churnFilter, setChurnFilter] = useState("all");
   const [segmentFilter, setSegmentFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
+  const [petFilter, setPetFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>('total_revenue');
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(0);
+
+  const petMap = useMemo(() => buildClientPetMap(salesData), [salesData]);
+
+  // Build species cache for "multiplos" sub-labels
+  const speciesCache = useMemo(() => {
+    const cache = new Map<string, string>();
+    for (const [cpf, profile] of petMap) {
+      if (profile === 'multiplos') {
+        const species = getClientPetSpecies(salesData, cpf);
+        cache.set(cpf, species.map(s => PET_PROFILE_LABELS[s]).join(' • '));
+      }
+    }
+    return cache;
+  }, [petMap, salesData]);
+
+  const getPetProfile = (cpf: string | null): BuyerPetProfile | null => {
+    if (!cpf) return null;
+    const normalized = cpf.replace(/\D/g, '');
+    return petMap.get(normalized) ?? null;
+  };
 
   const responsaveis = useMemo(() => {
     const set = new Set<string>();
@@ -61,8 +93,14 @@ export default function Clientes() {
     if (churnFilter !== 'all') list = list.filter(c => c.churn_status === churnFilter);
     if (segmentFilter !== 'all') list = list.filter(c => c.segment === segmentFilter);
     if (responsavelFilter !== 'all') list = list.filter(c => c.responsavel === responsavelFilter);
+    if (petFilter !== 'all') {
+      list = list.filter(c => {
+        const pet = getPetProfile(c.cpf_cnpj);
+        return pet === petFilter;
+      });
+    }
     return list;
-  }, [customers, search, churnFilter, segmentFilter, responsavelFilter]);
+  }, [customers, search, churnFilter, segmentFilter, responsavelFilter, petFilter, petMap]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -77,13 +115,20 @@ export default function Clientes() {
         case 'churn_status': va = a.churn_status ?? ''; vb = b.churn_status ?? ''; break;
         case 'total_orders_revenue': va = a.total_orders_revenue ?? 0; vb = b.total_orders_revenue ?? 0; break;
         case 'responsavel': va = a.responsavel ?? ''; vb = b.responsavel ?? ''; break;
+        case 'pet': {
+          const pa = getPetProfile(a.cpf_cnpj);
+          const pb = getPetProfile(b.cpf_cnpj);
+          va = pa ? petSortIndex[pa] ?? 99 : 99;
+          vb = pb ? petSortIndex[pb] ?? 99 : 99;
+          break;
+        }
       }
       if (va < vb) return sortAsc ? -1 : 1;
       if (va > vb) return sortAsc ? 1 : -1;
       return 0;
     });
     return copy;
-  }, [filtered, sortKey, sortAsc]);
+  }, [filtered, sortKey, sortAsc, petMap]);
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -95,6 +140,32 @@ export default function Clientes() {
   };
 
   const fmt = (v: number | null) => v != null ? `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—';
+
+  const renderPetBadge = (cpf: string | null) => {
+    const pet = getPetProfile(cpf);
+    if (!pet || pet === 'nao_identificado') return <span className="text-muted-foreground">—</span>;
+    const normalizedCpf = cpf?.replace(/\D/g, '') ?? '';
+    const subLabel = pet === 'multiplos' ? speciesCache.get(normalizedCpf) : null;
+
+    return (
+      <div className="flex flex-col gap-0.5">
+        <Badge
+          variant="outline"
+          className="text-[10px] border"
+          style={{
+            backgroundColor: `${PET_PROFILE_COLORS[pet]}20`,
+            color: PET_PROFILE_COLORS[pet],
+            borderColor: `${PET_PROFILE_COLORS[pet]}40`,
+          }}
+        >
+          {PET_PROFILE_LABELS[pet]}
+        </Badge>
+        {subLabel && (
+          <span className="text-[9px] text-muted-foreground pl-1">{subLabel}</span>
+        )}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -118,6 +189,7 @@ export default function Clientes() {
         segmentFilter={segmentFilter} onSegmentChange={v => { setSegmentFilter(v); setPage(0); }}
         responsavelFilter={responsavelFilter} onResponsavelChange={v => { setResponsavelFilter(v); setPage(0); }}
         responsaveis={responsaveis}
+        petFilter={petFilter} onPetChange={v => { setPetFilter(v); setPage(0); }}
       />
 
       <Card>
@@ -134,6 +206,9 @@ export default function Clientes() {
                 </TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort('churn_status')}>
                   <span className="flex items-center gap-1">Churn <ArrowUpDown className="h-3 w-3" /></span>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort('pet')}>
+                  <span className="flex items-center gap-1">Pet <ArrowUpDown className="h-3 w-3" /></span>
                 </TableHead>
                 <TableHead className="cursor-pointer text-right" onClick={() => toggleSort('total_revenue')}>
                   <span className="flex items-center gap-1 justify-end">Receita <ArrowUpDown className="h-3 w-3" /></span>
@@ -163,6 +238,7 @@ export default function Clientes() {
                   <TableCell>
                     {c.churn_status && <Badge variant="outline" className={`text-[10px] ${churnColors[c.churn_status] ?? ''}`}>{churnLabels[c.churn_status] ?? c.churn_status}</Badge>}
                   </TableCell>
+                  <TableCell>{renderPetBadge(c.cpf_cnpj)}</TableCell>
                   <TableCell className="text-right">{fmt(c.total_revenue)}</TableCell>
                   <TableCell className="text-right">{c.total_orders_revenue ?? 0}</TableCell>
                   <TableCell className="text-sm">{c.responsavel || '—'}</TableCell>
