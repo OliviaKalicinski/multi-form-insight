@@ -340,37 +340,11 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, newStatus, order }: { id: string; newStatus: string; order: OperationalOrder }) => {
-      const isSeeding = order.natureza_pedido === "Seeding";
-
       if (newStatus === "aguardando_expedicao") {
         if (!order.items || order.items.length === 0) throw new Error("Pedido precisa de pelo menos 1 item");
-        if (!isSeeding) {
-          if (!order.customer_id) {
-            if (!order.destinatario_nome) throw new Error("Cliente ou destinatário é obrigatório");
-            if (!order.destinatario_endereco) throw new Error("Endereço do destinatário é obrigatório");
-            if (!order.destinatario_cidade) throw new Error("Cidade do destinatário é obrigatória");
-            if (!order.destinatario_cep) throw new Error("CEP do destinatário é obrigatório");
-          }
-        }
-      }
-      if (newStatus === "fechado" && !isSeeding) {
-        const missingLote = order.items.some(i => !i.lote || i.lote.trim() === "");
-        if (missingLote) throw new Error("Todos os itens precisam de lote para fechar");
-        if (!order.peso_total) throw new Error("Peso total é obrigatório para fechar");
-        if (!order.medidas) throw new Error("Medidas são obrigatórias para fechar");
-      }
-      if (newStatus === "enviado" && !isSeeding) {
-        if (!order.codigo_rastreio) throw new Error("Código de rastreio é obrigatório para enviar");
-        if (!order.is_fiscal_exempt && !order.numero_nf && !order.nf_file_path) {
-          throw new Error("NF obrigatória para envio (número ou PDF anexado)");
-        }
       }
 
       const updateData: any = { status_operacional: newStatus };
-
-      if (newStatus === "enviado" && !order.numero_nf && !order.nf_file_path) {
-        updateData.nf_pendente = true;
-      }
 
       const { error } = await supabase
         .from("operational_orders")

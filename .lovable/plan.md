@@ -1,23 +1,21 @@
 
 
-# Liberar movimentação livre no Kanban para todos os pedidos
+# Inverter prioridade em `resolveAnimalSignal` + adicionar `CD_KIT_AMOSTRAS: 'caes'` ✅ IMPLEMENTADO
 
-Remover todas as validações de transição de status, mantendo apenas a checagem mínima de ter ≥1 item para sair de "Pedidos".
+## Resumo
+Invertida a ordem de detecção em `resolveAnimalSignal`: raw keyword detection agora tem prioridade sobre o mapa padrão quando `descricaoAjustada === "Kit de Amostras"`. Adicionado `CD_KIT_AMOSTRAS: 'caes'` ao `PRODUCT_ANIMAL_MAP` como fallback seguro.
 
-## Mudança
-
-**`src/hooks/useOperationalOrders.ts`** — bloco `updateStatus.mutationFn`
-
-Remover a variável `isSeeding` e todas as guards condicionais. O bloco de validação inteiro vira apenas:
-
-```typescript
-if (newStatus === "aguardando_expedicao") {
-  if (!order.items || order.items.length === 0) 
-    throw new Error("Pedido precisa de pelo menos 1 item");
-}
+## Pipeline final
+```
+descricaoAjustada == "Kit de Amostras"
+  → raw tem "gato"?  → gatos
+  → raw tem "grub"?  → exoticos
+  → raw não detectável? → CD_KIT_AMOSTRAS → caes
 ```
 
-Todas as outras checagens (destinatário, lote, peso, medidas, rastreio, NF) são removidas. Qualquer pedido anda livremente entre colunas.
+## Arquivos alterados
 
-**1 arquivo, ~20 linhas removidas.**
-
+| Arquivo | Ação |
+|---------|------|
+| `src/utils/petProfile.ts` | ✅ Invertida prioridade: raw detection antes do mapa padrão |
+| `src/data/operationalProducts.ts` | ✅ `CD_KIT_AMOSTRAS: 'caes'` adicionado ao `PRODUCT_ANIMAL_MAP` |
