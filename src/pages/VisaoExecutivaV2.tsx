@@ -486,20 +486,22 @@ const VisaoExecutivaV2 = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">🐶 Cachorro</span>
-                  <span className="font-semibold">{metrics.samplesDog}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">🐱 Gato</span>
-                  <span className="font-semibold">{metrics.samplesCat}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    🐶🐱 Cachorro + Gato
-                  </span>
-                  <span className="font-semibold">{metrics.samplesBoth}</span>
-                </div>
+                {Object.entries(metrics.samplesByProfile)
+                  .filter(([k]) => k !== 'nao_identificado')
+                  .map(([profile, count]) => (
+                    <div key={profile} className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        {PET_PROFILE_LABELS[profile as BuyerPetProfile] || profile}
+                      </span>
+                      <span className="font-semibold">{count}</span>
+                    </div>
+                  ))}
+                {metrics.samplesByProfile.nao_identificado ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Não identificado</span>
+                    <span className="font-semibold">{metrics.samplesByProfile.nao_identificado}</span>
+                  </div>
+                ) : null}
               </div>
               <Separator />
               <DonutChart

@@ -840,28 +840,20 @@ export const calculateSampleMetricsByPetType = (
 ): SampleMetrics['byPetType'] => {
   const qualifiedCustomers = getQualifiedSampleCustomers(cohortOrders, fullHistory);
   
-  const result = {
-    dog: { uniqueCustomers: 0, repurchaseRate: 0, avgTicket: 0, customersWhoRepurchased: 0 },
-    cat: { uniqueCustomers: 0, repurchaseRate: 0, avgTicket: 0, customersWhoRepurchased: 0 }
-  };
-  
-  // Acumuladores para ticket médio
-  const ticketAccumulator = {
-    dog: { totalValue: 0, orderCount: 0 },
-    cat: { totalValue: 0, orderCount: 0 }
-  };
+  const result: Partial<Record<BuyerPetProfile, { uniqueCustomers: number; repurchaseRate: number; avgTicket: number; customersWhoRepurchased: number }>> = {};
+  const ticketAccumulator: Partial<Record<BuyerPetProfile, { totalValue: number; orderCount: number }>> = {};
   
   qualifiedCustomers.forEach((customer) => {
-    // Identificar tipo de pet baseado nos produtos de amostra do primeiro pedido
     const sampleProducts = customer.sampleOrder?.produtos.filter(isSampleProduct) || [];
+    const profile = classifyProductsByAnimal(sampleProducts);
     
-    // Se qualquer produto da amostra for de gato, classifica como gato
-    const hasCatSample = sampleProducts.some(p => getSamplePetType(p) === 'cat');
-    const petType: PetType = hasCatSample ? 'cat' : 'dog';
+    if (!result[profile]) {
+      result[profile] = { uniqueCustomers: 0, repurchaseRate: 0, avgTicket: 0, customersWhoRepurchased: 0 };
+      ticketAccumulator[profile] = { totalValue: 0, orderCount: 0 };
+    }
     
-    result[petType].uniqueCustomers++;
+    result[profile]!.uniqueCustomers++;
     
-    // Verificar recompra com produto REGULAR
     const first = customer.sampleOrder;
     if (!first) return;
     
@@ -870,29 +862,22 @@ export const calculateSampleMetricsByPetType = (
       .filter(o => hasRegularProduct(o) && isRevenueOrder(o));
     
     if (regularRepurchases.length > 0) {
-      result[petType].customersWhoRepurchased++;
-      
-      // Calcular ticket médio das recompras regulares
+      result[profile]!.customersWhoRepurchased++;
       regularRepurchases.forEach(order => {
-        ticketAccumulator[petType].totalValue += getOfficialRevenue(order);
-        ticketAccumulator[petType].orderCount++;
+        ticketAccumulator[profile]!.totalValue += getOfficialRevenue(order);
+        ticketAccumulator[profile]!.orderCount++;
       });
     }
   });
   
-  // Calcular taxas finais
-  if (result.dog.uniqueCustomers > 0) {
-    result.dog.repurchaseRate = (result.dog.customersWhoRepurchased / result.dog.uniqueCustomers) * 100;
-    result.dog.avgTicket = ticketAccumulator.dog.orderCount > 0 
-      ? ticketAccumulator.dog.totalValue / ticketAccumulator.dog.orderCount 
-      : 0;
-  }
-  
-  if (result.cat.uniqueCustomers > 0) {
-    result.cat.repurchaseRate = (result.cat.customersWhoRepurchased / result.cat.uniqueCustomers) * 100;
-    result.cat.avgTicket = ticketAccumulator.cat.orderCount > 0 
-      ? ticketAccumulator.cat.totalValue / ticketAccumulator.cat.orderCount 
-      : 0;
+  // Calculate final rates
+  for (const profile of Object.keys(result) as BuyerPetProfile[]) {
+    const r = result[profile]!;
+    const t = ticketAccumulator[profile]!;
+    if (r.uniqueCustomers > 0) {
+      r.repurchaseRate = (r.customersWhoRepurchased / r.uniqueCustomers) * 100;
+      r.avgTicket = t.orderCount > 0 ? t.totalValue / t.orderCount : 0;
+    }
   }
   
   return result;

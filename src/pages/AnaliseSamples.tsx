@@ -442,114 +442,107 @@ const AnaliseSamples = () => {
         </div>
       )}
 
-      {/* Card Comparativo: Cachorro vs Gato */}
-      {metrics.byPetType && (metrics.byPetType.dog.uniqueCustomers > 0 || metrics.byPetType.cat.uniqueCustomers > 0) && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Dog className="h-5 w-5 text-amber-600" />
-              Cachorro vs
-              <Cat className="h-5 w-5 text-purple-600" />
-              Gato
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Comparativo de amostras por tipo de pet
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              {/* Coluna Cachorro */}
-              <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-900">
-                <div className="flex items-center gap-2">
-                  <Dog className="h-6 w-6 text-amber-600" />
-                  <span className="font-semibold text-amber-800 dark:text-amber-200">Cachorro</span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Clientes:</span>
-                    <span className="font-bold text-amber-700 dark:text-amber-300">{metrics.byPetType.dog.uniqueCustomers}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Recompra:</span>
-                    <span className={cn(
-                      "font-bold",
-                      metrics.byPetType.dog.repurchaseRate >= 25 ? "text-emerald-600" : "text-amber-600"
-                    )}>
-                      {metrics.byPetType.dog.repurchaseRate.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Recompraram:</span>
-                    <span className="font-medium">{metrics.byPetType.dog.customersWhoRepurchased}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-amber-200 dark:border-amber-800 pt-2">
-                    <span className="text-muted-foreground">Ticket Médio:</span>
-                    <span className="font-bold text-amber-700 dark:text-amber-300">{formatCurrency(metrics.byPetType.dog.avgTicket)}</span>
-                  </div>
-                </div>
+      {/* Card Comparativo: Por tipo de pet */}
+      {metrics.byPetType && (() => {
+        const visibleProfiles = PET_PROFILE_ORDER.filter(
+          k => k !== 'nao_identificado' && metrics.byPetType?.[k]?.uniqueCustomers && metrics.byPetType[k]!.uniqueCustomers > 0
+        );
+        if (visibleProfiles.length === 0) return null;
+
+        // Find top 2 profiles for comparison insight
+        const sorted = [...visibleProfiles].sort(
+          (a, b) => (metrics.byPetType?.[b]?.uniqueCustomers || 0) - (metrics.byPetType?.[a]?.uniqueCustomers || 0)
+        );
+        const top1 = sorted[0];
+        const top2 = sorted.length > 1 ? sorted[1] : null;
+
+        return (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Users className="h-5 w-5" />
+                Amostras por Tipo de Pet
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Comparativo de amostras por classificação de pet
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className={cn("grid gap-4", `grid-cols-${Math.min(visibleProfiles.length, 4)}`)}>
+                {visibleProfiles.map(profile => {
+                  const data = metrics.byPetType?.[profile];
+                  if (!data) return null;
+                  const color = PET_PROFILE_COLORS[profile];
+                  return (
+                    <div
+                      key={profile}
+                      className="space-y-3 p-4 rounded-lg border"
+                      style={{ 
+                        backgroundColor: `${color}10`,
+                        borderColor: `${color}40`,
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="font-semibold" style={{ color }}>{PET_PROFILE_LABELS[profile]}</span>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Clientes:</span>
+                          <span className="font-bold" style={{ color }}>{data.uniqueCustomers}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Recompra:</span>
+                          <span className={cn(
+                            "font-bold",
+                            data.repurchaseRate >= 25 ? "text-emerald-600" : "text-muted-foreground"
+                          )}>
+                            {data.repurchaseRate.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Recompraram:</span>
+                          <span className="font-medium">{data.customersWhoRepurchased}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2" style={{ borderColor: `${color}30` }}>
+                          <span className="text-muted-foreground">Ticket Médio:</span>
+                          <span className="font-bold" style={{ color }}>{formatCurrency(data.avgTicket)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               
-              {/* Coluna Gato */}
-              <div className="space-y-3 p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-900">
-                <div className="flex items-center gap-2">
-                  <Cat className="h-6 w-6 text-purple-600" />
-                  <span className="font-semibold text-purple-800 dark:text-purple-200">Gato</span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Clientes:</span>
-                    <span className="font-bold text-purple-700 dark:text-purple-300">{metrics.byPetType.cat.uniqueCustomers}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Recompra:</span>
-                    <span className={cn(
-                      "font-bold",
-                      metrics.byPetType.cat.repurchaseRate >= 25 ? "text-emerald-600" : "text-purple-600"
-                    )}>
-                      {metrics.byPetType.cat.repurchaseRate.toFixed(1)}%
+              {/* Insight comparativo */}
+              {top1 && top2 && (() => {
+                const d1 = metrics.byPetType?.[top1];
+                const d2 = metrics.byPetType?.[top2];
+                if (!d1 || !d2) return null;
+                const diff = d1.repurchaseRate - d2.repurchaseRate;
+                if (Math.abs(diff) < 0.5) {
+                  return (
+                    <div className="mt-3 p-2 bg-muted/50 rounded text-xs">
+                      <span className="text-muted-foreground">
+                        📊 Taxas de recompra equivalentes entre {PET_PROFILE_LABELS[top1]} e {PET_PROFILE_LABELS[top2]}
+                      </span>
+                    </div>
+                  );
+                }
+                const winner = diff > 0 ? top1 : top2;
+                const winnerColor = PET_PROFILE_COLORS[winner];
+                return (
+                  <div className="mt-3 p-2 bg-muted/50 rounded text-xs">
+                    <span style={{ color: winnerColor }}>
+                      {PET_PROFILE_LABELS[winner]} tem taxa de recompra {Math.abs(diff).toFixed(1)}pp maior
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Recompraram:</span>
-                    <span className="font-medium">{metrics.byPetType.cat.customersWhoRepurchased}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-purple-200 dark:border-purple-800 pt-2">
-                    <span className="text-muted-foreground">Ticket Médio:</span>
-                    <span className="font-bold text-purple-700 dark:text-purple-300">{formatCurrency(metrics.byPetType.cat.avgTicket)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Nota Histórica */}
-            {metrics.byPetType.cat.uniqueCustomers === 0 && (
-              <p className="text-xs text-muted-foreground mt-3 italic flex items-center gap-1">
-                <Info className="h-3 w-3" />
-                Amostras para gatos não identificadas. Todas classificadas como cachorro (padrão histórico).
-              </p>
-            )}
-            
-            {/* Insight comparativo */}
-            {metrics.byPetType.cat.uniqueCustomers > 0 && metrics.byPetType.dog.uniqueCustomers > 0 && (
-              <div className="mt-3 p-2 bg-muted/50 rounded text-xs">
-                {metrics.byPetType.cat.repurchaseRate > metrics.byPetType.dog.repurchaseRate ? (
-                  <span className="text-purple-700 dark:text-purple-300">
-                    🐱 Clientes de gatos têm taxa de recompra {(metrics.byPetType.cat.repurchaseRate - metrics.byPetType.dog.repurchaseRate).toFixed(1)}pp maior
-                  </span>
-                ) : metrics.byPetType.dog.repurchaseRate > metrics.byPetType.cat.repurchaseRate ? (
-                  <span className="text-amber-700 dark:text-amber-300">
-                    🐕 Clientes de cachorros têm taxa de recompra {(metrics.byPetType.dog.repurchaseRate - metrics.byPetType.cat.repurchaseRate).toFixed(1)}pp maior
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">
-                    📊 Taxas de recompra equivalentes entre cachorro e gato
-                  </span>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                );
+              })()}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
