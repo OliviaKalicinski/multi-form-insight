@@ -343,26 +343,26 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       const isSeeding = order.natureza_pedido === "Seeding";
 
       if (newStatus === "aguardando_expedicao") {
-        if (!order.customer_id) {
-          if (!order.destinatario_nome) throw new Error("Cliente ou destinatário é obrigatório");
-          if (!order.destinatario_endereco) throw new Error("Endereço do destinatário é obrigatório");
-          if (!order.destinatario_cidade) throw new Error("Cidade do destinatário é obrigatória");
-          if (!order.destinatario_cep) throw new Error("CEP do destinatário é obrigatório");
-        }
         if (!order.items || order.items.length === 0) throw new Error("Pedido precisa de pelo menos 1 item");
+        if (!isSeeding) {
+          if (!order.customer_id) {
+            if (!order.destinatario_nome) throw new Error("Cliente ou destinatário é obrigatório");
+            if (!order.destinatario_endereco) throw new Error("Endereço do destinatário é obrigatório");
+            if (!order.destinatario_cidade) throw new Error("Cidade do destinatário é obrigatória");
+            if (!order.destinatario_cep) throw new Error("CEP do destinatário é obrigatório");
+          }
+        }
       }
-      if (newStatus === "fechado") {
+      if (newStatus === "fechado" && !isSeeding) {
         const missingLote = order.items.some(i => !i.lote || i.lote.trim() === "");
         if (missingLote) throw new Error("Todos os itens precisam de lote para fechar");
         if (!order.peso_total) throw new Error("Peso total é obrigatório para fechar");
         if (!order.medidas) throw new Error("Medidas são obrigatórias para fechar");
       }
-      if (newStatus === "enviado") {
+      if (newStatus === "enviado" && !isSeeding) {
         if (!order.codigo_rastreio) throw new Error("Código de rastreio é obrigatório para enviar");
         if (!order.is_fiscal_exempt && !order.numero_nf && !order.nf_file_path) {
-          if (!isSeeding) {
-            throw new Error("NF obrigatória para envio (número ou PDF anexado)");
-          }
+          throw new Error("NF obrigatória para envio (número ou PDF anexado)");
         }
       }
 
