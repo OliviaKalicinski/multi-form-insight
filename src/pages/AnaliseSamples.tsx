@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, ShoppingBag, Target, Calendar, Percent, ArrowRight, Info, AlertTriangle, Dog, Cat } from "lucide-react";
+import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, ShoppingBag, Target, Calendar, Percent, ArrowRight, Info, AlertTriangle } from "lucide-react";
+import { PET_PROFILE_ORDER, PET_PROFILE_LABELS, PET_PROFILE_COLORS, BuyerPetProfile } from "@/data/operationalProducts";
 import { cn } from "@/lib/utils";
 
 const AnaliseSamples = () => {
