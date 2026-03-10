@@ -9,8 +9,9 @@ import {
   isSampleProduct,
   isOnlySampleOrder,
   hasRegularProduct,
-  getSamplePetType,
 } from "@/utils/samplesAnalyzer";
+import { classifyProductsByAnimal } from "@/utils/petProfile";
+import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
