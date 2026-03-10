@@ -174,8 +174,9 @@ function aggregateSales(rows: any[]) {
           hasSample = true;
           const desc = (name + " " + (p.descricao || "")).toLowerCase();
           if (desc.includes("gato") || desc.includes("gatos")) hasCat = true;
-          else if (desc.includes("cachorro") || desc.includes("caes") || desc.includes("cães")) hasDog = true;
-          else hasDog = true;
+          else if (desc.includes("grub")) hasExotic = true;
+          else if (desc.includes("suplemento") && (desc.includes("concentrad") || desc.includes("integral"))) hasDog = true;
+          // original, legumes, spirulina → no animal signal
         } else {
           hasProduct = true;
         }
