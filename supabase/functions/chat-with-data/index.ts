@@ -147,7 +147,9 @@ function aggregateSales(rows: any[]) {
   let sampleOrders = 0;
   let sampleDog = 0;
   let sampleCat = 0;
-  let sampleBoth = 0;
+  let sampleExotic = 0;
+  let sampleMultiple = 0;
+  let sampleUnidentified = 0;
 
   for (const r of rows) {
     try {
