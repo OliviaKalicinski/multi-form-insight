@@ -147,7 +147,9 @@ function aggregateSales(rows: any[]) {
   let sampleOrders = 0;
   let sampleDog = 0;
   let sampleCat = 0;
-  let sampleBoth = 0;
+  let sampleExotic = 0;
+  let sampleMultiple = 0;
+  let sampleUnidentified = 0;
 
   for (const r of rows) {
     try {
@@ -158,6 +160,7 @@ function aggregateSales(rows: any[]) {
       let hasSample = false;
       let hasDog = false;
       let hasCat = false;
+      let hasExotic = false;
 
       const month = new Date(r.data_venda).toISOString().slice(0, 7);
 
@@ -171,8 +174,9 @@ function aggregateSales(rows: any[]) {
           hasSample = true;
           const desc = (name + " " + (p.descricao || "")).toLowerCase();
           if (desc.includes("gato") || desc.includes("gatos")) hasCat = true;
-          else if (desc.includes("cachorro") || desc.includes("caes") || desc.includes("cães")) hasDog = true;
-          else hasDog = true;
+          else if (desc.includes("grub")) hasExotic = true;
+          else if (desc.includes("suplemento") && (desc.includes("concentrad") || desc.includes("integral"))) hasDog = true;
+          // original, legumes, spirulina → no animal signal
         } else {
           hasProduct = true;
         }
@@ -189,9 +193,12 @@ function aggregateSales(rows: any[]) {
 
       if (hasSample && !hasProduct) {
         sampleOrders++;
-        if (hasDog && hasCat) sampleBoth++;
+        const signals = [hasDog, hasCat, hasExotic].filter(Boolean).length;
+        if (signals > 1) sampleMultiple++;
         else if (hasCat) sampleCat++;
-        else sampleDog++;
+        else if (hasExotic) sampleExotic++;
+        else if (hasDog) sampleDog++;
+        else sampleUnidentified++;
       }
     } catch { /* skip */ }
   }
@@ -286,9 +293,11 @@ function aggregateSales(rows: any[]) {
     top_produtos_por_mes: topProductsByMonth,
     amostras: {
       total_pedidos_somente_amostra: sampleOrders,
-      cachorro: sampleDog,
-      gato: sampleCat,
-      cachorro_e_gato: sampleBoth,
+      caes: sampleDog,
+      gatos: sampleCat,
+      exoticos: sampleExotic,
+      multiplos: sampleMultiple,
+      nao_identificado: sampleUnidentified,
     },
     por_canal: channelMap,
     por_status: statusMap,
@@ -601,8 +610,14 @@ IMPORTANTE: NÃO existe "Mordida Original". A linha Mordida tem apenas Spirulina
 - Produto é amostra se: nome contém "amostra" OU preço entre R$ 0,01 e R$ 1,00
 - Pedido "somente amostra" = todos os produtos do pedido são amostras
 - Pedido "com produto" = tem pelo menos um produto regular (preço > R$ 1,00)
-- Tipo de pet: descrição contém "gato"/"gatos" → gato; senão → cachorro
-- Pedido com amostras de ambos tipos → "cachorro + gato"
+- Tipo de pet da amostra: classificação por keywords no nome:
+  - "gato"/"gatos" → gatos
+  - "grub" → exóticos
+  - "suplemento integral"/"suplemento concentrado" → cães
+  - Demais (original, legumes, spirulina) → sem sinal específico (não identificado)
+  - Múltiplos sinais no mesmo pedido → múltiplos
+- Conversão de amostra: cliente cujo 1º pedido foi somente amostra e depois fez pedido com produto regular
+- Janela de conversão ideal: até 45 dias após amostra
 - Conversão de amostra: cliente cujo 1º pedido foi somente amostra e depois fez pedido com produto regular
 - Janela de conversão ideal: até 45 dias após amostra
 

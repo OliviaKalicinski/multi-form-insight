@@ -9,8 +9,9 @@ import {
   isSampleProduct,
   isOnlySampleOrder,
   hasRegularProduct,
-  getSamplePetType,
 } from "@/utils/samplesAnalyzer";
+import { classifyProductsByAnimal } from "@/utils/petProfile";
+import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -253,23 +254,12 @@ const VisaoExecutivaV2 = () => {
         : 0;
 
     // Sample orders breakdown by pet type
-    let samplesDog = 0;
-    let samplesCat = 0;
-    let samplesBoth = 0;
+    const samplesByProfile: Partial<Record<BuyerPetProfile, number>> = {};
 
     onlySampleOrders.forEach((o) => {
-      let hasDog = false;
-      let hasCat = false;
-      o.produtos.forEach((p) => {
-        if (isSampleProduct(p)) {
-          const petType = getSamplePetType(p);
-          if (petType === "dog") hasDog = true;
-          else hasCat = true;
-        }
-      });
-      if (hasDog && hasCat) samplesBoth++;
-      else if (hasCat) samplesCat++;
-      else samplesDog++;
+      const sampleProducts = o.produtos.filter((p) => isSampleProduct(p));
+      const profile = classifyProductsByAnimal(sampleProducts);
+      samplesByProfile[profile] = (samplesByProfile[profile] || 0) + 1;
     });
 
     // Products sold (excluding samples) with quantities
@@ -313,9 +303,7 @@ const VisaoExecutivaV2 = () => {
       withProductCount: withProductOrders.length,
       ticketMedio,
       mediaProdutosPorPedido,
-      samplesDog,
-      samplesCat,
-      samplesBoth,
+      samplesByProfile,
       productsSold,
       channels,
       estadoSamplePie,
@@ -498,20 +486,22 @@ const VisaoExecutivaV2 = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">🐶 Cachorro</span>
-                  <span className="font-semibold">{metrics.samplesDog}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">🐱 Gato</span>
-                  <span className="font-semibold">{metrics.samplesCat}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    🐶🐱 Cachorro + Gato
-                  </span>
-                  <span className="font-semibold">{metrics.samplesBoth}</span>
-                </div>
+                {Object.entries(metrics.samplesByProfile)
+                  .filter(([k]) => k !== 'nao_identificado')
+                  .map(([profile, count]) => (
+                    <div key={profile} className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        {PET_PROFILE_LABELS[profile as BuyerPetProfile] || profile}
+                      </span>
+                      <span className="font-semibold">{count}</span>
+                    </div>
+                  ))}
+                {metrics.samplesByProfile.nao_identificado ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Não identificado</span>
+                    <span className="font-semibold">{metrics.samplesByProfile.nao_identificado}</span>
+                  </div>
+                ) : null}
               </div>
               <Separator />
               <DonutChart

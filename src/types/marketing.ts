@@ -584,20 +584,12 @@ export interface SampleMetrics {
       avgDaysToRepurchase: number;
     }[];
   };
-  byPetType: {
-    dog: {
-      uniqueCustomers: number;
-      repurchaseRate: number;
-      avgTicket: number;
-      customersWhoRepurchased: number;
-    };
-    cat: {
-      uniqueCustomers: number;
-      repurchaseRate: number;
-      avgTicket: number;
-      customersWhoRepurchased: number;
-    };
-  };
+  byPetType: Partial<Record<import("@/data/operationalProducts").BuyerPetProfile, {
+    uniqueCustomers: number;
+    repurchaseRate: number;
+    avgTicket: number;
+    customersWhoRepurchased: number;
+  }>>;
 }
 
 export interface CustomerPurchaseHistory {
