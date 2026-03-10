@@ -57,6 +57,43 @@ const categoriaLabels: Record<string, string> = {
   insumo: "Insumos",
 };
 
+// ── Animal Signal Classification ──
+
+export type AnimalSignal = 'caes' | 'gatos' | 'exoticos';
+export type BuyerPetProfile = 'caes' | 'gatos' | 'exoticos' | 'multiplos' | 'nao_identificado';
+
+export const PRODUCT_ANIMAL_MAP: Record<string, AnimalSignal> = {
+  CD_SUPLEMENTO_INTEGRAL_180G: 'caes',
+  CD_SUPLEMENTO_CONCENTRADO_200G: 'caes',
+  CD_AMOSTRA_SUPLEMENTO_INTEGRAL: 'caes',
+  CD_AMOSTRA_SUPLEMENTO_CONCENTRADO: 'caes',
+  CD_SUPLEMENTO_GATOS_180G: 'gatos',
+  CD_KIT_GATOS: 'gatos',
+  CD_AMOSTRA_GATOS: 'gatos',
+  CD_GRUB_120G: 'exoticos',
+  CD_AMOSTRA_GRUB: 'exoticos',
+};
+
+export const PET_PROFILE_ORDER: BuyerPetProfile[] = [
+  'caes', 'gatos', 'exoticos', 'multiplos', 'nao_identificado',
+];
+
+export const PET_PROFILE_LABELS: Record<BuyerPetProfile, string> = {
+  caes: 'Cães',
+  gatos: 'Gatos',
+  exoticos: 'Exóticos',
+  multiplos: 'Múltiplos',
+  nao_identificado: 'Não identificado',
+};
+
+export const PET_PROFILE_COLORS: Record<BuyerPetProfile, string> = {
+  caes: 'hsl(217, 91%, 60%)',
+  gatos: 'hsl(263, 70%, 58%)',
+  exoticos: 'hsl(160, 84%, 39%)',
+  multiplos: 'hsl(25, 95%, 53%)',
+  nao_identificado: 'hsl(220, 9%, 64%)',
+};
+
 export function findProductById(id: string): OperationalProduct | undefined {
   return operationalProducts.find((p) => p.id === id);
 }
