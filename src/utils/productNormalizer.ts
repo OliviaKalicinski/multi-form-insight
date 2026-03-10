@@ -1,7 +1,7 @@
 import { operationalProducts } from '@/data/operationalProducts';
 
 // ── FRIENDLY_TO_ID — gerada dinamicamente (single source of truth) ──
-const FRIENDLY_TO_ID: Record<string, string> = Object.fromEntries(
+export const FRIENDLY_TO_ID: Record<string, string> = Object.fromEntries(
   operationalProducts.map((p) => [p.nome, p.id])
 );
 
