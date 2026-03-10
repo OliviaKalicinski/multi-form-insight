@@ -63,6 +63,7 @@ export type AnimalSignal = 'caes' | 'gatos' | 'exoticos';
 export type BuyerPetProfile = 'caes' | 'gatos' | 'exoticos' | 'multiplos' | 'nao_identificado';
 
 export const PRODUCT_ANIMAL_MAP: Record<string, AnimalSignal> = {
+  CD_KIT_AMOSTRAS: 'caes',
   CD_SUPLEMENTO_INTEGRAL_180G: 'caes',
   CD_SUPLEMENTO_CONCENTRADO_200G: 'caes',
   CD_AMOSTRA_SUPLEMENTO_INTEGRAL: 'caes',
