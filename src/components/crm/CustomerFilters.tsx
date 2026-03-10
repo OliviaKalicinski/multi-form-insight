@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search } from "lucide-react";
+import { PET_PROFILE_ORDER, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 
 interface CustomerFiltersProps {
   search: string;
@@ -12,6 +13,8 @@ interface CustomerFiltersProps {
   responsavelFilter: string;
   onResponsavelChange: (v: string) => void;
   responsaveis: string[];
+  petFilter: string;
+  onPetChange: (v: string) => void;
 }
 
 export function CustomerFilters({
@@ -20,6 +23,7 @@ export function CustomerFilters({
   segmentFilter, onSegmentChange,
   responsavelFilter, onResponsavelChange,
   responsaveis,
+  petFilter, onPetChange,
 }: CustomerFiltersProps) {
   return (
     <div className="flex flex-wrap gap-3">
@@ -54,6 +58,17 @@ export function CustomerFilters({
           <SelectItem value="Recorrente">Recorrente</SelectItem>
           <SelectItem value="Fiel">Fiel</SelectItem>
           <SelectItem value="VIP">VIP</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={petFilter} onValueChange={onPetChange}>
+        <SelectTrigger className="w-[170px]">
+          <SelectValue placeholder="Pet" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos</SelectItem>
+          {PET_PROFILE_ORDER.map(p => (
+            <SelectItem key={p} value={p}>{PET_PROFILE_LABELS[p]}</SelectItem>
+          ))}
         </SelectContent>
       </Select>
       {responsaveis.length > 0 && (
