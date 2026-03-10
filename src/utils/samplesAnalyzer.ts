@@ -1,6 +1,8 @@
 import { ProcessedOrder, SampleMetrics, CustomerPurchaseHistory } from "@/types/marketing";
 import { format, differenceInDays, differenceInMonths } from "date-fns";
 import { getOfficialRevenue, isRevenueOrder } from "./revenue";
+import { classifyProductsByAnimal } from "./petProfile";
+import { BuyerPetProfile } from "@/data/operationalProducts";
 
 /**
  * Identifica se um produto é uma amostra baseado em nome OU preço
