@@ -160,6 +160,7 @@ function aggregateSales(rows: any[]) {
       let hasSample = false;
       let hasDog = false;
       let hasCat = false;
+      let hasExotic = false;
 
       const month = new Date(r.data_venda).toISOString().slice(0, 7);
 
