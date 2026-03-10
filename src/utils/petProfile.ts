@@ -14,11 +14,77 @@ const normalizeCpf = (cpf: string | undefined): string | null => {
 };
 
 /**
+ * Fallback: when descricaoAjustada is "Kit de Amostras" (collapsed by normalizer),
+ * use keywords in raw descricao to resolve the correct catalog name.
+ * Only covers sample subtypes that carry an animal signal.
+ */
+const SAMPLE_RAW_TO_FRIENDLY: [RegExp, string][] = [
+  [/gato/i,        "Amostra Gatos"],
+  [/grub/i,        "Amostra Grub"],
+  [/concentrad/i,  "Amostra Suplemento Concentrado"],
+  [/integral/i,    "Amostra Suplemento Integral"],
+];
+
+/**
+ * Resolves the animal signal for a single product.
+ * 1. Try descricaoAjustada → FRIENDLY_TO_ID → PRODUCT_ANIMAL_MAP
+ * 2. Fallback for collapsed samples: keyword match on raw descricao
+ */
+function resolveAnimalSignal(
+  descricaoAjustada?: string,
+  descricao?: string
+): AnimalSignal | null {
+  // Primary path
+  if (descricaoAjustada) {
+    const productId = FRIENDLY_TO_ID[descricaoAjustada];
+    if (productId) {
+      const signal = PRODUCT_ANIMAL_MAP[productId];
+      if (signal) return signal;
+    }
+  }
+
+  // Fallback: only when normalizer collapsed to generic sample name
+  if (descricaoAjustada === "Kit de Amostras" && descricao) {
+    for (const [regex, friendlyName] of SAMPLE_RAW_TO_FRIENDLY) {
+      if (regex.test(descricao)) {
+        const productId = FRIENDLY_TO_ID[friendlyName];
+        if (productId) {
+          const signal = PRODUCT_ANIMAL_MAP[productId];
+          if (signal) return signal;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Classifies a set of products by animal signal.
+ * Returns a single BuyerPetProfile for the set.
+ * 0 signals → nao_identificado, 1 → species, >1 → multiplos
+ */
+export function classifyProductsByAnimal(
+  produtos: Array<{ descricao?: string; descricaoAjustada?: string }>
+): BuyerPetProfile {
+  const signals = new Set<AnimalSignal>();
+
+  for (const p of produtos) {
+    const signal = resolveAnimalSignal(p.descricaoAjustada, p.descricao);
+    if (signal) signals.add(signal);
+  }
+
+  if (signals.size === 0) return "nao_identificado";
+  if (signals.size === 1) return [...signals][0];
+  return "multiplos";
+}
+
+/**
  * Builds a Map<normalized_cpf, BuyerPetProfile> from sales data.
  * Single source of truth for pet classification — used by useBuyerProfile and Clientes page.
  */
 export function buildClientPetMap(salesData: ProcessedOrder[]): Map<string, BuyerPetProfile> {
-  const clientSignals = new Map<string, Set<AnimalSignal>>();
+  const clientProducts = new Map<string, Array<{ descricao?: string; descricaoAjustada?: string }>>();
 
   const b2cOrders = getB2COrders(salesData);
 
@@ -26,32 +92,22 @@ export function buildClientPetMap(salesData: ProcessedOrder[]): Map<string, Buye
     const cpf = normalizeCpf(order.cpfCnpj);
     if (!cpf) continue;
 
-    if (!clientSignals.has(cpf)) {
-      clientSignals.set(cpf, new Set());
+    if (!clientProducts.has(cpf)) {
+      clientProducts.set(cpf, []);
     }
 
     for (const p of order.produtos) {
-      const productId = FRIENDLY_TO_ID[p.descricaoAjustada];
-      if (!productId) continue;
-      const signal = PRODUCT_ANIMAL_MAP[productId];
-      if (signal) {
-        clientSignals.get(cpf)!.add(signal);
-      }
+      clientProducts.get(cpf)!.push({
+        descricao: p.descricao,
+        descricaoAjustada: p.descricaoAjustada,
+      });
     }
   }
 
   const result = new Map<string, BuyerPetProfile>();
 
-  for (const [cpf, signals] of clientSignals) {
-    let profile: BuyerPetProfile;
-    if (signals.size === 0) {
-      profile = "nao_identificado";
-    } else if (signals.size === 1) {
-      profile = [...signals][0];
-    } else {
-      profile = "multiplos";
-    }
-    result.set(cpf, profile);
+  for (const [cpf, produtos] of clientProducts) {
+    result.set(cpf, classifyProductsByAnimal(produtos));
   }
 
   return result;
@@ -71,9 +127,7 @@ export function getClientPetSpecies(salesData: ProcessedOrder[], cpf: string): A
     if (orderCpf !== normalizedTarget) continue;
 
     for (const p of order.produtos) {
-      const productId = FRIENDLY_TO_ID[p.descricaoAjustada];
-      if (!productId) continue;
-      const signal = PRODUCT_ANIMAL_MAP[productId];
+      const signal = resolveAnimalSignal(p.descricaoAjustada, p.descricao);
       if (signal) signals.add(signal);
     }
   }
