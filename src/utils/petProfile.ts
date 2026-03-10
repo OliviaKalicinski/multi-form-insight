@@ -34,16 +34,7 @@ function resolveAnimalSignal(
   descricaoAjustada?: string,
   descricao?: string
 ): AnimalSignal | null {
-  // Primary path
-  if (descricaoAjustada) {
-    const productId = FRIENDLY_TO_ID[descricaoAjustada];
-    if (productId) {
-      const signal = PRODUCT_ANIMAL_MAP[productId];
-      if (signal) return signal;
-    }
-  }
-
-  // Fallback: only when normalizer collapsed to generic sample name
+  // Priority 1: raw keyword detection for collapsed samples
   if (descricaoAjustada === "Kit de Amostras" && descricao) {
     for (const [regex, friendlyName] of SAMPLE_RAW_TO_FRIENDLY) {
       if (regex.test(descricao)) {
@@ -53,6 +44,15 @@ function resolveAnimalSignal(
           if (signal) return signal;
         }
       }
+    }
+  }
+
+  // Priority 2: standard path
+  if (descricaoAjustada) {
+    const productId = FRIENDLY_TO_ID[descricaoAjustada];
+    if (productId) {
+      const signal = PRODUCT_ANIMAL_MAP[productId];
+      if (signal) return signal;
     }
   }
 
