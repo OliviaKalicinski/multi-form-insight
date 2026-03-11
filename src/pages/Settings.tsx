@@ -12,16 +12,16 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { UserManagement } from "@/components/settings/UserManagement";
 import { isValidDomain, getDomainValidationError } from "@/utils/domainValidation";
-import { 
-  Settings as SettingsIcon, 
-  Key, 
-  UserPlus, 
-  Shield, 
-  Loader2, 
+import {
+  Settings as SettingsIcon,
+  Key,
+  UserPlus,
+  Shield,
+  Loader2,
   AlertCircle,
   CheckCircle2,
   Users,
-  Instagram
+  Instagram,
 } from "lucide-react";
 
 export default function Settings() {
@@ -49,6 +49,7 @@ export default function Settings() {
   const [metaSeguidoresMes, setMetaSeguidoresMes] = useState(instagramGoals.metaSeguidoresMes);
   const [dataBaseline, setDataBaseline] = useState(instagramGoals.dataBaseline);
   const [instagramSuccess, setInstagramSuccess] = useState(false);
+  const [instagramError, setInstagramError] = useState<string | null>(null);
 
   useEffect(() => {
     setBaselineSeguidores(instagramGoals.baselineSeguidores);
@@ -59,15 +60,18 @@ export default function Settings() {
   const handleInstagramSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setInstagramSuccess(false);
-    
+    setInstagramError(null);
+
     const result = await updateInstagramGoals({
       baselineSeguidores,
       metaSeguidoresMes,
       dataBaseline,
     });
-    
+
     if (result.success) {
       setInstagramSuccess(true);
+    } else {
+      setInstagramError("Erro ao salvar configurações. Tente novamente.");
     }
   };
 
@@ -89,7 +93,7 @@ export default function Settings() {
     setPasswordLoading(true);
 
     const result = await updatePassword(newPassword);
-    
+
     setPasswordLoading(false);
 
     if (result.success) {
@@ -141,7 +145,7 @@ export default function Settings() {
       setInviteSuccess(true);
       setInviteEmail("");
       setInvitePassword("");
-      
+
       toast({
         title: "Usuário convidado!",
         description: `${inviteEmail} foi convidado como viewer.`,
@@ -170,9 +174,7 @@ export default function Settings() {
           <SettingsIcon className="h-8 w-8" />
           Configurações
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Gerencie sua conta e permissões
-        </p>
+        <p className="text-muted-foreground mt-1">Gerencie sua conta e permissões</p>
       </div>
 
       {/* Account Info */}
@@ -189,15 +191,12 @@ export default function Settings() {
               <Label className="text-muted-foreground">Email</Label>
               <p className="font-medium">{user?.email}</p>
             </div>
-            <Badge variant={isAdmin ? "default" : "secondary"}>
-              {isAdmin ? "Administrador" : "Visualizador"}
-            </Badge>
+            <Badge variant={isAdmin ? "default" : "secondary"}>{isAdmin ? "Administrador" : "Visualizador"}</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            {isAdmin 
+            {isAdmin
               ? "Você tem acesso total ao sistema, incluindo upload de dados e convite de novos usuários."
-              : "Você pode visualizar todos os dashboards, mas não pode fazer upload de dados ou convidar novos usuários."
-            }
+              : "Você pode visualizar todos os dashboards, mas não pode fazer upload de dados ou convidar novos usuários."}
           </p>
         </CardContent>
       </Card>
@@ -209,9 +208,7 @@ export default function Settings() {
             <Key className="h-4 w-4" />
             Alterar Senha
           </CardTitle>
-          <CardDescription>
-            Atualize sua senha de acesso
-          </CardDescription>
+          <CardDescription>Atualize sua senha de acesso</CardDescription>
         </CardHeader>
         <form onSubmit={handlePasswordChange}>
           <CardContent className="space-y-4">
@@ -227,7 +224,7 @@ export default function Settings() {
                 <AlertDescription>Senha alterada com sucesso!</AlertDescription>
               </Alert>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="new-password">Nova Senha</Label>
               <Input
@@ -241,7 +238,7 @@ export default function Settings() {
                 minLength={6}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="confirm-new-password">Confirmar Nova Senha</Label>
               <Input
@@ -271,84 +268,86 @@ export default function Settings() {
         </form>
       </Card>
 
-      {/* Instagram Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Instagram className="h-4 w-4" />
-            Configurações do Instagram
-          </CardTitle>
-          <CardDescription>
-            Configure o total de seguidores e metas mensais
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleInstagramSave}>
-          <CardContent className="space-y-4">
-            {instagramSuccess && (
-              <Alert>
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <AlertDescription>Configurações salvas com sucesso!</AlertDescription>
-              </Alert>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="baseline-seguidores">Total de Seguidores Atual</Label>
-              <Input
-                id="baseline-seguidores"
-                type="number"
-                placeholder="7025"
-                value={baselineSeguidores}
-                onChange={(e) => setBaselineSeguidores(Number(e.target.value))}
-                required
-                disabled={instagramSaving}
-              />
-              <p className="text-xs text-muted-foreground">
-                Este é o total atual de seguidores do seu perfil
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="data-baseline">Data de Referência</Label>
-              <Input
-                id="data-baseline"
-                type="date"
-                value={dataBaseline}
-                onChange={(e) => setDataBaseline(e.target.value)}
-                required
-                disabled={instagramSaving}
-              />
-              <p className="text-xs text-muted-foreground">
-                Data em que você verificou o total de seguidores
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="meta-seguidores">Meta de Novos Seguidores/Mês</Label>
-              <Input
-                id="meta-seguidores"
-                type="number"
-                placeholder="500"
-                value={metaSeguidoresMes}
-                onChange={(e) => setMetaSeguidoresMes(Number(e.target.value))}
-                required
-                disabled={instagramSaving}
-              />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" disabled={instagramSaving}>
-              {instagramSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                "Salvar Configurações"
+      {/* Instagram Settings (Admin only) */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Instagram className="h-4 w-4" />
+              Configurações do Instagram
+            </CardTitle>
+            <CardDescription>Configure o total de seguidores e metas mensais</CardDescription>
+          </CardHeader>
+          <form onSubmit={handleInstagramSave}>
+            <CardContent className="space-y-4">
+              {instagramSuccess && (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <AlertDescription>Configurações salvas com sucesso!</AlertDescription>
+                </Alert>
               )}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+              {instagramError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{instagramError}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="baseline-seguidores">Total de Seguidores Atual</Label>
+                <Input
+                  id="baseline-seguidores"
+                  type="number"
+                  placeholder="7025"
+                  value={baselineSeguidores}
+                  onChange={(e) => setBaselineSeguidores(Number(e.target.value) || 0)}
+                  required
+                  disabled={instagramSaving}
+                />
+                <p className="text-xs text-muted-foreground">Este é o total atual de seguidores do seu perfil</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="data-baseline">Data de Referência</Label>
+                <Input
+                  id="data-baseline"
+                  type="date"
+                  value={dataBaseline}
+                  onChange={(e) => setDataBaseline(e.target.value)}
+                  required
+                  disabled={instagramSaving}
+                />
+                <p className="text-xs text-muted-foreground">Data em que você verificou o total de seguidores</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="meta-seguidores">Meta de Novos Seguidores/Mês</Label>
+                <Input
+                  id="meta-seguidores"
+                  type="number"
+                  placeholder="500"
+                  value={metaSeguidoresMes}
+                  onChange={(e) => setMetaSeguidoresMes(Number(e.target.value) || 0)}
+                  required
+                  disabled={instagramSaving}
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" disabled={instagramSaving}>
+                {instagramSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar Configurações"
+                )}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      )}
 
       {/* User Management (Admin only) */}
       {isAdmin && <UserManagement />}
@@ -379,7 +378,7 @@ export default function Settings() {
                   <AlertDescription>Usuário convidado com sucesso!</AlertDescription>
                 </Alert>
               )}
-              
+
               <div className="space-y-2">
                 <Label htmlFor="invite-email">Email do Novo Usuário</Label>
                 <Input
@@ -392,13 +391,13 @@ export default function Settings() {
                   disabled={inviteLoading}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="invite-password">Senha Temporária</Label>
                 <Input
                   id="invite-password"
-                  type="text"
-                  placeholder="senha123"
+                  type="password"
+                  placeholder="••••••••"
                   value={invitePassword}
                   onChange={(e) => setInvitePassword(e.target.value)}
                   required
