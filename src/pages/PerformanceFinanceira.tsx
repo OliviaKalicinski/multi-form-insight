@@ -101,7 +101,7 @@ export default function PerformanceFinanceira() {
       faturamento: metrics!.faturamentoTotal,
       ticket: metrics!.ticketMedioReal,
       pedidos: metrics!.totalPedidos,
-      clientes: metrics!.clientesUnicos || 0,
+      clientes: 0,
       produtos: metrics!.produtoMedio,
     });
 
