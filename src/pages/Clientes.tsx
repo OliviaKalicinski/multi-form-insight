@@ -1,397 +1,163 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useCustomerData } from "@/hooks/useCustomerData";
+import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { buildClientPetMap, getClientPetSpecies } from "@/utils/petProfile";
-import { CustomerFilters } from "@/components/crm/CustomerFilters";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Truck, DollarSign, ShoppingCart, Weight, TrendingUp } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowUpDown, ExternalLink, Download } from "lucide-react";
-import { BuyerPetProfile, PET_PROFILE_LABELS, PET_PROFILE_COLORS, PET_PROFILE_ORDER } from "@/data/operationalProducts";
+import { EmptyState } from "@/components/EmptyState";
+import { getOfficialRevenue, getRevenueOrders, getB2BOrders } from "@/utils/revenue";
+import { filterOrdersByMonth } from "@/utils/salesCalculator";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
-const segmentColors: Record<string, string> = {
-  VIP: "bg-amber-500/15 text-amber-700 border-amber-500/30",
-  Fiel: "bg-blue-500/15 text-blue-700 border-blue-500/30",
-  Recorrente: "bg-green-500/15 text-green-700 border-green-500/30",
-  "Primeira Compra": "bg-muted text-muted-foreground border-border",
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+const formatKg = (value: number) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value) + " kg";
+
+const formatMonth = (yyyyMM: string): string => {
+  const [year, month] = yyyyMM.split("-");
+  const names = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  return `${names[parseInt(month) - 1]}/${year}`;
 };
 
-const churnColors: Record<string, string> = {
-  active: "bg-green-500/15 text-green-700 border-green-500/30",
-  at_risk: "bg-yellow-500/15 text-yellow-700 border-yellow-500/30",
-  inactive: "bg-orange-500/15 text-orange-700 border-orange-500/30",
-  churned: "bg-red-500/15 text-red-700 border-red-500/30",
-};
+export default function LetsFly() {
+  const { salesData, selectedMonth } = useDashboard();
 
-const churnLabels: Record<string, string> = {
-  active: "Ativo",
-  at_risk: "Em Risco",
-  inactive: "Inativo",
-  churned: "Churn",
-};
-
-type SortKey =
-  | "nome"
-  | "total_revenue"
-  | "days_since_last_purchase"
-  | "last_order_date"
-  | "segment"
-  | "churn_status"
-  | "total_orders_revenue"
-  | "responsavel"
-  | "pet";
-
-const PAGE_SIZE = 25;
-
-const petSortIndex = Object.fromEntries(PET_PROFILE_ORDER.map((p, i) => [p, i]));
-
-export default function Clientes() {
-  const navigate = useNavigate();
-  const { customers, isLoading } = useCustomerData();
-  const { salesData } = useDashboard();
-
-  const [search, setSearch] = useState("");
-  const [churnFilter, setChurnFilter] = useState("all");
-  const [segmentFilter, setSegmentFilter] = useState("all");
-  const [responsavelFilter, setResponsavelFilter] = useState("all");
-  const [petFilter, setPetFilter] = useState("all");
-  const [sortKey, setSortKey] = useState<SortKey>("total_revenue");
-  const [sortAsc, setSortAsc] = useState(false);
-  const [page, setPage] = useState(0);
-
-  const petMap = useMemo(() => buildClientPetMap(salesData), [salesData]);
-
-  // Build phone lookup: cpfCnpj (normalized) → most recent telefoneCliente
-  const phoneMap = useMemo(() => {
-    const map = new Map<string, string>();
-    const sorted = [...salesData].sort((a, b) => b.dataVenda.getTime() - a.dataVenda.getTime());
-    for (const order of sorted) {
-      if (!order.telefoneCliente) continue;
-      const key = order.cpfCnpj?.replace(/\D/g, "") ?? "";
-      if (key && !map.has(key)) map.set(key, order.telefoneCliente);
-    }
-    return map;
+  const availableSalesMonths = useMemo(() => {
+    const months = new Set<string>();
+    salesData.forEach((o) => months.add(format(o.dataVenda, "yyyy-MM")));
+    return Array.from(months).sort();
   }, [salesData]);
 
-  // Build species cache for "multiplos" sub-labels
-  const speciesCache = useMemo(() => {
-    const cache = new Map<string, string>();
-    for (const [cpf, profile] of petMap) {
-      if (profile === "multiplos") {
-        const species = getClientPetSpecies(salesData, cpf);
-        cache.set(cpf, species.map((s) => PET_PROFILE_LABELS[s]).join(" • "));
-      }
-    }
-    return cache;
-  }, [petMap, salesData]);
+  const filteredOrders = useMemo(() => {
+    const segmented = getRevenueOrders(getB2BOrders(salesData));
+    return selectedMonth ? filterOrdersByMonth(segmented, selectedMonth, availableSalesMonths) : segmented;
+  }, [salesData, selectedMonth, availableSalesMonths]);
 
-  const getPetProfile = (cpf: string | null): BuyerPetProfile | null => {
-    if (!cpf) return null;
-    const normalized = cpf.replace(/\D/g, "");
-    return petMap.get(normalized) ?? null;
-  };
+  const kpis = useMemo(() => {
+    const receita = filteredOrders.reduce((s, o) => s + getOfficialRevenue(o), 0);
+    const pedidos = filteredOrders.length;
+    const totalKg = filteredOrders.reduce((s, o) => s + (o.pesoLiquido || 0), 0);
+    const ticketMedio = pedidos > 0 ? receita / pedidos : 0;
+    const receitaPorKg = totalKg > 0 ? receita / totalKg : 0;
+    return { receita, pedidos, totalKg, ticketMedio, receitaPorKg };
+  }, [filteredOrders]);
 
-  const responsaveis = useMemo(() => {
-    const set = new Set<string>();
-    customers.forEach((c) => {
-      if (c.responsavel) set.add(c.responsavel);
+  // Tabela mensal
+  const monthlyData = useMemo(() => {
+    const map = new Map<string, { receita: number; kg: number; pedidos: number }>();
+    filteredOrders.forEach((o) => {
+      const month = format(o.dataVenda, "yyyy-MM");
+      const cur = map.get(month) || { receita: 0, kg: 0, pedidos: 0 };
+      cur.receita += getOfficialRevenue(o);
+      cur.kg += o.pesoLiquido || 0;
+      cur.pedidos += 1;
+      map.set(month, cur);
     });
-    return Array.from(set).sort();
-  }, [customers]);
+    return Array.from(map.entries())
+      .map(([month, d]) => ({ month, ...d, receitaPorKg: d.kg > 0 ? d.receita / d.kg : 0 }))
+      .sort((a, b) => b.month.localeCompare(a.month));
+  }, [filteredOrders]);
 
-  const filtered = useMemo(() => {
-    let list = customers;
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (c) => (c.nome ?? "").toLowerCase().includes(q) || (c.cpf_cnpj ?? "").toLowerCase().includes(q),
-      );
-    }
-    if (churnFilter !== "all") list = list.filter((c) => c.churn_status === churnFilter);
-    if (segmentFilter !== "all") list = list.filter((c) => c.segment === segmentFilter);
-    if (responsavelFilter !== "all") list = list.filter((c) => c.responsavel === responsavelFilter);
-    if (petFilter !== "all") {
-      list = list.filter((c) => {
-        const pet = getPetProfile(c.cpf_cnpj);
-        return pet === petFilter;
-      });
-    }
-    return list;
-  }, [customers, search, churnFilter, segmentFilter, responsavelFilter, petFilter, petMap]);
-
-  const sorted = useMemo(() => {
-    const copy = [...filtered];
-    copy.sort((a, b) => {
-      let va: any, vb: any;
-      switch (sortKey) {
-        case "nome":
-          va = a.nome ?? "";
-          vb = b.nome ?? "";
-          break;
-        case "total_revenue":
-          va = a.total_revenue ?? 0;
-          vb = b.total_revenue ?? 0;
-          break;
-        case "days_since_last_purchase":
-          va = a.days_since_last_purchase ?? 9999;
-          vb = b.days_since_last_purchase ?? 9999;
-          break;
-        case "last_order_date":
-          va = a.last_order_date ?? "";
-          vb = b.last_order_date ?? "";
-          break;
-        case "segment":
-          va = a.segment ?? "";
-          vb = b.segment ?? "";
-          break;
-        case "churn_status":
-          va = a.churn_status ?? "";
-          vb = b.churn_status ?? "";
-          break;
-        case "total_orders_revenue":
-          va = a.total_orders_revenue ?? 0;
-          vb = b.total_orders_revenue ?? 0;
-          break;
-        case "responsavel":
-          va = a.responsavel ?? "";
-          vb = b.responsavel ?? "";
-          break;
-        case "pet": {
-          const pa = getPetProfile(a.cpf_cnpj);
-          const pb = getPetProfile(b.cpf_cnpj);
-          va = pa ? (petSortIndex[pa] ?? 99) : 99;
-          vb = pb ? (petSortIndex[pb] ?? 99) : 99;
-          break;
-        }
-      }
-      if (va < vb) return sortAsc ? -1 : 1;
-      if (va > vb) return sortAsc ? 1 : -1;
-      return 0;
-    });
-    return copy;
-  }, [filtered, sortKey, sortAsc, petMap]);
-
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
-  const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else {
-      setSortKey(key);
-      setSortAsc(false);
-    }
-    setPage(0);
-  };
-
-  const fmt = (v: number | null) => (v != null ? `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—");
-
-  const handleExportCSV = () => {
-    const rows = sorted.map((c) => {
-      const key = c.cpf_cnpj?.replace(/\D/g, "") ?? "";
-      const telefone = phoneMap.get(key) ?? "";
-      const nome = (c.nome ?? "").replace(/"/g, '""');
-      return `"${nome}","${telefone}"`;
-    });
-    const csv = ["Nome,Telefone", ...rows].join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `clientes_remarketing_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const renderPetBadge = (cpf: string | null) => {
-    const pet = getPetProfile(cpf);
-    if (!pet || pet === "nao_identificado") return <span className="text-muted-foreground">—</span>;
-    const normalizedCpf = cpf?.replace(/\D/g, "") ?? "";
-    const subLabel = pet === "multiplos" ? speciesCache.get(normalizedCpf) : null;
-
+  if (filteredOrders.length === 0) {
     return (
-      <div className="flex flex-col gap-0.5">
-        <Badge
-          variant="outline"
-          className="text-[10px] border"
-          style={{
-            backgroundColor: `${PET_PROFILE_COLORS[pet]}20`,
-            color: PET_PROFILE_COLORS[pet],
-            borderColor: `${PET_PROFILE_COLORS[pet]}40`,
-          }}
-        >
-          {PET_PROFILE_LABELS[pet]}
-        </Badge>
-        {subLabel && <span className="text-[9px] text-muted-foreground pl-1">{subLabel}</span>}
-      </div>
-    );
-  };
-
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-[400px] w-full" />
+      <div className="container mx-auto px-6 py-8">
+        <EmptyState
+          icon={<Truck className="h-8 w-8" />}
+          title="Sem dados B2B"
+          description="Não há pedidos B2B para o período selecionado. Verifique o filtro de mês ou faça upload de dados com segmento 'b2b'."
+          action={{ label: "Ir para Upload", href: "/upload" }}
+        />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Clientes</h1>
-          <p className="text-sm text-muted-foreground">Lista operacional • {filtered.length} clientes</p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExportCSV}
-          disabled={sorted.length === 0}
-          className="flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Exportar para remarketing ({sorted.length})
-        </Button>
+    <div className="container mx-auto px-6 py-8 space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold">🚀 B2B</h1>
+        <p className="text-muted-foreground">Canal B2B — performance por volume e receita</p>
       </div>
 
-      <CustomerFilters
-        search={search}
-        onSearchChange={(v) => {
-          setSearch(v);
-          setPage(0);
-        }}
-        churnFilter={churnFilter}
-        onChurnChange={(v) => {
-          setChurnFilter(v);
-          setPage(0);
-        }}
-        segmentFilter={segmentFilter}
-        onSegmentChange={(v) => {
-          setSegmentFilter(v);
-          setPage(0);
-        }}
-        responsavelFilter={responsavelFilter}
-        onResponsavelChange={(v) => {
-          setResponsavelFilter(v);
-          setPage(0);
-        }}
-        responsaveis={responsaveis}
-        petFilter={petFilter}
-        onPetChange={(v) => {
-          setPetFilter(v);
-          setPage(0);
-        }}
-      />
+      {/* KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Receita</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatCurrency(kpis.receita)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Pedidos</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{kpis.pedidos}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Volume</CardTitle>
+            <Weight className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatKg(kpis.totalKg)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatCurrency(kpis.ticketMedio)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Receita/KG</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatCurrency(kpis.receitaPorKg)}</p>
+          </CardContent>
+        </Card>
+      </div>
 
+      {/* Tabela mensal */}
       <Card>
-        <CardContent className="p-0">
+        <CardHeader>
+          <CardTitle>Evolução Mensal</CardTitle>
+        </CardHeader>
+        <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("nome")}>
-                  <span className="flex items-center gap-1">
-                    Nome <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead>CPF/CNPJ</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("segment")}>
-                  <span className="flex items-center gap-1">
-                    Segmento <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("churn_status")}>
-                  <span className="flex items-center gap-1">
-                    Churn <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("pet")}>
-                  <span className="flex items-center gap-1">
-                    Pet <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort("total_revenue")}>
-                  <span className="flex items-center gap-1 justify-end">
-                    Receita <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort("total_orders_revenue")}>
-                  <span className="flex items-center gap-1 justify-end">
-                    Pedidos <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("responsavel")}>
-                  <span className="flex items-center gap-1">
-                    Responsável <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort("days_since_last_purchase")}>
-                  <span className="flex items-center gap-1 justify-end">
-                    Dias s/ compra <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead></TableHead>
+                <TableHead>Mês</TableHead>
+                <TableHead className="text-right">Pedidos</TableHead>
+                <TableHead className="text-right">Receita</TableHead>
+                <TableHead className="text-right">Volume KG</TableHead>
+                <TableHead className="text-right">Receita/KG</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginated.map((c) => (
-                <TableRow
-                  key={c.cpf_cnpj}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/clientes/${encodeURIComponent(c.cpf_cnpj!)}`)}
-                >
-                  <TableCell className="font-medium">{c.nome || "—"}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {(c.cpf_cnpj ?? "").length > 11 ? `${c.cpf_cnpj!.slice(0, 11)}...` : c.cpf_cnpj}
-                  </TableCell>
-                  <TableCell>
-                    {c.segment && (
-                      <Badge variant="outline" className={`text-[10px] ${segmentColors[c.segment] ?? ""}`}>
-                        {c.segment}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {c.churn_status && (
-                      <Badge variant="outline" className={`text-[10px] ${churnColors[c.churn_status] ?? ""}`}>
-                        {churnLabels[c.churn_status] ?? c.churn_status}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{renderPetBadge(c.cpf_cnpj)}</TableCell>
-                  <TableCell className="text-right">{fmt(c.total_revenue)}</TableCell>
-                  <TableCell className="text-right">{c.total_orders_revenue ?? 0}</TableCell>
-                  <TableCell className="text-sm">{c.responsavel || "—"}</TableCell>
-                  <TableCell className="text-right">{c.days_since_last_purchase ?? "—"}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
+              {monthlyData.map((d) => (
+                <TableRow key={d.month}>
+                  <TableCell className="font-medium">{formatMonth(d.month)}</TableCell>
+                  <TableCell className="text-right">{d.pedidos}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(d.receita)}</TableCell>
+                  <TableCell className="text-right">{formatKg(d.kg)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(d.receitaPorKg)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, sorted.length)} de {sorted.length}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
-              Anterior
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>
-              Próximo
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
