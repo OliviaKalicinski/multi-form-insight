@@ -39,13 +39,22 @@ import { ptBR } from "date-fns/locale";
 
 const queryClient = new QueryClient();
 
+// Helper to format last update date
 const formatLastUpdate = (date: Date | null): string => {
   if (!date) return "—";
-  if (isToday(date)) return format(date, "HH:mm", { locale: ptBR });
-  if (isYesterday(date)) return `Ontem ${format(date, "HH:mm", { locale: ptBR })}`;
+
+  if (isToday(date)) {
+    return format(date, "HH:mm", { locale: ptBR });
+  }
+
+  if (isYesterday(date)) {
+    return `Ontem ${format(date, "HH:mm", { locale: ptBR })}`;
+  }
+
   return format(date, "dd/MM HH:mm", { locale: ptBR });
 };
 
+// Inner layout that can use the Dashboard context
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const { lastDataUpdate } = useDashboard();
 
@@ -57,7 +66,11 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <header className="flex h-12 items-center border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
             <div className="ml-4 font-semibold text-sm">📊 Dashboard de Marketing</div>
+
+            {/* Spacer */}
             <div className="flex-1" />
+
+            {/* Data update indicator */}
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <span
                 className={`w-1.5 h-1.5 rounded-full ${lastDataUpdate ? "bg-green-500" : "bg-muted-foreground/50"}`}
@@ -75,6 +88,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// Layout component for authenticated pages
 const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => (
   <DashboardProvider>
     <DashboardLayout>{children}</DashboardLayout>
@@ -88,7 +102,10 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Public route */}
           <Route path="/login" element={<Login />} />
+
+          {/* Protected routes */}
           <Route path="/" element={<Navigate to="/visao-executiva-v2" replace />} />
 
           <Route
@@ -101,6 +118,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/dashboard"
             element={
@@ -111,6 +129,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/upload"
             element={
@@ -123,6 +142,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/settings"
             element={
@@ -133,6 +153,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/metas"
             element={
@@ -145,6 +166,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/seguidores"
             element={
@@ -155,6 +177,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/produtos"
             element={
@@ -165,6 +188,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/operacoes"
             element={
@@ -175,6 +199,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/ads"
             element={
@@ -185,6 +210,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/performance-financeira"
             element={
@@ -195,6 +221,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/comportamento-cliente"
             element={
@@ -205,8 +232,11 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
+          {/* Redirects de rotas antigas */}
           <Route path="/segmentacao-clientes" element={<Navigate to="/comportamento-cliente" replace />} />
           <Route path="/analise-churn" element={<Navigate to="/comportamento-cliente" replace />} />
+
           <Route
             path="/analise-samples"
             element={
@@ -217,6 +247,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/publico"
             element={
@@ -227,7 +258,9 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route path="/analise-critica" element={<Navigate to="/visao-executiva-v2" replace />} />
+
           <Route
             path="/clientes"
             element={
@@ -238,6 +271,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/clientes/:cpfCnpj"
             element={
@@ -248,6 +282,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/reclamacoes/nova"
             element={
@@ -258,6 +293,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/reclamacoes"
             element={
@@ -268,6 +304,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/atendimentos"
             element={
@@ -278,6 +315,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/radar-operacional"
             element={
@@ -288,6 +326,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/kanban-operacional"
             element={
@@ -298,6 +337,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/distribuidores"
             element={
@@ -308,6 +348,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/lets-fly"
             element={
@@ -318,6 +359,8 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
+          {/* Catch-all route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
