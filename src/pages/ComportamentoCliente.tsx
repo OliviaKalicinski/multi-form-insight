@@ -300,7 +300,7 @@ export default function ComportamentoCliente() {
                     <CardTitle>Evolução de Pedidos</CardTitle>
                     <CardDescription>
                       Volume de pedidos ao longo do tempo
-                    </div>
+                    </CardDescription>
                   </div>
                   <div className="flex gap-2">
                     {(['daily', 'weekly', 'monthly', 'quarterly'] as const).map(view => (
