@@ -12,7 +12,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
 import { analyzeNFIssuanceTime } from "@/utils/productOperationsMetrics";
-import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
+import { filterOrdersByDateRange, formatCurrency } from "@/utils/salesCalculator";
 import {
   segmentOrders,
   getRevenueOrders,
@@ -22,8 +22,6 @@ import {
   SEGMENT_ORDER,
   SegmentFilter,
 } from "@/utils/revenue";
-import { format, parse } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 type SegmentKey = Exclude<SegmentFilter, "all">;
 
@@ -34,7 +32,7 @@ interface SegmentBreakdownEntry {
 }
 
 export default function Operacoes() {
-  const { salesData, selectedMonth, availableMonths, comparisonMode, selectedMonths } = useDashboard();
+  const { salesData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
 
   const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>("all");
   const isConsolidated = selectedSegment === "all";
@@ -49,10 +47,10 @@ export default function Operacoes() {
     [segments, selectedSegment, isConsolidated],
   );
 
-  // 3. Filtrar por mês
+  // 3. Filtrar por período
   const ordersByMonth = useMemo(
-    () => (selectedMonth ? filterOrdersByMonth(ordersForSegment, selectedMonth, availableMonths) : ordersForSegment),
-    [ordersForSegment, selectedMonth, availableMonths],
+    () => (dateRange ? filterOrdersByDateRange(ordersForSegment, dateRange.start, dateRange.end) : ordersForSegment),
+    [ordersForSegment, dateRange],
   );
 
   // FLUXO OPERACIONAL: todos os pedidos filtrados
@@ -72,13 +70,13 @@ export default function Operacoes() {
     if (!isConsolidated) return null;
     return SEGMENT_ORDER.reduce(
       (acc, key) => {
-        const segOrdersByMonth = selectedMonth
-          ? filterOrdersByMonth(segments[key], selectedMonth, availableMonths)
+        const segOrdersByDate = dateRange
+          ? filterOrdersByDateRange(segments[key], dateRange.start, dateRange.end)
           : segments[key];
-        const revOrders = getRevenueOrders(segOrdersByMonth);
-        const nfStats = analyzeNFIssuanceTime(segOrdersByMonth);
+        const revOrders = getRevenueOrders(segOrdersByDate);
+        const nfStats = analyzeNFIssuanceTime(segOrdersByDate);
         acc[key] = {
-          pedidos: segOrdersByMonth.length,
+          pedidos: segOrdersByDate.length,
           faturamento: revOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0),
           tempoNF: nfStats.averageDays,
         };
@@ -86,48 +84,35 @@ export default function Operacoes() {
       },
       {} as Record<SegmentKey, SegmentBreakdownEntry>,
     );
-  }, [isConsolidated, segments, selectedMonth, availableMonths]);
+  }, [isConsolidated, segments, dateRange]);
 
-  // Métricas de comparação multi-mês (aplicando mesmo pipeline)
+  // Métricas de comparação (período principal vs período de comparação)
   const comparisonMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length === 0 || salesData.length === 0) {
-      return null;
-    }
+    if (!comparisonMode || !comparisonDateRange || salesData.length === 0) return null;
+
+    const COLORS = ["#8b5cf6", "#3b82f6"];
+    const baseOrders = isConsolidated
+      ? [...segments.b2c, ...segments.b2b2c, ...segments.b2b]
+      : segments[selectedSegment as SegmentKey];
+
+    const periods = [
+      { range: dateRange, label: "Período A", color: COLORS[0] },
+      { range: comparisonDateRange, label: "Período B", color: COLORS[1] },
+    ].filter((p) => p.range);
 
     const totalPedidos: any[] = [];
     const tempoMedioNF: any[] = [];
     const formaEnvioPrincipal: any[] = [];
     const faturamento: any[] = [];
 
-    const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
-
-    selectedMonths.forEach((month, index) => {
-      // Pipeline: segmentar → selecionar → filtrar mês
-      const monthOrders = isConsolidated
-        ? [...segments.b2c, ...segments.b2b2c, ...segments.b2b]
-        : segments[selectedSegment as SegmentKey];
-      const filteredOrders = filterOrdersByMonth(monthOrders, month, availableMonths);
+    periods.forEach(({ range, label, color }) => {
+      const filteredOrders = filterOrdersByDateRange(baseOrders, range!.start, range!.end);
       const metrics = calculateProductOperationsMetrics(filteredOrders, false);
-
       if (metrics) {
-        const monthLabel = format(parse(month, "yyyy-MM", new Date()), "MMM yyyy", { locale: ptBR });
-
-        const color = COLORS[index % COLORS.length];
-
-        totalPedidos.push({
-          month,
-          monthLabel,
-          value: filteredOrders.length,
-          color,
-        });
-
-        tempoMedioNF.push({
-          month,
-          monthLabel,
-          value: metrics.nfStats?.averageDays || 0,
-          color,
-        });
-
+        const monthLabel = label;
+        const month = label.toLowerCase().replace(" ", "-");
+        totalPedidos.push({ month, monthLabel, value: filteredOrders.length, color });
+        tempoMedioNF.push({ month, monthLabel, value: metrics.nfStats?.averageDays || 0, color });
         const mainShipping = metrics.shippingMethodStats[0];
         formaEnvioPrincipal.push({
           month,
@@ -136,15 +121,8 @@ export default function Operacoes() {
           color,
           shippingName: mainShipping?.formaEnvio || "N/A",
         });
-
-        // Faturamento via getRevenueOrders + getOfficialRevenue
         const rev = getRevenueOrders(filteredOrders).reduce((sum, o) => sum + getOfficialRevenue(o), 0);
-        faturamento.push({
-          month,
-          monthLabel,
-          value: rev,
-          color,
-        });
+        faturamento.push({ month, monthLabel, value: rev, color });
       }
     });
 
@@ -152,20 +130,16 @@ export default function Operacoes() {
       if (arr.length > 1) {
         const base = arr[0].value;
         arr.forEach((item, idx) => {
-          if (idx > 0 && base > 0) {
-            item.percentageChange = ((item.value - base) / base) * 100;
-          }
+          if (idx > 0 && base > 0) item.percentageChange = ((item.value - base) / base) * 100;
         });
       }
     };
-
     calcVariation(totalPedidos);
     calcVariation(tempoMedioNF);
     calcVariation(formaEnvioPrincipal);
     calcVariation(faturamento);
-
     return { totalPedidos, tempoMedioNF, formaEnvioPrincipal, faturamento };
-  }, [comparisonMode, selectedMonths, salesData, availableMonths, segments, selectedSegment, isConsolidated]);
+  }, [comparisonMode, comparisonDateRange, dateRange, salesData, segments, selectedSegment, isConsolidated]);
 
   // Resumo para cards
   const summaryMetrics = useMemo(() => {
