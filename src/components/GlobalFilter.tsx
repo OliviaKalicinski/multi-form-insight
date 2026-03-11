@@ -1,206 +1,241 @@
-import { useContext } from "react";
+import { useState } from "react";
 import { useLocation } from "react-router-dom";
-import { DashboardContext } from "@/contexts/DashboardContext";
-import { Card } from "@/components/ui/card";
+import { DashboardContext, PeriodState } from "@/contexts/DashboardContext";
+import { useContext } from "react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import {
-  Calendar,
-  RefreshCw,
-  X,
-  GitCompare,
-} from "lucide-react";
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, subDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
+import { Calendar as CalendarIcon, RefreshCw, X, GitCompare } from "lucide-react";
+
+type PresetKey = "1d" | "7d" | "30d" | "current_month" | "last_month" | "12m";
+
+const PRESETS: { key: PresetKey; label: string }[] = [
+  { key: "1d", label: "Hoje" },
+  { key: "7d", label: "7 dias" },
+  { key: "30d", label: "30 dias" },
+  { key: "current_month", label: "Mês atual" },
+  { key: "last_month", label: "Mês anterior" },
+  { key: "12m", label: "12 meses" },
+];
+
+function buildPreset(key: PresetKey, anchor: Date): PeriodState {
+  switch (key) {
+    case "1d":
+      return { start: startOfDay(anchor), end: endOfDay(anchor), label: key };
+    case "7d":
+      return { start: startOfDay(subDays(anchor, 6)), end: endOfDay(anchor), label: key };
+    case "30d":
+      return { start: startOfDay(subDays(anchor, 29)), end: endOfDay(anchor), label: key };
+    case "current_month":
+      return { start: startOfMonth(anchor), end: endOfDay(anchor), label: key };
+    case "last_month": {
+      const prev = subMonths(anchor, 1);
+      return { start: startOfMonth(prev), end: endOfMonth(prev), label: key };
+    }
+    case "12m":
+      return { start: startOfDay(subMonths(anchor, 11)), end: endOfDay(anchor), label: key };
+  }
+}
+
+function formatRangeLabel(range: PeriodState): string {
+  return `${format(range.start, "dd/MM/yy")} – ${format(range.end, "dd/MM/yy")}`;
+}
+
+function RangePicker({
+  value,
+  onChange,
+  maxDate,
+  placeholder,
+}: {
+  value: PeriodState | null;
+  onChange: (range: PeriodState | null) => void;
+  maxDate: Date;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(
+    value ? { from: value.start, to: value.end } : undefined,
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant={value?.label === "custom" ? "default" : "outline"} size="sm" className="h-8 text-xs gap-1.5">
+          <CalendarIcon className="h-3.5 w-3.5" />
+          {value?.label === "custom" ? formatRangeLabel(value) : placeholder}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="range"
+          selected={customRange}
+          onSelect={(range) => {
+            setCustomRange(range);
+            if (range?.from && range?.to) {
+              onChange({
+                start: startOfDay(range.from),
+                end: endOfDay(range.to),
+                label: "custom",
+              });
+              setOpen(false);
+            }
+          }}
+          numberOfMonths={2}
+          locale={ptBR}
+          disabled={{ after: maxDate }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+const HIDDEN_ROUTES = [
+  "/visao-executiva-v2",
+  "/reclamacoes",
+  "/reclamacoes/nova",
+  "/clientes",
+  "/radar-operacional",
+  "/upload",
+  "/metas",
+  "/settings",
+];
 
 export function GlobalFilter() {
   const context = useContext(DashboardContext);
   const location = useLocation();
-  
-  // Rotas onde o filtro deve ser completamente escondido
-  const hiddenRoutes = [
-    '/visao-executiva-v2',
-    '/reclamacoes',
-    '/reclamacoes/nova',
-    '/clientes',
-    '/radar-operacional',
-    '/upload',
-    '/metas',
-    '/settings',
-    '/segmentacao-clientes',
-    '/analise-churn',
-  ];
-  const isHidden = hiddenRoutes.includes(location.pathname)
-    || location.pathname.startsWith('/clientes/');
-  
-  if (isHidden || !context) {
-    return null;
-  }
+
+  const isHidden = HIDDEN_ROUTES.includes(location.pathname) || location.pathname.startsWith("/clientes/");
+
+  if (isHidden || !context) return null;
 
   const {
-    selectedMonth,
-    setSelectedMonth,
+    dateRange,
+    setDateRange,
+    comparisonDateRange,
+    setComparisonDateRange,
     comparisonMode,
     setComparisonMode,
-    selectedMonths,
-    setSelectedMonths,
-    availableMonths,
+    lastDataDate,
   } = context;
 
-  // Formatar mês para exibição (YYYY-MM → Mês/Ano)
-  const formatMonth = (month: string) => {
-    const [year, monthNum] = month.split("-");
-    const monthNames = [
-      "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-      "Jul", "Ago", "Set", "Out", "Nov", "Dez"
-    ];
-    return `${monthNames[parseInt(monthNum) - 1]}/${year.slice(2)}`;
+  const anchor = lastDataDate ?? new Date();
+  const hasFilter = !!dateRange || comparisonMode;
+
+  const handlePreset = (key: PresetKey) => {
+    setDateRange(buildPreset(key, anchor));
   };
 
-  // Limpar todos os filtros
   const handleClearAll = () => {
-    setSelectedMonth(null);
+    setDateRange(null);
     setComparisonMode(false);
-    setSelectedMonths([]);
+    setComparisonDateRange(null);
   };
-
-  // Refresh
-  const handleRefresh = () => {
-    window.location.reload();
-  };
-
-  // Toggle month selection (para modo comparação)
-  const handleToggleMonth = (month: string) => {
-    if (comparisonMode) {
-      if (selectedMonths.includes(month)) {
-        setSelectedMonths(selectedMonths.filter((m) => m !== month));
-      } else {
-        setSelectedMonths([...selectedMonths, month]);
-      }
-    } else {
-      // Modo normal: seleciona apenas um mês
-      setSelectedMonth(selectedMonth === month ? null : month);
-    }
-  };
-
-  if (availableMonths.length === 0) {
-    return null;
-  }
 
   return (
     <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
       <div className="container mx-auto px-6 py-3">
-        <Card className="border-0 shadow-none bg-transparent">
-          <div className="flex flex-col gap-4">
-            {/* Header com controles */}
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              {/* Lado Esquerdo */}
-              <div className="flex items-center gap-4">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">Período:</span>
-                
-                <Separator orientation="vertical" className="h-6" />
+        <div className="flex flex-col gap-3">
+          {/* Row 1: controls */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium">Período:</span>
+              <Separator orientation="vertical" className="h-6" />
 
-                {/* Toggle Modo Comparação */}
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={comparisonMode}
-                    onCheckedChange={(checked) => {
-                      setComparisonMode(checked);
-                      if (!checked) {
-                        setSelectedMonths([]);
-                      } else {
-                        // Se ativar modo comparação, converter seleção atual
-                        if (selectedMonth) {
-                          setSelectedMonths([selectedMonth]);
-                          setSelectedMonth(null);
-                        }
-                      }
-                    }}
-                    id="comparison-mode"
-                  />
-                  <label 
-                    htmlFor="comparison-mode" 
-                    className="text-sm font-medium cursor-pointer flex items-center gap-1.5"
+              {/* Presets */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {PRESETS.map((p) => (
+                  <Button
+                    key={p.key}
+                    variant={dateRange?.label === p.key ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => handlePreset(p.key)}
                   >
-                    <GitCompare className="h-4 w-4" />
-                    Comparação
-                  </label>
-                </div>
-              </div>
-
-              {/* Lado Direito - Ações */}
-              <div className="flex items-center gap-2">
-                {(selectedMonth || comparisonMode || selectedMonths.length > 0) && (
-                  <Button variant="ghost" size="sm" onClick={handleClearAll}>
-                    <X className="h-4 w-4 mr-1" />
-                    Limpar
+                    {p.label}
                   </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={handleRefresh}>
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                  Atualizar
-                </Button>
-              </div>
-            </div>
+                ))}
 
-            {/* Grid de Meses como Badges/Chips Clicáveis */}
-            <div className="flex flex-wrap gap-2">
-              {/* Badge "Todos" - só visível em modo normal */}
-              {!comparisonMode && (
-                <Badge
-                  variant={selectedMonth === null ? "default" : "outline"}
-                  className={cn(
-                    "cursor-pointer transition-all hover:scale-105 px-3 py-1",
-                    selectedMonth === null 
-                      ? "bg-primary text-primary-foreground" 
-                      : "hover:bg-muted"
-                  )}
-                  onClick={() => setSelectedMonth(null)}
+                {/* Custom range picker */}
+                <RangePicker
+                  value={dateRange?.label === "custom" ? dateRange : null}
+                  onChange={(r) => setDateRange(r)}
+                  maxDate={anchor}
+                  placeholder="Personalizado"
+                />
+              </div>
+
+              <Separator orientation="vertical" className="h-6" />
+
+              {/* Comparison toggle */}
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={comparisonMode}
+                  onCheckedChange={(checked) => {
+                    setComparisonMode(checked);
+                    if (!checked) setComparisonDateRange(null);
+                  }}
+                  id="comparison-mode"
+                />
+                <label
+                  htmlFor="comparison-mode"
+                  className="text-sm font-medium cursor-pointer flex items-center gap-1.5"
                 >
-                  Todos
-                </Badge>
-              )}
-
-              {/* Badges dos meses */}
-              {availableMonths.map((month) => {
-                const isSelected = comparisonMode 
-                  ? selectedMonths.includes(month)
-                  : selectedMonth === month;
-                
-                return (
-                  <Badge
-                    key={month}
-                    variant={isSelected ? "default" : "outline"}
-                    className={cn(
-                      "cursor-pointer transition-all hover:scale-105 px-3 py-1",
-                      isSelected 
-                        ? "bg-primary text-primary-foreground" 
-                        : "hover:bg-muted"
-                    )}
-                    onClick={() => handleToggleMonth(month)}
-                  >
-                    {formatMonth(month)}
-                  </Badge>
-                );
-              })}
+                  <GitCompare className="h-4 w-4" />
+                  Comparar
+                </label>
+              </div>
             </div>
 
-            {/* Indicador de Modo Comparação */}
+            {/* Actions */}
+            <div className="flex items-center gap-2">
+              {hasFilter && (
+                <Button variant="ghost" size="sm" onClick={handleClearAll}>
+                  <X className="h-4 w-4 mr-1" />
+                  Limpar
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Atualizar
+              </Button>
+            </div>
+          </div>
+
+          {/* Row 2: date range label + comparison picker */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {dateRange && (
+              <span className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{formatRangeLabel(dateRange)}</span>
+              </span>
+            )}
+
             {comparisonMode && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <GitCompare className="h-3 w-3" />
-                <span>
-                  {selectedMonths.length === 0 
-                    ? "Selecione meses para comparar"
-                    : `Comparando ${selectedMonths.length} ${selectedMonths.length === 1 ? "mês" : "meses"}`
-                  }
-                </span>
-              </div>
+              <>
+                <Separator orientation="vertical" className="h-4" />
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <GitCompare className="h-3.5 w-3.5" />
+                  <span>Comparar com:</span>
+                  <RangePicker
+                    value={comparisonDateRange}
+                    onChange={setComparisonDateRange}
+                    maxDate={anchor}
+                    placeholder="Selecionar período de comparação"
+                  />
+                  {comparisonDateRange && (
+                    <span className="text-foreground font-medium">{formatRangeLabel(comparisonDateRange)}</span>
+                  )}
+                </div>
+              </>
             )}
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
