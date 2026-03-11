@@ -1,10 +1,19 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
-import { DollarSign, TrendingUp, TrendingDown, Users, ShoppingCart, Package, Calendar, Loader2, Receipt, Target, Clock } from "lucide-react";
+import {
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  ShoppingCart,
+  Package,
+  Calendar,
+  Loader2,
+  Receipt,
+  Target,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { DailyRevenueChart, ChartViewMode } from "@/components/dashboard/DailyRevenueChart";
@@ -16,234 +25,166 @@ import { ChannelDonutChart } from "@/components/dashboard/ChannelDonutChart";
 import { TopProductsCompact } from "@/components/dashboard/TopProductsCompact";
 import { TicketDistributionCompact } from "@/components/dashboard/TicketDistributionCompact";
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
-import { IncompleteMonthBadge } from "@/components/dashboard/IncompleteMonthBadge";
-import { calculateFinancialMetrics, analyzeSeasonality, calculateOrdersByDayWithTypes, calculateOrdersByWeekWithTypes, calculateOrdersByMonthWithTypes, getPlatformPerformanceWithProducts } from "@/utils/financialMetrics";
-import { filterOrdersByMonth, filterOrdersByDateRange, extractDailyRevenue } from "@/utils/salesCalculator";
+import {
+  calculateFinancialMetrics,
+  analyzeSeasonality,
+  getPlatformPerformanceWithProducts,
+} from "@/utils/financialMetrics";
+import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { getOfficialRevenue, getRevenueOrders, getComiDaDragaoOrders } from "@/utils/revenue";
-import { filterAdsByMonth } from "@/utils/executiveMetricsCalculator";
+import { filterAdsByDateRange } from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
-import { calculateComparisonMetrics } from "@/utils/comparisonCalculator";
-import { detectIncompleteMonth, getEqualIntervalComparison, calculateProjection } from "@/utils/incompleteMonthDetector";
 import { benchmarksPetFood } from "@/data/executiveData";
-import { SectorBenchmarks } from "@/hooks/useAppSettings";
-import { format, parse } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
 export default function PerformanceFinanceira() {
-  const {
-    salesData,
-    adsData,
-    dateRange,
-    availableMonths,
-    comparisonMode,
-  } = useDashboard();
-  const selectedMonth = dateRange ? `${dateRange.start.getFullYear()}-${String(dateRange.start.getMonth() + 1).padStart(2, '0')}` : undefined;
-  const selectedMonths = availableMonths;
+  const { salesData, adsData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
 
   const { financialGoals, sectorBenchmarks, isLoading: goalsLoading } = useAppSettings();
 
-  const [seasonalityView, setSeasonalityView] = useState<'monthly' | 'quarterly'>('monthly');
-  const [chartViewMode, setChartViewMode] = useState<ChartViewMode>('daily');
+  const [seasonalityView, setSeasonalityView] = useState<"monthly" | "quarterly">("monthly");
+  const [chartViewMode, setChartViewMode] = useState<ChartViewMode>("daily");
 
   // Brand-level: excludes B2B (Lets Fly)
   const cdSalesData = useMemo(() => getComiDaDragaoOrders(salesData), [salesData]);
 
-  const isLast12MonthsView = selectedMonth === "last-12-months";
+  // Pedidos do período principal
+  const periodOrders = useMemo(() => {
+    if (!dateRange) return cdSalesData;
+    return filterOrdersByDateRange(cdSalesData, dateRange.start, dateRange.end);
+  }, [cdSalesData, dateRange]);
 
-  const availableSalesMonths = useMemo(() => {
-    const months = new Set<string>();
-    cdSalesData.forEach(o => months.add(format(o.dataVenda, "yyyy-MM")));
-    return Array.from(months).sort();
-  }, [cdSalesData]);
+  // Pedidos do período de comparação
+  const comparisonOrders = useMemo(() => {
+    if (!comparisonDateRange) return [];
+    return filterOrdersByDateRange(cdSalesData, comparisonDateRange.start, comparisonDateRange.end);
+  }, [cdSalesData, comparisonDateRange]);
 
-  // Detectar mês incompleto e calcular intervalos de comparação
-  const { monthInfo, comparison } = useMemo(() => {
-    if (!selectedMonth || selectedMonth === 'last-12-months') {
-      return { monthInfo: null, comparison: null };
-    }
-    const monthInfo = detectIncompleteMonth(selectedMonth);
-    const comparison = getEqualIntervalComparison(selectedMonth);
-    return { monthInfo, comparison };
-  }, [selectedMonth]);
-
-  // Calcular métricas do mês selecionado
+  // Métricas do período principal
   const financialMetrics = useMemo(() => {
     if (cdSalesData.length === 0) return null;
-    const filteredOrders = selectedMonth
-      ? filterOrdersByMonth(cdSalesData, selectedMonth, availableSalesMonths)
-      : cdSalesData;
-    return calculateFinancialMetrics(filteredOrders, selectedMonth || 'all');
-  }, [cdSalesData, selectedMonth, availableSalesMonths]);
+    return calculateFinancialMetrics(periodOrders, "range");
+  }, [periodOrders, cdSalesData]);
 
-  // Calcular métricas do mês anterior para comparação (com intervalos iguais para meses incompletos)
-  const previousMonthMetrics = useMemo(() => {
-    if (cdSalesData.length === 0 || !selectedMonth || selectedMonth === 'last-12-months') return null;
-    
-    const currentDate = parse(selectedMonth, "yyyy-MM", new Date());
-    const prevMonth = new Date(currentDate);
-    prevMonth.setMonth(prevMonth.getMonth() - 1);
-    const prevMonthStr = format(prevMonth, "yyyy-MM");
-    
-    if (!availableSalesMonths.includes(prevMonthStr)) return null;
-    
-    // Se mês incompleto, usar intervalo igual
-    if (comparison?.isIncomplete) {
-      const filteredOrders = filterOrdersByDateRange(
-        cdSalesData,
-        comparison.comparisonPeriod.start,
-        comparison.comparisonPeriod.end
-      );
-      return calculateFinancialMetrics(filteredOrders, prevMonthStr);
-    }
-    
-    // Mês completo: usar filtro normal
-    const filteredOrders = filterOrdersByMonth(cdSalesData, prevMonthStr, availableSalesMonths);
-    return calculateFinancialMetrics(filteredOrders, prevMonthStr);
-  }, [cdSalesData, selectedMonth, availableSalesMonths, comparison]);
+  // Métricas do período de comparação
+  const previousMetrics = useMemo(() => {
+    if (comparisonOrders.length === 0) return null;
+    return calculateFinancialMetrics(comparisonOrders, "range");
+  }, [comparisonOrders]);
 
-  // Para mês incompleto, recalcular métricas do período atual também
-  const currentPeriodMetrics = useMemo(() => {
-    if (!comparison?.isIncomplete || cdSalesData.length === 0) return null;
-    
-    const filteredOrders = filterOrdersByDateRange(
-      cdSalesData,
-      comparison.currentPeriod.start,
-      comparison.currentPeriod.end
-    );
-    return calculateFinancialMetrics(filteredOrders, selectedMonth || '');
-  }, [cdSalesData, comparison, selectedMonth]);
-
-  // Usar métricas do período atual para meses incompletos
-  const displayMetrics = comparison?.isIncomplete ? currentPeriodMetrics : financialMetrics;
-
-  // Calcular projeção para meses incompletos
-  const projection = useMemo(() => {
-    if (!monthInfo?.isIncomplete || !financialMetrics || !previousMonthMetrics) return null;
-    
-    const dailyRevenue = extractDailyRevenue(
-      filterOrdersByMonth(cdSalesData, selectedMonth!, availableSalesMonths)
-    );
-    
-    return calculateProjection(
-      financialMetrics.faturamentoTotal,
-      previousMonthMetrics.faturamentoTotal,
-      monthInfo,
-      dailyRevenue,
-      (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
-    );
-  }, [monthInfo, financialMetrics, previousMonthMetrics, cdSalesData, selectedMonth, availableSalesMonths]);
-
-  // Calcular variações (agora usando métricas de intervalos iguais para meses incompletos)
+  // Variações período atual vs comparação
   const variations = useMemo((): { revenue: number | null; ticket: number | null; orders: number | null } | null => {
-    const current = comparison?.isIncomplete ? currentPeriodMetrics : financialMetrics;
-    if (!current || !previousMonthMetrics) return null;
-    
-    const calc = (currentVal: number, previous: number): number | null =>
-      previous > 0 ? ((currentVal - previous) / previous) * 100 : null;
-    
+    if (!financialMetrics || !previousMetrics) return null;
+    const calc = (cur: number, prev: number) => (prev > 0 ? ((cur - prev) / prev) * 100 : null);
     return {
-      revenue: calc(current.faturamentoTotal, previousMonthMetrics.faturamentoTotal),
-      ticket: calc(current.ticketMedioReal, previousMonthMetrics.ticketMedioReal),
-      orders: calc(current.totalPedidos, previousMonthMetrics.totalPedidos),
+      revenue: calc(financialMetrics.faturamentoTotal, previousMetrics.faturamentoTotal),
+      ticket: calc(financialMetrics.ticketMedioReal, previousMetrics.ticketMedioReal),
+      orders: calc(financialMetrics.totalPedidos, previousMetrics.totalPedidos),
     };
-  }, [financialMetrics, currentPeriodMetrics, previousMonthMetrics, comparison]);
+  }, [financialMetrics, previousMetrics]);
 
-  // Métricas de comparação (quando comparisonMode ativo)
+  // Métricas de comparação (modo comparação ativo — 2 períodos)
   const comparisonMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length === 0 || cdSalesData.length === 0) {
-      return null;
-    }
-    return calculateComparisonMetrics(cdSalesData, selectedMonths, availableMonths);
-  }, [comparisonMode, selectedMonths, cdSalesData, availableMonths]);
+    if (!comparisonMode || !comparisonDateRange || !financialMetrics || !previousMetrics) return null;
 
-  // Análise de sazonalidade (todos os dados)
+    const COLORS = ["#8b5cf6", "#3b82f6"];
+
+    const toMetric = (metrics: typeof financialMetrics, label: string, color: string) => ({
+      month: label.toLowerCase().replace(" ", "-"),
+      monthLabel: label,
+      color,
+      value: 0, // placeholder — cada campo usa o próprio valor
+      faturamento: metrics!.faturamentoTotal,
+      ticket: metrics!.ticketMedioReal,
+      pedidos: metrics!.totalPedidos,
+      clientes: metrics!.clientesUnicos || 0,
+      produtos: metrics!.produtoMedio,
+    });
+
+    const a = toMetric(financialMetrics, "Período A", COLORS[0]);
+    const b = toMetric(previousMetrics, "Período B", COLORS[1]);
+
+    const makeSeries = (key: keyof typeof a) => {
+      const base = a[key] as number;
+      const comp = b[key] as number;
+      const change = base > 0 ? ((comp - base) / base) * 100 : undefined;
+      return [
+        { month: a.month, monthLabel: a.monthLabel, color: a.color, value: base },
+        { month: b.month, monthLabel: b.monthLabel, color: b.color, value: comp, percentageChange: change },
+      ];
+    };
+
+    return {
+      revenue: makeSeries("faturamento"),
+      averageTicket: makeSeries("ticket"),
+      totalOrders: makeSeries("pedidos"),
+      totalCustomers: makeSeries("clientes"),
+      averageProducts: makeSeries("produtos"),
+    };
+  }, [comparisonMode, comparisonDateRange, financialMetrics, previousMetrics]);
+
+  // Sazonalidade (todos os dados — sem filtro de período)
   const seasonalityAnalysis = useMemo(() => {
     if (cdSalesData.length === 0) return null;
     return analyzeSeasonality(cdSalesData);
   }, [cdSalesData]);
 
-  // === ROAS METRICS ===
+  // ROAS
   const roasMetrics = useMemo(() => {
     if (cdSalesData.length === 0) return null;
-    
-    // Filtrar pedidos do período
-    const filteredOrders = selectedMonth
-      ? filterOrdersByMonth(cdSalesData, selectedMonth, availableSalesMonths)
-      : cdSalesData;
-    
-    // Filtrar ads do período
-    const filteredAds = selectedMonth && selectedMonth !== 'last-12-months'
-      ? filterAdsByMonth(adsData, selectedMonth)
-      : adsData;
-    
-    // Calcular métricas de ads
+    const filteredAds = dateRange ? filterAdsByDateRange(adsData, dateRange.start, dateRange.end) : adsData;
     const adsMetrics = filteredAds.length > 0 ? calculateAdsMetrics(filteredAds) : null;
     const investimentoAds = adsMetrics?.investimentoTotal || 0;
     const valorConversaoMeta = adsMetrics?.valorConversaoTotal || 0;
-    
-    // Calcular faturamento e frete (somente vendas - paradigma fiscal)
-    const revenueFilteredOrders = getRevenueOrders(filteredOrders);
-    const faturamentoTotal = revenueFilteredOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
-    const freteTotal = revenueFilteredOrders.reduce((sum, o) => sum + (o.valorFrete || 0), 0);
+    const revenueOrders = getRevenueOrders(periodOrders);
+    const faturamentoTotal = revenueOrders.reduce((s, o) => s + getOfficialRevenue(o), 0);
+    const freteTotal = revenueOrders.reduce((s, o) => s + (o.valorFrete || 0), 0);
     const faturamentoExFrete = faturamentoTotal - freteTotal;
-    
-    // 3 ROAS (ROAS Meta já é ex-frete pelo pixel)
-    const roasBruto = investimentoAds > 0 ? faturamentoTotal / investimentoAds : 0;
-    const roasReal = investimentoAds > 0 ? faturamentoExFrete / investimentoAds : 0;
-    const roasMeta = investimentoAds > 0 ? valorConversaoMeta / investimentoAds : 0;
-    
     return {
-      roasBruto,
-      roasReal,
-      roasMeta,
+      roasBruto: investimentoAds > 0 ? faturamentoTotal / investimentoAds : 0,
+      roasReal: investimentoAds > 0 ? faturamentoExFrete / investimentoAds : 0,
+      roasMeta: investimentoAds > 0 ? valorConversaoMeta / investimentoAds : 0,
       investimentoAds,
-      hasAdsData: filteredAds.length > 0
+      hasAdsData: filteredAds.length > 0,
     };
-  }, [cdSalesData, adsData, selectedMonth, availableSalesMonths]);
+  }, [cdSalesData, adsData, periodOrders, dateRange]);
 
-  // Goals data para o card de metas
+  // Metas
   const goalsData = useMemo(() => {
     if (!financialMetrics) return [];
     return [
-      { 
-        label: "Receita", 
-        current: financialMetrics.faturamentoTotal, 
-        goal: financialGoals.receita, 
-        format: 'currency' as const 
+      {
+        label: "Receita",
+        current: financialMetrics.faturamentoTotal,
+        goal: financialGoals.receita,
+        format: "currency" as const,
       },
-      { 
-        label: "Pedidos", 
-        current: financialMetrics.totalPedidos, 
-        goal: financialGoals.pedidos, 
-        format: 'number' as const 
+      {
+        label: "Pedidos",
+        current: financialMetrics.totalPedidos,
+        goal: financialGoals.pedidos,
+        format: "number" as const,
       },
-      { 
-        label: "Ticket Médio", 
-        current: financialMetrics.ticketMedioReal, 
-        goal: financialGoals.ticketMedio, 
-        format: 'currency' as const 
+      {
+        label: "Ticket Médio",
+        current: financialMetrics.ticketMedioReal,
+        goal: financialGoals.ticketMedio,
+        format: "currency" as const,
       },
       {
         label: "Margem",
         current: (1 - financialGoals.custoFixo) * 100,
         goal: financialGoals.margem,
-        format: "percent" as const
+        format: "percent" as const,
       },
     ];
   }, [financialMetrics, financialGoals]);
 
-  // Obter pedidos do período atual para passar aos componentes
-  const periodOrders = useMemo(() => {
-    return selectedMonth
-      ? filterOrdersByMonth(cdSalesData, selectedMonth, availableSalesMonths)
-      : cdSalesData;
-  }, [cdSalesData, selectedMonth, availableSalesMonths]);
-
-  // Calcular breakdown hierárquico por canal → produtos
+  // Breakdown por canal + produtos
   const platformWithProducts = useMemo(() => {
     return getPlatformPerformanceWithProducts(periodOrders, 5);
   }, [periodOrders]);
@@ -282,73 +223,23 @@ export default function PerformanceFinanceira() {
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
       {/* ===== HEADER ===== */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <DollarSign className="w-8 h-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">💰 Performance Financeira</h1>
-            <p className="text-muted-foreground">
-              Análise completa de receita, margem e tendências
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <DollarSign className="w-8 h-8 text-primary" />
+        <div>
+          <h1 className="text-3xl font-bold">💰 Performance Financeira</h1>
+          <p className="text-muted-foreground">Análise completa de receita, margem e tendências</p>
         </div>
-        
       </div>
 
-      {/* Period indicator for multi-month views */}
-      {!selectedMonth && !comparisonMode && (
+      {/* Indicador de período */}
+      {!dateRange && !comparisonMode && (
         <Card className="border-blue-500/50 bg-blue-500/5">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <Calendar className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  📅 Visão Completa - Todos os Períodos
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Mostrando dados de {availableSalesMonths.length} meses com vendas
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {isLast12MonthsView && !comparisonMode && (
-        <Card className="border-blue-500/50 bg-blue-500/5">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  📅 Visão - Últimos 12 meses
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Mostrando janela móvel dos últimos 12 meses
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Indicator for incomplete month */}
-      {monthInfo?.isIncomplete && !comparisonMode && (
-        <Card className="border-amber-500/50 bg-amber-500/5">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-amber-500" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-foreground">
-                    🕐 Mês em andamento - {comparison?.label}
-                  </p>
-                  <IncompleteMonthBadge monthInfo={monthInfo} comparison={comparison} size="sm" />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {comparison?.tooltipText}
-                </p>
-              </div>
+              <p className="text-sm font-medium">
+                📅 Todos os períodos — use o filtro acima para selecionar um intervalo
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -357,7 +248,6 @@ export default function PerformanceFinanceira() {
       {/* ===== BLOCO 1: HERO METRICS ===== */}
       {!comparisonMode && financialMetrics && (
         <div className="grid gap-4 lg:grid-cols-2">
-          {/* Card Principal: Receita vs Meta */}
           <RevenueHeroCard
             totalRevenue={financialMetrics.faturamentoTotal}
             netRevenue={financialMetrics.faturamentoLiquido}
@@ -365,17 +255,12 @@ export default function PerformanceFinanceira() {
             variation={variations?.revenue}
             revenueGoal={financialGoals.receita}
             costPercentage={financialGoals.custoFixo}
-            monthInfo={monthInfo || undefined}
-            comparison={comparison || undefined}
-            projection={projection}
           />
 
-          {/* Cards Satélites (Grid 2x3) */}
           <div className="grid grid-cols-3 gap-2">
-            {/* Linha 1: Primários */}
             <StatusMetricCard
               title="Pedidos"
-              value={financialMetrics.totalPedidos.toLocaleString('pt-BR')}
+              value={financialMetrics.totalPedidos.toLocaleString("pt-BR")}
               icon={<ShoppingCart className="h-3 w-3" />}
               trend={variations?.orders}
               size="compact"
@@ -404,8 +289,6 @@ export default function PerformanceFinanceira() {
               size="compact"
               tooltipKey="itens_pedido"
             />
-
-            {/* Linha 2: Secundários */}
             <StatusMetricCard
               title="Receita Líq."
               value={formatCurrency(financialMetrics.faturamentoLiquido)}
@@ -416,12 +299,22 @@ export default function PerformanceFinanceira() {
             />
             <StatusMetricCard
               title="Crescimento"
-              value={`${(financialMetrics.growthRate || 0) >= 0 ? '+' : ''}${(financialMetrics.growthRate || 0).toFixed(1)}%`}
-              icon={financialMetrics.growthRate >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              value={`${(financialMetrics.growthRate || 0) >= 0 ? "+" : ""}${(financialMetrics.growthRate || 0).toFixed(1)}%`}
+              icon={
+                financialMetrics.growthRate >= 0 ? (
+                  <TrendingUp className="h-3 w-3" />
+                ) : (
+                  <TrendingDown className="h-3 w-3" />
+                )
+              }
               status={
-                (financialMetrics.growthRate || 0) > 10 ? 'success' :
-                (financialMetrics.growthRate || 0) < -10 ? 'danger' :
-                (financialMetrics.growthRate || 0) < 0 ? 'warning' : 'neutral'
+                (financialMetrics.growthRate || 0) > 10
+                  ? "success"
+                  : (financialMetrics.growthRate || 0) < -10
+                    ? "danger"
+                    : (financialMetrics.growthRate || 0) < 0
+                      ? "warning"
+                      : "neutral"
               }
               size="compact"
               tooltipKey="crescimento"
@@ -430,7 +323,7 @@ export default function PerformanceFinanceira() {
         </div>
       )}
 
-      {/* ===== BLOCO ROAS (3 Cards) ===== */}
+      {/* ===== ROAS ===== */}
       {!comparisonMode && roasMetrics && roasMetrics.hasAdsData && (
         <Card>
           <CardHeader className="pb-2">
@@ -438,52 +331,63 @@ export default function PerformanceFinanceira() {
               <Target className="h-4 w-4" />
               📈 ROAS - Retorno sobre Investimento em Ads
             </CardTitle>
-            <CardDescription>
-              Comparação de 3 métricas de ROAS: bruto, real e Meta (já ex-frete)
-            </CardDescription>
+            <CardDescription>Comparação de 3 métricas de ROAS: bruto, real e Meta (já ex-frete)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-3">
-              {/* 1. ROAS Bruto */}
               <StatusMetricCard
                 title="ROAS Bruto"
                 value={`${roasMetrics.roasBruto.toFixed(2)}x`}
                 icon={<DollarSign className="h-3 w-3" />}
                 status={
-                  roasMetrics.roasBruto >= (sectorBenchmarks.roasExcelente || 4) ? 'success' :
-                  roasMetrics.roasBruto >= (sectorBenchmarks.roasMedio || 3) ? 'warning' : 'danger'
+                  roasMetrics.roasBruto >= (sectorBenchmarks.roasExcelente || 4)
+                    ? "success"
+                    : roasMetrics.roasBruto >= (sectorBenchmarks.roasMedio || 3)
+                      ? "warning"
+                      : "danger"
                 }
-                benchmark={{ value: sectorBenchmarks.roasMedio || 3.0, label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x` }}
+                benchmark={{
+                  value: sectorBenchmarks.roasMedio || 3.0,
+                  label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x`,
+                }}
                 interpretation="Receita Total ÷ Ads"
                 size="compact"
                 tooltipKey="roas_bruto"
               />
-
-              {/* 2. ROAS Real */}
               <StatusMetricCard
                 title="ROAS Real"
                 value={`${roasMetrics.roasReal.toFixed(2)}x`}
                 icon={<DollarSign className="h-3 w-3" />}
                 status={
-                  roasMetrics.roasReal >= (sectorBenchmarks.roasExcelente || 4) ? 'success' :
-                  roasMetrics.roasReal >= (sectorBenchmarks.roasMedio || 3) ? 'warning' : 'danger'
+                  roasMetrics.roasReal >= (sectorBenchmarks.roasExcelente || 4)
+                    ? "success"
+                    : roasMetrics.roasReal >= (sectorBenchmarks.roasMedio || 3)
+                      ? "warning"
+                      : "danger"
                 }
-                benchmark={{ value: sectorBenchmarks.roasMedio || 3.0, label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x` }}
+                benchmark={{
+                  value: sectorBenchmarks.roasMedio || 3.0,
+                  label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x`,
+                }}
                 interpretation="Receita ex-frete ÷ Ads"
                 size="compact"
                 tooltipKey="roas_real"
               />
-
-              {/* 3. ROAS Meta (já ex-frete pelo pixel) */}
               <StatusMetricCard
                 title="ROAS Meta"
                 value={`${roasMetrics.roasMeta.toFixed(2)}x`}
                 icon={<Target className="h-3 w-3" />}
                 status={
-                  roasMetrics.roasMeta >= (sectorBenchmarks.roasExcelente || 4) ? 'success' :
-                  roasMetrics.roasMeta >= (sectorBenchmarks.roasMedio || 3) ? 'warning' : 'danger'
+                  roasMetrics.roasMeta >= (sectorBenchmarks.roasExcelente || 4)
+                    ? "success"
+                    : roasMetrics.roasMeta >= (sectorBenchmarks.roasMedio || 3)
+                      ? "warning"
+                      : "danger"
                 }
-                benchmark={{ value: sectorBenchmarks.roasMedio || 3.0, label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x` }}
+                benchmark={{
+                  value: sectorBenchmarks.roasMedio || 3.0,
+                  label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x`,
+                }}
                 interpretation="Valor Meta ÷ Ads (ex-frete)"
                 size="compact"
                 tooltipKey="roas_meta"
@@ -493,71 +397,98 @@ export default function PerformanceFinanceira() {
         </Card>
       )}
 
-
-      {/* Cards de comparação */}
+      {/* ===== COMPARAÇÃO ===== */}
       {comparisonMode && comparisonMetrics && (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <ComparisonMetricCard
-            title="Faturamento Total"
-            icon={DollarSign}
-            metrics={comparisonMetrics.revenue}
-            formatValue={(v) => formatCurrency(v)}
-          />
-          <ComparisonMetricCard
-            title="Ticket Médio"
-            icon={TrendingUp}
-            metrics={comparisonMetrics.averageTicket}
-            formatValue={(v) => formatCurrency(v)}
-          />
-          <ComparisonMetricCard
-            title="Total de Pedidos"
-            icon={ShoppingCart}
-            metrics={comparisonMetrics.totalOrders}
-          />
-          <ComparisonMetricCard
-            title="Total de Clientes"
-            icon={Users}
-            metrics={comparisonMetrics.totalCustomers}
-          />
-          <ComparisonMetricCard
-            title="Produto Médio"
-            icon={Package}
-            metrics={comparisonMetrics.averageProducts}
-            formatValue={(v) => `${v.toFixed(1)} itens`}
-          />
-        </div>
+        <>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <ComparisonMetricCard
+              title="Faturamento Total"
+              icon={DollarSign}
+              metrics={comparisonMetrics.revenue}
+              formatValue={formatCurrency}
+            />
+            <ComparisonMetricCard
+              title="Ticket Médio"
+              icon={TrendingUp}
+              metrics={comparisonMetrics.averageTicket}
+              formatValue={formatCurrency}
+            />
+            <ComparisonMetricCard
+              title="Total de Pedidos"
+              icon={ShoppingCart}
+              metrics={comparisonMetrics.totalOrders}
+            />
+            <ComparisonMetricCard title="Total de Clientes" icon={Users} metrics={comparisonMetrics.totalCustomers} />
+            <ComparisonMetricCard
+              title="Produto Médio"
+              icon={Package}
+              metrics={comparisonMetrics.averageProducts}
+              formatValue={(v) => `${v.toFixed(1)} itens`}
+            />
+          </div>
+
+          {/* Barra comparativa de faturamento */}
+          <Card>
+            <CardHeader>
+              <CardTitle>📊 Comparação de Faturamento</CardTitle>
+              <CardDescription>Período A vs Período B</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {comparisonMetrics.revenue.map((metric) => {
+                  const max = Math.max(...comparisonMetrics.revenue.map((m) => m.value), 0);
+                  return (
+                    <div key={metric.month} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full" style={{ backgroundColor: metric.color }} />
+                          <span className="font-medium">{metric.monthLabel}</span>
+                          {metric.percentageChange !== undefined && (
+                            <span
+                              className={cn(
+                                "text-xs",
+                                metric.percentageChange >= 0 ? "text-green-600" : "text-red-500",
+                              )}
+                            >
+                              {metric.percentageChange >= 0 ? "+" : ""}
+                              {metric.percentageChange.toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-lg font-bold">{formatCurrency(metric.value)}</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-3">
+                        <div
+                          className="h-3 rounded-full transition-all"
+                          style={{
+                            width: `${max > 0 ? (metric.value / max) * 100 : 0}%`,
+                            backgroundColor: metric.color,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
 
-      {/* ===== BLOCO 2: EVOLUÇÃO TEMPORAL ===== */}
+      {/* ===== EVOLUÇÃO TEMPORAL ===== */}
       {!comparisonMode && financialMetrics && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <DailyRevenueChart
-            rawOrders={periodOrders}
-            viewMode={chartViewMode}
-            onViewModeChange={setChartViewMode}
-          />
-          <DailyVolumeChart
-            rawOrders={periodOrders}
-            viewMode={chartViewMode}
-            onViewModeChange={setChartViewMode}
-          />
+          <DailyRevenueChart rawOrders={periodOrders} viewMode={chartViewMode} onViewModeChange={setChartViewMode} />
+          <DailyVolumeChart rawOrders={periodOrders} viewMode={chartViewMode} onViewModeChange={setChartViewMode} />
         </div>
       )}
 
-      {/* ===== BLOCO 3: ANÁLISE POR DIMENSÃO ===== */}
+      {/* ===== ANÁLISE POR DIMENSÃO ===== */}
       {!comparisonMode && financialMetrics && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Por Canal (Donut) */}
-          <ChannelDonutChart 
-            data={financialMetrics.platformPerformance} 
-            rawOrders={periodOrders}
-          />
-          
-          {/* Top Produtos (Barras Horizontais) */}
+          <ChannelDonutChart data={financialMetrics.platformPerformance} rawOrders={periodOrders} />
           <TopProductsCompact data={financialMetrics.revenueByProduct} limit={8} />
-          
-          {/* Distribuição de Ticket (Histograma) */}
-          <TicketDistributionCompact 
+          <TicketDistributionCompact
             data={financialMetrics.orderDistribution}
             averageTicket={financialMetrics.ticketMedioReal}
             rawOrders={periodOrders}
@@ -565,36 +496,30 @@ export default function PerformanceFinanceira() {
         </div>
       )}
 
-      {/* ===== BLOCO 4: INSIGHTS E SAZONALIDADE ===== */}
+      {/* ===== SAZONALIDADE + METAS ===== */}
       {!comparisonMode && financialMetrics && seasonalityAnalysis && (
         <div className="space-y-6">
-          {/* Sazonalidade (100% largura) */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <button
                 className={cn(
                   "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-                  seasonalityView === 'monthly' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted hover:bg-muted/80'
+                  seasonalityView === "monthly" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80",
                 )}
-                onClick={() => setSeasonalityView('monthly')}
+                onClick={() => setSeasonalityView("monthly")}
               >
                 📅 Mensal
               </button>
               <button
                 className={cn(
                   "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-                  seasonalityView === 'quarterly' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted hover:bg-muted/80'
+                  seasonalityView === "quarterly" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80",
                 )}
-                onClick={() => setSeasonalityView('quarterly')}
+                onClick={() => setSeasonalityView("quarterly")}
               >
                 📊 Trimestral
               </button>
             </div>
-            
             <SeasonalityChart
               monthlyData={seasonalityAnalysis.monthly}
               quarterlyData={seasonalityAnalysis.quarterly}
@@ -602,7 +527,6 @@ export default function PerformanceFinanceira() {
             />
           </div>
 
-          {/* Grid 50/50: Metas + Breakdown Financeiro */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <GoalsProgressCard goals={goalsData} />
             <FinancialBreakdownCard
@@ -615,50 +539,6 @@ export default function PerformanceFinanceira() {
           </div>
         </div>
       )}
-
-      {/* Comparison mode - evolution tab content */}
-      {comparisonMode && comparisonMetrics && (() => {
-        const maxRevenue = Math.max(...comparisonMetrics.revenue.map(m => m.value), 0);
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle>📊 Comparação de Faturamento por Mês</CardTitle>
-              <CardDescription>
-                Comparando {selectedMonths.length} meses selecionados
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {comparisonMetrics.revenue.map((metric) => (
-                  <div key={metric.month} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-4 h-4 rounded-full"
-                          style={{ backgroundColor: metric.color }}
-                        />
-                        <span className="font-medium">{metric.monthLabel}</span>
-                      </div>
-                      <span className="text-lg font-bold">
-                        {formatCurrency(metric.value)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-3">
-                      <div
-                        className="h-3 rounded-full transition-all"
-                        style={{
-                          width: `${maxRevenue > 0 ? (metric.value / maxRevenue) * 100 : 0}%`,
-                          backgroundColor: metric.color,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
     </div>
   );
 }
