@@ -1,26 +1,38 @@
-import { ProcessedOrder, ProductOperationsMetrics, ProductRanking, SKUPerformance, ProductCombination, FreebieProduct, ShippingMethodStat, NFIssuanceDistribution } from "@/types/marketing";
+import {
+  ProcessedOrder,
+  ProductOperationsMetrics,
+  ProductRanking,
+  SKUPerformance,
+  ProductCombination,
+  FreebieProduct,
+  ShippingMethodStat,
+  NFIssuanceDistribution,
+} from "@/types/marketing";
 import { differenceInDays } from "date-fns";
-import { breakdownOrders } from './orderBreakdown';
-import { getOfficialRevenue } from './revenue';
+import { breakdownOrders } from "./orderBreakdown";
+import { getOfficialRevenue } from "./revenue";
 
 /**
  * KPI 12: Analisa produtos mais vendidos por quantidade
  */
 export const analyzeTopProductsByQuantity = (orders: ProcessedOrder[], limit: number = 20): ProductRanking[] => {
-  const productMap = new Map<string, {
-    sku: string;
-    descricao: string;
-    descricaoAjustada: string;
-    quantidade: number;
-    faturamento: number;
-    pedidos: Set<string>;
-  }>();
+  const productMap = new Map<
+    string,
+    {
+      sku: string;
+      descricao: string;
+      descricaoAjustada: string;
+      quantidade: number;
+      faturamento: number;
+      pedidos: Set<string>;
+    }
+  >();
 
-  orders.forEach(order => {
-    order.produtos.forEach(produto => {
+  orders.forEach((order) => {
+    order.produtos.forEach((produto) => {
       const key = produto.descricaoAjustada;
       const existing = productMap.get(key);
-      
+
       if (!existing) {
         productMap.set(key, {
           sku: produto.sku,
@@ -28,7 +40,7 @@ export const analyzeTopProductsByQuantity = (orders: ProcessedOrder[], limit: nu
           descricaoAjustada: produto.descricaoAjustada,
           quantidade: produto.quantidade,
           faturamento: produto.preco,
-          pedidos: new Set([order.numeroPedido])
+          pedidos: new Set([order.numeroPedido]),
         });
       } else {
         existing.quantidade += produto.quantidade;
@@ -50,7 +62,7 @@ export const analyzeTopProductsByQuantity = (orders: ProcessedOrder[], limit: nu
     numeroPedidos: data.pedidos.size,
     ticketMedio: data.faturamento / data.pedidos.size,
     percentualQuantidade: (data.quantidade / totalQuantidade) * 100,
-    percentualFaturamento: (data.faturamento / totalFaturamento) * 100
+    percentualFaturamento: (data.faturamento / totalFaturamento) * 100,
   }));
 
   return ranking.sort((a, b) => b.quantidadeTotal - a.quantidadeTotal).slice(0, limit);
@@ -68,22 +80,25 @@ export const analyzeTopProductsByRevenue = (orders: ProcessedOrder[], limit: num
  * KPI 14: Análise detalhada de SKU
  */
 export const analyzeSKUPerformance = (orders: ProcessedOrder[]): SKUPerformance[] => {
-  const skuMap = new Map<string, {
-    sku: string;
-    descricao: string;
-    descricaoAjustada: string;
-    faturamento: number;
-    quantidade: number;
-    pedidos: Set<string>;
-    precos: number[];
-    datas: Date[];
-  }>();
+  const skuMap = new Map<
+    string,
+    {
+      sku: string;
+      descricao: string;
+      descricaoAjustada: string;
+      faturamento: number;
+      quantidade: number;
+      pedidos: Set<string>;
+      precos: number[];
+      datas: Date[];
+    }
+  >();
 
-  orders.forEach(order => {
-    order.produtos.forEach(produto => {
+  orders.forEach((order) => {
+    order.produtos.forEach((produto) => {
       const key = `${produto.sku}-${produto.descricaoAjustada}`;
       const existing = skuMap.get(key);
-      
+
       if (!existing) {
         skuMap.set(key, {
           sku: produto.sku,
@@ -93,7 +108,7 @@ export const analyzeSKUPerformance = (orders: ProcessedOrder[]): SKUPerformance[
           quantidade: produto.quantidade,
           pedidos: new Set([order.numeroPedido]),
           precos: [produto.preco / produto.quantidade],
-          datas: [order.dataVenda]
+          datas: [order.dataVenda],
         });
       } else {
         existing.faturamento += produto.preco;
@@ -105,54 +120,60 @@ export const analyzeSKUPerformance = (orders: ProcessedOrder[]): SKUPerformance[
     });
   });
 
-  return Array.from(skuMap.values()).map(data => {
-    const sortedDatas = data.datas.sort((a, b) => a.getTime() - b.getTime());
-    const precoMedio = data.precos.reduce((sum, p) => sum + p, 0) / data.precos.length;
-    
-    return {
-      sku: data.sku,
-      descricao: data.descricao,
-      descricaoAjustada: data.descricaoAjustada,
-      faturamentoTotal: data.faturamento,
-      quantidadeTotal: data.quantidade,
-      numeroPedidos: data.pedidos.size,
-      ticketMedio: data.faturamento / data.pedidos.size,
-      precoMedio,
-      primeiraVenda: sortedDatas[0],
-      ultimaVenda: sortedDatas[sortedDatas.length - 1]
-    };
-  }).sort((a, b) => b.faturamentoTotal - a.faturamentoTotal);
+  return Array.from(skuMap.values())
+    .map((data) => {
+      const sortedDatas = data.datas.sort((a, b) => a.getTime() - b.getTime());
+      const precoMedio = data.precos.reduce((sum, p) => sum + p, 0) / data.precos.length;
+
+      return {
+        sku: data.sku,
+        descricao: data.descricao,
+        descricaoAjustada: data.descricaoAjustada,
+        faturamentoTotal: data.faturamento,
+        quantidadeTotal: data.quantidade,
+        numeroPedidos: data.pedidos.size,
+        ticketMedio: data.faturamento / data.pedidos.size,
+        precoMedio,
+        primeiraVenda: sortedDatas[0],
+        ultimaVenda: sortedDatas[sortedDatas.length - 1],
+      };
+    })
+    .sort((a, b) => b.faturamentoTotal - a.faturamentoTotal);
 };
 
 /**
  * KPI 15: Produtos frequentemente comprados juntos
  */
-export const analyzeProductCombinations = (orders: ProcessedOrder[], minFrequency: number = 2): ProductCombination[] => {
-  const combinationMap = new Map<string, {
-    produto1: string;
-    produto2: string;
-    sku1: string;
-    sku2: string;
-    count: number;
-    faturamentos: number[];
-  }>();
+export const analyzeProductCombinations = (
+  orders: ProcessedOrder[],
+  minFrequency: number = 2,
+): ProductCombination[] => {
+  const combinationMap = new Map<
+    string,
+    {
+      produto1: string;
+      produto2: string;
+      sku1: string;
+      sku2: string;
+      count: number;
+      faturamentos: number[];
+    }
+  >();
 
-  orders.forEach(order => {
+  orders.forEach((order) => {
     if (order.produtos.length >= 2) {
       const produtos = order.produtos;
-      
+
       for (let i = 0; i < produtos.length; i++) {
         for (let j = i + 1; j < produtos.length; j++) {
           const p1 = produtos[i];
           const p2 = produtos[j];
-          
-          const [first, second] = [p1, p2].sort((a, b) => 
-            a.descricaoAjustada.localeCompare(b.descricaoAjustada)
-          );
-          
+
+          const [first, second] = [p1, p2].sort((a, b) => a.descricaoAjustada.localeCompare(b.descricaoAjustada));
+
           const key = `${first.descricaoAjustada}|||${second.descricaoAjustada}`;
           const existing = combinationMap.get(key);
-          
+
           if (!existing) {
             combinationMap.set(key, {
               produto1: first.descricaoAjustada,
@@ -160,7 +181,7 @@ export const analyzeProductCombinations = (orders: ProcessedOrder[], minFrequenc
               sku1: first.sku,
               sku2: second.sku,
               count: 1,
-              faturamentos: [getOfficialRevenue(order)]
+              faturamentos: [getOfficialRevenue(order)],
             });
           } else {
             existing.count++;
@@ -174,15 +195,15 @@ export const analyzeProductCombinations = (orders: ProcessedOrder[], minFrequenc
   const totalPedidos = orders.length;
 
   return Array.from(combinationMap.values())
-    .filter(combo => combo.count >= minFrequency)
-    .map(combo => ({
+    .filter((combo) => combo.count >= minFrequency)
+    .map((combo) => ({
       produto1: combo.produto1,
       produto2: combo.produto2,
       sku1: combo.sku1,
       sku2: combo.sku2,
       frequencia: combo.count,
       percentualPedidos: (combo.count / totalPedidos) * 100,
-      faturamentoMedio: combo.faturamentos.reduce((sum, f) => sum + f, 0) / combo.faturamentos.length
+      faturamentoMedio: combo.faturamentos.reduce((sum, f) => sum + f, 0) / combo.faturamentos.length,
     }))
     .sort((a, b) => b.frequencia - a.frequencia);
 };
@@ -191,25 +212,28 @@ export const analyzeProductCombinations = (orders: ProcessedOrder[], minFrequenc
  * KPI 16: Produtos com preço 0,01 (brindes/promoções)
  */
 export const analyzeFreebieProducts = (orders: ProcessedOrder[]): FreebieProduct[] => {
-  const freebieMap = new Map<string, {
-    sku: string;
-    descricao: string;
-    quantidade: number;
-    pedidos: Set<string>;
-  }>();
+  const freebieMap = new Map<
+    string,
+    {
+      sku: string;
+      descricao: string;
+      quantidade: number;
+      pedidos: Set<string>;
+    }
+  >();
 
-  orders.forEach(order => {
-    order.produtos.forEach(produto => {
+  orders.forEach((order) => {
+    order.produtos.forEach((produto) => {
       if (Math.abs(produto.preco - 0.01) < 0.001) {
         const key = produto.descricaoAjustada;
         const existing = freebieMap.get(key);
-        
+
         if (!existing) {
           freebieMap.set(key, {
             sku: produto.sku,
             descricao: produto.descricaoAjustada,
             quantidade: produto.quantidade,
-            pedidos: new Set([order.numeroPedido])
+            pedidos: new Set([order.numeroPedido]),
           });
         } else {
           existing.quantidade += produto.quantidade;
@@ -221,32 +245,37 @@ export const analyzeFreebieProducts = (orders: ProcessedOrder[]): FreebieProduct
 
   const totalPedidos = orders.length;
 
-  return Array.from(freebieMap.values()).map(data => ({
-    sku: data.sku,
-    descricao: data.descricao,
-    quantidadeTotal: data.quantidade,
-    numeroPedidos: data.pedidos.size,
-    percentualPedidosComBrinde: (data.pedidos.size / totalPedidos) * 100
-  })).sort((a, b) => b.numeroPedidos - a.numeroPedidos);
+  return Array.from(freebieMap.values())
+    .map((data) => ({
+      sku: data.sku,
+      descricao: data.descricao,
+      quantidadeTotal: data.quantidade,
+      numeroPedidos: data.pedidos.size,
+      percentualPedidosComBrinde: (data.pedidos.size / totalPedidos) * 100,
+    }))
+    .sort((a, b) => b.numeroPedidos - a.numeroPedidos);
 };
 
 /**
  * KPI 17: Formas de envio mais utilizadas
  */
 export const analyzeShippingMethods = (orders: ProcessedOrder[]): ShippingMethodStat[] => {
-  const shippingMap = new Map<string, {
-    count: number;
-    faturamento: number;
-  }>();
+  const shippingMap = new Map<
+    string,
+    {
+      count: number;
+      faturamento: number;
+    }
+  >();
 
-  orders.forEach(order => {
+  orders.forEach((order) => {
     const forma = order.formaEnvio || "Não informado";
     const existing = shippingMap.get(forma);
-    
+
     if (!existing) {
       shippingMap.set(forma, {
         count: 1,
-        faturamento: getOfficialRevenue(order)
+        faturamento: getOfficialRevenue(order),
       });
     } else {
       existing.count++;
@@ -256,19 +285,23 @@ export const analyzeShippingMethods = (orders: ProcessedOrder[]): ShippingMethod
 
   const totalPedidos = orders.length;
 
-  return Array.from(shippingMap.entries()).map(([forma, data]) => ({
-    formaEnvio: forma,
-    numeroPedidos: data.count,
-    percentual: (data.count / totalPedidos) * 100,
-    faturamentoTotal: data.faturamento,
-    ticketMedio: data.faturamento / data.count
-  })).sort((a, b) => b.numeroPedidos - a.numeroPedidos);
+  return Array.from(shippingMap.entries())
+    .map(([forma, data]) => ({
+      formaEnvio: forma,
+      numeroPedidos: data.count,
+      percentual: (data.count / totalPedidos) * 100,
+      faturamentoTotal: data.faturamento,
+      ticketMedio: data.faturamento / data.count,
+    }))
+    .sort((a, b) => b.numeroPedidos - a.numeroPedidos);
 };
 
 /**
  * KPI 18: Tempo entre venda e emissão de NF
  */
-export const analyzeNFIssuanceTime = (orders: ProcessedOrder[]): {
+export const analyzeNFIssuanceTime = (
+  orders: ProcessedOrder[],
+): {
   averageDays: number;
   distribution: NFIssuanceDistribution[];
   minDays: number;
@@ -276,8 +309,8 @@ export const analyzeNFIssuanceTime = (orders: ProcessedOrder[]): {
   medianDays: number;
 } => {
   const dias: number[] = [];
-  
-  orders.forEach(order => {
+
+  orders.forEach((order) => {
     const diff = differenceInDays(order.dataEmissao, order.dataVenda);
     if (diff >= 0) {
       dias.push(diff);
@@ -290,7 +323,7 @@ export const analyzeNFIssuanceTime = (orders: ProcessedOrder[]): {
       distribution: [],
       minDays: 0,
       maxDays: 0,
-      medianDays: 0
+      medianDays: 0,
     };
   }
 
@@ -305,15 +338,15 @@ export const analyzeNFIssuanceTime = (orders: ProcessedOrder[]): {
     { label: "2-3 dias", min: 2, max: 3 },
     { label: "4-7 dias", min: 4, max: 7 },
     { label: "8-15 dias", min: 8, max: 15 },
-    { label: "15+ dias", min: 16, max: Infinity }
+    { label: "15+ dias", min: 16, max: Infinity },
   ];
 
-  const distribution: NFIssuanceDistribution[] = faixas.map(faixa => {
-    const count = dias.filter(d => d >= faixa.min && d <= faixa.max).length;
+  const distribution: NFIssuanceDistribution[] = faixas.map((faixa) => {
+    const count = dias.filter((d) => d >= faixa.min && d <= faixa.max).length;
     return {
       faixa: faixa.label,
       quantidade: count,
-      percentual: (count / dias.length) * 100
+      percentual: (count / dias.length) * 100,
     };
   });
 
@@ -322,7 +355,7 @@ export const analyzeNFIssuanceTime = (orders: ProcessedOrder[]): {
     distribution,
     minDays,
     maxDays,
-    medianDays
+    medianDays,
   };
 };
 
@@ -330,12 +363,12 @@ export const analyzeNFIssuanceTime = (orders: ProcessedOrder[]): {
  * Calcula métricas consolidadas de produto e operações
  */
 export const calculateProductOperationsMetrics = (
-  orders: ProcessedOrder[], 
-  breakdownKits: boolean = false
+  orders: ProcessedOrder[],
+  breakdownKits: boolean = false,
 ): ProductOperationsMetrics => {
   // Se modo "Individual", desmembrar kits
   const processedOrders = breakdownKits ? breakdownOrders(orders) : orders;
-  
+
   const topByQuantity = analyzeTopProductsByQuantity(processedOrders, 100);
   const topByRevenue = analyzeTopProductsByRevenue(processedOrders, 100);
   const skuAnalysis = analyzeSKUPerformance(processedOrders);
@@ -345,7 +378,7 @@ export const calculateProductOperationsMetrics = (
   const nfTime = analyzeNFIssuanceTime(processedOrders);
 
   // ✅ Converter brindes para ProductRanking
-  const freebieAsRanking: ProductRanking[] = freebies.map(f => ({
+  const freebieAsRanking: ProductRanking[] = freebies.map((f) => ({
     sku: f.sku,
     descricao: f.descricao,
     descricaoAjustada: f.descricao,
@@ -358,34 +391,36 @@ export const calculateProductOperationsMetrics = (
   }));
 
   // ✅ Filtrar brindes dos arrays originais para evitar duplicação
-  const regularProductsByQuantity = topByQuantity.filter(p => p.ticketMedio > 0.02);
-  const regularProductsByRevenue = topByRevenue.filter(p => p.ticketMedio > 0.02);
+  const regularProductsByQuantity = topByQuantity.filter((p) => p.ticketMedio > 0.02);
+  const regularProductsByRevenue = topByRevenue.filter((p) => p.ticketMedio > 0.02);
 
   // ✅ Mesclar produtos regulares + brindes e reordenar por quantidade
-  const mergedByQuantity = [...regularProductsByQuantity, ...freebieAsRanking]
-    .sort((a, b) => b.quantidadeTotal - a.quantidadeTotal);
+  const mergedByQuantity = [...regularProductsByQuantity, ...freebieAsRanking].sort(
+    (a, b) => b.quantidadeTotal - a.quantidadeTotal,
+  );
 
   // Recalcular percentuais de quantidade
   const totalQuantity = mergedByQuantity.reduce((sum, p) => sum + p.quantidadeTotal, 0);
-  mergedByQuantity.forEach(p => {
+  mergedByQuantity.forEach((p) => {
     p.percentualQuantidade = (p.quantidadeTotal / totalQuantity) * 100;
   });
 
   // ✅ Mesclar produtos regulares + brindes e reordenar por faturamento
-  const mergedByRevenue = [...regularProductsByRevenue, ...freebieAsRanking]
-    .sort((a, b) => b.faturamentoTotal - a.faturamentoTotal);
+  const mergedByRevenue = [...regularProductsByRevenue, ...freebieAsRanking].sort(
+    (a, b) => b.faturamentoTotal - a.faturamentoTotal,
+  );
 
   // Recalcular percentuais de faturamento
   const totalRevenue = mergedByRevenue.reduce((sum, p) => sum + p.faturamentoTotal, 0);
-  mergedByRevenue.forEach(p => {
+  mergedByRevenue.forEach((p) => {
     p.percentualFaturamento = (p.faturamentoTotal / totalRevenue) * 100;
   });
 
   const uniqueProducts = new Set<string>();
   const uniqueSKUs = new Set<string>();
-  
-  processedOrders.forEach(order => {
-    order.produtos.forEach(produto => {
+
+  processedOrders.forEach((order) => {
+    order.produtos.forEach((produto) => {
       uniqueProducts.add(produto.descricaoAjustada);
       uniqueSKUs.add(produto.sku);
     });
@@ -404,9 +439,9 @@ export const calculateProductOperationsMetrics = (
       averageDays: nfTime.averageDays,
       medianDays: nfTime.medianDays,
       minDays: nfTime.minDays,
-      maxDays: nfTime.maxDays
+      maxDays: nfTime.maxDays,
     },
     totalProducts: uniqueProducts.size,
-    totalSKUs: uniqueSKUs.size
+    totalSKUs: uniqueSKUs.size,
   };
 };
