@@ -61,12 +61,13 @@ const Seguidores = () => {
   const {
     marketingData,
     followersData,
-    selectedMonth: _selectedMonth,
     availableMonths,
     dateRange,
     comparisonDateRange,
     comparisonMode,
   } = useDashboard();
+
+  const [chartViewMode, setChartViewMode] = useState<"daily" | "monthly">("daily");
 
   const { instagramGoals } = useAppSettings();
 
