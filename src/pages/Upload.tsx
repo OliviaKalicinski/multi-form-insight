@@ -5,48 +5,39 @@ import { supabase } from "@/integrations/supabase/client";
 import { InstagramMetricsUploader } from "@/components/dashboard/InstagramMetricsUploader";
 import { AdsUploader } from "@/components/dashboard/AdsUploader";
 import { SalesUploader } from "@/components/dashboard/SalesUploader";
-import { AudienceUploader } from "@/components/dashboard/AudienceUploader";
 import { UploadHistory } from "@/components/dashboard/UploadHistory";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Upload as UploadIcon, 
+import {
+  Upload as UploadIcon,
   BarChart3,
   Instagram,
   TrendingUp,
   ShoppingCart,
-  Users,
   CalendarDays,
-  ExternalLink
+  ExternalLink,
 } from "lucide-react";
 
 const EXTERNAL_LINKS = {
   ads: "https://adsmanager.facebook.com/adsmanager/reporting/view?act=539294475386018&business_id=458832849232355&selected_report_id=120227439365750622&ads_manager_write_regions=true#",
-  instagram: "https://business.facebook.com/latest/insights/results?business_id=458832849232355&asset_id=444099275461175&time_range=%257B%2522end%2522%253A%25222026-02-22%2522%252C%2522start%2522%253A%25222026-02-11%2522%257D&platform=Instagram",
+  instagram:
+    "https://business.facebook.com/latest/insights/results?business_id=458832849232355&asset_id=444099275461175&time_range=%257B%2522end%2522%253A%25222026-02-22%2522%252C%2522start%2522%253A%25222026-02-11%2522%257D&platform=Instagram",
   vendas: "https://erp.olist.com/relatorios_personalizados#/view/4449",
 };
 
 export default function Upload() {
   const navigate = useNavigate();
-  const { 
-    marketingData, 
-    followersData, 
-    adsData, 
-    salesData,
-    audienceData,
-    setAudienceData,
-    refreshFromDatabase
-  } = useDashboard();
+  const { marketingData, followersData, adsData, salesData, refreshFromDatabase } = useDashboard();
 
   const [latestDate, setLatestDate] = useState<string | null>(null);
 
   const fetchLatestDataDate = useCallback(async () => {
     const [salesRes, adsRes, followersRes, marketingRes] = await Promise.all([
-      supabase.from('sales_data').select('data_venda').order('data_venda', { ascending: false }).limit(1),
-      supabase.from('ads_data').select('data').order('data', { ascending: false }).limit(1),
-      supabase.from('followers_data').select('data').order('data', { ascending: false }).limit(1),
-      supabase.from('marketing_data').select('data').order('data', { ascending: false }).limit(1),
+      supabase.from("sales_data").select("data_venda").order("data_venda", { ascending: false }).limit(1),
+      supabase.from("ads_data").select("data").order("data", { ascending: false }).limit(1),
+      supabase.from("followers_data").select("data").order("data", { ascending: false }).limit(1),
+      supabase.from("marketing_data").select("data").order("data", { ascending: false }).limit(1),
     ]);
 
     const dates: string[] = [];
@@ -56,9 +47,9 @@ export default function Upload() {
     if (marketingRes.data?.[0]?.data) dates.push(marketingRes.data[0].data);
 
     if (dates.length > 0) {
-      const normalizedDates = dates.map(d => d.substring(0, 10));
+      const normalizedDates = dates.map((d) => d.substring(0, 10));
       const maxDate = normalizedDates.sort().reverse()[0];
-      const [year, month, day] = maxDate.split('-');
+      const [year, month, day] = maxDate.split("-");
       setLatestDate(`${day}/${month}/${year}`);
     } else {
       setLatestDate(null);
@@ -74,9 +65,9 @@ export default function Upload() {
     await fetchLatestDataDate();
     // Recalcular entidade customer após upload de vendas
     try {
-      await supabase.rpc('recalculate_all_customers');
+      await supabase.rpc("recalculate_all_customers");
     } catch (e) {
-      console.warn('Falha ao recalcular clientes:', e);
+      console.warn("Falha ao recalcular clientes:", e);
     }
   };
 
@@ -92,13 +83,11 @@ export default function Upload() {
             <UploadIcon className="h-8 w-8" />
             Upload de Dados
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Faça upload dos arquivos CSV para alimentar o dashboard
-          </p>
+          <p className="text-muted-foreground mt-1">Faça upload dos arquivos CSV para alimentar o dashboard</p>
         </div>
-        
+
         {hasAnyData && (
-          <Button onClick={() => navigate('/dashboard')}>
+          <Button onClick={() => navigate("/dashboard")}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Ver Dashboard
           </Button>
@@ -109,7 +98,9 @@ export default function Upload() {
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <CalendarDays className="h-4 w-4" />
         {latestDate ? (
-          <span>Dados até: <span className="font-semibold text-foreground">{latestDate}</span></span>
+          <span>
+            Dados até: <span className="font-semibold text-foreground">{latestDate}</span>
+          </span>
         ) : (
           <span>Nenhum dado importado ainda</span>
         )}
@@ -136,7 +127,12 @@ export default function Upload() {
                     {instagramMetricsCount} registros
                   </Badge>
                 )}
-                <a href={EXTERNAL_LINKS.instagram} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                <a
+                  href={EXTERNAL_LINKS.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                >
                   Exportar <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -163,7 +159,12 @@ export default function Upload() {
                       {salesData.length} pedidos
                     </Badge>
                   )}
-                  <a href={EXTERNAL_LINKS.vendas} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                  <a
+                    href={EXTERNAL_LINKS.vendas}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                  >
                     Exportar <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
@@ -188,7 +189,12 @@ export default function Upload() {
                       {adsData.length} registros
                     </Badge>
                   )}
-                  <a href={EXTERNAL_LINKS.ads} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                  <a
+                    href={EXTERNAL_LINKS.ads}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                  >
                     Exportar <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
@@ -196,26 +202,6 @@ export default function Upload() {
             </CardHeader>
             <CardContent className="pt-2">
               <AdsUploader onDataLoaded={handleUploadComplete} />
-            </CardContent>
-          </Card>
-
-          {/* Público */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Users className="h-5 w-5 text-orange-500" />
-                  <CardTitle className="text-base">Público</CardTitle>
-                </div>
-                {audienceData && (
-                  <Badge variant="secondary" className="font-normal text-xs">
-                    ✓
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="pt-2">
-              <AudienceUploader onDataLoaded={setAudienceData} />
             </CardContent>
           </Card>
         </div>
