@@ -21,7 +21,26 @@ const GRAVIDADES = [
   { value: "alta", label: "Alta" },
   { value: "critica", label: "Crítica" },
 ];
-const TIPOS = ["Qualidade", "Entrega", "Atendimento", "Produto Errado", "Falta de Produto", "Validade", "Embalagem", "Outro"];
+const TIPOS = [
+  "Qualidade",
+  "Entrega",
+  "Atendimento",
+  "Produto Errado",
+  "Falta de Produto",
+  "Validade",
+  "Embalagem",
+  "Outro",
+];
+
+const formatCpfCnpj = (value: string | null): string => {
+  if (!value) return "—";
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 11)
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  if (digits.length === 14)
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+  return value;
+};
 
 interface CustomerOption {
   id: string;
@@ -98,7 +117,7 @@ export default function ReclamacaoNova() {
   });
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ["customer-orders", selectedCustomer?.cpf_cnpj],
+    queryKey: ["complaint-form-orders", selectedCustomer?.cpf_cnpj],
     queryFn: async () => {
       if (!selectedCustomer) return [];
       const { data, error } = await supabase
@@ -116,7 +135,7 @@ export default function ReclamacaoNova() {
 
   const selectedOrder = useMemo(() => {
     if (!selectedOrderId) return null;
-    return orders.find(o => o.id === selectedOrderId) ?? null;
+    return orders.find((o) => o.id === selectedOrderId) ?? null;
   }, [orders, selectedOrderId]);
 
   const orderProducts = useMemo(() => {
@@ -129,10 +148,7 @@ export default function ReclamacaoNova() {
     if (!customerSearch || customerSearch.length < 2) return [];
     const q = customerSearch.toLowerCase();
     return allCustomers
-      .filter(c =>
-        (c.nome ?? "").toLowerCase().includes(q) ||
-        c.cpf_cnpj.toLowerCase().includes(q)
-      )
+      .filter((c) => (c.nome ?? "").toLowerCase().includes(q) || c.cpf_cnpj.toLowerCase().includes(q))
       .slice(0, 20);
   }, [allCustomers, customerSearch]);
 
@@ -150,7 +166,7 @@ export default function ReclamacaoNova() {
   };
 
   const handleSelectOrder = (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
+    const order = orders.find((o) => o.id === orderId);
     if (!order) return;
     setSelectedOrderId(orderId);
     // Auto-fill
@@ -252,9 +268,11 @@ export default function ReclamacaoNova() {
         <CardContent>
           {selectedCustomer ? (
             <div className="flex items-center gap-2 p-3 rounded-md border bg-muted/50">
-              <Badge variant="secondary" className="text-xs">Selecionado</Badge>
+              <Badge variant="secondary" className="text-xs">
+                Selecionado
+              </Badge>
               <span className="text-sm font-medium">{selectedCustomer.nome ?? "—"}</span>
-              <span className="text-xs text-muted-foreground ml-1">{selectedCustomer.cpf_cnpj}</span>
+              <span className="text-xs text-muted-foreground ml-1">{formatCpfCnpj(selectedCustomer.cpf_cnpj)}</span>
               <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={handleClearCustomer}>
                 <X className="h-3.5 w-3.5" />
               </Button>
@@ -266,13 +284,13 @@ export default function ReclamacaoNova() {
                 <Input
                   placeholder="Buscar por nome ou CPF/CNPJ..."
                   value={customerSearch}
-                  onChange={e => setCustomerSearch(e.target.value)}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
                   className="pl-9"
                 />
               </div>
               {filteredCustomers.length > 0 && (
                 <div className="border rounded-md max-h-[200px] overflow-y-auto divide-y">
-                  {filteredCustomers.map(c => (
+                  {filteredCustomers.map((c) => (
                     <button
                       key={c.id}
                       type="button"
@@ -280,7 +298,7 @@ export default function ReclamacaoNova() {
                       onClick={() => handleSelectCustomer(c)}
                     >
                       <span className="font-medium">{c.nome ?? "—"}</span>
-                      <span className="text-xs text-muted-foreground">{c.cpf_cnpj}</span>
+                      <span className="text-xs text-muted-foreground">{formatCpfCnpj(c.cpf_cnpj)}</span>
                     </button>
                   ))}
                 </div>
@@ -297,7 +315,9 @@ export default function ReclamacaoNova() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">2. Selecionar Pedido</CardTitle>
               {orders.length >= 50 && (
-                <Badge variant="outline" className="text-xs">Exibindo últimos 50 pedidos</Badge>
+                <Badge variant="outline" className="text-xs">
+                  Exibindo últimos 50 pedidos
+                </Badge>
               )}
             </div>
           </CardHeader>
@@ -327,7 +347,7 @@ export default function ReclamacaoNova() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {orders.map(o => (
+                    {orders.map((o) => (
                       <tr
                         key={o.id}
                         className={`cursor-pointer hover:bg-muted/50 transition-colors ${selectedOrderId === o.id ? "bg-primary/5 ring-1 ring-inset ring-primary/20" : ""}`}
@@ -343,11 +363,19 @@ export default function ReclamacaoNova() {
                           />
                         </td>
                         <td className="px-3 py-2 font-medium">{o.numero_pedido ?? "—"}</td>
-                        <td className="px-3 py-2">{o.data_venda ? format(new Date(o.data_venda), "dd/MM/yyyy") : "—"}</td>
+                        <td className="px-3 py-2">
+                          {o.data_venda ? format(new Date(o.data_venda), "dd/MM/yyyy") : "—"}
+                        </td>
                         <td className="px-3 py-2">{o.numero_nota ?? "—"}</td>
                         <td className="px-3 py-2 hidden sm:table-cell">{o.forma_envio ?? "—"}</td>
                         <td className="px-3 py-2 hidden sm:table-cell">
-                          {o.status ? <Badge variant="outline" className="text-xs">{o.status}</Badge> : "—"}
+                          {o.status ? (
+                            <Badge variant="outline" className="text-xs">
+                              {o.status}
+                            </Badge>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -379,38 +407,58 @@ export default function ReclamacaoNova() {
               <div className="space-y-1.5">
                 <Label>Gravidade *</Label>
                 <Select value={gravidade} onValueChange={setGravidade}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {GRAVIDADES.map(g => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}
+                    {GRAVIDADES.map((g) => (
+                      <SelectItem key={g.value} value={g.value}>
+                        {g.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Tipo de Reclamação *</Label>
                 <Select value={tipoReclamacao} onValueChange={setTipoReclamacao}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {TIPOS.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Data do Contato *</Label>
-                <Input type="date" value={dataContato} onChange={e => setDataContato(e.target.value)} />
+                <Input type="date" value={dataContato} onChange={(e) => setDataContato(e.target.value)} />
               </div>
 
               {/* Auto-filled fields */}
               <div className="space-y-1.5">
                 <Label>NF do Produto</Label>
-                <Input placeholder="Nota fiscal" value={nfProduto} onChange={e => setNfProduto(e.target.value)} />
+                <Input placeholder="Nota fiscal" value={nfProduto} onChange={(e) => setNfProduto(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Transportador</Label>
-                <Input placeholder="Transportadora" value={transportador} onChange={e => setTransportador(e.target.value)} />
+                <Input
+                  placeholder="Transportadora"
+                  value={transportador}
+                  onChange={(e) => setTransportador(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Natureza do Pedido</Label>
-                <Input placeholder="Natureza" value={naturezaPedido} onChange={e => setNaturezaPedido(e.target.value)} />
+                <Input
+                  placeholder="Natureza"
+                  value={naturezaPedido}
+                  onChange={(e) => setNaturezaPedido(e.target.value)}
+                />
               </div>
 
               {/* Product - Select if multiple, Input if single/none */}
@@ -418,15 +466,19 @@ export default function ReclamacaoNova() {
                 <Label>Produto</Label>
                 {orderProducts.length > 1 ? (
                   <Select value={produto} onValueChange={setProduto}>
-                    <SelectTrigger><SelectValue placeholder="Selecione o produto" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o produto" />
+                    </SelectTrigger>
                     <SelectContent>
                       {orderProducts.map((p, i) => (
-                        <SelectItem key={i} value={p.value}>{p.label}</SelectItem>
+                        <SelectItem key={i} value={p.value}>
+                          {p.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Input placeholder="Nome do produto" value={produto} onChange={e => setProduto(e.target.value)} />
+                  <Input placeholder="Nome do produto" value={produto} onChange={(e) => setProduto(e.target.value)} />
                 )}
               </div>
 
@@ -434,27 +486,46 @@ export default function ReclamacaoNova() {
               <div className="space-y-1.5">
                 <Label>Canal</Label>
                 <Select value={canal} onValueChange={setCanal}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {CANAIS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {CANAIS.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Lote</Label>
-                <Input placeholder="Número do lote" value={lote} onChange={e => setLote(e.target.value)} />
+                <Input placeholder="Número do lote" value={lote} onChange={(e) => setLote(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Atendente</Label>
-                <Input placeholder="Nome do atendente" value={atendente} onChange={e => setAtendente(e.target.value)} />
+                <Input
+                  placeholder="Nome do atendente"
+                  value={atendente}
+                  onChange={(e) => setAtendente(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Link da Reclamação</Label>
-                <Input type="url" placeholder="https://..." value={linkReclamacao} onChange={e => setLinkReclamacao(e.target.value)} />
+                <Input
+                  type="url"
+                  placeholder="https://..."
+                  value={linkReclamacao}
+                  onChange={(e) => setLinkReclamacao(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Local da Compra</Label>
-                <Input placeholder="Onde comprou" value={localCompra} onChange={e => setLocalCompra(e.target.value)} />
+                <Input
+                  placeholder="Onde comprou"
+                  value={localCompra}
+                  onChange={(e) => setLocalCompra(e.target.value)}
+                />
               </div>
             </div>
 
@@ -463,7 +534,7 @@ export default function ReclamacaoNova() {
               <Textarea
                 placeholder="Descreva a reclamação em detalhes..."
                 value={descricao}
-                onChange={e => setDescricao(e.target.value)}
+                onChange={(e) => setDescricao(e.target.value)}
                 rows={4}
               />
             </div>
@@ -473,7 +544,7 @@ export default function ReclamacaoNova() {
               <Textarea
                 placeholder="Ação tomada ou orientação dada..."
                 value={acaoOrientacao}
-                onChange={e => setAcaoOrientacao(e.target.value)}
+                onChange={(e) => setAcaoOrientacao(e.target.value)}
                 rows={3}
               />
             </div>
@@ -485,16 +556,10 @@ export default function ReclamacaoNova() {
       <div className="flex items-center justify-between">
         <div>
           {!canSubmit && selectedCustomer && selectedOrderId && (
-            <p className="text-xs text-muted-foreground">
-              Campos obrigatórios faltando: {validationErrors.join(", ")}
-            </p>
+            <p className="text-xs text-muted-foreground">Campos obrigatórios faltando: {validationErrors.join(", ")}</p>
           )}
         </div>
-        <Button
-          size="lg"
-          disabled={!canSubmit || mutation.isPending}
-          onClick={() => mutation.mutate()}
-        >
+        <Button size="lg" disabled={!canSubmit || mutation.isPending} onClick={() => mutation.mutate()}>
           {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           Salvar Reclamação
         </Button>
