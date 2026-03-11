@@ -1,5 +1,18 @@
 import { useMemo, useState } from "react";
-import { Users, UserPlus, TrendingUp, TrendingDown, Calendar, Target, Eye, MousePointerClick, Heart, Percent, BarChart3, ExternalLink } from "lucide-react";
+import {
+  Users,
+  UserPlus,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Target,
+  Eye,
+  MousePointerClick,
+  Heart,
+  Percent,
+  BarChart3,
+  ExternalLink,
+} from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
@@ -16,236 +29,220 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
-import { 
-  calculateFollowersMetrics, 
-  calculateFollowersGrowth, 
-  formatFollowersNumber, 
-  formatFollowersGrowth, 
+import {
+  calculateFollowersMetrics,
+  calculateFollowersGrowth,
+  formatFollowersNumber,
+  formatFollowersGrowth,
   extractDailyFollowers,
-  calculateDailyAverage 
+  calculateDailyAverage,
 } from "@/utils/followersCalculator";
-import { calculateMonthlyMetrics, calculateGrowthMetrics, formatNumber, formatPercentage, extractDailyValues } from "@/utils/metricsCalculator";
+import {
+  calculateMonthlyMetrics,
+  calculateGrowthMetrics,
+  formatNumber,
+  formatPercentage,
+  extractDailyValues,
+} from "@/utils/metricsCalculator";
 import { aggregateFollowersByMonth, aggregateMarketingByMonth } from "@/utils/monthlyAggregator";
-import { getLast12Months, getPrevious12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
 import { MarketingData, FollowersData } from "@/types/marketing";
-import { calculateFollowersMultiMonthMetrics, calculateMultiMonthMetrics, prepareFollowersComparisonChartData, prepareMarketingComparisonChartData, getMonthColor, formatMonthLabel } from "@/utils/comparisonCalculator";
+import {
+  calculateFollowersMultiMonthMetrics,
+  calculateMultiMonthMetrics,
+  prepareFollowersComparisonChartData,
+  prepareMarketingComparisonChartData,
+  getMonthColor,
+  formatMonthLabel,
+} from "@/utils/comparisonCalculator";
 import { detectIncompleteMonth, calculateProjection } from "@/utils/incompleteMonthDetector";
 
 const Seguidores = () => {
   const {
     marketingData,
     followersData,
-    selectedMonth,
+    selectedMonth: _selectedMonth,
     availableMonths,
+    dateRange,
+    comparisonDateRange,
     comparisonMode,
-    selectedMonths,
   } = useDashboard();
 
   const { instagramGoals } = useAppSettings();
 
-  // Chart view mode state
-  const [chartViewMode, setChartViewMode] = useState<ViewMode>("daily");
+  // Helper: filter string-dated items (Data: "YYYY-MM-DD") by dateRange
+  const filterByDateRange = (items: { Data: string }[], range: typeof dateRange) => {
+    if (!range) return items;
+    return items.filter((item) => {
+      const d = new Date(item.Data);
+      return d >= range.start && d <= range.end;
+    });
+  };
 
-  // Detect 12-month view
-  const isLast12MonthsView = selectedMonth === "last-12-months";
-  
-  // Detect "Todos os períodos" view
-  const isAllPeriodsView = !selectedMonth && !comparisonMode;
+  // Months within current dateRange (for monthly aggregation charts)
+  const monthsInRange = useMemo(() => {
+    if (!dateRange) return availableMonths;
+    const months: string[] = [];
+    const d = new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), 1);
+    while (d <= dateRange.end) {
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+      d.setMonth(d.getMonth() + 1);
+    }
+    return months.filter((m) => availableMonths.includes(m));
+  }, [dateRange, availableMonths]);
 
-  // Comparison mode calculations
+  const isMultiMonthView = monthsInRange.length > 1;
+  const isAllPeriodsView = !dateRange;
+
+  // Reference month = last month in current range
+  const referenceMonth = useMemo(() => {
+    if (dateRange) return format(dateRange.end, "yyyy-MM");
+    return availableMonths[availableMonths.length - 1] || "";
+  }, [dateRange, availableMonths]);
+
+  // Followers filtering
+  const currentMonthFollowersData = useMemo(
+    () => filterByDateRange(followersData, dateRange) as typeof followersData,
+    [followersData, dateRange],
+  );
+
+  const previousMonthFollowersData = useMemo(() => {
+    if (!comparisonDateRange) return [] as typeof followersData;
+    return filterByDateRange(followersData, comparisonDateRange) as typeof followersData;
+  }, [followersData, comparisonDateRange]);
+
+  // Comparison mode calculations — use 2-period comparison
   const multiMonthMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length < 2) return null;
-    return calculateFollowersMultiMonthMetrics(followersData, selectedMonths);
-  }, [comparisonMode, selectedMonths, followersData]);
+    if (!comparisonMode || !comparisonDateRange) return null;
+    const compMonths = (() => {
+      const months: string[] = [];
+      const d = new Date(comparisonDateRange.start.getFullYear(), comparisonDateRange.start.getMonth(), 1);
+      while (d <= comparisonDateRange.end) {
+        months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        d.setMonth(d.getMonth() + 1);
+      }
+      return months.filter((m) => availableMonths.includes(m));
+    })();
+    const allMonths = [...new Set([...monthsInRange, ...compMonths])];
+    if (allMonths.length < 2) return null;
+    return calculateFollowersMultiMonthMetrics(followersData, allMonths);
+  }, [comparisonMode, comparisonDateRange, monthsInRange, followersData, availableMonths]);
 
   const comparisonChartData = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length < 2) return [];
-    return prepareFollowersComparisonChartData(followersData, selectedMonths);
-  }, [comparisonMode, selectedMonths, followersData]);
+    if (!comparisonMode || !comparisonDateRange) return [];
+    const compMonths = (() => {
+      const months: string[] = [];
+      const d = new Date(comparisonDateRange.start.getFullYear(), comparisonDateRange.start.getMonth(), 1);
+      while (d <= comparisonDateRange.end) {
+        months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        d.setMonth(d.getMonth() + 1);
+      }
+      return months.filter((m) => availableMonths.includes(m));
+    })();
+    const allMonths = [...new Set([...monthsInRange, ...compMonths])];
+    return prepareFollowersComparisonChartData(followersData, allMonths);
+  }, [comparisonMode, comparisonDateRange, monthsInRange, followersData, availableMonths]);
 
   const monthColors = useMemo(() => {
     const colors: Record<string, string> = {};
-    selectedMonths.forEach((month) => {
-      colors[formatMonthLabel(month)] = getMonthColor(month, selectedMonths);
+    monthsInRange.forEach((month) => {
+      colors[formatMonthLabel(month)] = getMonthColor(month, monthsInRange);
     });
     return colors;
-  }, [selectedMonths]);
-  
-  // Get last 12 months
-  const last12Months = useMemo(() => {
-    if (!isLast12MonthsView) return [];
-    return getLast12Months(availableMonths);
-  }, [isLast12MonthsView, availableMonths]);
-
-  // Filter followers data by selected month or last 12 months
-  const currentMonthFollowersData = useMemo(() => {
-    // selectedMonth null = "Todos os períodos" = retornar todos os dados
-    if (!selectedMonth) {
-      return followersData;
-    }
-    if (isLast12MonthsView) {
-      return followersData.filter((item) => 
-        last12Months.some(month => item.Data.startsWith(month))
-      );
-    }
-    return followersData.filter((item) => item.Data.startsWith(selectedMonth));
-  }, [followersData, selectedMonth, isLast12MonthsView, last12Months]);
-
-  // Get previous month/period followers data for comparison
-  const previousMonthFollowersData = useMemo(() => {
-    if (!selectedMonth || availableMonths.length < 2) return [];
-    
-    if (isLast12MonthsView) {
-      const previous12 = getPrevious12Months(availableMonths, last12Months);
-      if (previous12.length === 0) return [];
-      return followersData.filter((item) => 
-        previous12.some(month => item.Data.startsWith(month))
-      );
-    }
-    
-    const currentIndex = availableMonths.indexOf(selectedMonth);
-    if (currentIndex <= 0) return [];
-    const previousMonth = availableMonths[currentIndex - 1];
-    return followersData.filter((item) => item.Data.startsWith(previousMonth));
-  }, [followersData, selectedMonth, availableMonths, isLast12MonthsView, last12Months]);
+  }, [monthsInRange]);
 
   // Calculate followers metrics
   const currentFollowersMetrics = useMemo(() => {
     if (currentMonthFollowersData.length === 0) {
-      return { 
-        totalSeguidores: 0, 
-        novosSeguidoresMes: 0, 
-        crescimentoAbsoluto: 0, 
-        crescimentoPercentual: 0 
+      return {
+        totalSeguidores: 0,
+        novosSeguidoresMes: 0,
+        crescimentoAbsoluto: 0,
+        crescimentoPercentual: 0,
       };
     }
-    
-    // Determine reference month - handle null (Todos os períodos)
-    let referenceMonth: string;
-    if (isLast12MonthsView && last12Months.length > 0) {
-      referenceMonth = last12Months[last12Months.length - 1].slice(0, 7);
-    } else if (!selectedMonth && availableMonths.length > 0) {
-      // "Todos os períodos" - usar o mês mais recente como referência
-      referenceMonth = availableMonths[availableMonths.length - 1].slice(0, 7);
-    } else if (selectedMonth) {
-      referenceMonth = selectedMonth.slice(0, 7);
-    } else {
-      // Fallback: extrair do próprio dado
-      referenceMonth = currentMonthFollowersData[currentMonthFollowersData.length - 1]?.Data?.slice(0, 7) || '';
-    }
-    
-    const metrics = calculateFollowersMetrics(
-      currentMonthFollowersData,
-      followersData,
-      referenceMonth
-    );
-    
-    // Para "Todos os períodos", não calcular crescimento vs período anterior
-    if (!selectedMonth) {
-      return metrics;
-    }
-    
-    if (previousMonthFollowersData.length > 0) {
-      const currentIndex = availableMonths.indexOf(selectedMonth);
-      const previousMonth = isLast12MonthsView && last12Months.length > 0
-        ? getLast12Months(availableMonths.slice(0, availableMonths.indexOf(last12Months[0])))[0]
-        : availableMonths[currentIndex - 1];
-      
-      if (previousMonth) {
-        const previousMonthStr = previousMonth.slice(0, 7);
-        
-        const growth = calculateFollowersGrowth(
-          currentMonthFollowersData,
-          previousMonthFollowersData,
-          followersData,
-          referenceMonth,
-          previousMonthStr
-        );
-        return { ...metrics, ...growth };
-      }
+
+    const metrics = calculateFollowersMetrics(currentMonthFollowersData, followersData, referenceMonth);
+
+    if (!dateRange || previousMonthFollowersData.length === 0) return metrics;
+
+    const compRefMonth = comparisonDateRange ? format(comparisonDateRange.end, "yyyy-MM") : "";
+    if (compRefMonth) {
+      const growth = calculateFollowersGrowth(
+        currentMonthFollowersData,
+        previousMonthFollowersData,
+        followersData,
+        referenceMonth,
+        compRefMonth,
+      );
+      return { ...metrics, ...growth };
     }
     return metrics;
-  }, [currentMonthFollowersData, previousMonthFollowersData, followersData, selectedMonth, availableMonths, isLast12MonthsView, last12Months]);
+  }, [
+    currentMonthFollowersData,
+    previousMonthFollowersData,
+    followersData,
+    dateRange,
+    comparisonDateRange,
+    referenceMonth,
+  ]);
 
   // Detect incomplete month and calculate projections
-  const monthInfo = useMemo(() => 
-    detectIncompleteMonth(selectedMonth || ''), 
-    [selectedMonth]
-  );
+  const monthInfo = useMemo(() => detectIncompleteMonth(referenceMonth), [referenceMonth]);
 
-  const dailyFollowers = useMemo(() => 
-    extractDailyFollowers(currentMonthFollowersData),
-    [currentMonthFollowersData]
-  );
+  const dailyFollowers = useMemo(() => extractDailyFollowers(currentMonthFollowersData), [currentMonthFollowersData]);
 
   // Calculate daily average
-  const mediaDiaria = useMemo(() => 
-    calculateDailyAverage(currentMonthFollowersData),
-    [currentMonthFollowersData]
-  );
+  const mediaDiaria = useMemo(() => calculateDailyAverage(currentMonthFollowersData), [currentMonthFollowersData]);
 
   const followersProjection = useMemo(() => {
     if (!monthInfo.isIncomplete || previousMonthFollowersData.length === 0) return null;
-    
-    const currentIndex = availableMonths.indexOf(selectedMonth || '');
-    if (currentIndex <= 0) return null;
-    
-    const previousMonth = availableMonths[currentIndex - 1];
-    const previousMonthStr = previousMonth.slice(0, 7);
-    
-    const previousMetrics = calculateFollowersMetrics(
-      previousMonthFollowersData, 
-      followersData, 
-      previousMonthStr
-    );
-    
+    const prevRefMonth = comparisonDateRange ? format(comparisonDateRange.end, "yyyy-MM") : "";
+    if (!prevRefMonth) return null;
+    const previousMetrics = calculateFollowersMetrics(previousMonthFollowersData, followersData, prevRefMonth);
     return calculateProjection(
       currentFollowersMetrics.novosSeguidoresMes,
       previousMetrics.novosSeguidoresMes,
       monthInfo,
       dailyFollowers,
-      formatFollowersNumber
+      formatFollowersNumber,
     );
-  }, [monthInfo, currentFollowersMetrics, previousMonthFollowersData, followersData, dailyFollowers, availableMonths, selectedMonth]);
+  }, [
+    monthInfo,
+    currentFollowersMetrics,
+    previousMonthFollowersData,
+    followersData,
+    dailyFollowers,
+    comparisonDateRange,
+  ]);
 
-  // Aggregate data for 12-month view
+  // Aggregate data for monthly view
   const monthlyFollowersData = useMemo(() => {
-    if (!isLast12MonthsView || followersData.length === 0) return [];
-    return aggregateFollowersByMonth(followersData, last12Months);
-  }, [followersData, isLast12MonthsView, last12Months]);
+    if (!isMultiMonthView || followersData.length === 0) return [];
+    return aggregateFollowersByMonth(followersData, monthsInRange);
+  }, [followersData, isMultiMonthView, monthsInRange]);
 
   // === MARKETING DATA CALCULATIONS ===
-  
-  // Filter marketing data by selected month or last 12 months
+
   const currentMonthMarketingData = useMemo(() => {
     if (!marketingData.length) return [];
-    if (!selectedMonth) return marketingData; // Todos os períodos
-    if (isLast12MonthsView) {
-      return marketingData.filter(item => 
-        last12Months.some(month => item.Data.startsWith(month))
-      );
-    }
-    return marketingData.filter(item => item.Data.startsWith(selectedMonth));
-  }, [marketingData, selectedMonth, isLast12MonthsView, last12Months]);
+    return filterByDateRange(marketingData, dateRange) as typeof marketingData;
+  }, [marketingData, dateRange]);
 
   const dailyMarketingData = useMemo(() => {
     if (!currentMonthMarketingData.length || !monthInfo.isIncomplete) return null;
     return {
-      visualizacoes: extractDailyValues(currentMonthMarketingData, 'visualizacoes'),
-      alcance: extractDailyValues(currentMonthMarketingData, 'alcance'),
-      visitas: extractDailyValues(currentMonthMarketingData, 'visitas'),
-      interacoes: extractDailyValues(currentMonthMarketingData, 'interacoes'),
-      clicks: extractDailyValues(currentMonthMarketingData, 'clicks'),
+      visualizacoes: extractDailyValues(currentMonthMarketingData, "visualizacoes"),
+      alcance: extractDailyValues(currentMonthMarketingData, "alcance"),
+      visitas: extractDailyValues(currentMonthMarketingData, "visitas"),
+      interacoes: extractDailyValues(currentMonthMarketingData, "interacoes"),
+      clicks: extractDailyValues(currentMonthMarketingData, "clicks"),
     };
   }, [currentMonthMarketingData, monthInfo.isIncomplete]);
 
   const previousMonthMarketingData = useMemo(() => {
-    if (!marketingData.length || !selectedMonth || isLast12MonthsView) return [];
-    const monthIndex = availableMonths.indexOf(selectedMonth);
-    if (monthIndex <= 0) return [];
-    const previousMonth = availableMonths[monthIndex - 1];
-    return marketingData.filter(item => item.Data.startsWith(previousMonth));
-  }, [marketingData, selectedMonth, availableMonths, isLast12MonthsView]);
+    if (!marketingData.length || !comparisonDateRange) return [];
+    return filterByDateRange(marketingData, comparisonDateRange) as typeof marketingData;
+  }, [marketingData, comparisonDateRange]);
 
   // Calculate marketing metrics
   const currentMarketingMetrics = useMemo(() => {
@@ -259,38 +256,30 @@ const Seguidores = () => {
     return calculateGrowthMetrics(currentMonthMarketingData, previousMonthMarketingData);
   }, [currentMonthMarketingData, previousMonthMarketingData]);
 
-  // Monthly aggregated data for 12-month view
+  // Monthly aggregated data for multi-month view
   const monthlyMarketingData = useMemo(() => {
-    if (!isLast12MonthsView || !marketingData.length) return [];
-    return aggregateMarketingByMonth(marketingData, last12Months);
-  }, [isLast12MonthsView, marketingData, last12Months]);
+    if (!isMultiMonthView || !marketingData.length) return [];
+    return aggregateMarketingByMonth(marketingData, monthsInRange);
+  }, [isMultiMonthView, marketingData, monthsInRange]);
 
   // Multi-month comparison metrics for marketing
   const multiMonthMarketingMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length < 2) return null;
-    return calculateMultiMonthMetrics(marketingData, selectedMonths);
-  }, [comparisonMode, selectedMonths, marketingData]);
+    if (!comparisonMode || monthsInRange.length < 2) return null;
+    return calculateMultiMonthMetrics(marketingData, monthsInRange);
+  }, [comparisonMode, monthsInRange, marketingData]);
 
   const hasFollowersData = followersData && followersData.length > 0;
   const hasMarketingData = marketingData && marketingData.length > 0;
 
   // Prepare chart data for FollowersTrendChart
   const followersChartData = useMemo(() => {
-    if (isAllPeriodsView || isLast12MonthsView) {
-      // For "Todos" or 12-month view, use all available data
-      return extractDailyFollowers(currentMonthFollowersData);
-    }
-    return dailyFollowers;
-  }, [isAllPeriodsView, isLast12MonthsView, currentMonthFollowersData, dailyFollowers]);
+    return extractDailyFollowers(currentMonthFollowersData);
+  }, [currentMonthFollowersData]);
 
   // Set default view mode based on filter
   useMemo(() => {
-    if (isAllPeriodsView) {
-      setChartViewMode("monthly");
-    } else if (isLast12MonthsView) {
-      setChartViewMode("monthly");
-    }
-  }, [isAllPeriodsView, isLast12MonthsView]);
+    if (isAllPeriodsView || isMultiMonthView) setChartViewMode("monthly");
+  }, [isAllPeriodsView, isMultiMonthView]);
 
   return (
     <div className="container mx-auto px-6 py-8">
@@ -299,13 +288,12 @@ const Seguidores = () => {
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-foreground">📸 Instagram</h1>
-            <Badge variant="secondary" className="text-xs">Orgânico</Badge>
+            <Badge variant="secondary" className="text-xs">
+              Orgânico
+            </Badge>
           </div>
-          <p className="text-muted-foreground">
-            Métricas de atenção, alcance e engajamento orgânico
-          </p>
+          <p className="text-muted-foreground">Métricas de atenção, alcance e engajamento orgânico</p>
         </div>
-
 
         {/* Show welcome message if no data */}
         {!hasFollowersData && (
@@ -317,28 +305,7 @@ const Seguidores = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                📊 CSV de Seguidores
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Period indicator for 12-month view */}
-        {isLast12MonthsView && last12Months.length > 0 && (
-          <Card className="border-primary/50 bg-primary/5">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    📅 Visão Anual - Análise dos Últimos {last12Months.length} Meses
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Período: {formatMonthRange(last12Months)}
-                  </p>
-                </div>
-              </div>
+              <p className="text-muted-foreground">📊 CSV de Seguidores</p>
             </CardContent>
           </Card>
         )}
@@ -350,9 +317,7 @@ const Seguidores = () => {
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5 text-blue-500" />
                 <div>
-                  <p className="text-sm font-medium text-foreground">
-                    📅 Visão Completa - Todos os Períodos
-                  </p>
+                  <p className="text-sm font-medium text-foreground">📅 Visão Completa - Todos os Períodos</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Mostrando dados de {availableMonths.length} meses disponíveis
                   </p>
@@ -438,7 +403,7 @@ const Seguidores = () => {
                   title="Seguidores Acumulados - Comparação"
                   description="Comparação do total acumulado entre meses"
                   comparisonMode={true}
-                  selectedMonths={selectedMonths.map(formatMonthLabel)}
+                  selectedMonths={monthsInRange.map(formatMonthLabel)}
                   monthColors={monthColors}
                 />
                 <NewFollowersChart
@@ -446,7 +411,7 @@ const Seguidores = () => {
                   title="Novos Seguidores - Comparação"
                   description="Comparação diária de novos seguidores"
                   comparisonMode={true}
-                  selectedMonths={selectedMonths.map(formatMonthLabel)}
+                  selectedMonths={monthsInRange.map(formatMonthLabel)}
                   monthColors={monthColors}
                 />
               </div>
@@ -473,27 +438,34 @@ const Seguidores = () => {
                   title="Novos Seguidores"
                   value={formatFollowersNumber(currentFollowersMetrics.novosSeguidoresMes)}
                   icon={<UserPlus className="h-3 w-3" />}
-                  trend={previousMonthFollowersData.length > 0 ? currentFollowersMetrics.crescimentoPercentual : undefined}
-                  status={getStatusFromBenchmark(
-                    currentFollowersMetrics.crescimentoPercentual, 
-                    0, 
-                    { warningThreshold: -10, dangerThreshold: -25 }
-                  )}
+                  trend={
+                    previousMonthFollowersData.length > 0 ? currentFollowersMetrics.crescimentoPercentual : undefined
+                  }
+                  status={getStatusFromBenchmark(currentFollowersMetrics.crescimentoPercentual, 0, {
+                    warningThreshold: -10,
+                    dangerThreshold: -25,
+                  })}
                   size="compact"
                   tooltipKey="novos_seguidores"
                 />
                 <StatusMetricCard
                   title="Crescimento"
                   value={formatFollowersGrowth(currentFollowersMetrics.crescimentoAbsoluto)}
-                  icon={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  icon={
+                    currentFollowersMetrics.crescimentoAbsoluto >= 0 ? (
+                      <TrendingUp className="h-3 w-3" />
+                    ) : (
+                      <TrendingDown className="h-3 w-3" />
+                    )
+                  }
                   status={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? "success" : "danger"}
                   interpretation={
-                    previousMonthFollowersData.length > 0 
-                      ? (currentFollowersMetrics.novosSeguidoresMes > 0 && 
-                         currentFollowersMetrics.crescimentoPercentual === 0 &&
-                         currentFollowersMetrics.crescimentoAbsoluto > 0
-                          ? "Primeiro período"
-                          : `${currentFollowersMetrics.crescimentoPercentual >= 0 ? '+' : ''}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}% vs anterior`)
+                    previousMonthFollowersData.length > 0
+                      ? currentFollowersMetrics.novosSeguidoresMes > 0 &&
+                        currentFollowersMetrics.crescimentoPercentual === 0 &&
+                        currentFollowersMetrics.crescimentoAbsoluto > 0
+                        ? "Primeiro período"
+                        : `${currentFollowersMetrics.crescimentoPercentual >= 0 ? "+" : ""}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}% vs anterior`
                       : undefined
                   }
                   size="compact"
@@ -506,12 +478,15 @@ const Seguidores = () => {
                       title="Visualizações"
                       value={formatNumber(currentMarketingMetrics.visualizacoesTotal)}
                       icon={<Eye className="h-3 w-3" />}
-                      trend={previousMonthMarketingData.length > 0 ? growthMarketingMetrics.crescimentoVisualizacoes : undefined}
-                      status={getStatusFromBenchmark(
-                        growthMarketingMetrics.crescimentoVisualizacoes, 
-                        0, 
-                        { warningThreshold: -10, dangerThreshold: -25 }
-                      )}
+                      trend={
+                        previousMonthMarketingData.length > 0
+                          ? growthMarketingMetrics.crescimentoVisualizacoes
+                          : undefined
+                      }
+                      status={getStatusFromBenchmark(growthMarketingMetrics.crescimentoVisualizacoes, 0, {
+                        warningThreshold: -10,
+                        dangerThreshold: -25,
+                      })}
                       size="compact"
                       tooltipKey="visualizacoes_instagram"
                     />
@@ -520,12 +495,13 @@ const Seguidores = () => {
                       title="Alcance"
                       value={formatNumber(currentMarketingMetrics.alcanceTotal)}
                       icon={<Users className="h-3 w-3" />}
-                      trend={previousMonthMarketingData.length > 0 ? growthMarketingMetrics.crescimentoAlcance : undefined}
-                      status={getStatusFromBenchmark(
-                        growthMarketingMetrics.crescimentoAlcance, 
-                        0, 
-                        { warningThreshold: -10, dangerThreshold: -25 }
-                      )}
+                      trend={
+                        previousMonthMarketingData.length > 0 ? growthMarketingMetrics.crescimentoAlcance : undefined
+                      }
+                      status={getStatusFromBenchmark(growthMarketingMetrics.crescimentoAlcance, 0, {
+                        warningThreshold: -10,
+                        dangerThreshold: -25,
+                      })}
                       size="compact"
                       tooltipKey="alcance_instagram"
                     />
@@ -534,11 +510,10 @@ const Seguidores = () => {
                       title="Interações"
                       value={formatNumber(currentMarketingMetrics.interacoesTotal)}
                       icon={<Heart className="h-3 w-3" />}
-                      status={getStatusFromBenchmark(
-                        currentMarketingMetrics.interacoesTotal, 
-                        1000, 
-                        { warningThreshold: 500, dangerThreshold: 100 }
-                      )}
+                      status={getStatusFromBenchmark(currentMarketingMetrics.interacoesTotal, 1000, {
+                        warningThreshold: 500,
+                        dangerThreshold: 100,
+                      })}
                       size="compact"
                       tooltipKey="interacoes_instagram"
                     />
@@ -547,12 +522,13 @@ const Seguidores = () => {
                       title="Visitas ao Perfil"
                       value={formatNumber(currentMarketingMetrics.visitasTotal)}
                       icon={<MousePointerClick className="h-3 w-3" />}
-                      trend={previousMonthMarketingData.length > 0 ? growthMarketingMetrics.crescimentoVisitas : undefined}
-                      status={getStatusFromBenchmark(
-                        growthMarketingMetrics.crescimentoVisitas, 
-                        0, 
-                        { warningThreshold: -10, dangerThreshold: -25 }
-                      )}
+                      trend={
+                        previousMonthMarketingData.length > 0 ? growthMarketingMetrics.crescimentoVisitas : undefined
+                      }
+                      status={getStatusFromBenchmark(growthMarketingMetrics.crescimentoVisitas, 0, {
+                        warningThreshold: -10,
+                        dangerThreshold: -25,
+                      })}
                       size="compact"
                       tooltipKey="visitas_perfil_instagram"
                     />
@@ -560,11 +536,10 @@ const Seguidores = () => {
                       title="Cliques no Link"
                       value={formatNumber(currentMarketingMetrics.clicksTotal)}
                       icon={<ExternalLink className="h-3 w-3" />}
-                      status={getStatusFromBenchmark(
-                        currentMarketingMetrics.clicksTotal, 
-                        100, 
-                        { warningThreshold: 50, dangerThreshold: 10 }
-                      )}
+                      status={getStatusFromBenchmark(currentMarketingMetrics.clicksTotal, 100, {
+                        warningThreshold: 50,
+                        dangerThreshold: 10,
+                      })}
                       size="compact"
                       tooltipKey="cliques_link_instagram"
                     />
@@ -578,24 +553,28 @@ const Seguidores = () => {
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-semibold text-foreground">📊 Taxas Derivadas</h2>
-                  <Badge variant="outline" className="text-xs">Orgânico</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    Orgânico
+                  </Badge>
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
                   <StatusMetricCard
                     title="Taxa de Engajamento"
                     value={`${currentMarketingMetrics.taxaEngajamento.toFixed(2)}%`}
                     icon={<Heart className="h-4 w-4" />}
-                    status={getStatusFromBenchmark(
-                      currentMarketingMetrics.taxaEngajamento, 
-                      3, 
-                      { warningThreshold: 1, dangerThreshold: 0.5 }
-                    )}
+                    status={getStatusFromBenchmark(currentMarketingMetrics.taxaEngajamento, 3, {
+                      warningThreshold: 1,
+                      dangerThreshold: 0.5,
+                    })}
                     benchmark={{ value: 3, label: "Meta: 3%" }}
                     interpretation={
-                      currentMarketingMetrics.taxaEngajamento >= 5 ? "🏆 Excelente engajamento" :
-                      currentMarketingMetrics.taxaEngajamento >= 3 ? "✅ Bom engajamento" :
-                      currentMarketingMetrics.taxaEngajamento >= 1 ? "⚠️ Engajamento médio" :
-                      "📉 Engajamento baixo"
+                      currentMarketingMetrics.taxaEngajamento >= 5
+                        ? "🏆 Excelente engajamento"
+                        : currentMarketingMetrics.taxaEngajamento >= 3
+                          ? "✅ Bom engajamento"
+                          : currentMarketingMetrics.taxaEngajamento >= 1
+                            ? "⚠️ Engajamento médio"
+                            : "📉 Engajamento baixo"
                     }
                     tooltipKey="taxa_engajamento_instagram"
                   />
@@ -603,17 +582,19 @@ const Seguidores = () => {
                     title="Taxa Alcance → Visita"
                     value={`${currentMarketingMetrics.taxaAlcanceVisita.toFixed(2)}%`}
                     icon={<MousePointerClick className="h-4 w-4" />}
-                    status={getStatusFromBenchmark(
-                      currentMarketingMetrics.taxaAlcanceVisita, 
-                      1, 
-                      { warningThreshold: 0.5, dangerThreshold: 0.25 }
-                    )}
+                    status={getStatusFromBenchmark(currentMarketingMetrics.taxaAlcanceVisita, 1, {
+                      warningThreshold: 0.5,
+                      dangerThreshold: 0.25,
+                    })}
                     benchmark={{ value: 1, label: "Meta: 1%" }}
                     interpretation={
-                      currentMarketingMetrics.taxaAlcanceVisita >= 2 ? "🏆 Excelente conversão" :
-                      currentMarketingMetrics.taxaAlcanceVisita >= 1 ? "✅ Boa conversão" :
-                      currentMarketingMetrics.taxaAlcanceVisita >= 0.5 ? "⚠️ Conversão média" :
-                      "📉 Conversão baixa"
+                      currentMarketingMetrics.taxaAlcanceVisita >= 2
+                        ? "🏆 Excelente conversão"
+                        : currentMarketingMetrics.taxaAlcanceVisita >= 1
+                          ? "✅ Boa conversão"
+                          : currentMarketingMetrics.taxaAlcanceVisita >= 0.5
+                            ? "⚠️ Conversão média"
+                            : "📉 Conversão baixa"
                     }
                     tooltipKey="taxa_alcance_visita"
                   />
@@ -621,17 +602,19 @@ const Seguidores = () => {
                     title="Taxa Visita → Clique"
                     value={`${currentMarketingMetrics.taxaVisitaClique.toFixed(2)}%`}
                     icon={<ExternalLink className="h-4 w-4" />}
-                    status={getStatusFromBenchmark(
-                      currentMarketingMetrics.taxaVisitaClique, 
-                      10, 
-                      { warningThreshold: 5, dangerThreshold: 2 }
-                    )}
+                    status={getStatusFromBenchmark(currentMarketingMetrics.taxaVisitaClique, 10, {
+                      warningThreshold: 5,
+                      dangerThreshold: 2,
+                    })}
                     benchmark={{ value: 10, label: "Meta: 10%" }}
                     interpretation={
-                      currentMarketingMetrics.taxaVisitaClique >= 15 ? "🏆 Excelente conversão para ação" :
-                      currentMarketingMetrics.taxaVisitaClique >= 10 ? "✅ Boa conversão para ação" :
-                      currentMarketingMetrics.taxaVisitaClique >= 5 ? "⚠️ Conversão média" :
-                      "📉 Conversão baixa - revisar CTA"
+                      currentMarketingMetrics.taxaVisitaClique >= 15
+                        ? "🏆 Excelente conversão para ação"
+                        : currentMarketingMetrics.taxaVisitaClique >= 10
+                          ? "✅ Boa conversão para ação"
+                          : currentMarketingMetrics.taxaVisitaClique >= 5
+                            ? "⚠️ Conversão média"
+                            : "📉 Conversão baixa - revisar CTA"
                     }
                     tooltipKey="taxa_visita_clique"
                   />
@@ -655,7 +638,7 @@ const Seguidores = () => {
             {/* Charts - Visualizações × Alcance */}
             {hasMarketingData && currentMonthMarketingData.length > 0 && (
               <div className="grid gap-6 lg:grid-cols-2">
-                {isLast12MonthsView && monthlyMarketingData.length > 0 ? (
+                {isMultiMonthView && monthlyMarketingData.length > 0 ? (
                   <>
                     <MonthlyAggregateChart
                       data={monthlyMarketingData}
@@ -718,13 +701,11 @@ const Seguidores = () => {
             )}
           </>
         ) : (
-          selectedMonth && (
+          hasFollowersData && (
             <Card>
               <CardContent className="pt-6">
                 <p className="text-center text-muted-foreground">
-                  {isLast12MonthsView 
-                    ? "Não há dados de seguidores para os últimos 12 meses."
-                    : "Não há dados de seguidores para o mês selecionado."}
+                  Não há dados de seguidores para o período selecionado.
                 </p>
               </CardContent>
             </Card>
