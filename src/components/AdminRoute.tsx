@@ -39,7 +39,7 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
             <p className="text-muted-foreground">
               Você não tem permissão para acessar esta página. Apenas administradores podem acessar esta funcionalidade.
             </p>
-            <Button onClick={() => navigate("/dashboard")} className="w-full">
+            <Button onClick={() => navigate("/visao-executiva-v2")} className="w-full">
               Voltar ao Dashboard
             </Button>
           </CardContent>
