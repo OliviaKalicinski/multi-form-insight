@@ -63,7 +63,6 @@ export default function Upload() {
   const handleUploadComplete = async () => {
     await refreshFromDatabase();
     await fetchLatestDataDate();
-    // Recalcular entidade customer após upload de vendas
     try {
       await supabase.rpc("recalculate_all_customers");
     } catch (e) {
@@ -87,7 +86,7 @@ export default function Upload() {
         </div>
 
         {hasAnyData && (
-          <Button onClick={() => navigate("/dashboard")}>
+          <Button onClick={() => navigate("/visao-executiva-v2")}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Ver Dashboard
           </Button>
@@ -127,7 +126,7 @@ export default function Upload() {
                     {instagramMetricsCount} registros
                   </Badge>
                 )}
-                <a
+                
                   href={EXTERNAL_LINKS.instagram}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -159,7 +158,7 @@ export default function Upload() {
                       {salesData.length} pedidos
                     </Badge>
                   )}
-                  <a
+                  
                     href={EXTERNAL_LINKS.vendas}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -189,7 +188,7 @@ export default function Upload() {
                       {adsData.length} registros
                     </Badge>
                   )}
-                  <a
+                  
                     href={EXTERNAL_LINKS.ads}
                     target="_blank"
                     rel="noopener noreferrer"
