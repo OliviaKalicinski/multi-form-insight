@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { formatCurrency } from "@/utils/salesCalculator";
 import { getOfficialRevenue, isRevenueOrder, getB2COrders, getB2BOrders, getB2B2COrders } from "@/utils/revenue";
-import { isSampleProduct, isOnlySampleOrder, hasRegularProduct } from "@/utils/samplesAnalyzer";
+import { isSampleProduct, isOnlySampleOrder, hasRegularProduct, isMaterialProduct } from "@/utils/samplesAnalyzer";
 import { classifyProductsByAnimal } from "@/utils/petProfile";
 import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
@@ -109,7 +109,7 @@ function buildProductRevenueMap(orders: ProcessedOrder[]) {
   const map: Record<string, { revenue: number; qty: number }> = {};
   orders.forEach((o) =>
     o.produtos.forEach((p) => {
-      if (!isSampleProduct(p)) {
+      if (!isSampleProduct(p) && !isMaterialProduct(p)) {
         const key = p.descricaoAjustada || p.descricao;
         if (!map[key]) map[key] = { revenue: 0, qty: 0 };
         map[key].revenue += p.preco;
@@ -405,7 +405,7 @@ const VisaoExecutivaV2 = () => {
     let totalNonSampleLines = 0;
     withProductOrders.forEach((o) =>
       o.produtos.forEach((p) => {
-        if (!isSampleProduct(p)) totalNonSampleLines += 1;
+        if (!isSampleProduct(p) && !isMaterialProduct(p)) totalNonSampleLines += 1;
       }),
     );
     const mediaProdutosPorPedido = withProductOrders.length > 0 ? totalNonSampleLines / withProductOrders.length : 0;
@@ -491,8 +491,8 @@ const VisaoExecutivaV2 = () => {
         multiplos = 0;
       mo.filter(isOnlySampleOrder).forEach((o) => {
         const profile = classifyProductsByAnimal(o.produtos.filter(isSampleProduct));
-        if (profile === "caes") cachorro++;
-        else if (profile === "gatos") gato++;
+        if (profile === "cachorro") cachorro++;
+        else if (profile === "gato") gato++;
         else if (profile === "multiplos") multiplos++;
       });
       return { mes: fmtMonth(m), Cachorro: cachorro, Gato: gato, "Cach.+Gato": multiplos };
