@@ -401,13 +401,14 @@ const VisaoExecutivaV2 = () => {
         ? revenueProductOrders.reduce((s, o) => s + getOfficialRevenue(o), 0) / revenueProductOrders.length
         : 0;
 
-    let totalNonSampleItems = 0;
+    // Conta linhas de produto distintas por pedido (não soma de unidades físicas)
+    let totalNonSampleLines = 0;
     withProductOrders.forEach((o) =>
       o.produtos.forEach((p) => {
-        if (!isSampleProduct(p)) totalNonSampleItems += p.quantidade;
+        if (!isSampleProduct(p)) totalNonSampleLines += 1;
       }),
     );
-    const mediaProdutosPorPedido = withProductOrders.length > 0 ? totalNonSampleItems / withProductOrders.length : 0;
+    const mediaProdutosPorPedido = withProductOrders.length > 0 ? totalNonSampleLines / withProductOrders.length : 0;
 
     const samplesByProfile: Partial<Record<BuyerPetProfile, number>> = {};
     onlySampleOrders.forEach((o) => {
@@ -490,8 +491,8 @@ const VisaoExecutivaV2 = () => {
         multiplos = 0;
       mo.filter(isOnlySampleOrder).forEach((o) => {
         const profile = classifyProductsByAnimal(o.produtos.filter(isSampleProduct));
-        if (profile === "caes") cachorro++;
-        else if (profile === "gatos") gato++;
+        if (profile === "cachorro") cachorro++;
+        else if (profile === "gato") gato++;
         else if (profile === "multiplos") multiplos++;
       });
       return { mes: fmtMonth(m), Cachorro: cachorro, Gato: gato, "Cach.+Gato": multiplos };
@@ -749,9 +750,9 @@ const VisaoExecutivaV2 = () => {
           />
           <KPICard
             icon={Users}
-            label="Ticket Médio"
+            label="Ticket Médio (excl. amostras)"
             value={formatCurrency(b2c.ticketMedio)}
-            sub={`${b2c.mediaProdutosPorPedido.toFixed(1)} itens/pedido`}
+            sub={`${b2c.mediaProdutosPorPedido.toFixed(1)} SKUs/pedido (excl. amostras)`}
             accentColor={B2C_COLOR}
           />
           <KPICard
@@ -934,6 +935,7 @@ const VisaoExecutivaV2 = () => {
           color={B2B_COLOR}
           icon={Building2}
           badgeRevenue={formatCurrency(b2b.receitaTotal)}
+          defaultOpen={true}
         >
           {b2b.totalPedidos === 0 ? (
             <Card>
