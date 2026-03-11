@@ -13,118 +13,70 @@ import { CrossSellKPICards } from "@/components/dashboard/CrossSellKPICards";
 import { CrossSellBarsChart } from "@/components/dashboard/CrossSellBarsChart";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
-import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
+import { filterOrdersByDateRange, formatCurrency } from "@/utils/salesCalculator";
 import { Button } from "@/components/ui/button";
-import { format, parse } from "date-fns";
-import { ptBR } from "date-fns/locale";
 export default function Produtos() {
-  const {
-    salesData,
-    selectedMonth,
-    availableMonths,
-    comparisonMode,
-    selectedMonths,
-  } = useDashboard();
+  const { salesData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
 
-  const [productSortBy, setProductSortBy] = useState<'quantity' | 'revenue'>('quantity');
-  const [viewMode, setViewMode] = useState<'as-sold' | 'individual'>('as-sold');
+  const [productSortBy, setProductSortBy] = useState<"quantity" | "revenue">("quantity");
+  const [viewMode, setViewMode] = useState<"as-sold" | "individual">("as-sold");
 
   const productMetrics = useMemo(() => {
     if (salesData.length === 0) return null;
-    
-    const filteredOrders = selectedMonth 
-      ? filterOrdersByMonth(salesData, selectedMonth, availableMonths) 
-      : salesData;
-    
-    return calculateProductOperationsMetrics(
-      filteredOrders, 
-      viewMode === 'individual'
-    );
-  }, [salesData, selectedMonth, availableMonths, viewMode]);
+    const filteredOrders = dateRange ? filterOrdersByDateRange(salesData, dateRange.start, dateRange.end) : salesData;
+    return calculateProductOperationsMetrics(filteredOrders, viewMode === "individual");
+  }, [salesData, dateRange, viewMode]);
 
-  // Métricas de comparação multi-mês
+  // Métricas de comparação (período A vs período B)
   const comparisonMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length === 0 || salesData.length === 0) {
-      return null;
-    }
+    if (!comparisonMode || !comparisonDateRange || salesData.length === 0) return null;
+
+    const COLORS = ["#8b5cf6", "#3b82f6"];
+    const periods = [
+      { range: dateRange, label: "Período A", color: COLORS[0] },
+      { range: comparisonDateRange, label: "Período B", color: COLORS[1] },
+    ].filter((p) => p.range);
 
     const receitaProdutos: any[] = [];
     const produtosVendidos: any[] = [];
     const skusUnicos: any[] = [];
     const topProduto: any[] = [];
 
-    const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
-
-    selectedMonths.forEach((month, index) => {
-      const filteredOrders = filterOrdersByMonth(salesData, month, availableMonths);
-      const metrics = calculateProductOperationsMetrics(filteredOrders, viewMode === 'individual');
-      
+    periods.forEach(({ range, label, color }) => {
+      const filteredOrders = filterOrdersByDateRange(salesData, range!.start, range!.end);
+      const metrics = calculateProductOperationsMetrics(filteredOrders, viewMode === "individual");
       if (metrics) {
-        const monthLabel = format(
-          parse(month, "yyyy-MM", new Date()), 
-          "MMM yyyy", 
-          { locale: ptBR }
-        );
-        
-        const color = COLORS[index % COLORS.length];
-
-        // Receita total de produtos
+        const month = label.toLowerCase().replace(" ", "-");
         const totalRevenue = metrics.topProductsByRevenue.reduce((sum, p) => sum + p.faturamentoTotal, 0);
-        receitaProdutos.push({
-          month,
-          monthLabel,
-          value: totalRevenue,
-          color,
-        });
-
-        // Total de produtos vendidos
+        receitaProdutos.push({ month, monthLabel: label, value: totalRevenue, color });
         const totalProducts = metrics.topProductsByQuantity.reduce((sum, p) => sum + p.quantidadeTotal, 0);
-        produtosVendidos.push({
-          month,
-          monthLabel,
-          value: totalProducts,
-          color,
-        });
-
-        // SKUs únicos
-        skusUnicos.push({
-          month,
-          monthLabel,
-          value: metrics.skuAnalysis.length,
-          color,
-        });
-
-        // Top produto
+        produtosVendidos.push({ month, monthLabel: label, value: totalProducts, color });
+        skusUnicos.push({ month, monthLabel: label, value: metrics.skuAnalysis.length, color });
         const topProduct = metrics.topProductsByRevenue[0];
         topProduto.push({
           month,
-          monthLabel,
+          monthLabel: label,
           value: topProduct?.faturamentoTotal || 0,
           color,
-          productName: topProduct?.descricaoAjustada || 'N/A',
+          productName: topProduct?.descricaoAjustada || "N/A",
         });
       }
     });
 
-    // Calcular variações percentuais
     const calcVariation = (arr: any[]) => {
       if (arr.length > 1) {
         const base = arr[0].value;
         arr.forEach((item, idx) => {
-          if (idx > 0 && base > 0) {
-            item.percentageChange = ((item.value - base) / base) * 100;
-          }
+          if (idx > 0 && base > 0) item.percentageChange = ((item.value - base) / base) * 100;
         });
       }
     };
-
     calcVariation(receitaProdutos);
     calcVariation(produtosVendidos);
     calcVariation(skusUnicos);
     calcVariation(topProduto);
-
     return { receitaProdutos, produtosVendidos, skusUnicos, topProduto };
-  }, [comparisonMode, selectedMonths, salesData, availableMonths, viewMode]);
+  }, [comparisonMode, comparisonDateRange, dateRange, salesData, viewMode]);
 
   if (salesData.length === 0) {
     return (
@@ -150,9 +102,7 @@ export default function Produtos() {
         <Package className="w-8 h-8 text-primary" />
         <div>
           <h1 className="text-3xl font-bold">📦 Produtos</h1>
-          <p className="text-muted-foreground">
-            Análise de produtos, SKUs, combinações e brindes
-          </p>
+          <p className="text-muted-foreground">Análise de produtos, SKUs, combinações e brindes</p>
         </div>
       </div>
 
@@ -162,20 +112,18 @@ export default function Produtos() {
           <div className="flex flex-col md:flex-row md:items-center gap-6">
             {/* Grupo 1: Ordenação */}
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground">
-                Ordenar por:
-              </span>
+              <span className="text-sm font-medium text-muted-foreground">Ordenar por:</span>
               <div className="flex gap-2">
                 <Button
-                  variant={productSortBy === 'quantity' ? 'default' : 'outline'}
-                  onClick={() => setProductSortBy('quantity')}
+                  variant={productSortBy === "quantity" ? "default" : "outline"}
+                  onClick={() => setProductSortBy("quantity")}
                   size="sm"
                 >
                   Por Quantidade
                 </Button>
                 <Button
-                  variant={productSortBy === 'revenue' ? 'default' : 'outline'}
-                  onClick={() => setProductSortBy('revenue')}
+                  variant={productSortBy === "revenue" ? "default" : "outline"}
+                  onClick={() => setProductSortBy("revenue")}
                   size="sm"
                 >
                   Por Faturamento
@@ -188,21 +136,19 @@ export default function Produtos() {
 
             {/* Grupo 2: Modo de Visualização */}
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground">
-                Visualização:
-              </span>
+              <span className="text-sm font-medium text-muted-foreground">Visualização:</span>
               <div className="flex gap-2">
                 <Button
-                  variant={viewMode === 'as-sold' ? 'default' : 'outline'}
-                  onClick={() => setViewMode('as-sold')}
+                  variant={viewMode === "as-sold" ? "default" : "outline"}
+                  onClick={() => setViewMode("as-sold")}
                   size="sm"
                 >
                   <Package className="h-4 w-4 mr-2" />
                   Como Vendidos
                 </Button>
                 <Button
-                  variant={viewMode === 'individual' ? 'default' : 'outline'}
-                  onClick={() => setViewMode('individual')}
+                  variant={viewMode === "individual" ? "default" : "outline"}
+                  onClick={() => setViewMode("individual")}
                   size="sm"
                 >
                   <ListTree className="h-4 w-4 mr-2" />
@@ -219,10 +165,11 @@ export default function Produtos() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* HERO Card - Produto Campeão */}
           {(() => {
-            const topProduct = productSortBy === 'quantity' 
-              ? productMetrics.topProductsByQuantity[0]
-              : productMetrics.topProductsByRevenue[0];
-            
+            const topProduct =
+              productSortBy === "quantity"
+                ? productMetrics.topProductsByQuantity[0]
+                : productMetrics.topProductsByRevenue[0];
+
             return (
               <KPITooltip metricKey="produto_campeao">
                 <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
@@ -234,23 +181,19 @@ export default function Produtos() {
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Produto Campeão</p>
                         <p className="text-xs text-muted-foreground">
-                          {productSortBy === 'quantity' 
-                            ? '🏆 Mais vendido em unidades no período' 
-                            : '💰 Maior faturamento no período'}
+                          {productSortBy === "quantity"
+                            ? "🏆 Mais vendido em unidades no período"
+                            : "💰 Maior faturamento no período"}
                         </p>
                       </div>
                     </div>
-                    
-                    <h3 className="text-xl font-bold mb-4 line-clamp-2">
-                      {topProduct?.descricaoAjustada || 'N/A'}
-                    </h3>
-                    
+
+                    <h3 className="text-xl font-bold mb-4 line-clamp-2">{topProduct?.descricaoAjustada || "N/A"}</h3>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-background/50 rounded-lg p-3">
                         <p className="text-xs text-muted-foreground">📦 Unidades</p>
-                        <p className="text-lg font-bold">
-                          {topProduct?.quantidadeTotal.toLocaleString('pt-BR') || 0}
-                        </p>
+                        <p className="text-lg font-bold">{topProduct?.quantidadeTotal.toLocaleString("pt-BR") || 0}</p>
                       </div>
                       <div className="bg-background/50 rounded-lg p-3">
                         <p className="text-xs text-muted-foreground">💰 Receita</p>
@@ -261,16 +204,15 @@ export default function Produtos() {
                       <div className="bg-background/50 rounded-lg p-3">
                         <p className="text-xs text-muted-foreground">📈 % do Total</p>
                         <p className="text-lg font-bold text-primary">
-                          {productSortBy === 'quantity'
-                            ? (topProduct?.percentualQuantidade?.toFixed(1) || 0)
-                            : (topProduct?.percentualFaturamento?.toFixed(1) || 0)}%
+                          {productSortBy === "quantity"
+                            ? topProduct?.percentualQuantidade?.toFixed(1) || 0
+                            : topProduct?.percentualFaturamento?.toFixed(1) || 0}
+                          %
                         </p>
                       </div>
                       <div className="bg-background/50 rounded-lg p-3">
                         <p className="text-xs text-muted-foreground">🛒 Pedidos</p>
-                        <p className="text-lg font-bold">
-                          {topProduct?.numeroPedidos.toLocaleString('pt-BR') || 0}
-                        </p>
+                        <p className="text-lg font-bold">{topProduct?.numeroPedidos.toLocaleString("pt-BR") || 0}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -289,7 +231,9 @@ export default function Produtos() {
                     <span className="text-xs text-muted-foreground">Receita Total</span>
                   </div>
                   <p className="text-xl font-bold text-green-600">
-                    {formatCurrency(productMetrics.topProductsByRevenue.reduce((sum, p) => sum + p.faturamentoTotal, 0))}
+                    {formatCurrency(
+                      productMetrics.topProductsByRevenue.reduce((sum, p) => sum + p.faturamentoTotal, 0),
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -303,7 +247,9 @@ export default function Produtos() {
                     <span className="text-xs text-muted-foreground">Unidades Vendidas</span>
                   </div>
                   <p className="text-xl font-bold text-blue-600">
-                    {productMetrics.topProductsByQuantity.reduce((sum, p) => sum + p.quantidadeTotal, 0).toLocaleString('pt-BR')}
+                    {productMetrics.topProductsByQuantity
+                      .reduce((sum, p) => sum + p.quantidadeTotal, 0)
+                      .toLocaleString("pt-BR")}
                   </p>
                 </CardContent>
               </Card>
@@ -317,7 +263,7 @@ export default function Produtos() {
                     <span className="text-xs text-muted-foreground">SKUs Únicos</span>
                   </div>
                   <p className="text-xl font-bold text-purple-600">
-                    {productMetrics.skuAnalysis.length.toLocaleString('pt-BR')}
+                    {productMetrics.skuAnalysis.length.toLocaleString("pt-BR")}
                   </p>
                 </CardContent>
               </Card>
@@ -331,7 +277,7 @@ export default function Produtos() {
                     <span className="text-xs text-muted-foreground">Combinações</span>
                   </div>
                   <p className="text-xl font-bold text-orange-600">
-                    {productMetrics.productCombinations.length.toLocaleString('pt-BR')}
+                    {productMetrics.productCombinations.length.toLocaleString("pt-BR")}
                   </p>
                 </CardContent>
               </Card>
@@ -345,7 +291,7 @@ export default function Produtos() {
                     <span className="text-xs text-muted-foreground">Brindes</span>
                   </div>
                   <p className="text-xl font-bold text-pink-600">
-                    {productMetrics.freebieProducts.length.toLocaleString('pt-BR')}
+                    {productMetrics.freebieProducts.length.toLocaleString("pt-BR")}
                   </p>
                 </CardContent>
               </Card>
@@ -399,25 +345,27 @@ export default function Produtos() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    {viewMode === 'as-sold' ? (
-                      <><Package className="h-5 w-5" /> Top 15 Produtos</>
+                    {viewMode === "as-sold" ? (
+                      <>
+                        <Package className="h-5 w-5" /> Top 15 Produtos
+                      </>
                     ) : (
-                      <><ListTree className="h-5 w-5" /> Top 15 Produtos (Individuais)</>
+                      <>
+                        <ListTree className="h-5 w-5" /> Top 15 Produtos (Individuais)
+                      </>
                     )}
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    {productSortBy === 'quantity' 
-                      ? 'Ordenados por quantidade vendida' 
-                      : 'Ordenados por faturamento'}
+                    {productSortBy === "quantity" ? "Ordenados por quantidade vendida" : "Ordenados por faturamento"}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            
+
             <CardContent className="pb-6">
               <TopProductsChart
                 products={
-                  productSortBy === 'quantity'
+                  productSortBy === "quantity"
                     ? productMetrics?.topProductsByQuantity || []
                     : productMetrics?.topProductsByRevenue || []
                 }
@@ -430,16 +378,14 @@ export default function Produtos() {
             <div className="px-6 pb-2">
               <div className="border-t pt-6">
                 <h3 className="text-sm font-semibold mb-2">📋 Tabela Detalhada - Top 20 Produtos</h3>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Detalhamento completo dos produtos mais vendidos
-                </p>
+                <p className="text-xs text-muted-foreground mb-4">Detalhamento completo dos produtos mais vendidos</p>
               </div>
             </div>
 
             <CardContent>
               <TopProductsTable
                 products={
-                  productSortBy === 'quantity'
+                  productSortBy === "quantity"
                     ? productMetrics?.topProductsByQuantity || []
                     : productMetrics?.topProductsByRevenue || []
                 }
@@ -452,9 +398,7 @@ export default function Produtos() {
             <Card>
               <CardHeader>
                 <CardTitle>🎁 Produtos Brinde / Promoções (R$ 0,01)</CardTitle>
-                <CardDescription>
-                  Produtos distribuídos como cortesia ou amostras
-                </CardDescription>
+                <CardDescription>Produtos distribuídos como cortesia ou amostras</CardDescription>
               </CardHeader>
               <CardContent>
                 <FreebieProductsList products={productMetrics.freebieProducts} />
@@ -467,9 +411,7 @@ export default function Produtos() {
           <Card>
             <CardHeader>
               <CardTitle>Análise Detalhada de SKU</CardTitle>
-              <CardDescription>
-                Desempenho individual de cada código de produto
-              </CardDescription>
+              <CardDescription>Desempenho individual de cada código de produto</CardDescription>
             </CardHeader>
             <CardContent>
               <SKUAnalysisTable skus={productMetrics?.skuAnalysis || []} />
@@ -488,9 +430,7 @@ export default function Produtos() {
             <Card>
               <CardHeader>
                 <CardTitle>🏆 Top 5 Combinações Mais Frequentes</CardTitle>
-                <CardDescription>
-                  Produtos mais comprados juntos
-                </CardDescription>
+                <CardDescription>Produtos mais comprados juntos</CardDescription>
               </CardHeader>
               <CardContent>
                 <CrossSellBarsChart combinations={productMetrics.productCombinations} limit={5} />
@@ -502,15 +442,11 @@ export default function Produtos() {
           <Card>
             <CardHeader>
               <CardTitle>🔗 Oportunidades de Cross-Sell</CardTitle>
-              <CardDescription>
-                Identificar oportunidades de bundles e promoções combinadas
-              </CardDescription>
+              <CardDescription>Identificar oportunidades de bundles e promoções combinadas</CardDescription>
             </CardHeader>
             <CardContent>
               {productMetrics && productMetrics.productCombinations.length > 0 ? (
-                <ProductCombinationsTable
-                  combinations={productMetrics.productCombinations}
-                />
+                <ProductCombinationsTable combinations={productMetrics.productCombinations} />
               ) : (
                 <p className="text-muted-foreground text-center py-8">
                   Não há combinações frequentes de produtos no período selecionado
