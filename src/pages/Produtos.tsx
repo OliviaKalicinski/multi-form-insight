@@ -3,6 +3,8 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { Package, ListTree, DollarSign, ShoppingCart, BarChart3, TrendingUp, Trophy, Gift, Link2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { TopProductsTable } from "@/components/dashboard/TopProductsTable";
 import { SKUAnalysisTable } from "@/components/dashboard/SKUAnalysisTable";
@@ -14,18 +16,38 @@ import { CrossSellBarsChart } from "@/components/dashboard/CrossSellBarsChart";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
 import { filterOrdersByDateRange, formatCurrency } from "@/utils/salesCalculator";
+import { segmentOrders, SEGMENT_LABELS, SEGMENT_COLORS, SEGMENT_ORDER, SegmentFilter } from "@/utils/revenue";
 import { Button } from "@/components/ui/button";
+
+type SegmentKey = Exclude<SegmentFilter, "all">;
+
 export default function Produtos() {
   const { salesData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
 
   const [productSortBy, setProductSortBy] = useState<"quantity" | "revenue">("quantity");
   const [viewMode, setViewMode] = useState<"as-sold" | "individual">("as-sold");
+  const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>("all");
 
+  const isConsolidated = selectedSegment === "all";
+
+  // 1. Segmentar sempre primeiro
+  const segments = useMemo(() => segmentOrders(salesData), [salesData]);
+
+  // 2. Selecionar segmento
+  const ordersForSegment = useMemo(
+    () =>
+      isConsolidated ? [...segments.b2c, ...segments.b2b2c, ...segments.b2b] : segments[selectedSegment as SegmentKey],
+    [segments, selectedSegment, isConsolidated],
+  );
+
+  // 3. Filtrar por período
   const productMetrics = useMemo(() => {
     if (salesData.length === 0) return null;
-    const filteredOrders = dateRange ? filterOrdersByDateRange(salesData, dateRange.start, dateRange.end) : salesData;
+    const filteredOrders = dateRange
+      ? filterOrdersByDateRange(ordersForSegment, dateRange.start, dateRange.end)
+      : ordersForSegment;
     return calculateProductOperationsMetrics(filteredOrders, viewMode === "individual");
-  }, [salesData, dateRange, viewMode]);
+  }, [ordersForSegment, dateRange, viewMode, salesData.length]);
 
   // Métricas de comparação (período A vs período B)
   const comparisonMetrics = useMemo(() => {
@@ -43,7 +65,7 @@ export default function Produtos() {
     const topProduto: any[] = [];
 
     periods.forEach(({ range, label, color }) => {
-      const filteredOrders = filterOrdersByDateRange(salesData, range!.start, range!.end);
+      const filteredOrders = filterOrdersByDateRange(ordersForSegment, range!.start, range!.end);
       const metrics = calculateProductOperationsMetrics(filteredOrders, viewMode === "individual");
       if (metrics) {
         const month = label.toLowerCase().replace(" ", "-");
@@ -76,7 +98,7 @@ export default function Produtos() {
     calcVariation(skusUnicos);
     calcVariation(topProduto);
     return { receitaProdutos, produtosVendidos, skusUnicos, topProduto };
-  }, [comparisonMode, comparisonDateRange, dateRange, salesData, viewMode]);
+  }, [comparisonMode, comparisonDateRange, dateRange, ordersForSegment, viewMode, salesData.length]);
 
   if (salesData.length === 0) {
     return (
@@ -98,15 +120,63 @@ export default function Produtos() {
 
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
-      <div className="flex items-center gap-3">
-        <Package className="w-8 h-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold">📦 Produtos</h1>
-          <p className="text-muted-foreground">Análise de produtos, SKUs, combinações e brindes</p>
+      {/* ===== HEADER + SEGMENTO (menu superior) ===== */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Package className="w-8 h-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">📦 Produtos</h1>
+            <p className="text-muted-foreground">Análise de produtos, SKUs, combinações e brindes</p>
+          </div>
         </div>
+
+        {/* Seletor de segmento elevado */}
+        <TooltipProvider>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-muted-foreground">Segmento:</span>
+            <ToggleGroup
+              type="single"
+              value={selectedSegment}
+              onValueChange={(value) => {
+                if (value) setSelectedSegment(value as SegmentFilter);
+              }}
+              className="gap-1"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem value="all" className="text-xs px-3">
+                    Todos
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent>Todos os segmentos combinados</TooltipContent>
+              </Tooltip>
+              {SEGMENT_ORDER.map((seg) => (
+                <Tooltip key={seg}>
+                  <TooltipTrigger asChild>
+                    <ToggleGroupItem
+                      value={seg}
+                      className="text-xs px-3"
+                      style={{
+                        borderColor: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
+                        color: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
+                      }}
+                    >
+                      {SEGMENT_LABELS[seg]}
+                    </ToggleGroupItem>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {seg === "b2c" && "Vendas diretas ao consumidor (DTC)"}
+                    {seg === "b2b2c" && "Vendas via distribuidores/revendedores"}
+                    {seg === "b2b" && "Vendas Let's Fly (atacado)"}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </ToggleGroup>
+          </div>
+        </TooltipProvider>
       </div>
 
-      {/* FILTROS GLOBAIS */}
+      {/* ===== FILTROS SECUNDÁRIOS ===== */}
       <Card className="bg-muted/20 border-dashed">
         <CardContent className="py-4">
           <div className="flex flex-col md:flex-row md:items-center gap-6">
@@ -300,7 +370,7 @@ export default function Produtos() {
         </div>
       )}
 
-      {/* Cards de comparação multi-mês */}
+      {/* Cards de comparação multi-período */}
       {comparisonMode && comparisonMetrics && (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <ComparisonMetricCard
@@ -420,12 +490,10 @@ export default function Produtos() {
         </TabsContent>
 
         <TabsContent value="crosssell" className="space-y-6">
-          {/* KPIs de Cross-Sell */}
           {productMetrics && productMetrics.productCombinations.length > 0 && (
             <CrossSellKPICards combinations={productMetrics.productCombinations} />
           )}
 
-          {/* Gráfico de Barras - Top Combinações */}
           {productMetrics && productMetrics.productCombinations.length > 0 && (
             <Card>
               <CardHeader>
@@ -438,7 +506,6 @@ export default function Produtos() {
             </Card>
           )}
 
-          {/* Tabela de Combinações */}
           <Card>
             <CardHeader>
               <CardTitle>🔗 Oportunidades de Cross-Sell</CardTitle>
