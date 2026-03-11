@@ -1,10 +1,19 @@
 import { format, parse, startOfMonth, differenceInMonths, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ProcessedOrder, FinancialMetrics, SeasonalityAnalysis, OrderValueDistribution, PlatformPerformance, ProductRevenueData, PlatformWithProducts, ProductContribution } from "@/types/marketing";
-import { extractDailyOrders, calculateAverageTicket } from './salesCalculator';
-import { breakdownOrders } from './orderBreakdown';
-import { isOnlySampleOrder } from './samplesAnalyzer';
-import { getOfficialRevenue, getRevenueOrders } from './revenue';
+import {
+  ProcessedOrder,
+  FinancialMetrics,
+  SeasonalityAnalysis,
+  OrderValueDistribution,
+  PlatformPerformance,
+  ProductRevenueData,
+  PlatformWithProducts,
+  ProductContribution,
+} from "@/types/marketing";
+import { extractDailyOrders, calculateAverageTicket } from "./salesCalculator";
+import { breakdownOrders } from "./orderBreakdown";
+import { isOnlySampleOrder, isMaterialProduct } from "./samplesAnalyzer";
+import { getOfficialRevenue, getRevenueOrders } from "./revenue";
 
 // ======= TYPES =======
 
@@ -22,24 +31,22 @@ export interface OrderDataWithTypes {
 /**
  * Calcula pedidos diários separados por tipo (só amostras vs produtos)
  */
-export const calculateOrdersByDayWithTypes = (
-  orders: ProcessedOrder[]
-): OrderDataWithTypes[] => {
+export const calculateOrdersByDayWithTypes = (orders: ProcessedOrder[]): OrderDataWithTypes[] => {
   const dailyMap = new Map<string, { sampleOnly: number; product: number }>();
-  
-  orders.forEach(order => {
+
+  orders.forEach((order) => {
     const dateKey = format(order.dataVenda, "yyyy-MM-dd");
     const current = dailyMap.get(dateKey) || { sampleOnly: 0, product: 0 };
-    
+
     if (isOnlySampleOrder(order)) {
       current.sampleOnly++;
     } else {
       current.product++;
     }
-    
+
     dailyMap.set(dateKey, current);
   });
-  
+
   return Array.from(dailyMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([date, counts]) => ({
@@ -53,25 +60,23 @@ export const calculateOrdersByDayWithTypes = (
 /**
  * Calcula pedidos semanais separados por tipo (só amostras vs produtos)
  */
-export const calculateOrdersByWeekWithTypes = (
-  orders: ProcessedOrder[]
-): OrderDataWithTypes[] => {
+export const calculateOrdersByWeekWithTypes = (orders: ProcessedOrder[]): OrderDataWithTypes[] => {
   const weeklyMap = new Map<string, { sampleOnly: number; product: number }>();
-  
-  orders.forEach(order => {
+
+  orders.forEach((order) => {
     const weekStart = startOfWeek(order.dataVenda, { weekStartsOn: 0 });
     const weekKey = format(weekStart, "yyyy-'W'ww");
     const current = weeklyMap.get(weekKey) || { sampleOnly: 0, product: 0 };
-    
+
     if (isOnlySampleOrder(order)) {
       current.sampleOnly++;
     } else {
       current.product++;
     }
-    
+
     weeklyMap.set(weekKey, current);
   });
-  
+
   return Array.from(weeklyMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([week, counts]) => ({
@@ -85,24 +90,22 @@ export const calculateOrdersByWeekWithTypes = (
 /**
  * Calcula pedidos mensais separados por tipo (só amostras vs produtos)
  */
-export const calculateOrdersByMonthWithTypes = (
-  orders: ProcessedOrder[]
-): OrderDataWithTypes[] => {
+export const calculateOrdersByMonthWithTypes = (orders: ProcessedOrder[]): OrderDataWithTypes[] => {
   const monthlyMap = new Map<string, { sampleOnly: number; product: number }>();
-  
-  orders.forEach(order => {
+
+  orders.forEach((order) => {
     const monthKey = format(order.dataVenda, "yyyy-MM");
     const current = monthlyMap.get(monthKey) || { sampleOnly: 0, product: 0 };
-    
+
     if (isOnlySampleOrder(order)) {
       current.sampleOnly++;
     } else {
       current.product++;
     }
-    
+
     monthlyMap.set(monthKey, current);
   });
-  
+
   return Array.from(monthlyMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([month, counts]) => ({
@@ -117,12 +120,10 @@ export const calculateOrdersByMonthWithTypes = (
  * Retorna apenas pedidos com produtos reais (não apenas R$ 0,01)
  */
 export const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => {
-  return orders.filter(order => {
+  return orders.filter((order) => {
     // Verificar se o pedido tem outros produtos além de Kit de Amostras
-    const nonSampleProducts = order.produtos.filter(
-      p => p.descricaoAjustada !== 'Kit de Amostras'
-    );
-    
+    const nonSampleProducts = order.produtos.filter((p) => p.descricaoAjustada !== "Kit de Amostras");
+
     // Manter pedido se tiver pelo menos 1 produto que não seja Kit de Amostras
     return nonSampleProducts.length > 0;
   });
@@ -130,27 +131,25 @@ export const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => 
 /**
  * Calcula pedidos trimestrais separados por tipo (só amostras vs produtos)
  */
-export const calculateOrdersByQuarterWithTypes = (
-  orders: ProcessedOrder[]
-): OrderDataWithTypes[] => {
+export const calculateOrdersByQuarterWithTypes = (orders: ProcessedOrder[]): OrderDataWithTypes[] => {
   const quarterlyMap = new Map<string, { sampleOnly: number; product: number }>();
-  
-  orders.forEach(order => {
+
+  orders.forEach((order) => {
     const date = order.dataVenda;
     const year = date.getFullYear();
     const quarter = Math.floor(date.getMonth() / 3) + 1;
     const quarterKey = `${year}-Q${quarter}`;
     const current = quarterlyMap.get(quarterKey) || { sampleOnly: 0, product: 0 };
-    
+
     if (isOnlySampleOrder(order)) {
       current.sampleOnly++;
     } else {
       current.product++;
     }
-    
+
     quarterlyMap.set(quarterKey, current);
   });
-  
+
   return Array.from(quarterlyMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([quarter, counts]) => ({
@@ -164,24 +163,22 @@ export const calculateOrdersByQuarterWithTypes = (
 /**
  * Calcula faturamento agregado por trimestre
  */
-export const calculateQuarterlyRevenue = (
-  orders: ProcessedOrder[]
-): { quarter: string; revenue: number }[] => {
+export const calculateQuarterlyRevenue = (orders: ProcessedOrder[]): { quarter: string; revenue: number }[] => {
   const quarterlyMap = new Map<string, number>();
-  
-  orders.forEach(order => {
+
+  orders.forEach((order) => {
     const date = order.dataVenda;
     const year = date.getFullYear();
     const quarter = Math.floor(date.getMonth() / 3) + 1;
     const quarterKey = `${year}-Q${quarter}`;
     quarterlyMap.set(quarterKey, (quarterlyMap.get(quarterKey) || 0) + getOfficialRevenue(order));
   });
-  
+
   return Array.from(quarterlyMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([quarter, revenue]) => ({
       quarter,
-      revenue
+      revenue,
     }));
 };
 
@@ -190,20 +187,20 @@ export const calculateQuarterlyRevenue = (
  */
 export const calculateRevenueByPeriod = (
   orders: ProcessedOrder[],
-  periodType: 'day' | 'month' | 'year'
+  periodType: "day" | "month" | "year",
 ): { period: string; revenue: number }[] => {
   const revenueMap = new Map<string, number>();
 
   orders.forEach((order) => {
     let periodKey: string;
     switch (periodType) {
-      case 'day':
+      case "day":
         periodKey = format(order.dataVenda, "yyyy-MM-dd");
         break;
-      case 'month':
+      case "month":
         periodKey = format(order.dataVenda, "yyyy-MM");
         break;
-      case 'year':
+      case "year":
         periodKey = format(order.dataVenda, "yyyy");
         break;
     }
@@ -219,10 +216,10 @@ export const calculateRevenueByPeriod = (
  * Calcula evolução do faturamento ao longo do tempo
  */
 export const calculateRevenueEvolution = (
-  orders: ProcessedOrder[]
+  orders: ProcessedOrder[],
 ): { date: string; revenue: number; cumulativeRevenue: number }[] => {
-  const dailyRevenue = calculateRevenueByPeriod(orders, 'day');
-  
+  const dailyRevenue = calculateRevenueByPeriod(orders, "day");
+
   let cumulative = 0;
   return dailyRevenue.map((item) => {
     cumulative += item.revenue;
@@ -237,65 +234,59 @@ export const calculateRevenueEvolution = (
 /**
  * Calcula volume de pedidos agregado por mês
  */
-export const calculateMonthlyOrders = (
-  orders: ProcessedOrder[]
-): { month: string; orders: number }[] => {
+export const calculateMonthlyOrders = (orders: ProcessedOrder[]): { month: string; orders: number }[] => {
   const monthlyMap = new Map<string, number>();
-  
-  orders.forEach(order => {
+
+  orders.forEach((order) => {
     const monthKey = format(order.dataVenda, "yyyy-MM");
     monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + 1);
   });
-  
+
   return Array.from(monthlyMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([month, orders]) => ({
       month: format(parse(month, "yyyy-MM", new Date()), "MMM/yy", { locale: ptBR }),
-      orders
+      orders,
     }));
 };
 
 /**
  * Calcula volume de pedidos agregado por semana
  */
-export const calculateWeeklyOrders = (
-  orders: ProcessedOrder[]
-): { week: string; orders: number }[] => {
+export const calculateWeeklyOrders = (orders: ProcessedOrder[]): { week: string; orders: number }[] => {
   const weeklyMap = new Map<string, number>();
-  
-  orders.forEach(order => {
+
+  orders.forEach((order) => {
     const weekStart = startOfWeek(order.dataVenda, { weekStartsOn: 0 });
     const weekKey = format(weekStart, "yyyy-'W'ww");
     weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + 1);
   });
-  
+
   return Array.from(weeklyMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([week, orders]) => ({
       week,
-      orders
+      orders,
     }));
 };
 
 /**
  * Calcula faturamento agregado por semana
  */
-export const calculateWeeklyRevenue = (
-  orders: ProcessedOrder[]
-): { week: string; revenue: number }[] => {
+export const calculateWeeklyRevenue = (orders: ProcessedOrder[]): { week: string; revenue: number }[] => {
   const weeklyMap = new Map<string, number>();
-  
-  orders.forEach(order => {
+
+  orders.forEach((order) => {
     const weekStart = startOfWeek(order.dataVenda, { weekStartsOn: 0 });
     const weekKey = format(weekStart, "yyyy-'W'ww");
     weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + getOfficialRevenue(order));
   });
-  
+
   return Array.from(weeklyMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([week, revenue]) => ({
       week,
-      revenue
+      revenue,
     }));
 };
 
@@ -331,7 +322,7 @@ export const analyzeSeasonality = (orders: ProcessedOrder[]): SeasonalityAnalysi
     const month = date.getMonth();
     const quarter = Math.floor(month / 3) + 1;
     const quarterKey = `${year}-Q${quarter}`;
-    
+
     const existing = quarterlyMap.get(quarterKey) || { revenue: 0, orders: 0 };
     quarterlyMap.set(quarterKey, {
       revenue: existing.revenue + getOfficialRevenue(order),
@@ -382,7 +373,7 @@ export const getOrderValueDistribution = (orders: ProcessedOrder[]): OrderValueD
 
   const distribution = ranges.map((range) => {
     const ordersInRange = orders.filter(
-      (order) => getOfficialRevenue(order) >= range.min && getOfficialRevenue(order) <= range.max
+      (order) => getOfficialRevenue(order) >= range.min && getOfficialRevenue(order) <= range.max,
     );
     return {
       range: range.label,
@@ -433,70 +424,70 @@ export const getPlatformPerformance = (orders: ProcessedOrder[]): PlatformPerfor
  */
 export const getPlatformPerformanceWithProducts = (
   orders: ProcessedOrder[],
-  maxProductsPerChannel: number = 5
+  maxProductsPerChannel: number = 5,
 ): PlatformWithProducts[] => {
   // Desmembrar kits em produtos individuais
   const ordersWithBreakdown = breakdownOrders(orders);
-  
+
   // Map: canal → Map<produto, revenue>
   const platformProductMap = new Map<string, Map<string, number>>();
   const platformRevenueMap = new Map<string, number>();
-  
+
   ordersWithBreakdown.forEach((order) => {
     const platform = order.ecommerce;
-    
+
     // Inicializar maps para a plataforma se necessário
     if (!platformProductMap.has(platform)) {
       platformProductMap.set(platform, new Map<string, number>());
       platformRevenueMap.set(platform, 0);
     }
-    
+
     const productMap = platformProductMap.get(platform)!;
-    
+
     order.produtos.forEach((produto) => {
       // Excluir Kit de Amostras (R$ 0,01)
-      if (produto.descricaoAjustada === 'Kit de Amostras') {
+      if (produto.descricaoAjustada === "Kit de Amostras") {
         return;
       }
-      
+
       const productName = produto.descricaoAjustada;
       const revenue = produto.preco;
-      
+
       // Acumular revenue do produto
       productMap.set(productName, (productMap.get(productName) || 0) + revenue);
-      
+
       // Acumular revenue total da plataforma
       platformRevenueMap.set(platform, (platformRevenueMap.get(platform) || 0) + revenue);
     });
   });
-  
+
   // Calcular receita líquida total (para calcular marketShare)
   const totalNetRevenue = Array.from(platformRevenueMap.values()).reduce((sum, r) => sum + r, 0);
-  
+
   // Converter para estrutura hierárquica
   const result: PlatformWithProducts[] = Array.from(platformProductMap.entries())
     .map(([platform, productMap]) => {
       const platformRevenue = platformRevenueMap.get(platform) || 0;
-      
+
       // Converter produtos para array e ordenar por revenue
       const products: ProductContribution[] = Array.from(productMap.entries())
         .map(([productName, revenue]) => ({
           productName,
           revenue,
-          percentage: platformRevenue > 0 ? (revenue / platformRevenue) * 100 : 0
+          percentage: platformRevenue > 0 ? (revenue / platformRevenue) * 100 : 0,
         }))
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, maxProductsPerChannel);
-      
+
       return {
         platform,
         revenue: platformRevenue,
         marketShare: totalNetRevenue > 0 ? (platformRevenue / totalNetRevenue) * 100 : 0,
-        products
+        products,
       };
     })
     .sort((a, b) => b.revenue - a.revenue);
-  
+
   return result;
 };
 
@@ -506,7 +497,7 @@ export const getPlatformPerformanceWithProducts = (
 export const compareEcommercePlatforms = (orders: ProcessedOrder[]) => {
   const platforms = getPlatformPerformance(orders);
   const totalRevenue = platforms.reduce((sum, p) => sum + p.revenue, 0);
-  
+
   return {
     platforms,
     topPerformer: platforms[0]?.platform || "N/A",
@@ -529,10 +520,8 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
   // Base fiscal: somente vendas
   const revenueOrders = getRevenueOrders(orders);
 
-  const currentMonthOrders = revenueOrders.filter(
-    (order) => format(order.dataVenda, "yyyy-MM") === selectedMonth
-  );
-  
+  const currentMonthOrders = revenueOrders.filter((order) => format(order.dataVenda, "yyyy-MM") === selectedMonth);
+
   const currentRevenue = currentMonthOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
 
   // Mês anterior
@@ -541,14 +530,12 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
   previousDate.setMonth(previousDate.getMonth() - 1);
   const previousMonth = format(previousDate, "yyyy-MM");
 
-  const previousMonthOrders = revenueOrders.filter(
-    (order) => format(order.dataVenda, "yyyy-MM") === previousMonth
-  );
-  
+  const previousMonthOrders = revenueOrders.filter((order) => format(order.dataVenda, "yyyy-MM") === previousMonth);
+
   const previousRevenue = previousMonthOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
 
   if (previousRevenue === 0) return 0;
-  
+
   return ((currentRevenue - previousRevenue) / previousRevenue) * 100;
 };
 
@@ -559,103 +546,103 @@ const calculateGrowthRate = (orders: ProcessedOrder[], selectedMonth: string): n
 export const calculateAccumulatedRevenueByProduct = (
   orders: ProcessedOrder[],
   topN: number = 15,
-  breakdownKits: boolean = true  // Padrão TRUE = desmembrar kits em produtos individuais
+  breakdownKits: boolean = true, // Padrão TRUE = desmembrar kits em produtos individuais
 ): ProductRevenueData[] => {
   // Desmembrar kits em produtos individuais apenas se breakdownKits = true
   const ordersToProcess = breakdownKits ? breakdownOrders(orders) : orders;
-  
+
   const productMap = new Map<string, number>();
   let totalRevenue = 0;
-  
-  ordersToProcess.forEach(order => {
-    order.produtos.forEach(produto => {
+
+  ordersToProcess.forEach((order) => {
+    order.produtos.forEach((produto) => {
+      // Excluir materiais de divulgação do ranking de produtos
+      if (isMaterialProduct(produto)) return;
+
       const productName = produto.descricaoAjustada;
       const revenue = produto.preco;
-      
+
       // Acumular faturamento
-      productMap.set(
-        productName,
-        (productMap.get(productName) || 0) + revenue
-      );
-      
+      productMap.set(productName, (productMap.get(productName) || 0) + revenue);
+
       totalRevenue += revenue;
     });
   });
-  
+
   // Converter para array e ordenar
   const productRevenues: ProductRevenueData[] = Array.from(productMap.entries())
     .map(([product, revenue]) => ({
       product,
       revenue,
-      percentage: (revenue / totalRevenue) * 100
+      percentage: (revenue / totalRevenue) * 100,
     }))
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, topN);
-  
+
   return productRevenues;
 };
 
 /**
  * Calcula todas as métricas financeiras
  */
-export const calculateFinancialMetrics = (
-  orders: ProcessedOrder[],
-  selectedMonth?: string
-): FinancialMetrics => {
+export const calculateFinancialMetrics = (orders: ProcessedOrder[], selectedMonth?: string): FinancialMetrics => {
   // Detectar se é período multi-mês
   const isMultiMonth = selectedMonth === "last-12-months" || !selectedMonth;
-  
+
   // ===== FILTRO FISCAL: somente pedidos tipo 'venda' =====
   const revenueOrders = getRevenueOrders(orders);
-  
+
   // ===== CÁLCULOS DE FRETE (somente vendas - frete de bonificação é custo operacional) =====
   const freteTotal = revenueOrders.reduce((sum, order) => sum + order.valorFrete, 0);
-  
+
   // ===== CÁLCULOS FISCAIS (somente vendas) =====
   // Receita fiscal: já inclui frete via getOfficialRevenue
   const totalRevenue = revenueOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
-  
+
   // [AUDIT] Comparação legada vs fiscal
   const receitaLegada = revenueOrders.reduce((s, o) => s + (o.valorTotal || 0), 0);
-  const delta = receitaLegada > 0
-    ? ((totalRevenue - receitaLegada) / receitaLegada) * 100 : 0;
-  console.log(`[AUDIT] Legada=${receitaLegada.toFixed(2)} | Fiscal=${totalRevenue.toFixed(2)} | Delta=${delta.toFixed(2)}%`);
-  
+  const delta = receitaLegada > 0 ? ((totalRevenue - receitaLegada) / receitaLegada) * 100 : 0;
+  console.log(
+    `[AUDIT] Legada=${receitaLegada.toFixed(2)} | Fiscal=${totalRevenue.toFixed(2)} | Delta=${delta.toFixed(2)}%`,
+  );
+
   const faturamentoBruto = totalRevenue; // já inclui frete via getOfficialRevenue
   const faturamentoLiquido = totalRevenue - freteTotal; // ex-frete
   const percentualFrete = totalRevenue > 0 ? (freteTotal / totalRevenue) * 100 : 0;
-  
+
   // Denominador fiscal: somente vendas (nunca base operacional)
   const totalRevenueOrders = revenueOrders.length;
   const averageTicket = calculateAverageTicket(orders);
   const ticketMedioBruto = totalRevenueOrders > 0 ? faturamentoBruto / totalRevenueOrders : 0;
-  
+
   // ===== CÁLCULOS REAIS (sem pedidos de apenas samples, dentro da base fiscal) =====
   const realOrders = filterRealOrders(revenueOrders);
   const realRevenue = realOrders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
   const totalRealOrders = realOrders.length;
   const realAverageTicket = totalRealOrders > 0 ? realRevenue / totalRealOrders : 0;
-  
+
   // Calcular produto médio REAL (média de produtos individuais, excluindo amostras)
   const brokenDownOrders = breakdownOrders(realOrders);
-  
-  // Contar quantidade total de produtos individuais (EXCLUINDO Kit de Amostras)
+
+  // Contar linhas de SKU por pedido (não soma de unidades físicas), excluindo amostras e materiais
   const totalIndividualItems = brokenDownOrders.reduce((sum, order) => {
-    return sum + order.produtos.reduce((pSum, produto) => {
-      // Excluir "Kit de Amostras" da contagem
-      if (produto.descricaoAjustada === 'Kit de Amostras') {
-        return pSum;
-      }
-      return pSum + produto.quantidade;
-    }, 0);
+    return (
+      sum +
+      order.produtos.reduce((pSum, produto) => {
+        if (produto.descricaoAjustada === "Kit de Amostras" || isMaterialProduct(produto)) {
+          return pSum;
+        }
+        return pSum + 1; // conta linha, não quantidade
+      }, 0)
+    );
   }, 0);
-  
+
   // Calcular média de produtos individuais por pedido REAL
   const produtoMedio = totalRealOrders > 0 ? totalIndividualItems / totalRealOrders : 0;
 
   // ===== SUB-CÁLCULOS FINANCEIROS (base fiscal: revenueOrders) =====
   const revenueEvolution = calculateRevenueEvolution(revenueOrders);
-  const revenueByMonth = calculateRevenueByPeriod(revenueOrders, 'month').map((item) => ({
+  const revenueByMonth = calculateRevenueByPeriod(revenueOrders, "month").map((item) => ({
     month: item.period,
     revenue: item.revenue,
     orders: revenueOrders.filter((o) => format(o.dataVenda, "yyyy-MM") === item.period).length,
@@ -663,18 +650,18 @@ export const calculateFinancialMetrics = (
 
   // ===== SUB-CÁLCULOS OPERACIONAIS (base completa: orders) =====
   // Volume de pedidos no tempo = contexto operacional, inclui todos os registros
-  const ordersByDay = extractDailyOrders(orders).map(item => ({
+  const ordersByDay = extractDailyOrders(orders).map((item) => ({
     date: item.date,
-    orders: item.value
+    orders: item.value,
   }));
-  
+
   // Calcular pedidos e faturamento semanais
   const ordersByWeek = calculateWeeklyOrders(orders);
   const revenueByWeek = calculateWeeklyRevenue(revenueOrders);
-  
+
   // Calcular pedidos por mês (agregado) - operacional
   const ordersByMonth = calculateMonthlyOrders(orders);
-  
+
   // ===== SUB-CÁLCULOS FINANCEIROS (base fiscal) =====
   const revenueByProduct = calculateAccumulatedRevenueByProduct(revenueOrders, 15);
 
