@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { filterOrdersByMonth, formatCurrency } from "@/utils/salesCalculator";
+import { filterOrdersByDateRange, formatCurrency } from "@/utils/salesCalculator";
 import { calculateAllSampleMetrics, calculateDataPeriod, isSampleProduct } from "@/utils/samplesAnalyzer";
 import { format } from "date-fns";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
@@ -14,30 +14,35 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Package, TrendingUp, TrendingDown, DollarSign, Clock, Users, ShoppingCart, ShoppingBag, Target, Calendar, Percent, ArrowRight, Info, AlertTriangle } from "lucide-react";
+import {
+  Package,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Clock,
+  Users,
+  ShoppingCart,
+  ShoppingBag,
+  Target,
+  Calendar,
+  Percent,
+  ArrowRight,
+  Info,
+  AlertTriangle,
+} from "lucide-react";
 import { PET_PROFILE_ORDER, PET_PROFILE_LABELS, PET_PROFILE_COLORS, BuyerPetProfile } from "@/data/operationalProducts";
 import { cn } from "@/lib/utils";
 
 const AnaliseSamples = () => {
-  const { 
-    salesData, 
-    selectedMonth, 
-    availableMonths, 
-    comparisonMode,
-    selectedMonths,
-  } = useDashboard();
+  const { salesData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
 
   const filteredOrders = useMemo(() => {
     if (salesData.length === 0) return [];
-    if (!selectedMonth) return salesData;
-    return filterOrdersByMonth(salesData, selectedMonth, availableMonths);
-  }, [salesData, selectedMonth, availableMonths]);
+    return dateRange ? filterOrdersByDateRange(salesData, dateRange.start, dateRange.end) : salesData;
+  }, [salesData, dateRange]);
 
   const metrics = useMemo(() => {
-    if (filteredOrders.length === 0) {
-      return null;
-    }
-    // Passar pedidos filtrados E histórico completo
+    if (filteredOrders.length === 0) return null;
     return calculateAllSampleMetrics(filteredOrders, salesData);
   }, [filteredOrders, salesData]);
 
@@ -47,38 +52,29 @@ const AnaliseSamples = () => {
   }, [filteredOrders]);
 
   const comparisonMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length === 0 || salesData.length === 0) {
-      return null;
-    }
-    
-    return selectedMonths.map(month => {
-      const orders = filterOrdersByMonth(salesData, month, availableMonths);
-      // Passar pedidos filtrados E histórico completo
-      const monthMetrics = calculateAllSampleMetrics(orders, salesData);
-      
-      const formatMonthLabel = (m: string) => {
-        if (m === 'last-12-months') return 'Últimos 12 meses';
-        const [year, monthNum] = m.split('-');
-        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        return `${monthNames[parseInt(monthNum) - 1]} ${year}`;
-      };
-      
+    if (!comparisonMode || !comparisonDateRange || salesData.length === 0) return null;
+    const periods = [
+      { range: dateRange, label: "Período A" },
+      { range: comparisonDateRange, label: "Período B" },
+    ].filter((p) => p.range);
+    return periods.map(({ range, label }) => {
+      const orders = filterOrdersByDateRange(salesData, range!.start, range!.end);
       return {
-        month,
-        label: formatMonthLabel(month),
-        metrics: monthMetrics
+        month: label.toLowerCase().replace(" ", "-"),
+        label,
+        metrics: calculateAllSampleMetrics(orders, salesData),
       };
     });
-  }, [comparisonMode, selectedMonths, salesData, availableMonths]);
+  }, [comparisonMode, comparisonDateRange, dateRange, salesData]);
 
   // Calcular estatísticas de diagnóstico
   const diagnosticStats = useMemo(() => {
     if (filteredOrders.length === 0) return null;
-    
-    const allProducts = filteredOrders.flatMap(o => o.produtos);
-    const sampleProducts = allProducts.filter(p => isSampleProduct(p));
-    const uniqueSampleNames = [...new Set(sampleProducts.map(p => p.descricaoAjustada || p.descricao))];
-    
+
+    const allProducts = filteredOrders.flatMap((o) => o.produtos);
+    const sampleProducts = allProducts.filter((p) => isSampleProduct(p));
+    const uniqueSampleNames = [...new Set(sampleProducts.map((p) => p.descricaoAjustada || p.descricao))];
+
     return {
       totalOrders: filteredOrders.length,
       totalProducts: allProducts.length,
@@ -99,28 +95,33 @@ const AnaliseSamples = () => {
             Análise de clientes cujo primeiro pedido foi apenas amostra (sem produto regular)
           </p>
         </div>
-      
+
         <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
           <AlertTitle className="text-amber-600">Nenhum cliente qualificado encontrado</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>
-              Não foram encontrados clientes cujo <strong>primeiro pedido</strong> foi exclusivamente de amostras no período selecionado.
+              Não foram encontrados clientes cujo <strong>primeiro pedido</strong> foi exclusivamente de amostras no
+              período selecionado.
             </p>
-            
+
             {diagnosticStats && (
               <div className="bg-background/50 rounded-lg p-3 space-y-2">
                 <p className="text-sm font-medium">📊 Diagnóstico do período:</p>
                 <ul className="text-sm space-y-1 ml-4">
-                  <li>• Pedidos analisados: <strong>{diagnosticStats.totalOrders}</strong></li>
-                  <li>• Produtos de amostra identificados: <strong>{diagnosticStats.sampleProducts}</strong></li>
+                  <li>
+                    • Pedidos analisados: <strong>{diagnosticStats.totalOrders}</strong>
+                  </li>
+                  <li>
+                    • Produtos de amostra identificados: <strong>{diagnosticStats.sampleProducts}</strong>
+                  </li>
                   {diagnosticStats.uniqueSampleNames.length > 0 && (
-                    <li>• Exemplos: {diagnosticStats.uniqueSampleNames.join(', ')}</li>
+                    <li>• Exemplos: {diagnosticStats.uniqueSampleNames.join(", ")}</li>
                   )}
                 </ul>
               </div>
             )}
-            
+
             <div className="bg-muted/50 rounded-lg p-3 space-y-2">
               <p className="text-sm font-medium">ℹ️ Critérios de identificação de amostras:</p>
               <ul className="text-sm space-y-1 ml-4">
@@ -140,40 +141,39 @@ const AnaliseSamples = () => {
   // Preparar dados de segmentação para o gráfico
   const segmentationData = [
     {
-      segment: 'Primeira Compra' as const,
+      segment: "Primeira Compra" as const,
       count: metrics.segmentation.oneTime,
-      percentage: metrics.volume.uniqueCustomers > 0
-        ? (metrics.segmentation.oneTime / metrics.volume.uniqueCustomers) * 100
-        : 0,
+      percentage:
+        metrics.volume.uniqueCustomers > 0 ? (metrics.segmentation.oneTime / metrics.volume.uniqueCustomers) * 100 : 0,
       totalRevenue: 0,
       totalOrders: 0,
       ticketMedio: 0,
       arpu: 0,
-      criteria: '1 compra apenas',
+      criteria: "1 compra apenas",
     },
     {
-      segment: 'Recorrente' as const,
+      segment: "Recorrente" as const,
       count: metrics.segmentation.explorers,
-      percentage: metrics.volume.uniqueCustomers > 0
-        ? (metrics.segmentation.explorers / metrics.volume.uniqueCustomers) * 100
-        : 0,
+      percentage:
+        metrics.volume.uniqueCustomers > 0
+          ? (metrics.segmentation.explorers / metrics.volume.uniqueCustomers) * 100
+          : 0,
       totalRevenue: 0,
       totalOrders: 0,
       ticketMedio: 0,
       arpu: 0,
-      criteria: '1-2 recompras regulares',
+      criteria: "1-2 recompras regulares",
     },
     {
-      segment: 'VIP' as const,
+      segment: "VIP" as const,
       count: metrics.segmentation.loyal,
-      percentage: metrics.volume.uniqueCustomers > 0
-        ? (metrics.segmentation.loyal / metrics.volume.uniqueCustomers) * 100
-        : 0,
+      percentage:
+        metrics.volume.uniqueCustomers > 0 ? (metrics.segmentation.loyal / metrics.volume.uniqueCustomers) * 100 : 0,
       totalRevenue: 0,
       totalOrders: 0,
       ticketMedio: 0,
       arpu: 0,
-      criteria: '4+ compras',
+      criteria: "4+ compras",
     },
   ];
 
@@ -181,25 +181,40 @@ const AnaliseSamples = () => {
   const REPURCHASE_BENCHMARK = 25;
   const repurchaseRate = metrics.repurchase.repurchaseRate;
   const benchmarkProgress = Math.min((repurchaseRate / REPURCHASE_BENCHMARK) * 100, 150);
-  
+
   // Determinar status baseado na taxa
   const getRepurchaseStatus = (rate: number) => {
-    if (rate >= 35) return 'success';
-    if (rate >= 25) return 'neutral';
-    if (rate >= 15) return 'warning';
-    return 'danger';
+    if (rate >= 35) return "success";
+    if (rate >= 25) return "neutral";
+    if (rate >= 15) return "warning";
+    return "danger";
   };
-  
+
   const repurchaseStatus = getRepurchaseStatus(repurchaseRate);
-  
+
   // Interpretação contextual
   const getInterpretation = (rate: number) => {
-    if (rate >= 35) return { text: "🎯 Excelente! Taxa muito acima da média do mercado.", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
-    if (rate >= 25) return { text: "✅ Bom desempenho, dentro do esperado para e-commerce.", color: "bg-blue-50 text-blue-700 border-blue-200" };
-    if (rate >= 15) return { text: "⚠️ Abaixo da média, avaliar qualidade das amostras e follow-up.", color: "bg-amber-50 text-amber-700 border-amber-200" };
-    return { text: "🚨 Taxa crítica, revisar estratégia de amostras urgentemente.", color: "bg-red-50 text-red-700 border-red-200" };
+    if (rate >= 35)
+      return {
+        text: "🎯 Excelente! Taxa muito acima da média do mercado.",
+        color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      };
+    if (rate >= 25)
+      return {
+        text: "✅ Bom desempenho, dentro do esperado para e-commerce.",
+        color: "bg-blue-50 text-blue-700 border-blue-200",
+      };
+    if (rate >= 15)
+      return {
+        text: "⚠️ Abaixo da média, avaliar qualidade das amostras e follow-up.",
+        color: "bg-amber-50 text-amber-700 border-amber-200",
+      };
+    return {
+      text: "🚨 Taxa crítica, revisar estratégia de amostras urgentemente.",
+      color: "bg-red-50 text-red-700 border-red-200",
+    };
   };
-  
+
   const interpretation = getInterpretation(repurchaseRate);
 
   return (
@@ -211,7 +226,7 @@ const AnaliseSamples = () => {
           Clientes cujo primeiro pedido foi apenas amostra (sem produto regular)
           {dataPeriod && (
             <span className="ml-2 text-xs">
-              • {format(dataPeriod.startDate, 'dd/MM/yyyy')} até {format(dataPeriod.endDate, 'dd/MM/yyyy')}
+              • {format(dataPeriod.startDate, "dd/MM/yyyy")} até {format(dataPeriod.endDate, "dd/MM/yyyy")}
             </span>
           )}
         </p>
@@ -222,7 +237,7 @@ const AnaliseSamples = () => {
         {dataPeriod && dataPeriod.isShortPeriod && (
           <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
             <Calendar className="h-3 w-3 mr-1" />
-            Período curto: {dataPeriod.totalMonths} {dataPeriod.totalMonths === 1 ? 'mês' : 'meses'}
+            Período curto: {dataPeriod.totalMonths} {dataPeriod.totalMonths === 1 ? "mês" : "meses"}
           </Badge>
         )}
       </div>
@@ -233,43 +248,43 @@ const AnaliseSamples = () => {
           <ComparisonMetricCard
             title="Clientes Qualificados"
             icon={Users}
-            metrics={comparisonMetrics.map(m => ({
+            metrics={comparisonMetrics.map((m) => ({
               value: m.metrics.volume.uniqueCustomers,
               month: m.month,
               monthLabel: m.label,
-              color: 'hsl(var(--primary))'
+              color: "hsl(var(--primary))",
             }))}
           />
           <ComparisonMetricCard
             title="Taxa de Recompra"
             icon={TrendingUp}
-            metrics={comparisonMetrics.map(m => ({
+            metrics={comparisonMetrics.map((m) => ({
               value: m.metrics.repurchase.repurchaseRate,
               month: m.month,
               monthLabel: m.label,
-              color: 'hsl(var(--primary))'
+              color: "hsl(var(--primary))",
             }))}
             formatValue={(v) => `${v.toFixed(1)}%`}
           />
           <ComparisonMetricCard
             title="Ticket Médio"
             icon={DollarSign}
-            metrics={comparisonMetrics.map(m => ({
+            metrics={comparisonMetrics.map((m) => ({
               value: m.metrics.repurchase.avgTicketRepurchase,
               month: m.month,
               monthLabel: m.label,
-              color: 'hsl(var(--primary))'
+              color: "hsl(var(--primary))",
             }))}
             formatValue={(v) => formatCurrency(v)}
           />
           <ComparisonMetricCard
             title="Tempo até Recompra"
             icon={Clock}
-            metrics={comparisonMetrics.map(m => ({
+            metrics={comparisonMetrics.map((m) => ({
               value: m.metrics.repurchase.avgDaysToFirstRepurchase,
               month: m.month,
               monthLabel: m.label,
-              color: 'hsl(var(--primary))'
+              color: "hsl(var(--primary))",
             }))}
             formatValue={(v) => `${Math.round(v)} dias`}
           />
@@ -277,44 +292,54 @@ const AnaliseSamples = () => {
       ) : (
         <div className="grid gap-3 lg:grid-cols-5">
           {/* Card Principal - Taxa de Recompra (40% = 2 colunas) */}
-          <Card className={cn(
-            "lg:col-span-2 transition-all",
-            repurchaseStatus === 'success' && "border-emerald-300 bg-gradient-to-br from-emerald-50/50 to-background",
-            repurchaseStatus === 'warning' && "border-amber-300 bg-gradient-to-br from-amber-50/50 to-background",
-            repurchaseStatus === 'danger' && "border-red-300 bg-gradient-to-br from-red-50/50 to-background"
-          )}>
+          <Card
+            className={cn(
+              "lg:col-span-2 transition-all",
+              repurchaseStatus === "success" && "border-emerald-300 bg-gradient-to-br from-emerald-50/50 to-background",
+              repurchaseStatus === "warning" && "border-amber-300 bg-gradient-to-br from-amber-50/50 to-background",
+              repurchaseStatus === "danger" && "border-red-300 bg-gradient-to-br from-red-50/50 to-background",
+            )}
+          >
             <CardContent className="p-4">
               <div className="space-y-3">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Percent className="h-5 w-5 text-primary" />
-                    <span className="text-sm font-medium text-muted-foreground">Taxa de Conversão (amostra → regular) — base total</span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Taxa de Conversão (amostra → regular) — base total
+                    </span>
                   </div>
-                  <Badge 
+                  <Badge
                     variant="outline"
                     className={cn(
                       "text-xs",
-                      repurchaseStatus === 'success' && "bg-emerald-100 text-emerald-700 border-emerald-300",
-                      repurchaseStatus === 'neutral' && "bg-blue-100 text-blue-700 border-blue-300",
-                      repurchaseStatus === 'warning' && "bg-amber-100 text-amber-700 border-amber-300",
-                      repurchaseStatus === 'danger' && "bg-red-100 text-red-700 border-red-300"
+                      repurchaseStatus === "success" && "bg-emerald-100 text-emerald-700 border-emerald-300",
+                      repurchaseStatus === "neutral" && "bg-blue-100 text-blue-700 border-blue-300",
+                      repurchaseStatus === "warning" && "bg-amber-100 text-amber-700 border-amber-300",
+                      repurchaseStatus === "danger" && "bg-red-100 text-red-700 border-red-300",
                     )}
                   >
-                    {repurchaseStatus === 'success' ? '🏆 Premium' : 
-                     repurchaseStatus === 'neutral' ? '✓ Benchmark' :
-                     repurchaseStatus === 'warning' ? '⚠️ Atenção' : '🚨 Crítico'}
+                    {repurchaseStatus === "success"
+                      ? "🏆 Premium"
+                      : repurchaseStatus === "neutral"
+                        ? "✓ Benchmark"
+                        : repurchaseStatus === "warning"
+                          ? "⚠️ Atenção"
+                          : "🚨 Crítico"}
                   </Badge>
                 </div>
 
                 {/* Valor Principal */}
-                <div className={cn(
-                  "text-3xl font-bold",
-                  repurchaseStatus === 'success' && "text-emerald-600",
-                  repurchaseStatus === 'neutral' && "text-blue-600",
-                  repurchaseStatus === 'warning' && "text-amber-600",
-                  repurchaseStatus === 'danger' && "text-red-600"
-                )}>
+                <div
+                  className={cn(
+                    "text-3xl font-bold",
+                    repurchaseStatus === "success" && "text-emerald-600",
+                    repurchaseStatus === "neutral" && "text-blue-600",
+                    repurchaseStatus === "warning" && "text-amber-600",
+                    repurchaseStatus === "danger" && "text-red-600",
+                  )}
+                >
                   {repurchaseRate.toFixed(1)}%
                 </div>
 
@@ -330,7 +355,10 @@ const AnaliseSamples = () => {
                   </div>
                   <div className="border-t pt-1 flex justify-between font-medium">
                     <span>Taxa:</span>
-                    <span>{metrics.repurchase.customersWhoRepurchased} ÷ {metrics.volume.uniqueCustomers} = {repurchaseRate.toFixed(1)}%</span>
+                    <span>
+                      {metrics.repurchase.customersWhoRepurchased} ÷ {metrics.volume.uniqueCustomers} ={" "}
+                      {repurchaseRate.toFixed(1)}%
+                    </span>
                   </div>
                 </div>
 
@@ -338,23 +366,22 @@ const AnaliseSamples = () => {
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Benchmark: {REPURCHASE_BENCHMARK}%</span>
-                    <span className={cn(
-                      "font-medium",
-                      repurchaseRate >= REPURCHASE_BENCHMARK ? "text-emerald-600" : "text-amber-600"
-                    )}>
-                      {repurchaseRate >= REPURCHASE_BENCHMARK 
+                    <span
+                      className={cn(
+                        "font-medium",
+                        repurchaseRate >= REPURCHASE_BENCHMARK ? "text-emerald-600" : "text-amber-600",
+                      )}
+                    >
+                      {repurchaseRate >= REPURCHASE_BENCHMARK
                         ? `+${(repurchaseRate - REPURCHASE_BENCHMARK).toFixed(0)}pp acima`
-                        : `${(repurchaseRate - REPURCHASE_BENCHMARK).toFixed(0)}pp abaixo`
-                      }
+                        : `${(repurchaseRate - REPURCHASE_BENCHMARK).toFixed(0)}pp abaixo`}
                     </span>
                   </div>
                   <Progress value={benchmarkProgress} className="h-2" />
                 </div>
 
                 {/* Interpretação */}
-                <p className={cn("text-xs p-2 rounded-md border", interpretation.color)}>
-                  {interpretation.text}
-                </p>
+                <p className={cn("text-xs p-2 rounded-md border", interpretation.color)}>{interpretation.text}</p>
 
                 {/* Receita Gerada */}
                 {metrics.quality.avgLTV > 0 && (
@@ -371,36 +398,40 @@ const AnaliseSamples = () => {
           <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-2">
             <StatusMetricCard
               title="Amostras Distribuídas"
-              value={metrics.volume.totalSampleUnits.toLocaleString('pt-BR')}
+              value={metrics.volume.totalSampleUnits.toLocaleString("pt-BR")}
               icon={<Package className="h-3 w-3" />}
               status="neutral"
-              interpretation={metrics.volume.sampleOrders > 0
-                ? `${(metrics.volume.totalSampleUnits / metrics.volume.sampleOrders).toFixed(1)} unidades/pedido`
-                : 'Sem pedidos'}
+              interpretation={
+                metrics.volume.sampleOrders > 0
+                  ? `${(metrics.volume.totalSampleUnits / metrics.volume.sampleOrders).toFixed(1)} unidades/pedido`
+                  : "Sem pedidos"
+              }
               size="compact"
             />
             <StatusMetricCard
               title="Pedidos com Amostra"
-              value={metrics.volume.sampleOrders.toLocaleString('pt-BR')}
+              value={metrics.volume.sampleOrders.toLocaleString("pt-BR")}
               icon={<ShoppingBag className="h-3 w-3" />}
               status="neutral"
-              interpretation={metrics.volume.uniqueCustomers > 0
-                ? `${(metrics.volume.sampleOrders / metrics.volume.uniqueCustomers).toFixed(1)} pedidos/cliente`
-                : 'Sem clientes qualificados'}
+              interpretation={
+                metrics.volume.uniqueCustomers > 0
+                  ? `${(metrics.volume.sampleOrders / metrics.volume.uniqueCustomers).toFixed(1)} pedidos/cliente`
+                  : "Sem clientes qualificados"
+              }
               size="compact"
             />
             <StatusMetricCard
               title="Clientes Qualificados"
-              value={metrics.volume.uniqueCustomers.toLocaleString('pt-BR')}
+              value={metrics.volume.uniqueCustomers.toLocaleString("pt-BR")}
               icon={<Users className="h-3 w-3" />}
-              status={metrics.volume.uniqueCustomers >= 30 ? 'success' : 'warning'}
+              status={metrics.volume.uniqueCustomers >= 30 ? "success" : "warning"}
               interpretation={`${metrics.volume.percentageOfTotal.toFixed(1)}% do total`}
               size="compact"
               tooltipKey="clientes_qualificados"
             />
             <StatusMetricCard
               title="Converteram (regular)"
-              value={metrics.repurchase.customersWhoRepurchased.toLocaleString('pt-BR')}
+              value={metrics.repurchase.customersWhoRepurchased.toLocaleString("pt-BR")}
               icon={<ShoppingCart className="h-3 w-3" />}
               status={getStatusFromBenchmark(repurchaseRate, REPURCHASE_BENCHMARK)}
               size="compact"
@@ -418,7 +449,7 @@ const AnaliseSamples = () => {
               title="Tempo até Recompra"
               value={`${Math.round(metrics.repurchase.avgDaysToFirstRepurchase)} dias`}
               icon={<Clock className="h-3 w-3" />}
-              status={metrics.repurchase.avgDaysToFirstRepurchase <= 45 ? 'success' : 'warning'}
+              status={metrics.repurchase.avgDaysToFirstRepurchase <= 45 ? "success" : "warning"}
               invertTrend
               size="compact"
               tooltipKey="tempo_ate_recompra"
@@ -427,7 +458,7 @@ const AnaliseSamples = () => {
               title="LTV Médio"
               value={formatCurrency(metrics.quality.avgLTV)}
               icon={<TrendingUp className="h-3 w-3" />}
-              status={metrics.quality.avgLTV >= 300 ? 'success' : 'neutral'}
+              status={metrics.quality.avgLTV >= 300 ? "success" : "neutral"}
               size="compact"
               tooltipKey="ltv_medio_samples"
             />
@@ -443,106 +474,119 @@ const AnaliseSamples = () => {
       )}
 
       {/* Card Comparativo: Por tipo de pet */}
-      {metrics.byPetType && (() => {
-        const visibleProfiles = PET_PROFILE_ORDER.filter(
-          k => k !== 'nao_identificado' && metrics.byPetType?.[k]?.uniqueCustomers && metrics.byPetType[k]!.uniqueCustomers > 0
-        );
-        if (visibleProfiles.length === 0) return null;
+      {metrics.byPetType &&
+        (() => {
+          const visibleProfiles = PET_PROFILE_ORDER.filter(
+            (k) =>
+              k !== "nao_identificado" &&
+              metrics.byPetType?.[k]?.uniqueCustomers &&
+              metrics.byPetType[k]!.uniqueCustomers > 0,
+          );
+          if (visibleProfiles.length === 0) return null;
 
-        // Find top 2 profiles for comparison insight
-        const sorted = [...visibleProfiles].sort(
-          (a, b) => (metrics.byPetType?.[b]?.uniqueCustomers || 0) - (metrics.byPetType?.[a]?.uniqueCustomers || 0)
-        );
-        const top1 = sorted[0];
-        const top2 = sorted.length > 1 ? sorted[1] : null;
+          // Find top 2 profiles for comparison insight
+          const sorted = [...visibleProfiles].sort(
+            (a, b) => (metrics.byPetType?.[b]?.uniqueCustomers || 0) - (metrics.byPetType?.[a]?.uniqueCustomers || 0),
+          );
+          const top1 = sorted[0];
+          const top2 = sorted.length > 1 ? sorted[1] : null;
 
-        return (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Users className="h-5 w-5" />
-                Amostras por Tipo de Pet
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Comparativo de amostras por classificação de pet
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className={cn("grid gap-4", `grid-cols-${Math.min(visibleProfiles.length, 4)}`)}>
-                {visibleProfiles.map(profile => {
-                  const data = metrics.byPetType?.[profile];
-                  if (!data) return null;
-                  const color = PET_PROFILE_COLORS[profile];
-                  return (
-                    <div
-                      key={profile}
-                      className="space-y-3 p-4 rounded-lg border"
-                      style={{ 
-                        backgroundColor: `${color}10`,
-                        borderColor: `${color}40`,
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
-                        <span className="font-semibold" style={{ color }}>{PET_PROFILE_LABELS[profile]}</span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Clientes:</span>
-                          <span className="font-bold" style={{ color }}>{data.uniqueCustomers}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Recompra:</span>
-                          <span className={cn(
-                            "font-bold",
-                            data.repurchaseRate >= 25 ? "text-emerald-600" : "text-muted-foreground"
-                          )}>
-                            {data.repurchaseRate.toFixed(1)}%
+          return (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Users className="h-5 w-5" />
+                  Amostras por Tipo de Pet
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Comparativo de amostras por classificação de pet</p>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("grid gap-4", `grid-cols-${Math.min(visibleProfiles.length, 4)}`)}>
+                  {visibleProfiles.map((profile) => {
+                    const data = metrics.byPetType?.[profile];
+                    if (!data) return null;
+                    const color = PET_PROFILE_COLORS[profile];
+                    return (
+                      <div
+                        key={profile}
+                        className="space-y-3 p-4 rounded-lg border"
+                        style={{
+                          backgroundColor: `${color}10`,
+                          borderColor: `${color}40`,
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+                          <span className="font-semibold" style={{ color }}>
+                            {PET_PROFILE_LABELS[profile]}
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Recompraram:</span>
-                          <span className="font-medium">{data.customersWhoRepurchased}</span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2" style={{ borderColor: `${color}30` }}>
-                          <span className="text-muted-foreground">Ticket Médio:</span>
-                          <span className="font-bold" style={{ color }}>{formatCurrency(data.avgTicket)}</span>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Clientes:</span>
+                            <span className="font-bold" style={{ color }}>
+                              {data.uniqueCustomers}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Recompra:</span>
+                            <span
+                              className={cn(
+                                "font-bold",
+                                data.repurchaseRate >= 25 ? "text-emerald-600" : "text-muted-foreground",
+                              )}
+                            >
+                              {data.repurchaseRate.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Recompraram:</span>
+                            <span className="font-medium">{data.customersWhoRepurchased}</span>
+                          </div>
+                          <div className="flex justify-between border-t pt-2" style={{ borderColor: `${color}30` }}>
+                            <span className="text-muted-foreground">Ticket Médio:</span>
+                            <span className="font-bold" style={{ color }}>
+                              {formatCurrency(data.avgTicket)}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {/* Insight comparativo */}
-              {top1 && top2 && (() => {
-                const d1 = metrics.byPetType?.[top1];
-                const d2 = metrics.byPetType?.[top2];
-                if (!d1 || !d2) return null;
-                const diff = d1.repurchaseRate - d2.repurchaseRate;
-                if (Math.abs(diff) < 0.5) {
-                  return (
-                    <div className="mt-3 p-2 bg-muted/50 rounded text-xs">
-                      <span className="text-muted-foreground">
-                        📊 Taxas de recompra equivalentes entre {PET_PROFILE_LABELS[top1]} e {PET_PROFILE_LABELS[top2]}
-                      </span>
-                    </div>
-                  );
-                }
-                const winner = diff > 0 ? top1 : top2;
-                const winnerColor = PET_PROFILE_COLORS[winner];
-                return (
-                  <div className="mt-3 p-2 bg-muted/50 rounded text-xs">
-                    <span style={{ color: winnerColor }}>
-                      {PET_PROFILE_LABELS[winner]} tem taxa de recompra {Math.abs(diff).toFixed(1)}pp maior
-                    </span>
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        );
-      })()}
+                    );
+                  })}
+                </div>
+
+                {/* Insight comparativo */}
+                {top1 &&
+                  top2 &&
+                  (() => {
+                    const d1 = metrics.byPetType?.[top1];
+                    const d2 = metrics.byPetType?.[top2];
+                    if (!d1 || !d2) return null;
+                    const diff = d1.repurchaseRate - d2.repurchaseRate;
+                    if (Math.abs(diff) < 0.5) {
+                      return (
+                        <div className="mt-3 p-2 bg-muted/50 rounded text-xs">
+                          <span className="text-muted-foreground">
+                            📊 Taxas de recompra equivalentes entre {PET_PROFILE_LABELS[top1]} e{" "}
+                            {PET_PROFILE_LABELS[top2]}
+                          </span>
+                        </div>
+                      );
+                    }
+                    const winner = diff > 0 ? top1 : top2;
+                    const winnerColor = PET_PROFILE_COLORS[winner];
+                    return (
+                      <div className="mt-3 p-2 bg-muted/50 rounded text-xs">
+                        <span style={{ color: winnerColor }}>
+                          {PET_PROFILE_LABELS[winner]} tem taxa de recompra {Math.abs(diff).toFixed(1)}pp maior
+                        </span>
+                      </div>
+                    );
+                  })()}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
       <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -575,12 +619,24 @@ const AnaliseSamples = () => {
       {/* Tabs com análises detalhadas */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview" className="text-xs">📊 Visão Geral</TabsTrigger>
-          <TabsTrigger value="repurchase" className="text-xs">🔄 Recompra</TabsTrigger>
-          <TabsTrigger value="cohort" className="text-xs">⏱️ Coorte</TabsTrigger>
-          <TabsTrigger value="crosssell" className="text-xs">🛒 Cross-sell</TabsTrigger>
-          <TabsTrigger value="profile" className="text-xs">👤 Perfil</TabsTrigger>
-          <TabsTrigger value="trends" className="text-xs">📈 Tendências</TabsTrigger>
+          <TabsTrigger value="overview" className="text-xs">
+            📊 Visão Geral
+          </TabsTrigger>
+          <TabsTrigger value="repurchase" className="text-xs">
+            🔄 Recompra
+          </TabsTrigger>
+          <TabsTrigger value="cohort" className="text-xs">
+            ⏱️ Coorte
+          </TabsTrigger>
+          <TabsTrigger value="crosssell" className="text-xs">
+            🛒 Cross-sell
+          </TabsTrigger>
+          <TabsTrigger value="profile" className="text-xs">
+            👤 Perfil
+          </TabsTrigger>
+          <TabsTrigger value="trends" className="text-xs">
+            📈 Tendências
+          </TabsTrigger>
         </TabsList>
 
         {/* Aba: Visão Geral - Simplificada */}
@@ -594,7 +650,6 @@ const AnaliseSamples = () => {
 
         {/* Aba: Recompra - Sem cards duplicados */}
         <TabsContent value="repurchase" className="space-y-4">
-
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -603,15 +658,11 @@ const AnaliseSamples = () => {
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Recompras por Cliente</p>
-                  <p className="text-2xl font-bold">
-                    {metrics.quality.avgRepurchasesPerCustomer.toFixed(2)}
-                  </p>
+                  <p className="text-2xl font-bold">{metrics.quality.avgRepurchasesPerCustomer.toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">LTV Médio</p>
-                  <p className="text-2xl font-bold">
-                    R$ {metrics.quality.avgLTV.toFixed(2)}
-                  </p>
+                  <p className="text-2xl font-bold">R$ {metrics.quality.avgLTV.toFixed(2)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -652,15 +703,17 @@ const AnaliseSamples = () => {
                         <td className="text-right py-3 px-4">{cohort.customerCount}</td>
                         <td className="text-right py-3 px-4">{cohort.repurchaseCount}</td>
                         <td className="text-right py-3 px-4">
-                          <span className={`font-semibold ${cohort.repurchaseRate > 30 ? 'text-primary' : cohort.repurchaseRate > 15 ? 'text-warning' : 'text-muted-foreground'}`}>
+                          <span
+                            className={`font-semibold ${cohort.repurchaseRate > 30 ? "text-primary" : cohort.repurchaseRate > 15 ? "text-warning" : "text-muted-foreground"}`}
+                          >
                             {cohort.repurchaseRate.toFixed(1)}%
                           </span>
                         </td>
                         <td className="text-right py-3 px-4">
-                          {cohort.avgTicket > 0 ? formatCurrency(cohort.avgTicket) : '-'}
+                          {cohort.avgTicket > 0 ? formatCurrency(cohort.avgTicket) : "-"}
                         </td>
                         <td className="text-right py-3 px-4">
-                          {cohort.avgDaysToRepurchase > 0 ? `${Math.round(cohort.avgDaysToRepurchase)} dias` : '-'}
+                          {cohort.avgDaysToRepurchase > 0 ? `${Math.round(cohort.avgDaysToRepurchase)} dias` : "-"}
                         </td>
                       </tr>
                     ))}
@@ -679,26 +732,18 @@ const AnaliseSamples = () => {
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={metrics.cohortAnalysis.cohorts}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="rangeLabel" 
-                      tick={{ fontSize: 12 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                    />
-                    <YAxis 
-                      label={{ value: 'Taxa de Recompra (%)', angle: -90, position: 'insideLeft' }}
-                    />
-                    <Tooltip 
+                    <XAxis dataKey="rangeLabel" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
+                    <YAxis label={{ value: "Taxa de Recompra (%)", angle: -90, position: "insideLeft" }} />
+                    <Tooltip
                       formatter={(value: number) => `${value.toFixed(1)}%`}
                       labelFormatter={(label) => `Período: ${label}`}
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="repurchaseRate" 
-                      stroke="hsl(var(--primary))" 
+                    <Line
+                      type="monotone"
+                      dataKey="repurchaseRate"
+                      stroke="hsl(var(--primary))"
                       strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))', r: 5 }}
+                      dot={{ fill: "hsl(var(--primary))", r: 5 }}
                       name="Taxa de Recompra"
                     />
                   </LineChart>
@@ -714,34 +759,24 @@ const AnaliseSamples = () => {
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={metrics.cohortAnalysis.cohorts}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="rangeLabel" 
-                      tick={{ fontSize: 12 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                    />
-                    <YAxis 
-                      label={{ value: 'Número de Clientes', angle: -90, position: 'insideLeft' }}
-                    />
-                    <Tooltip 
-                      labelFormatter={(label) => `Período: ${label}`}
-                    />
+                    <XAxis dataKey="rangeLabel" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
+                    <YAxis label={{ value: "Número de Clientes", angle: -90, position: "insideLeft" }} />
+                    <Tooltip labelFormatter={(label) => `Período: ${label}`} />
                     <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="customerCount" 
-                      stroke="hsl(var(--chart-1))" 
+                    <Line
+                      type="monotone"
+                      dataKey="customerCount"
+                      stroke="hsl(var(--chart-1))"
                       strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--chart-1))', r: 4 }}
+                      dot={{ fill: "hsl(var(--chart-1))", r: 4 }}
                       name="Total de Clientes"
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="repurchaseCount" 
-                      stroke="hsl(var(--chart-2))" 
+                    <Line
+                      type="monotone"
+                      dataKey="repurchaseCount"
+                      stroke="hsl(var(--chart-2))"
                       strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--chart-2))', r: 4 }}
+                      dot={{ fill: "hsl(var(--chart-2))", r: 4 }}
                       name="Clientes que Recompraram"
                     />
                   </LineChart>
@@ -803,12 +838,8 @@ const AnaliseSamples = () => {
                 <Package className="h-5 w-5 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {metrics.basket.avgBasketSize.toFixed(1)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Produtos por pedido com amostra
-                </p>
+                <div className="text-2xl font-bold">{metrics.basket.avgBasketSize.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Produtos por pedido com amostra</p>
               </CardContent>
             </Card>
           </div>
@@ -891,7 +922,7 @@ const AnaliseSamples = () => {
                     dataKey="month"
                     stroke="hsl(var(--muted-foreground))"
                     tickFormatter={(value) => {
-                      const [year, month] = value.split('-');
+                      const [year, month] = value.split("-");
                       return `${month}/${year.slice(2)}`;
                     }}
                   />
@@ -903,7 +934,7 @@ const AnaliseSamples = () => {
                       borderRadius: "var(--radius)",
                     }}
                     labelFormatter={(value) => {
-                      const [year, month] = value.split('-');
+                      const [year, month] = value.split("-");
                       return `${month}/${year}`;
                     }}
                   />
@@ -933,7 +964,7 @@ const AnaliseSamples = () => {
                     dataKey="month"
                     stroke="hsl(var(--muted-foreground))"
                     tickFormatter={(value) => {
-                      const [year, month] = value.split('-');
+                      const [year, month] = value.split("-");
                       return `${month}/${year.slice(2)}`;
                     }}
                   />
