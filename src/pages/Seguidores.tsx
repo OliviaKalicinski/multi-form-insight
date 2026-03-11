@@ -67,7 +67,7 @@ const Seguidores = () => {
     comparisonMode,
   } = useDashboard();
 
-  const [chartViewMode, setChartViewMode] = useState<"daily" | "monthly">("daily");
+  const [chartViewMode, setChartViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
 
   const { instagramGoals } = useAppSettings();
 
