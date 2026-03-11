@@ -3,8 +3,6 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { Package, ListTree, DollarSign, ShoppingCart, BarChart3, TrendingUp, Trophy, Gift, Link2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { TopProductsTable } from "@/components/dashboard/TopProductsTable";
 import { SKUAnalysisTable } from "@/components/dashboard/SKUAnalysisTable";
@@ -16,17 +14,16 @@ import { CrossSellBarsChart } from "@/components/dashboard/CrossSellBarsChart";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
 import { filterOrdersByDateRange, formatCurrency } from "@/utils/salesCalculator";
-import { segmentOrders, SEGMENT_LABELS, SEGMENT_COLORS, SEGMENT_ORDER, SegmentFilter } from "@/utils/revenue";
+import { segmentOrders, SegmentFilter } from "@/utils/revenue";
 import { Button } from "@/components/ui/button";
 
 type SegmentKey = Exclude<SegmentFilter, "all">;
 
 export default function Produtos() {
-  const { salesData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
+  const { salesData, dateRange, comparisonDateRange, comparisonMode, selectedSegment } = useDashboard();
 
   const [productSortBy, setProductSortBy] = useState<"quantity" | "revenue">("quantity");
   const [viewMode, setViewMode] = useState<"as-sold" | "individual">("as-sold");
-  const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>("all");
 
   const isConsolidated = selectedSegment === "all";
 
@@ -120,60 +117,13 @@ export default function Produtos() {
 
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
-      {/* ===== HEADER + SEGMENTO (menu superior) ===== */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Package className="w-8 h-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">📦 Produtos</h1>
-            <p className="text-muted-foreground">Análise de produtos, SKUs, combinações e brindes</p>
-          </div>
+      {/* ===== HEADER ===== */}
+      <div className="flex items-center gap-3">
+        <Package className="w-8 h-8 text-primary" />
+        <div>
+          <h1 className="text-3xl font-bold">📦 Produtos</h1>
+          <p className="text-muted-foreground">Análise de produtos, SKUs, combinações e brindes</p>
         </div>
-
-        {/* Seletor de segmento elevado */}
-        <TooltipProvider>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground">Segmento:</span>
-            <ToggleGroup
-              type="single"
-              value={selectedSegment}
-              onValueChange={(value) => {
-                if (value) setSelectedSegment(value as SegmentFilter);
-              }}
-              className="gap-1"
-            >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <ToggleGroupItem value="all" className="text-xs px-3">
-                    Todos
-                  </ToggleGroupItem>
-                </TooltipTrigger>
-                <TooltipContent>Todos os segmentos combinados</TooltipContent>
-              </Tooltip>
-              {SEGMENT_ORDER.map((seg) => (
-                <Tooltip key={seg}>
-                  <TooltipTrigger asChild>
-                    <ToggleGroupItem
-                      value={seg}
-                      className="text-xs px-3"
-                      style={{
-                        borderColor: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
-                        color: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
-                      }}
-                    >
-                      {SEGMENT_LABELS[seg]}
-                    </ToggleGroupItem>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {seg === "b2c" && "Vendas diretas ao consumidor (DTC)"}
-                    {seg === "b2b2c" && "Vendas via distribuidores/revendedores"}
-                    {seg === "b2b" && "Vendas Let's Fly (atacado)"}
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </ToggleGroup>
-          </div>
-        </TooltipProvider>
       </div>
 
       {/* ===== FILTROS SECUNDÁRIOS ===== */}
