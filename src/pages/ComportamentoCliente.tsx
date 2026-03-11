@@ -90,7 +90,7 @@ export default function ComportamentoCliente() {
     });
     if (volumePorMes.length > 1) {
       const base = volumePorMes[0].value;
-      volumePorMes.forEach((item, idx) => { if (idx > 0 && base > 0) item.percentageChange = ((item.value - base) / base) * 100; });
+      volumePorMes.forEach((item, idx) => { if (idx > 0 && base > 0) (item as any).percentageChange = ((item.value - base) / base) * 100; });
     }
     return { volumePorMes };
   }, [comparisonMode, comparisonDateRange, dateRange, b2cSalesData]);
