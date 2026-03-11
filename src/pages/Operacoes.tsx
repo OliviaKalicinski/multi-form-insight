@@ -25,7 +25,7 @@ import {
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-type SegmentKey = Exclude<SegmentFilter, 'all'>;
+type SegmentKey = Exclude<SegmentFilter, "all">;
 
 interface SegmentBreakdownEntry {
   pedidos: number;
@@ -34,34 +34,25 @@ interface SegmentBreakdownEntry {
 }
 
 export default function Operacoes() {
-  const {
-    salesData,
-    selectedMonth,
-    availableMonths,
-    comparisonMode,
-    selectedMonths,
-  } = useDashboard();
+  const { salesData, selectedMonth, availableMonths, comparisonMode, selectedMonths } = useDashboard();
 
-  const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>('all');
-  const isConsolidated = selectedSegment === 'all';
+  const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>("all");
+  const isConsolidated = selectedSegment === "all";
 
   // 1. Segmentar SEMPRE primeiro, memoizado
   const segments = useMemo(() => segmentOrders(salesData), [salesData]);
 
   // 2. Selecionar segmento — concatenar no modo consolidado para consistência
-  const ordersForSegment = useMemo(() =>
-    isConsolidated
-      ? [...segments.b2c, ...segments.b2b2c, ...segments.b2b]
-      : segments[selectedSegment as SegmentKey],
-    [segments, selectedSegment, isConsolidated]
+  const ordersForSegment = useMemo(
+    () =>
+      isConsolidated ? [...segments.b2c, ...segments.b2b2c, ...segments.b2b] : segments[selectedSegment as SegmentKey],
+    [segments, selectedSegment, isConsolidated],
   );
 
   // 3. Filtrar por mês
-  const ordersByMonth = useMemo(() =>
-    selectedMonth
-      ? filterOrdersByMonth(ordersForSegment, selectedMonth, availableMonths)
-      : ordersForSegment,
-    [ordersForSegment, selectedMonth, availableMonths]
+  const ordersByMonth = useMemo(
+    () => (selectedMonth ? filterOrdersByMonth(ordersForSegment, selectedMonth, availableMonths) : ordersForSegment),
+    [ordersForSegment, selectedMonth, availableMonths],
   );
 
   // FLUXO OPERACIONAL: todos os pedidos filtrados
@@ -71,27 +62,30 @@ export default function Operacoes() {
   }, [ordersByMonth]);
 
   // FLUXO FINANCEIRO: apenas vendas
-  const totalRevenue = useMemo(() =>
-    getRevenueOrders(ordersByMonth).reduce((sum, o) => sum + getOfficialRevenue(o), 0),
-    [ordersByMonth]
+  const totalRevenue = useMemo(
+    () => getRevenueOrders(ordersByMonth).reduce((sum, o) => sum + getOfficialRevenue(o), 0),
+    [ordersByMonth],
   );
 
   // Breakdown por segmento (modo consolidado)
   const segmentBreakdown = useMemo(() => {
     if (!isConsolidated) return null;
-    return SEGMENT_ORDER.reduce((acc, key) => {
-      const segOrdersByMonth = selectedMonth
-        ? filterOrdersByMonth(segments[key], selectedMonth, availableMonths)
-        : segments[key];
-      const revOrders = getRevenueOrders(segOrdersByMonth);
-      const nfStats = analyzeNFIssuanceTime(segOrdersByMonth);
-      acc[key] = {
-        pedidos: segOrdersByMonth.length,
-        faturamento: revOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0),
-        tempoNF: nfStats.averageDays,
-      };
-      return acc;
-    }, {} as Record<SegmentKey, SegmentBreakdownEntry>);
+    return SEGMENT_ORDER.reduce(
+      (acc, key) => {
+        const segOrdersByMonth = selectedMonth
+          ? filterOrdersByMonth(segments[key], selectedMonth, availableMonths)
+          : segments[key];
+        const revOrders = getRevenueOrders(segOrdersByMonth);
+        const nfStats = analyzeNFIssuanceTime(segOrdersByMonth);
+        acc[key] = {
+          pedidos: segOrdersByMonth.length,
+          faturamento: revOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0),
+          tempoNF: nfStats.averageDays,
+        };
+        return acc;
+      },
+      {} as Record<SegmentKey, SegmentBreakdownEntry>,
+    );
   }, [isConsolidated, segments, selectedMonth, availableMonths]);
 
   // Métricas de comparação multi-mês (aplicando mesmo pipeline)
@@ -116,34 +110,40 @@ export default function Operacoes() {
       const metrics = calculateProductOperationsMetrics(filteredOrders, false);
 
       if (metrics) {
-        const monthLabel = format(
-          parse(month, "yyyy-MM", new Date()),
-          "MMM yyyy",
-          { locale: ptBR }
-        );
+        const monthLabel = format(parse(month, "yyyy-MM", new Date()), "MMM yyyy", { locale: ptBR });
 
         const color = COLORS[index % COLORS.length];
 
         totalPedidos.push({
-          month, monthLabel, value: filteredOrders.length, color,
+          month,
+          monthLabel,
+          value: filteredOrders.length,
+          color,
         });
 
         tempoMedioNF.push({
-          month, monthLabel, value: metrics.nfStats?.averageDays || 0, color,
+          month,
+          monthLabel,
+          value: metrics.nfStats?.averageDays || 0,
+          color,
         });
 
         const mainShipping = metrics.shippingMethodStats[0];
         formaEnvioPrincipal.push({
-          month, monthLabel,
+          month,
+          monthLabel,
           value: mainShipping?.numeroPedidos || 0,
           color,
-          shippingName: mainShipping?.formaEnvio || 'N/A',
+          shippingName: mainShipping?.formaEnvio || "N/A",
         });
 
         // Faturamento via getRevenueOrders + getOfficialRevenue
         const rev = getRevenueOrders(filteredOrders).reduce((sum, o) => sum + getOfficialRevenue(o), 0);
         faturamento.push({
-          month, monthLabel, value: rev, color,
+          month,
+          monthLabel,
+          value: rev,
+          color,
         });
       }
     });
@@ -209,9 +209,7 @@ export default function Operacoes() {
         <Truck className="w-8 h-8 text-primary" />
         <div>
           <h1 className="text-3xl font-bold">🚚 Operações</h1>
-          <p className="text-muted-foreground">
-            Formas de envio, logística e emissão de notas fiscais
-          </p>
+          <p className="text-muted-foreground">Formas de envio, logística e emissão de notas fiscais</p>
         </div>
       </div>
 
@@ -235,7 +233,7 @@ export default function Operacoes() {
               </TooltipTrigger>
               <TooltipContent>Todos os segmentos combinados</TooltipContent>
             </Tooltip>
-            {SEGMENT_ORDER.map(seg => (
+            {SEGMENT_ORDER.map((seg) => (
               <Tooltip key={seg}>
                 <TooltipTrigger asChild>
                   <ToggleGroupItem
@@ -250,9 +248,9 @@ export default function Operacoes() {
                   </ToggleGroupItem>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {seg === 'b2c' && 'Vendas diretas ao consumidor (DTC)'}
-                  {seg === 'b2b2c' && 'Vendas via distribuidores/revendedores'}
-                  {seg === 'b2b' && "Vendas Let's Fly (atacado)"}
+                  {seg === "b2c" && "Vendas diretas ao consumidor (DTC)"}
+                  {seg === "b2b2c" && "Vendas via distribuidores/revendedores"}
+                  {seg === "b2b" && "Vendas Let's Fly (atacado)"}
                 </TooltipContent>
               </Tooltip>
             ))}
@@ -273,21 +271,19 @@ export default function Operacoes() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Forma de Envio Principal</p>
-                    <p className="text-xs text-muted-foreground">
-                      🚚 Método mais utilizado no período
-                    </p>
+                    <p className="text-xs text-muted-foreground">🚚 Método mais utilizado no período</p>
                   </div>
                 </div>
 
                 <h3 className="text-xl font-bold mb-4 line-clamp-2">
-                  {summaryMetrics.mainShipping?.formaEnvio || 'N/A'}
+                  {summaryMetrics.mainShipping?.formaEnvio || "N/A"}
                 </h3>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-background/50 rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">📦 Pedidos</p>
                     <p className="text-lg font-bold">
-                      {summaryMetrics.mainShipping?.numeroPedidos.toLocaleString('pt-BR') || 0}
+                      {summaryMetrics.mainShipping?.numeroPedidos.toLocaleString("pt-BR") || 0}
                     </p>
                   </div>
                   <div className="bg-background/50 rounded-lg p-3">
@@ -304,7 +300,7 @@ export default function Operacoes() {
                   </div>
                   {!isConsolidated && (
                     <div className="bg-background/50 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">🎫 Ticket Médio</p>
+                      <p className="text-xs text-muted-foreground">🎫 Ticket Médio *</p>
                       <p className="text-lg font-bold">
                         {formatCurrency(summaryMetrics.mainShipping?.ticketMedio || 0)}
                       </p>
@@ -324,9 +320,7 @@ export default function Operacoes() {
                     <Package className="h-4 w-4 text-primary" />
                     <span className="text-xs text-muted-foreground">Total Pedidos</span>
                   </div>
-                  <p className="text-xl font-bold text-primary">
-                    {summaryMetrics.totalOrders.toLocaleString('pt-BR')}
-                  </p>
+                  <p className="text-xl font-bold text-primary">{summaryMetrics.totalOrders.toLocaleString("pt-BR")}</p>
                   {isConsolidated && segmentBreakdown && (
                     <SegmentBreakdownBars
                       data={{
@@ -347,9 +341,7 @@ export default function Operacoes() {
                     <Truck className="h-4 w-4 text-primary" />
                     <span className="text-xs text-muted-foreground">Formas de Envio</span>
                   </div>
-                  <p className="text-xl font-bold text-primary">
-                    {summaryMetrics.totalShippingMethods}
-                  </p>
+                  <p className="text-xl font-bold text-primary">{summaryMetrics.totalShippingMethods}</p>
                 </CardContent>
               </Card>
             </KPITooltip>
@@ -358,10 +350,14 @@ export default function Operacoes() {
               <Card className="bg-muted/30">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Clock className={`h-4 w-4 ${summaryMetrics.avgNFTime <= 1 ? 'text-green-600' : summaryMetrics.avgNFTime <= 3 ? 'text-yellow-600' : 'text-red-600'}`} />
+                    <Clock
+                      className={`h-4 w-4 ${summaryMetrics.avgNFTime <= 1 ? "text-green-600" : summaryMetrics.avgNFTime <= 3 ? "text-yellow-600" : "text-red-600"}`}
+                    />
                     <span className="text-xs text-muted-foreground">Tempo Médio NF</span>
                   </div>
-                  <p className={`text-xl font-bold ${summaryMetrics.avgNFTime <= 1 ? 'text-green-600' : summaryMetrics.avgNFTime <= 3 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  <p
+                    className={`text-xl font-bold ${summaryMetrics.avgNFTime <= 1 ? "text-green-600" : summaryMetrics.avgNFTime <= 3 ? "text-yellow-600" : "text-red-600"}`}
+                  >
                     {summaryMetrics.avgNFTime.toFixed(1)} dias
                   </p>
                   {isConsolidated && segmentBreakdown && (
@@ -385,9 +381,7 @@ export default function Operacoes() {
                     <DollarSign className="h-4 w-4 text-primary" />
                     <span className="text-xs text-muted-foreground">Faturamento</span>
                   </div>
-                  <p className="text-xl font-bold text-primary">
-                    {formatCurrency(summaryMetrics.totalRevenue)}
-                  </p>
+                  <p className="text-xl font-bold text-primary">{formatCurrency(summaryMetrics.totalRevenue)}</p>
                   {isConsolidated && segmentBreakdown && (
                     <SegmentBreakdownBars
                       data={{
@@ -455,23 +449,17 @@ export default function Operacoes() {
             <Card>
               <CardHeader>
                 <CardTitle>🚚 Métodos de Envio</CardTitle>
-                <CardDescription>
-                  Distribuição de como os pedidos são entregues
-                </CardDescription>
+                <CardDescription>Distribuição de como os pedidos são entregues</CardDescription>
               </CardHeader>
               <CardContent>
-                <ShippingMethodsChart
-                  data={productMetrics?.shippingMethodStats || []}
-                />
+                <ShippingMethodsChart data={productMetrics?.shippingMethodStats || []} />
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle>⏱️ Tempo de Emissão NF</CardTitle>
-                <CardDescription>
-                  Distribuição do tempo entre venda e emissão de nota fiscal
-                </CardDescription>
+                <CardDescription>Distribuição do tempo entre venda e emissão de nota fiscal</CardDescription>
               </CardHeader>
               <CardContent>
                 <NFIssuanceChart
@@ -486,9 +474,7 @@ export default function Operacoes() {
           <Card>
             <CardHeader>
               <CardTitle>📋 Detalhes por Forma de Envio</CardTitle>
-              <CardDescription>
-                Performance detalhada de cada método de entrega
-              </CardDescription>
+              <CardDescription>Performance detalhada de cada método de entrega</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -499,14 +485,14 @@ export default function Operacoes() {
                       <th className="text-right p-3 font-medium">Pedidos</th>
                       <th className="text-right p-3 font-medium">% Total</th>
                       <th className="text-right p-3 font-medium">Faturamento</th>
-                      <th className="text-right p-3 font-medium">Ticket Médio</th>
+                      <th className="text-right p-3 font-medium">Ticket Médio *</th>
                     </tr>
                   </thead>
                   <tbody>
                     {productMetrics?.shippingMethodStats.map((stat, index) => (
                       <tr key={index} className="border-b hover:bg-muted/50">
                         <td className="p-3 font-medium">{stat.formaEnvio}</td>
-                        <td className="p-3 text-right">{stat.numeroPedidos.toLocaleString('pt-BR')}</td>
+                        <td className="p-3 text-right">{stat.numeroPedidos.toLocaleString("pt-BR")}</td>
                         <td className="p-3 text-right">{stat.percentual.toFixed(1)}%</td>
                         <td className="p-3 text-right font-mono">{formatCurrency(stat.faturamentoTotal)}</td>
                         <td className="p-3 text-right font-mono">{formatCurrency(stat.ticketMedio)}</td>
@@ -514,6 +500,9 @@ export default function Operacoes() {
                     ))}
                   </tbody>
                 </table>
+                <p className="text-xs text-muted-foreground mt-3">
+                  * Ticket Médio exclui pedidos somente de amostra (R$ 0,01)
+                </p>
               </div>
             </CardContent>
           </Card>
