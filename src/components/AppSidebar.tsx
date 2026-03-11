@@ -13,7 +13,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { 
+import {
   LayoutDashboard,
   TrendingUp,
   Gift,
@@ -64,6 +64,7 @@ const navSections: NavSection[] = [
       { title: "Kanban", url: "/kanban-operacional", icon: ClipboardList },
       { title: "Radar Operacional", url: "/radar-operacional", icon: Activity },
       { title: "Operações", url: "/operacoes", icon: Truck },
+      { title: "Produtos", url: "/produtos", icon: Package },
     ],
   },
   {
@@ -89,7 +90,6 @@ const navSections: NavSection[] = [
     items: [
       { title: "Performance Financeira", url: "/performance-financeira", icon: TrendingUp },
       { title: "Comportamento", url: "/comportamento-cliente", icon: UserCheck },
-      { title: "Produtos", url: "/produtos", icon: BarChart3 },
       { title: "Amostras", url: "/analise-samples", icon: Gift },
       { title: "Anúncios Meta", url: "/ads", icon: Megaphone },
       { title: "Seguidores", url: "/seguidores", icon: Instagram },
@@ -103,15 +103,14 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
-  
+
   const { user, signOut } = useAuth();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
 
   const isActive = (url: string) => location.pathname === url;
-  
+
   // Check if any item in section is active
-  const isSectionActive = (section: NavSection) => 
-    section.items.some(item => isActive(item.url));
+  const isSectionActive = (section: NavSection) => section.items.some((item) => isActive(item.url));
 
   const handleLogout = async () => {
     await signOut();
@@ -122,21 +121,13 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b">
         <div className="flex items-center justify-center px-2 py-4">
-          <img 
-            src={comidaDragaoLogo} 
-            alt="Comida de Dragão" 
-            className="h-24 w-auto object-contain"
-          />
+          <img src={comidaDragaoLogo} alt="Comida de Dragão" className="h-24 w-auto object-contain" />
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         {navSections.map((section) => (
-          <Collapsible
-            key={section.title}
-            defaultOpen={isSectionActive(section)}
-            className="group/collapsible"
-          >
+          <Collapsible key={section.title} defaultOpen={isSectionActive(section)} className="group/collapsible">
             <SidebarGroup>
               <CollapsibleTrigger asChild>
                 <SidebarGroupLabel className="cursor-pointer hover:bg-sidebar-accent rounded-md transition-colors">
@@ -151,7 +142,7 @@ export function AppSidebar() {
                   </div>
                 </SidebarGroupLabel>
               </CollapsibleTrigger>
-              
+
               <CollapsibleContent>
                 <SidebarGroupContent>
                   <SidebarMenu>
@@ -177,7 +168,7 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t">
         <SidebarMenu>
-        {/* Upload - Admin only */}
+          {/* Upload - Admin only */}
           {isAdmin && (
             <SidebarMenuItem>
               <SidebarMenuButton
