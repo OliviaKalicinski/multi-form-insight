@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { Package, Truck, Clock, DollarSign } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +8,6 @@ import { NFIssuanceChart } from "@/components/dashboard/NFIssuanceChart";
 import { LogisticsKPICards } from "@/components/dashboard/LogisticsKPICards";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { SegmentBreakdownBars } from "@/components/dashboard/SegmentBreakdownBars";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calculateProductOperationsMetrics } from "@/utils/productOperationsMetrics";
 import { analyzeNFIssuanceTime } from "@/utils/productOperationsMetrics";
 import { filterOrdersByDateRange, formatCurrency } from "@/utils/salesCalculator";
@@ -17,7 +15,6 @@ import {
   segmentOrders,
   getRevenueOrders,
   getOfficialRevenue,
-  SEGMENT_LABELS,
   SEGMENT_COLORS,
   SEGMENT_ORDER,
   SegmentFilter,
@@ -32,9 +29,8 @@ interface SegmentBreakdownEntry {
 }
 
 export default function Operacoes() {
-  const { salesData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
+  const { salesData, dateRange, comparisonDateRange, comparisonMode, selectedSegment } = useDashboard();
 
-  const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>("all");
   const isConsolidated = selectedSegment === "all";
 
   // 1. Segmentar SEMPRE primeiro, memoizado
@@ -186,51 +182,6 @@ export default function Operacoes() {
           <p className="text-muted-foreground">Formas de envio, logística e emissão de notas fiscais</p>
         </div>
       </div>
-
-      {/* ========== SEGMENT TOGGLE ========== */}
-      <TooltipProvider>
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-muted-foreground">Segmento:</span>
-          <ToggleGroup
-            type="single"
-            value={selectedSegment}
-            onValueChange={(value) => {
-              if (value) setSelectedSegment(value as SegmentFilter);
-            }}
-            className="gap-1"
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToggleGroupItem value="all" className="text-xs px-3">
-                  Consolidado
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent>Todos os segmentos combinados</TooltipContent>
-            </Tooltip>
-            {SEGMENT_ORDER.map((seg) => (
-              <Tooltip key={seg}>
-                <TooltipTrigger asChild>
-                  <ToggleGroupItem
-                    value={seg}
-                    className="text-xs px-3"
-                    style={{
-                      borderColor: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
-                      color: selectedSegment === seg ? SEGMENT_COLORS[seg] : undefined,
-                    }}
-                  >
-                    {SEGMENT_LABELS[seg]}
-                  </ToggleGroupItem>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {seg === "b2c" && "Vendas diretas ao consumidor (DTC)"}
-                  {seg === "b2b2c" && "Vendas via distribuidores/revendedores"}
-                  {seg === "b2b" && "Vendas Let's Fly (atacado)"}
-                </TooltipContent>
-              </Tooltip>
-            ))}
-          </ToggleGroup>
-        </div>
-      </TooltipProvider>
 
       {/* Cards resumo - HERO + SATÉLITES */}
       {!comparisonMode && productMetrics && summaryMetrics && (
