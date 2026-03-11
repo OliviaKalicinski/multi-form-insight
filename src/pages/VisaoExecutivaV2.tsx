@@ -4,8 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { formatCurrency } from "@/utils/salesCalculator";
 import { getOfficialRevenue, isRevenueOrder, getB2COrders, getB2BOrders, getB2B2COrders } from "@/utils/revenue";
@@ -13,10 +11,9 @@ import { isSampleProduct, isOnlySampleOrder, hasRegularProduct, isMaterialProduc
 import { classifyProductsByAnimal } from "@/utils/petProfile";
 import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { format, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  CalendarIcon,
   ChevronDown,
   ChevronUp,
   TrendingUp,
@@ -26,6 +23,8 @@ import {
   Building2,
   Handshake,
   Globe,
+  ShoppingCart,
+  DollarSign,
 } from "lucide-react";
 import {
   PieChart,
@@ -39,61 +38,19 @@ import {
   YAxis,
   CartesianGrid,
   Legend,
+  LineChart,
+  Line,
 } from "recharts";
-import { DateRange } from "react-day-picker";
 import { ProcessedOrder } from "@/types/marketing";
 
-// ─── Colors ──────────────────────────────────────────────────────────────────
-
+// ─── Colors ───────────────────────────────────────────────────────────────────
 const CHART_COLORS = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2", "#65a30d", "#c2410c"];
 const B2C_COLOR = "#2563eb";
 const B2B_COLOR = "#d97706";
 const B2B2C_COLOR = "#9333ea";
 const FRETE_COLOR = "#16a34a";
 
-// ─── Period types ─────────────────────────────────────────────────────────────
-
-type PresetKey = "1d" | "7d" | "30d" | "current_month" | "last_month";
-
-interface PeriodState {
-  type: PresetKey | "custom";
-  start: Date;
-  end: Date;
-}
-
-const PRESETS: { key: PresetKey; label: string }[] = [
-  { key: "1d", label: "Hoje" },
-  { key: "7d", label: "7 dias" },
-  { key: "30d", label: "30 dias" },
-  { key: "current_month", label: "Mês atual" },
-  { key: "last_month", label: "Mês anterior" },
-];
-
-function buildPreset(key: PresetKey, anchor: Date): PeriodState {
-  switch (key) {
-    case "1d":
-      return { type: key, start: startOfDay(anchor), end: endOfDay(anchor) };
-    case "7d": {
-      const s = new Date(anchor);
-      s.setDate(s.getDate() - 6);
-      return { type: key, start: startOfDay(s), end: endOfDay(anchor) };
-    }
-    case "30d": {
-      const s = new Date(anchor);
-      s.setDate(s.getDate() - 29);
-      return { type: key, start: startOfDay(s), end: endOfDay(anchor) };
-    }
-    case "current_month":
-      return { type: key, start: startOfMonth(anchor), end: endOfDay(anchor) };
-    case "last_month": {
-      const prev = subMonths(anchor, 1);
-      return { type: key, start: startOfMonth(prev), end: endOfMonth(prev) };
-    }
-  }
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function getLast12Months(orders: ProcessedOrder[]): string[] {
   const months = new Set<string>();
   orders.forEach((o) => months.add(format(o.dataVenda, "yyyy-MM")));
@@ -135,7 +92,6 @@ function buildTopClientes(orders: ProcessedOrder[], n = 5) {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
 const DonutChart = ({
   data,
   label,
@@ -271,15 +227,15 @@ const ProductBarChart = ({
   );
 };
 
-// Collapsible section wrapper for B2B / B2B2C
-const OfflineSection = ({
+// Seção por segmento — separação visual forte com borda colorida lateral
+const SegmentSection = ({
   title,
   badge,
   color,
   icon: Icon,
   badgeRevenue,
   children,
-  defaultOpen = false,
+  defaultOpen = true,
 }: {
   title: string;
   badge: string;
@@ -292,52 +248,55 @@ const OfflineSection = ({
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="flex items-center justify-between border-b pb-2">
-        <div className="flex items-center gap-2">
-          <Icon className="h-5 w-5" style={{ color }} />
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <Badge style={{ backgroundColor: color }} className="text-white text-xs">
-            {badge}
-          </Badge>
-          {!open && <span className="text-sm font-semibold text-muted-foreground ml-1">{badgeRevenue}</span>}
+      <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: `${color}40` }}>
+        {/* Header da seção */}
+        <div className="flex items-center justify-between px-5 py-3" style={{ backgroundColor: `${color}10` }}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg" style={{ backgroundColor: `${color}20` }}>
+              <Icon className="h-5 w-5" style={{ color }} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold">{title}</h2>
+                <Badge style={{ backgroundColor: color }} className="text-white text-xs px-2">
+                  {badge}
+                </Badge>
+              </div>
+              {!open && (
+                <p className="text-sm font-semibold mt-0.5" style={{ color }}>
+                  {badgeRevenue}
+                </p>
+              )}
+            </div>
+          </div>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
         </div>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
-        </CollapsibleTrigger>
+
+        {/* Conteúdo */}
+        <CollapsibleContent>
+          <div className="p-5 space-y-4">{children}</div>
+        </CollapsibleContent>
       </div>
-      <CollapsibleContent className="space-y-4 mt-4">{children}</CollapsibleContent>
     </Collapsible>
   );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-
+// ─── Main Component ────────────────────────────────────────────────────────────
 const VisaoExecutivaV2 = () => {
-  const { salesData, isLoadingData } = useDashboard();
-  const [period, setPeriod] = useState<PeriodState | null>(null);
-  const [customRange, setCustomRange] = useState<DateRange | undefined>();
-  const [calendarOpen, setCalendarOpen] = useState(false);
+  const { salesData, isLoadingData, dateRange } = useDashboard();
   const [estadoSampleData, setEstadoSampleData] = useState<Record<string, number>>({});
   const [estadoProductData, setEstadoProductData] = useState<Record<string, number>>({});
 
-  // Anchor = last date with data
-  const lastDate = useMemo(() => {
-    if (!salesData.length) return null;
-    return new Date(Math.max(...salesData.map((o) => o.dataVenda.getTime())));
-  }, [salesData]);
-
-  // Init period on data load
-  useEffect(() => {
-    if (lastDate && !period) setPeriod(buildPreset("7d", lastDate));
-  }, [lastDate]);
-
-  // Filtered orders by period
+  // Filtered orders by GlobalFilter dateRange
   const filteredOrders = useMemo(() => {
-    if (!period || !salesData.length) return [];
-    return salesData.filter((o) => isWithinInterval(o.dataVenda, { start: period.start, end: period.end }));
-  }, [salesData, period]);
+    if (!salesData.length) return [];
+    if (!dateRange) return salesData;
+    return salesData.filter((o) => isWithinInterval(o.dataVenda, { start: dateRange.start, end: dateRange.end }));
+  }, [salesData, dateRange]);
 
   // IDs for estado queries (B2C only)
   const { sampleOrderIds, productOrderIds } = useMemo(() => {
@@ -378,7 +337,7 @@ const VisaoExecutivaV2 = () => {
     fetchEstados(productOrderIds, setEstadoProductData);
   }, [filteredOrders, sampleOrderIds, productOrderIds]);
 
-  // ── B2C metrics ──────────────────────────────────────────────────────────
+  // ── B2C metrics ────────────────────────────────────────────────────────────
   const b2c = useMemo(() => {
     const orders = getB2COrders(filteredOrders);
     const receitaProdutos = orders.reduce((s, o) => s + o.valorTotal, 0);
@@ -401,7 +360,6 @@ const VisaoExecutivaV2 = () => {
         ? revenueProductOrders.reduce((s, o) => s + getOfficialRevenue(o), 0) / revenueProductOrders.length
         : 0;
 
-    // Conta linhas de produto distintas por pedido (não soma de unidades físicas)
     let totalNonSampleLines = 0;
     withProductOrders.forEach((o) =>
       o.produtos.forEach((p) => {
@@ -524,14 +482,15 @@ const VisaoExecutivaV2 = () => {
     };
   }, [filteredOrders, salesData, estadoSampleData, estadoProductData, sampleOrderIds, productOrderIds]);
 
-  // ── Offline segment factory ──────────────────────────────────────────────
+  // ── Offline segment factory ────────────────────────────────────────────────
   const buildOfflineMetrics = (seg: "b2b" | "b2b2c") => {
     const getOrders = seg === "b2b" ? getB2BOrders : getB2B2COrders;
     const orders = getOrders(filteredOrders);
     const allSeg = getOrders(salesData);
 
-    const receitaTotal = orders.filter(isRevenueOrder).reduce((s, o) => s + getOfficialRevenue(o), 0);
-    const totalPedidos = orders.filter(isRevenueOrder).length;
+    const receitaOrders = orders.filter(isRevenueOrder);
+    const receitaTotal = receitaOrders.reduce((s, o) => s + getOfficialRevenue(o), 0);
+    const totalPedidos = receitaOrders.length;
     const ticketMedio = totalPedidos > 0 ? receitaTotal / totalPedidos : 0;
     const productRevenueMap = buildProductRevenueMap(orders);
     const productsSold = Object.entries(productRevenueMap)
@@ -595,23 +554,38 @@ const VisaoExecutivaV2 = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const b2b2c = useMemo(() => buildOfflineMetrics("b2b2c"), [filteredOrders, salesData]);
 
-  // ── Consolidated header metrics ─────────────────────────────────────────
+  // ── Consolidated metrics ───────────────────────────────────────────────────
   const consolidated = useMemo(() => {
     const totalReceita = b2c.receitaTotal + b2b.receitaTotal + b2b2c.receitaTotal;
     const totalPedidos = b2c.totalOrders + b2b.totalPedidos + b2b2c.totalPedidos;
-    return { totalReceita, totalPedidos };
+    const ticketGeral = totalPedidos > 0 ? totalReceita / totalPedidos : 0;
+    const b2cPct = totalReceita > 0 ? ((b2c.receitaTotal / totalReceita) * 100).toFixed(0) : "0";
+    const b2bPct = totalReceita > 0 ? ((b2b.receitaTotal / totalReceita) * 100).toFixed(0) : "0";
+    const b2b2cPct = totalReceita > 0 ? ((b2b2c.receitaTotal / totalReceita) * 100).toFixed(0) : "0";
+    return { totalReceita, totalPedidos, ticketGeral, b2cPct, b2bPct, b2b2cPct };
   }, [b2c, b2b, b2b2c]);
 
-  // ── Period label ────────────────────────────────────────────────────────
-  const periodLabel = useMemo(() => {
-    if (!period) return "";
-    const s = format(period.start, "dd/MM/yyyy", { locale: ptBR });
-    const e = format(period.end, "dd/MM/yyyy", { locale: ptBR });
-    if (s === e) return s;
-    return `${s} — ${e}`;
-  }, [period]);
+  // ── Consolidated 12-month trend ────────────────────────────────────────────
+  const consolidatedTrend = useMemo(() => {
+    const months12 = getLast12Months(salesData);
+    const b2cAll = getB2COrders(salesData);
+    const b2bAll = getB2BOrders(salesData);
+    const b2b2cAll = getB2B2COrders(salesData);
 
-  // ── Loading / empty ─────────────────────────────────────────────────────
+    return months12.map((m) => {
+      const b2cM = b2cAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
+      const b2bM = b2bAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
+      const b2b2cM = b2b2cAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
+      return {
+        mes: fmtMonth(m),
+        B2C: Math.round(b2cM.reduce((s, o) => s + o.valorTotal + o.valorFrete, 0)),
+        B2B: Math.round(b2bM.filter(isRevenueOrder).reduce((s, o) => s + getOfficialRevenue(o), 0)),
+        B2B2C: Math.round(b2b2cM.filter(isRevenueOrder).reduce((s, o) => s + getOfficialRevenue(o), 0)),
+      };
+    });
+  }, [salesData]);
+
+  // ── Loading / empty ────────────────────────────────────────────────────────
   if (isLoadingData) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[60vh]">
@@ -629,110 +603,132 @@ const VisaoExecutivaV2 = () => {
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      {/* ── Header ── */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Fotografia Operacional</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {periodLabel}
-              <span className="ml-2 text-xs opacity-60">· gráficos = últimos 12 meses</span>
-            </p>
-          </div>
-
-          {/* Period selector */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {PRESETS.map((p) => (
-              <Button
-                key={p.key}
-                variant={period?.type === p.key ? "default" : "outline"}
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => lastDate && setPeriod(buildPreset(p.key, lastDate))}
-              >
-                {p.label}
-              </Button>
-            ))}
-
-            {/* Custom date range picker */}
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={period?.type === "custom" ? "default" : "outline"}
-                  size="sm"
-                  className="h-8 text-xs gap-1.5"
-                >
-                  <CalendarIcon className="h-3.5 w-3.5" />
-                  Personalizado
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="range"
-                  selected={customRange}
-                  onSelect={(range) => {
-                    setCustomRange(range);
-                    if (range?.from && range?.to) {
-                      setPeriod({
-                        type: "custom",
-                        start: startOfDay(range.from),
-                        end: endOfDay(range.to),
-                      });
-                      setCalendarOpen(false);
-                    }
-                  }}
-                  numberOfMonths={2}
-                  locale={ptBR}
-                  disabled={{ after: lastDate ?? new Date() }}
-                />
-              </PopoverContent>
-            </Popover>
+      {/* ── BANNER CONSOLIDADO ── */}
+      <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden shadow-xl">
+        {/* Linha superior — totais da empresa */}
+        <div className="px-6 pt-6 pb-4 border-b border-white/10">
+          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Fotografia Operacional</p>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+            <div>
+              <p className="text-xs text-slate-400">Receita Total Empresa</p>
+              <p className="text-4xl font-bold tracking-tight">{formatCurrency(consolidated.totalReceita)}</p>
+            </div>
+            <div className="flex gap-6 pb-1">
+              <div>
+                <p className="text-xs text-slate-400">Total Pedidos / NFs</p>
+                <p className="text-2xl font-bold">{consolidated.totalPedidos.toLocaleString("pt-BR")}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Ticket Médio Geral</p>
+                <p className="text-2xl font-bold">{formatCurrency(consolidated.ticketGeral)}</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Consolidated totals banner */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white">
-          <div>
-            <p className="text-xs text-slate-400">Receita Total Empresa</p>
-            <p className="text-2xl font-bold">{formatCurrency(consolidated.totalReceita)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-400">Total de Pedidos / NFs</p>
-            <p className="text-2xl font-bold">{consolidated.totalPedidos}</p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-400">B2C</p>
-            <p className="text-lg font-semibold" style={{ color: "#93c5fd" }}>
+        {/* Linha inferior — breakdown por segmento */}
+        <div className="grid grid-cols-3 divide-x divide-white/10">
+          {/* B2C */}
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#93c5fd" }} />
+              <span className="text-xs text-slate-400 font-medium">B2C · Online</span>
+              <span className="text-xs text-slate-500">{consolidated.b2cPct}%</span>
+            </div>
+            <p className="text-xl font-bold" style={{ color: "#93c5fd" }}>
               {formatCurrency(b2c.receitaTotal)}
             </p>
-          </div>
-          <div className="flex gap-4">
-            <div>
-              <p className="text-xs text-slate-400">B2B</p>
-              <p className="text-lg font-semibold" style={{ color: "#fdba74" }}>
-                {formatCurrency(b2b.receitaTotal)}
-              </p>
+            <div className="flex gap-4 mt-2">
+              <div>
+                <p className="text-[10px] text-slate-500">Pedidos</p>
+                <p className="text-sm font-semibold text-slate-300">{b2c.totalOrders.toLocaleString("pt-BR")}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500">Ticket Médio</p>
+                <p className="text-sm font-semibold text-slate-300">{formatCurrency(b2c.ticketMedio)}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-slate-400">B2B2C</p>
-              <p className="text-lg font-semibold" style={{ color: "#d8b4fe" }}>
-                {formatCurrency(b2b2c.receitaTotal)}
-              </p>
+          </div>
+
+          {/* B2B */}
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#fdba74" }} />
+              <span className="text-xs text-slate-400 font-medium">B2B · Let's Fly</span>
+              <span className="text-xs text-slate-500">{consolidated.b2bPct}%</span>
+            </div>
+            <p className="text-xl font-bold" style={{ color: "#fdba74" }}>
+              {formatCurrency(b2b.receitaTotal)}
+            </p>
+            <div className="flex gap-4 mt-2">
+              <div>
+                <p className="text-[10px] text-slate-500">NFs</p>
+                <p className="text-sm font-semibold text-slate-300">{b2b.totalPedidos.toLocaleString("pt-BR")}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500">Ticket Médio</p>
+                <p className="text-sm font-semibold text-slate-300">{formatCurrency(b2b.ticketMedio)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* B2B2C */}
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#d8b4fe" }} />
+              <span className="text-xs text-slate-400 font-medium">B2B2C · Distrib.</span>
+              <span className="text-xs text-slate-500">{consolidated.b2b2cPct}%</span>
+            </div>
+            <p className="text-xl font-bold" style={{ color: "#d8b4fe" }}>
+              {formatCurrency(b2b2c.receitaTotal)}
+            </p>
+            <div className="flex gap-4 mt-2">
+              <div>
+                <p className="text-[10px] text-slate-500">NFs</p>
+                <p className="text-sm font-semibold text-slate-300">{b2b2c.totalPedidos.toLocaleString("pt-BR")}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-500">Ticket Médio</p>
+                <p className="text-sm font-semibold text-slate-300">{formatCurrency(b2b2c.ticketMedio)}</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ════════════════════ MUNDO ONLINE — B2C ════════════════════ */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2 border-b pb-2">
-          <Globe className="h-5 w-5" style={{ color: B2C_COLOR }} />
-          <h2 className="text-lg font-semibold">Mundo Online</h2>
-          <Badge style={{ backgroundColor: B2C_COLOR }} className="text-white text-xs">
-            B2C
-          </Badge>
-        </div>
+      {/* ── GRÁFICO DE TENDÊNCIA CONSOLIDADA ── */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            Receita Consolidada — últimos 12 meses
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={consolidatedTrend} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} width={58} />
+              <Tooltip formatter={(v: number, n: string) => [formatCurrency(v), n]} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="B2C" stackId="a" fill={B2C_COLOR} />
+              <Bar dataKey="B2B2C" stackId="a" fill={B2B2C_COLOR} />
+              <Bar dataKey="B2B" stackId="a" fill={B2B_COLOR} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
+      {/* ════════════ MUNDO ONLINE — B2C ════════════ */}
+      <SegmentSection
+        title="Mundo Online"
+        badge="B2C"
+        color={B2C_COLOR}
+        icon={Globe}
+        badgeRevenue={formatCurrency(b2c.receitaTotal)}
+        defaultOpen={true}
+      >
         {/* KPI row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KPICard
@@ -749,14 +745,14 @@ const VisaoExecutivaV2 = () => {
             accentColor={B2C_COLOR}
           />
           <KPICard
-            icon={Users}
+            icon={DollarSign}
             label="Ticket Médio (excl. amostras)"
             value={formatCurrency(b2c.ticketMedio)}
-            sub={`${b2c.mediaProdutosPorPedido.toFixed(1)} SKUs/pedido (excl. amostras)`}
+            sub={`${b2c.mediaProdutosPorPedido.toFixed(1)} SKUs/pedido`}
             accentColor={B2C_COLOR}
           />
           <KPICard
-            icon={Truck}
+            icon={ShoppingCart}
             label="Pedidos"
             value={String(b2c.totalOrders)}
             sub={`${b2c.onlySampleCount} amostras · ${b2c.withProductCount} c/ produto`}
@@ -764,7 +760,7 @@ const VisaoExecutivaV2 = () => {
           />
         </div>
 
-        {/* Main chart — full width, taller */}
+        {/* Main chart */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Faturamento mensal — últimos 12 meses</CardTitle>
@@ -784,7 +780,6 @@ const VisaoExecutivaV2 = () => {
           </CardContent>
         </Card>
 
-        {/* Secondary charts — 2 columns */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -851,7 +846,6 @@ const VisaoExecutivaV2 = () => {
           </Card>
         </div>
 
-        {/* Detail row — smaller weight */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -925,215 +919,198 @@ const VisaoExecutivaV2 = () => {
             </CardContent>
           </Card>
         </div>
-      </section>
+      </SegmentSection>
 
-      {/* ════════════════════ MUNDO OFFLINE — B2B (colapsável) ════════════════════ */}
-      <section>
-        <OfflineSection
-          title="Mundo Offline"
-          badge="B2B"
-          color={B2B_COLOR}
-          icon={Building2}
-          badgeRevenue={formatCurrency(b2b.receitaTotal)}
-          defaultOpen={true}
-        >
-          {b2b.totalPedidos === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                Sem pedidos B2B no período selecionado
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <KPICard
-                  icon={TrendingUp}
-                  label="Receita Total (B2B)"
-                  value={formatCurrency(b2b.receitaTotal)}
-                  accentColor={B2B_COLOR}
-                />
-                <KPICard icon={Package} label="NFs emitidas" value={String(b2b.totalPedidos)} accentColor={B2B_COLOR} />
-                <KPICard
-                  icon={Users}
-                  label="Ticket Médio"
-                  value={formatCurrency(b2b.ticketMedio)}
-                  accentColor={B2B_COLOR}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Faturamento por Produto — 12 meses</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ProductBarChart
-                      data={b2b.faturamentoPorProduto}
-                      keys={b2b.top5}
-                      formatY={(v) => `R$${(v / 1000).toFixed(0)}k`}
-                    />
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Volume em kg por Produto — 12 meses</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ProductBarChart
-                      data={b2b.volumePorProduto}
-                      keys={b2b.top5}
-                      formatY={(v) => `${v.toLocaleString("pt-BR")} kg`}
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Pedidos (NFs) por Mês</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={b2b.pedidosMensais} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} width={30} />
-                        <Tooltip />
-                        <Bar dataKey="Pedidos" fill={B2B_COLOR} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Top Clientes B2B</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <TopClientesTable clientes={b2b.topClientes} />
-                  </CardContent>
-                </Card>
-              </div>
-
+      {/* ════════════ MUNDO OFFLINE — B2B ════════════ */}
+      <SegmentSection
+        title="Mundo Offline"
+        badge="B2B"
+        color={B2B_COLOR}
+        icon={Building2}
+        badgeRevenue={formatCurrency(b2b.receitaTotal)}
+        defaultOpen={true}
+      >
+        {b2b.totalPedidos === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">Sem pedidos B2B no período selecionado</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <KPICard
+                icon={TrendingUp}
+                label="Receita Total (B2B)"
+                value={formatCurrency(b2b.receitaTotal)}
+                accentColor={B2B_COLOR}
+              />
+              <KPICard icon={Package} label="NFs emitidas" value={String(b2b.totalPedidos)} accentColor={B2B_COLOR} />
+              <KPICard
+                icon={DollarSign}
+                label="Ticket Médio"
+                value={formatCurrency(b2b.ticketMedio)}
+                accentColor={B2B_COLOR}
+              />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Mix de Produtos B2B (qtd no período)</CardTitle>
+                  <CardTitle className="text-sm">Faturamento por Produto — 12 meses</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <DonutChart
-                    data={b2b.productsSold.slice(0, 8).map((p) => ({ name: p.name, value: p.qty }))}
-                    label="Volume em unidades"
+                  <ProductBarChart
+                    data={b2b.faturamentoPorProduto}
+                    keys={b2b.top5}
+                    formatY={(v) => `R$${(v / 1000).toFixed(0)}k`}
                   />
                 </CardContent>
               </Card>
-            </>
-          )}
-        </OfflineSection>
-      </section>
-
-      {/* ════════════════════ MUNDO OFFLINE — B2B2C (colapsável) ════════════════════ */}
-      <section>
-        <OfflineSection
-          title="Mundo Offline"
-          badge="B2B2C"
-          color={B2B2C_COLOR}
-          icon={Handshake}
-          badgeRevenue={formatCurrency(b2b2c.receitaTotal)}
-        >
-          {b2b2c.totalPedidos === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                Sem pedidos B2B2C no período selecionado
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <KPICard
-                  icon={TrendingUp}
-                  label="Receita Total (B2B2C)"
-                  value={formatCurrency(b2b2c.receitaTotal)}
-                  accentColor={B2B2C_COLOR}
-                />
-                <KPICard
-                  icon={Package}
-                  label="NFs emitidas"
-                  value={String(b2b2c.totalPedidos)}
-                  accentColor={B2B2C_COLOR}
-                />
-                <KPICard
-                  icon={Users}
-                  label="Ticket Médio"
-                  value={formatCurrency(b2b2c.ticketMedio)}
-                  accentColor={B2B2C_COLOR}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Faturamento por Produto — 12 meses</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ProductBarChart
-                      data={b2b2c.faturamentoPorProduto}
-                      keys={b2b2c.top5}
-                      formatY={(v) => `R$${(v / 1000).toFixed(0)}k`}
-                    />
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Volume por Produto — 12 meses</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ProductBarChart data={b2b2c.volumePorProduto} keys={b2b2c.top5} />
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Pedidos (NFs) por Mês</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={b2b2c.pedidosMensais} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} width={30} />
-                        <Tooltip />
-                        <Bar dataKey="Pedidos" fill={B2B2C_COLOR} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Top Clientes B2B2C</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <TopClientesTable clientes={b2b2c.topClientes} />
-                  </CardContent>
-                </Card>
-              </div>
-
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Mix de Produtos B2B2C (qtd no período)</CardTitle>
+                  <CardTitle className="text-sm">Volume em kg por Produto — 12 meses</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <DonutChart
-                    data={b2b2c.productsSold.slice(0, 8).map((p) => ({ name: p.name, value: p.qty }))}
-                    label="Volume em unidades"
+                  <ProductBarChart
+                    data={b2b.volumePorProduto}
+                    keys={b2b.top5}
+                    formatY={(v) => `${v.toLocaleString("pt-BR")} kg`}
                   />
                 </CardContent>
               </Card>
-            </>
-          )}
-        </OfflineSection>
-      </section>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Pedidos (NFs) por Mês</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={b2b.pedidosMensais} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} width={30} />
+                      <Tooltip />
+                      <Bar dataKey="Pedidos" fill={B2B_COLOR} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Top Clientes B2B</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <TopClientesTable clientes={b2b.topClientes} />
+                </CardContent>
+              </Card>
+            </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Mix de Produtos B2B (qtd no período)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DonutChart
+                  data={b2b.productsSold.slice(0, 8).map((p) => ({ name: p.name, value: p.qty }))}
+                  label="Volume em unidades"
+                />
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </SegmentSection>
+
+      {/* ════════════ MUNDO OFFLINE — B2B2C ════════════ */}
+      <SegmentSection
+        title="Mundo Offline"
+        badge="B2B2C"
+        color={B2B2C_COLOR}
+        icon={Handshake}
+        badgeRevenue={formatCurrency(b2b2c.receitaTotal)}
+        defaultOpen={true}
+      >
+        {b2b2c.totalPedidos === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">Sem pedidos B2B2C no período selecionado</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <KPICard
+                icon={TrendingUp}
+                label="Receita Total (B2B2C)"
+                value={formatCurrency(b2b2c.receitaTotal)}
+                accentColor={B2B2C_COLOR}
+              />
+              <KPICard
+                icon={Package}
+                label="NFs emitidas"
+                value={String(b2b2c.totalPedidos)}
+                accentColor={B2B2C_COLOR}
+              />
+              <KPICard
+                icon={DollarSign}
+                label="Ticket Médio"
+                value={formatCurrency(b2b2c.ticketMedio)}
+                accentColor={B2B2C_COLOR}
+              />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Faturamento por Produto — 12 meses</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ProductBarChart
+                    data={b2b2c.faturamentoPorProduto}
+                    keys={b2b2c.top5}
+                    formatY={(v) => `R$${(v / 1000).toFixed(0)}k`}
+                  />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Volume por Produto — 12 meses</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ProductBarChart data={b2b2c.volumePorProduto} keys={b2b2c.top5} />
+                </CardContent>
+              </Card>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Pedidos (NFs) por Mês</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={b2b2c.pedidosMensais} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} width={30} />
+                      <Tooltip />
+                      <Bar dataKey="Pedidos" fill={B2B2C_COLOR} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Top Clientes B2B2C</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <TopClientesTable clientes={b2b2c.topClientes} />
+                </CardContent>
+              </Card>
+            </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Mix de Produtos B2B2C (qtd no período)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DonutChart
+                  data={b2b2c.productsSold.slice(0, 8).map((p) => ({ name: p.name, value: p.qty }))}
+                  label="Volume em unidades"
+                />
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </SegmentSection>
     </div>
   );
 };
