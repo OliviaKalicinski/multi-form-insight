@@ -11,6 +11,7 @@ import {
 import { differenceInDays } from "date-fns";
 import { breakdownOrders } from "./orderBreakdown";
 import { getOfficialRevenue } from "./revenue";
+import { isMaterialProduct, isOnlySampleOrder } from "./samplesAnalyzer";
 
 /**
  * KPI 12: Analisa produtos mais vendidos por quantidade
@@ -30,6 +31,7 @@ export const analyzeTopProductsByQuantity = (orders: ProcessedOrder[], limit: nu
 
   orders.forEach((order) => {
     order.produtos.forEach((produto) => {
+      if (isMaterialProduct(produto)) return; // exclui materiais de divulgação
       const key = produto.descricaoAjustada;
       const existing = productMap.get(key);
 
@@ -96,6 +98,7 @@ export const analyzeSKUPerformance = (orders: ProcessedOrder[]): SKUPerformance[
 
   orders.forEach((order) => {
     order.produtos.forEach((produto) => {
+      if (isMaterialProduct(produto)) return; // exclui materiais de divulgação
       const key = `${produto.sku}-${produto.descricaoAjustada}`;
       const existing = skuMap.get(key);
 
@@ -161,9 +164,9 @@ export const analyzeProductCombinations = (
   >();
 
   orders.forEach((order) => {
-    if (order.produtos.length >= 2) {
-      const produtos = order.produtos;
-
+    // filtrar materiais antes de calcular combinações
+    const produtos = order.produtos.filter((p) => !isMaterialProduct(p));
+    if (produtos.length >= 2) {
       for (let i = 0; i < produtos.length; i++) {
         for (let j = i + 1; j < produtos.length; j++) {
           const p1 = produtos[i];
@@ -263,23 +266,30 @@ export const analyzeShippingMethods = (orders: ProcessedOrder[]): ShippingMethod
   const shippingMap = new Map<
     string,
     {
-      count: number;
-      faturamento: number;
+      count: number; // todos os pedidos (para % de volume logístico)
+      countReal: number; // pedidos com produto real (para ticket médio)
+      faturamento: number; // receita de pedidos reais
     }
   >();
 
   orders.forEach((order) => {
     const forma = order.formaEnvio || "Não informado";
+    const isOnlySample = isOnlySampleOrder(order);
     const existing = shippingMap.get(forma);
+    const rev = isOnlySample ? 0 : getOfficialRevenue(order);
 
     if (!existing) {
       shippingMap.set(forma, {
         count: 1,
-        faturamento: getOfficialRevenue(order),
+        countReal: isOnlySample ? 0 : 1,
+        faturamento: rev,
       });
     } else {
       existing.count++;
-      existing.faturamento += getOfficialRevenue(order);
+      if (!isOnlySample) {
+        existing.countReal++;
+        existing.faturamento += rev;
+      }
     }
   });
 
@@ -291,7 +301,8 @@ export const analyzeShippingMethods = (orders: ProcessedOrder[]): ShippingMethod
       numeroPedidos: data.count,
       percentual: (data.count / totalPedidos) * 100,
       faturamentoTotal: data.faturamento,
-      ticketMedio: data.faturamento / data.count,
+      // ticket médio só sobre pedidos com produto real (exclui amostras)
+      ticketMedio: data.countReal > 0 ? data.faturamento / data.countReal : 0,
     }))
     .sort((a, b) => b.numeroPedidos - a.numeroPedidos);
 };
@@ -421,6 +432,7 @@ export const calculateProductOperationsMetrics = (
 
   processedOrders.forEach((order) => {
     order.produtos.forEach((produto) => {
+      if (isMaterialProduct(produto)) return; // exclui materiais de divulgação
       uniqueProducts.add(produto.descricaoAjustada);
       uniqueSKUs.add(produto.sku);
     });
