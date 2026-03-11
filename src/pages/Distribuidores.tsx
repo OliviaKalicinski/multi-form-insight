@@ -17,9 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { getOfficialRevenue, getRevenueOrders, getB2B2COrders } from "@/utils/revenue";
-import { filterOrdersByMonth } from "@/utils/salesCalculator";
+import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { format } from "date-fns";
-
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
@@ -36,7 +35,7 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
 }
 
 export default function Distribuidores() {
-  const { salesData, selectedMonth } = useDashboard();
+  const { salesData, dateRange } = useDashboard();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>("receita");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -58,16 +57,10 @@ export default function Distribuidores() {
     }
   };
 
-  const availableSalesMonths = useMemo(() => {
-    const months = new Set<string>();
-    salesData.forEach((o) => months.add(format(o.dataVenda, "yyyy-MM")));
-    return Array.from(months).sort();
-  }, [salesData]);
-
   const filteredOrders = useMemo(() => {
     const segmented = getRevenueOrders(getB2B2COrders(salesData));
-    return selectedMonth ? filterOrdersByMonth(segmented, selectedMonth, availableSalesMonths) : segmented;
-  }, [salesData, selectedMonth, availableSalesMonths]);
+    return dateRange ? filterOrdersByDateRange(segmented, dateRange.start, dateRange.end) : segmented;
+  }, [salesData, dateRange]);
 
   const kpis = useMemo(() => {
     const receita = filteredOrders.reduce((s, o) => s + getOfficialRevenue(o), 0);
@@ -163,7 +156,7 @@ export default function Distribuidores() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Top Parceiros B2B2C</CardTitle>
+          <CardTitle>Top Distribuidores</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
