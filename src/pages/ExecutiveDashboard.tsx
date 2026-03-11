@@ -48,7 +48,8 @@ const formatPercent = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixe
 
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
-  const { salesData, adsData, selectedMonth } = useDashboard();
+  const { salesData, adsData, dateRange } = useDashboard();
+  const selectedMonth = dateRange ? `${dateRange.start.getFullYear()}-${String(dateRange.start.getMonth() + 1).padStart(2, '0')}` : undefined;
   const [selectedSegment, setSelectedSegment] = useState<SegmentFilter>('all');
   const isConsolidated = selectedSegment === 'all';
   

@@ -39,7 +39,6 @@ import {
   filterAdsByObjective,
   determinePrimaryObjective,
   getAdObjective,
-  hasObjective,
 } from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { getLast12Months, formatMonthRange } from "@/utils/dateRangeCalculator";

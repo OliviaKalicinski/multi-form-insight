@@ -37,11 +37,12 @@ export default function PerformanceFinanceira() {
   const {
     salesData,
     adsData,
-    selectedMonth,
+    dateRange,
     availableMonths,
     comparisonMode,
-    selectedMonths,
   } = useDashboard();
+  const selectedMonth = dateRange ? `${dateRange.start.getFullYear()}-${String(dateRange.start.getMonth() + 1).padStart(2, '0')}` : undefined;
+  const selectedMonths = availableMonths;
 
   const { financialGoals, sectorBenchmarks, isLoading: goalsLoading } = useAppSettings();
 

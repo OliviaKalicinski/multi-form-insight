@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { format } from "date-fns";
 import {
   Users,
   UserPlus,
@@ -60,12 +61,13 @@ const Seguidores = () => {
   const {
     marketingData,
     followersData,
-    selectedMonth: _selectedMonth,
     availableMonths,
     dateRange,
     comparisonDateRange,
     comparisonMode,
   } = useDashboard();
+
+  const [chartViewMode, setChartViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
 
   const { instagramGoals } = useAppSettings();
 
