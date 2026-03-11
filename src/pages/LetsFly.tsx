@@ -7,27 +7,31 @@ import { EmptyState } from "@/components/EmptyState";
 import { getOfficialRevenue, getRevenueOrders, getB2BOrders } from "@/utils/revenue";
 import { filterOrdersByMonth } from "@/utils/salesCalculator";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
-const formatKg = (value: number) =>
-  new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value) + " kg";
+const formatKg = (value: number) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value) + " kg";
+
+const formatMonth = (yyyyMM: string): string => {
+  const [year, month] = yyyyMM.split("-");
+  const names = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  return `${names[parseInt(month) - 1]}/${year}`;
+};
 
 export default function LetsFly() {
   const { salesData, selectedMonth } = useDashboard();
 
   const availableSalesMonths = useMemo(() => {
     const months = new Set<string>();
-    salesData.forEach(o => months.add(format(o.dataVenda, "yyyy-MM")));
+    salesData.forEach((o) => months.add(format(o.dataVenda, "yyyy-MM")));
     return Array.from(months).sort();
   }, [salesData]);
 
   const filteredOrders = useMemo(() => {
     const segmented = getRevenueOrders(getB2BOrders(salesData));
-    return selectedMonth
-      ? filterOrdersByMonth(segmented, selectedMonth, availableSalesMonths)
-      : segmented;
+    return selectedMonth ? filterOrdersByMonth(segmented, selectedMonth, availableSalesMonths) : segmented;
   }, [salesData, selectedMonth, availableSalesMonths]);
 
   const kpis = useMemo(() => {
@@ -42,7 +46,7 @@ export default function LetsFly() {
   // Tabela mensal
   const monthlyData = useMemo(() => {
     const map = new Map<string, { receita: number; kg: number; pedidos: number }>();
-    filteredOrders.forEach(o => {
+    filteredOrders.forEach((o) => {
       const month = format(o.dataVenda, "yyyy-MM");
       const cur = map.get(month) || { receita: 0, kg: 0, pedidos: 0 };
       cur.receita += getOfficialRevenue(o);
@@ -82,35 +86,45 @@ export default function LetsFly() {
             <CardTitle className="text-sm font-medium">Receita</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{formatCurrency(kpis.receita)}</p></CardContent>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatCurrency(kpis.receita)}</p>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Pedidos</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{kpis.pedidos}</p></CardContent>
+          <CardContent>
+            <p className="text-2xl font-bold">{kpis.pedidos}</p>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Volume</CardTitle>
             <Weight className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{formatKg(kpis.totalKg)}</p></CardContent>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatKg(kpis.totalKg)}</p>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{formatCurrency(kpis.ticketMedio)}</p></CardContent>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatCurrency(kpis.ticketMedio)}</p>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Receita/KG</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent><p className="text-2xl font-bold">{formatCurrency(kpis.receitaPorKg)}</p></CardContent>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatCurrency(kpis.receitaPorKg)}</p>
+          </CardContent>
         </Card>
       </div>
 
@@ -124,15 +138,17 @@ export default function LetsFly() {
             <TableHeader>
               <TableRow>
                 <TableHead>Mês</TableHead>
+                <TableHead className="text-right">Pedidos</TableHead>
                 <TableHead className="text-right">Receita</TableHead>
                 <TableHead className="text-right">Volume KG</TableHead>
                 <TableHead className="text-right">Receita/KG</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {monthlyData.map(d => (
+              {monthlyData.map((d) => (
                 <TableRow key={d.month}>
-                  <TableCell className="font-medium">{d.month}</TableCell>
+                  <TableCell className="font-medium">{formatMonth(d.month)}</TableCell>
+                  <TableCell className="text-right">{d.pedidos}</TableCell>
                   <TableCell className="text-right">{formatCurrency(d.receita)}</TableCell>
                   <TableCell className="text-right">{formatKg(d.kg)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(d.receitaPorKg)}</TableCell>
