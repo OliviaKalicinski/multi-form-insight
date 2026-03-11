@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
 import { getOfficialRevenue, getRevenueOrders, getB2BOrders } from "@/utils/revenue";
-import { filterOrdersByMonth } from "@/utils/salesCalculator";
+import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -21,18 +21,12 @@ const formatMonth = (yyyyMM: string): string => {
 };
 
 export default function LetsFly() {
-  const { salesData, selectedMonth } = useDashboard();
-
-  const availableSalesMonths = useMemo(() => {
-    const months = new Set<string>();
-    salesData.forEach((o) => months.add(format(o.dataVenda, "yyyy-MM")));
-    return Array.from(months).sort();
-  }, [salesData]);
+  const { salesData, dateRange } = useDashboard();
 
   const filteredOrders = useMemo(() => {
     const segmented = getRevenueOrders(getB2BOrders(salesData));
-    return selectedMonth ? filterOrdersByMonth(segmented, selectedMonth, availableSalesMonths) : segmented;
-  }, [salesData, selectedMonth, availableSalesMonths]);
+    return dateRange ? filterOrdersByDateRange(segmented, dateRange.start, dateRange.end) : segmented;
+  }, [salesData, dateRange]);
 
   const kpis = useMemo(() => {
     const receita = filteredOrders.reduce((s, o) => s + getOfficialRevenue(o), 0);
@@ -65,7 +59,7 @@ export default function LetsFly() {
         <EmptyState
           icon={<Truck className="h-8 w-8" />}
           title="Sem dados B2B"
-          description="Não há pedidos B2B para o período selecionado. Verifique o filtro de mês ou faça upload de dados com segmento 'b2b'."
+          description="Não há pedidos B2B para o período selecionado. Verifique o filtro de data ou faça upload de dados com segmento 'b2b'."
           action={{ label: "Ir para Upload", href: "/upload" }}
         />
       </div>
