@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowUpDown, ExternalLink, Download, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ArrowUpDown, ExternalLink, Download } from "lucide-react";
 import { BuyerPetProfile, PET_PROFILE_LABELS, PET_PROFILE_COLORS, PET_PROFILE_ORDER } from "@/data/operationalProducts";
 
 const segmentColors: Record<string, string> = {
@@ -62,11 +61,20 @@ export default function Clientes() {
   const [sortKey, setSortKey] = useState<SortKey>("total_revenue");
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(0);
-  const [exportLoading, setExportLoading] = useState(false);
 
   const petMap = useMemo(() => buildClientPetMap(salesData), [salesData]);
 
-  // Build species cache for "multiplos" sub-labels
+  const phoneMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const sorted = [...salesData].sort((a, b) => b.dataVenda.getTime() - a.dataVenda.getTime());
+    for (const order of sorted) {
+      if (!order.telefoneCliente) continue;
+      const key = order.cpfCnpj?.replace(/\D/g, "") ?? "";
+      if (key && !map.has(key)) map.set(key, order.telefoneCliente);
+    }
+    return map;
+  }, [salesData]);
+
   const speciesCache = useMemo(() => {
     const cache = new Map<string, string>();
     for (const [cpf, profile] of petMap) {
@@ -178,48 +186,21 @@ export default function Clientes() {
 
   const fmt = (v: number | null) => (v != null ? `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—");
 
-  const handleExportCSV = async () => {
-    if (sorted.length === 0) return;
-    setExportLoading(true);
-    try {
-      // Fetch phones from customer_identifier for all visible customers
-      const cpfs = sorted.map((c) => c.cpf_cnpj).filter((v): v is string => !!v);
-
-      // Batch in chunks of 500 to avoid URL length limits
-      const phoneMap = new Map<string, string>();
-      for (let i = 0; i < cpfs.length; i += 500) {
-        const batch = cpfs.slice(i, i + 500);
-        const { data } = await (supabase as any)
-          .from("customer_identifier")
-          .select("customer_id, value")
-          .eq("type", "phone")
-          .in("customer_id", batch);
-        if (data) {
-          for (const row of data) {
-            if (!phoneMap.has(row.customer_id)) {
-              phoneMap.set(row.customer_id, row.value);
-            }
-          }
-        }
-      }
-
-      const rows = sorted.map((c) => {
-        const telefone = phoneMap.get(c.cpf_cnpj ?? "") ?? "";
-        const nome = (c.nome ?? "").replace(/"/g, '""');
-        return `"${nome}","${telefone}"`;
-      });
-
-      const csv = ["Nome,Telefone", ...rows].join("\n");
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `clientes_remarketing_${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } finally {
-      setExportLoading(false);
-    }
+  const handleExportCSV = () => {
+    const rows = sorted.map((c) => {
+      const key = c.cpf_cnpj?.replace(/\D/g, "") ?? "";
+      const telefone = phoneMap.get(key) ?? "";
+      const nome = (c.nome ?? "").replace(/"/g, '""');
+      return `"${nome}","${telefone}"`;
+    });
+    const csv = ["Nome,Telefone", ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `clientes_remarketing_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const renderPetBadge = (cpf: string | null) => {
@@ -227,7 +208,6 @@ export default function Clientes() {
     if (!pet || pet === "nao_identificado") return <span className="text-muted-foreground">—</span>;
     const normalizedCpf = cpf?.replace(/\D/g, "") ?? "";
     const subLabel = pet === "multiplos" ? speciesCache.get(normalizedCpf) : null;
-
     return (
       <div className="flex flex-col gap-0.5">
         <Badge
@@ -266,11 +246,11 @@ export default function Clientes() {
           variant="outline"
           size="sm"
           onClick={handleExportCSV}
-          disabled={sorted.length === 0 || exportLoading}
+          disabled={sorted.length === 0}
           className="flex items-center gap-2"
         >
-          {exportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          {exportLoading ? "Exportando..." : `Exportar para remarketing (${sorted.length})`}
+          <Download className="h-4 w-4" />
+          Exportar para remarketing ({sorted.length})
         </Button>
       </div>
 
