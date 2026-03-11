@@ -27,7 +27,10 @@ const tipoNfLabels: Record<string, string> = {
 
 export default function KanbanOperacional() {
   const [naturezaFilter, setNaturezaFilter] = useState<string>("all");
-  const { orders, isLoading, createOrder, updateOrder, updateStatus, cancelOrder } = useOperationalOrders(undefined, naturezaFilter === "all" ? undefined : naturezaFilter);
+  const { orders, isLoading, createOrder, updateOrder, updateStatus, cancelOrder } = useOperationalOrders(
+    undefined,
+    naturezaFilter === "all" ? undefined : naturezaFilter,
+  );
 
   const [newOpen, setNewOpen] = useState(false);
   const [editOrder, setEditOrder] = useState<OperationalOrder | null>(null);
@@ -63,14 +66,31 @@ export default function KanbanOperacional() {
     for (const col of columns) {
       const colOrders = ordersByStatus[col.key] || [];
       result[col.key] = [
-        { label: "NF Pend.", count: colOrders.filter((o) => o.nf_pendente && !o.nf_file_path && !o.is_fiscal_exempt).length, variant: "warning" as const },
+        {
+          label: "NF Pend.",
+          count: colOrders.filter((o) => o.nf_pendente && !o.nf_file_path && !o.is_fiscal_exempt).length,
+          variant: "warning" as const,
+        },
       ];
     }
     return result;
   }, [ordersByStatus]);
 
   const handleExportCSV = () => {
-    const headers = ["Cliente", "Natureza", "Produtos", "Valor (R$)", "Status", "NF", "Tipo NF", "NF Pendente", "Reconciliado", "Divergência", "Responsável", "Data Criação"];
+    const headers = [
+      "Cliente",
+      "Natureza",
+      "Produtos",
+      "Valor (R$)",
+      "Status",
+      "NF",
+      "Tipo NF",
+      "NF Pendente",
+      "Reconciliado",
+      "Divergência",
+      "Responsável",
+      "Data Criação",
+    ];
     const rows = orders.map((o) => [
       o.customer?.nome || o.destinatario_nome || "Sem cliente",
       o.natureza_pedido,
@@ -78,7 +98,7 @@ export default function KanbanOperacional() {
       o.valor_total_informado.toFixed(2),
       o.status_operacional,
       o.numero_nf || "",
-      o.tipo_nf ? (tipoNfLabels[o.tipo_nf] || o.tipo_nf) : "",
+      o.tipo_nf ? tipoNfLabels[o.tipo_nf] || o.tipo_nf : "",
       o.nf_pendente ? "Sim" : "Não",
       o.reconciliado ? "Sim" : "Não",
       o.divergencia || "",
@@ -86,7 +106,7 @@ export default function KanbanOperacional() {
       format(new Date(o.created_at), "dd/MM/yyyy"),
     ]);
 
-    const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+    const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -130,7 +150,14 @@ export default function KanbanOperacional() {
         <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {columns.map((col) => (
-              <KanbanColumn key={col.key} columnKey={col.key} title={col.title} count={ordersByStatus[col.key]?.length || 0} color={col.color} indicators={indicatorsByStatus[col.key]}>
+              <KanbanColumn
+                key={col.key}
+                columnKey={col.key}
+                title={col.title}
+                count={ordersByStatus[col.key]?.length || 0}
+                color={col.color}
+                indicators={indicatorsByStatus[col.key]}
+              >
                 {ordersByStatus[col.key]?.map((order) => (
                   <OrderCard
                     key={order.id}
@@ -161,7 +188,9 @@ export default function KanbanOperacional() {
       <EditOrderForm
         order={editOrder}
         open={!!editOrder}
-        onOpenChange={(open) => { if (!open) setEditOrder(null); }}
+        onOpenChange={(open) => {
+          if (!open) setEditOrder(null);
+        }}
         onSubmit={(data) => {
           updateOrder.mutate(data, { onSuccess: () => setEditOrder(null) });
         }}
