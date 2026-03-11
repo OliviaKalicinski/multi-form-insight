@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { formatCurrency } from "@/utils/salesCalculator";
 import { getOfficialRevenue, isRevenueOrder, getB2COrders, getB2BOrders, getB2B2COrders } from "@/utils/revenue";
@@ -11,20 +13,28 @@ import { isSampleProduct, isOnlySampleOrder, hasRegularProduct, isMaterialProduc
 import { classifyProductsByAnimal } from "@/utils/petProfile";
 import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
-import { format, isWithinInterval } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  isWithinInterval,
+  startOfDay,
+  endOfDay,
+  differenceInDays,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  CalendarIcon,
   ChevronDown,
   ChevronUp,
   TrendingUp,
   Package,
-  Users,
-  Truck,
   Building2,
   Handshake,
   Globe,
-  ShoppingCart,
   DollarSign,
+  ShoppingCart,
 } from "lucide-react";
 import {
   PieChart,
@@ -38,45 +48,74 @@ import {
   YAxis,
   CartesianGrid,
   Legend,
-  LineChart,
-  Line,
 } from "recharts";
+import { DateRange } from "react-day-picker";
 import { ProcessedOrder } from "@/types/marketing";
 
-// ─── Colors ───────────────────────────────────────────────────────────────────
 const CHART_COLORS = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2", "#65a30d", "#c2410c"];
-const B2C_COLOR = "#2563eb";
-const B2B_COLOR = "#d97706";
-const B2B2C_COLOR = "#9333ea";
-const FRETE_COLOR = "#16a34a";
+const B2C_COLOR = "#2563eb",
+  B2B_COLOR = "#d97706",
+  B2B2C_COLOR = "#9333ea",
+  FRETE_COLOR = "#16a34a";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getLast12Months(orders: ProcessedOrder[]): string[] {
-  const months = new Set<string>();
-  orders.forEach((o) => months.add(format(o.dataVenda, "yyyy-MM")));
-  return Array.from(months).sort().slice(-12);
+type PresetKey = "1d" | "7d" | "30d" | "current_month" | "last_month";
+interface LocalPeriod {
+  type: PresetKey | "custom";
+  start: Date;
+  end: Date;
 }
-
+const PRESETS: { key: PresetKey; label: string }[] = [
+  { key: "1d", label: "Hoje" },
+  { key: "7d", label: "7 dias" },
+  { key: "30d", label: "30 dias" },
+  { key: "current_month", label: "Mês atual" },
+  { key: "last_month", label: "Mês anterior" },
+];
+function buildPreset(key: PresetKey, anchor: Date): LocalPeriod {
+  switch (key) {
+    case "1d":
+      return { type: key, start: startOfDay(anchor), end: endOfDay(anchor) };
+    case "7d": {
+      const s = new Date(anchor);
+      s.setDate(s.getDate() - 6);
+      return { type: key, start: startOfDay(s), end: endOfDay(anchor) };
+    }
+    case "30d": {
+      const s = new Date(anchor);
+      s.setDate(s.getDate() - 29);
+      return { type: key, start: startOfDay(s), end: endOfDay(anchor) };
+    }
+    case "current_month":
+      return { type: key, start: startOfMonth(anchor), end: endOfDay(anchor) };
+    case "last_month": {
+      const p = subMonths(anchor, 1);
+      return { type: key, start: startOfMonth(p), end: endOfMonth(p) };
+    }
+  }
+}
+function getLast12Months(orders: ProcessedOrder[]): string[] {
+  const m = new Set<string>();
+  orders.forEach((o) => m.add(format(o.dataVenda, "yyyy-MM")));
+  return Array.from(m).sort().slice(-12);
+}
 function fmtMonth(yyyyMM: string): string {
   const [y, m] = yyyyMM.split("-");
   return format(new Date(Number(y), Number(m) - 1, 1), "MMM/yy", { locale: ptBR });
 }
-
 function buildProductRevenueMap(orders: ProcessedOrder[]) {
   const map: Record<string, { revenue: number; qty: number }> = {};
   orders.forEach((o) =>
     o.produtos.forEach((p) => {
       if (!isSampleProduct(p) && !isMaterialProduct(p)) {
-        const key = p.descricaoAjustada || p.descricao;
-        if (!map[key]) map[key] = { revenue: 0, qty: 0 };
-        map[key].revenue += p.preco;
-        map[key].qty += p.quantidade;
+        const k = p.descricaoAjustada || p.descricao;
+        if (!map[k]) map[k] = { revenue: 0, qty: 0 };
+        map[k].revenue += p.preco;
+        map[k].qty += p.quantidade;
       }
     }),
   );
   return map;
 }
-
 function buildTopClientes(orders: ProcessedOrder[], n = 5) {
   const map: Record<string, { pedidos: number; receita: number }> = {};
   orders.filter(isRevenueOrder).forEach((o) => {
@@ -91,7 +130,6 @@ function buildTopClientes(orders: ProcessedOrder[], n = 5) {
     .slice(0, n);
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 const DonutChart = ({
   data,
   label,
@@ -101,7 +139,7 @@ const DonutChart = ({
   label?: string;
   formatValue?: (v: number) => string;
 }) => {
-  if (data.length === 0) return <p className="text-sm text-muted-foreground">Sem dados</p>;
+  if (!data.length) return <p className="text-sm text-muted-foreground">Sem dados</p>;
   const total = data.reduce((s, d) => s + d.value, 0);
   const fmt = formatValue ?? ((v: number) => v.toLocaleString("pt-BR"));
   return (
@@ -150,7 +188,6 @@ const DonutChart = ({
     </div>
   );
 };
-
 const KPICard = ({
   icon: Icon,
   label,
@@ -180,9 +217,8 @@ const KPICard = ({
     </CardContent>
   </Card>
 );
-
 const TopClientesTable = ({ clientes }: { clientes: { nome: string; pedidos: number; receita: number }[] }) => {
-  if (clientes.length === 0) return <p className="text-sm text-muted-foreground">Sem dados no período</p>;
+  if (!clientes.length) return <p className="text-sm text-muted-foreground">Sem dados no período</p>;
   return (
     <div className="space-y-1">
       {clientes.map((c, i) => (
@@ -200,7 +236,6 @@ const TopClientesTable = ({ clientes }: { clientes: { nome: string; pedidos: num
     </div>
   );
 };
-
 const ProductBarChart = ({
   data,
   keys,
@@ -227,7 +262,6 @@ const ProductBarChart = ({
   );
 };
 
-// Seção por segmento — separação visual forte com borda colorida lateral
 const SegmentSection = ({
   title,
   badge,
@@ -249,7 +283,6 @@ const SegmentSection = ({
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: `${color}40` }}>
-        {/* Header da seção */}
         <div className="flex items-center justify-between px-5 py-3" style={{ backgroundColor: `${color}10` }}>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg" style={{ backgroundColor: `${color}20` }}>
@@ -275,8 +308,6 @@ const SegmentSection = ({
             </Button>
           </CollapsibleTrigger>
         </div>
-
-        {/* Conteúdo */}
         <CollapsibleContent>
           <div className="p-5 space-y-4">{children}</div>
         </CollapsibleContent>
@@ -285,23 +316,38 @@ const SegmentSection = ({
   );
 };
 
-// ─── Main Component ────────────────────────────────────────────────────────────
 const VisaoExecutivaV2 = () => {
-  const { salesData, isLoadingData, dateRange } = useDashboard();
+  const { salesData, isLoadingData } = useDashboard();
+  const [period, setPeriod] = useState<LocalPeriod | null>(null);
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [estadoSampleData, setEstadoSampleData] = useState<Record<string, number>>({});
   const [estadoProductData, setEstadoProductData] = useState<Record<string, number>>({});
 
-  // Filtered orders by GlobalFilter dateRange
-  const filteredOrders = useMemo(() => {
-    if (!salesData.length) return [];
-    if (!dateRange) return salesData;
-    return salesData.filter((o) => isWithinInterval(o.dataVenda, { start: dateRange.start, end: dateRange.end }));
-  }, [salesData, dateRange]);
+  const lastDate = useMemo(() => {
+    if (!salesData.length) return null;
+    return new Date(Math.max(...salesData.map((o) => o.dataVenda.getTime())));
+  }, [salesData]);
+  useEffect(() => {
+    if (lastDate && !period) setPeriod(buildPreset("30d", lastDate));
+  }, [lastDate]);
 
-  // IDs for estado queries (B2C only)
+  const filteredOrders = useMemo(() => {
+    if (!period || !salesData.length) return [];
+    return salesData.filter((o) => isWithinInterval(o.dataVenda, { start: period.start, end: period.end }));
+  }, [salesData, period]);
+  const periodLabel = useMemo(() => {
+    if (!period) return "";
+    const s = format(period.start, "dd/MM/yyyy", { locale: ptBR });
+    const e = format(period.end, "dd/MM/yyyy", { locale: ptBR });
+    const days = differenceInDays(period.end, period.start) + 1;
+    if (s === e) return `${s} · 1 dia`;
+    return `${s} — ${e} · ${days} dias`;
+  }, [period]);
+
   const { sampleOrderIds, productOrderIds } = useMemo(() => {
-    const sIds: string[] = [];
-    const pIds: string[] = [];
+    const sIds: string[] = [],
+      pIds: string[] = [];
     getB2COrders(filteredOrders).forEach((o) => {
       if (isOnlySampleOrder(o)) sIds.push(o.numeroPedido);
       else if (hasRegularProduct(o)) pIds.push(o.numeroPedido);
@@ -309,14 +355,13 @@ const VisaoExecutivaV2 = () => {
     return { sampleOrderIds: sIds, productOrderIds: pIds };
   }, [filteredOrders]);
 
-  // Estado data from Supabase
   useEffect(() => {
     if (!filteredOrders.length) {
       setEstadoSampleData({});
       setEstadoProductData({});
       return;
     }
-    const fetchEstados = async (ids: string[], setter: (d: Record<string, number>) => void) => {
+    const fetch = async (ids: string[], setter: (d: Record<string, number>) => void) => {
       if (!ids.length) {
         setter({});
         return;
@@ -326,58 +371,50 @@ const VisaoExecutivaV2 = () => {
         .select("numero_pedido, estado")
         .in("numero_pedido", ids.slice(0, 500));
       if (error || !data) return;
-      const counts: Record<string, number> = {};
-      data.forEach((row) => {
-        const estado = row.estado || "Não informado";
-        counts[estado] = (counts[estado] || 0) + 1;
+      const c: Record<string, number> = {};
+      data.forEach((r) => {
+        const e = r.estado || "Não informado";
+        c[e] = (c[e] || 0) + 1;
       });
-      setter(counts);
+      setter(c);
     };
-    fetchEstados(sampleOrderIds, setEstadoSampleData);
-    fetchEstados(productOrderIds, setEstadoProductData);
+    fetch(sampleOrderIds, setEstadoSampleData);
+    fetch(productOrderIds, setEstadoProductData);
   }, [filteredOrders, sampleOrderIds, productOrderIds]);
 
-  // ── B2C metrics ────────────────────────────────────────────────────────────
   const b2c = useMemo(() => {
     const orders = getB2COrders(filteredOrders);
     const receitaProdutos = orders.reduce((s, o) => s + o.valorTotal, 0);
     const frete = orders.reduce((s, o) => s + o.valorFrete, 0);
     const receitaTotal = receitaProdutos + frete;
     const fretePercent = receitaTotal > 0 ? ((frete / receitaTotal) * 100).toFixed(1) : "0";
-
     const productRevenueMap = buildProductRevenueMap(orders);
     const receitaSemAmostras = Object.values(productRevenueMap).reduce((s, d) => s + d.revenue, 0);
     const receitaMediaPorProduto = Object.entries(productRevenueMap)
       .map(([name, d]) => ({ name, avgPrice: d.qty > 0 ? d.revenue / d.qty : 0 }))
       .sort((a, b) => b.avgPrice - a.avgPrice);
-
     const onlySampleOrders = orders.filter(isOnlySampleOrder);
     const withProductOrders = orders.filter(hasRegularProduct);
     const revenueProductOrders = withProductOrders.filter(isRevenueOrder);
-
     const ticketMedio =
       revenueProductOrders.length > 0
         ? revenueProductOrders.reduce((s, o) => s + getOfficialRevenue(o), 0) / revenueProductOrders.length
         : 0;
-
     let totalNonSampleLines = 0;
     withProductOrders.forEach((o) =>
       o.produtos.forEach((p) => {
-        if (!isSampleProduct(p) && !isMaterialProduct(p)) totalNonSampleLines += 1;
+        if (!isSampleProduct(p) && !isMaterialProduct(p)) totalNonSampleLines++;
       }),
     );
     const mediaProdutosPorPedido = withProductOrders.length > 0 ? totalNonSampleLines / withProductOrders.length : 0;
-
     const samplesByProfile: Partial<Record<BuyerPetProfile, number>> = {};
     onlySampleOrders.forEach((o) => {
-      const profile = classifyProductsByAnimal(o.produtos.filter(isSampleProduct));
-      samplesByProfile[profile] = (samplesByProfile[profile] || 0) + 1;
+      const p = classifyProductsByAnimal(o.produtos.filter(isSampleProduct));
+      samplesByProfile[p] = (samplesByProfile[p] || 0) + 1;
     });
-
     const productsSold = Object.entries(productRevenueMap)
       .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
       .sort((a, b) => b.qty - a.qty);
-
     const channelMap: Record<string, { orders: number; revenue: number }> = {};
     orders.forEach((o) => {
       const ch = o.ecommerce || "Outros";
@@ -388,7 +425,6 @@ const VisaoExecutivaV2 = () => {
     const channels = Object.entries(channelMap)
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.revenue - a.revenue);
-
     const estadoSamplePie = Object.entries(estadoSampleData)
       .filter(([k]) => k !== "Não informado")
       .sort((a, b) => b[1] - a[1])
@@ -399,11 +435,8 @@ const VisaoExecutivaV2 = () => {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([name, value]) => ({ name, value }));
-
-    // 12-month charts from ALL B2C data
     const b2cAll = getB2COrders(salesData);
     const months12 = getLast12Months(b2cAll);
-
     const faturamentoMensal = months12.map((m) => {
       const mo = b2cAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       return {
@@ -412,13 +445,11 @@ const VisaoExecutivaV2 = () => {
         Frete: Math.round(mo.reduce((s, o) => s + o.valorFrete, 0)),
       };
     });
-
     const allProdMap = buildProductRevenueMap(b2cAll);
     const top5Products = Object.entries(allProdMap)
       .sort((a, b) => b[1].revenue - a[1].revenue)
       .slice(0, 5)
       .map(([name]) => name);
-
     const faturamentoPorProduto = months12.map((m) => {
       const mo = b2cAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       const entry: Record<string, number | string> = { mes: fmtMonth(m) };
@@ -432,7 +463,6 @@ const VisaoExecutivaV2 = () => {
       });
       return entry;
     });
-
     const pedidosMensais = months12.map((m) => {
       const mo = b2cAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       return {
@@ -441,21 +471,19 @@ const VisaoExecutivaV2 = () => {
         "Com produto": mo.filter(hasRegularProduct).length,
       };
     });
-
     const amostrasMensais = months12.map((m) => {
       const mo = b2cAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
-      let cachorro = 0,
-        gato = 0,
-        multiplos = 0;
+      let ca = 0,
+        g = 0,
+        mul = 0;
       mo.filter(isOnlySampleOrder).forEach((o) => {
-        const profile = classifyProductsByAnimal(o.produtos.filter(isSampleProduct));
-        if (profile === "caes") cachorro++;
-        else if (profile === "gatos") gato++;
-        else if (profile === "multiplos") multiplos++;
+        const p = classifyProductsByAnimal(o.produtos.filter(isSampleProduct));
+        if (p === "caes") ca++;
+        else if (p === "gatos") g++;
+        else if (p === "multiplos") mul++;
       });
-      return { mes: fmtMonth(m), Cachorro: cachorro, Gato: gato, "Cach.+Gato": multiplos };
+      return { mes: fmtMonth(m), Cachorro: ca, Gato: g, "Cach.+Gato": mul };
     });
-
     return {
       receitaTotal,
       receitaSemAmostras,
@@ -482,12 +510,10 @@ const VisaoExecutivaV2 = () => {
     };
   }, [filteredOrders, salesData, estadoSampleData, estadoProductData, sampleOrderIds, productOrderIds]);
 
-  // ── Offline segment factory ────────────────────────────────────────────────
   const buildOfflineMetrics = (seg: "b2b" | "b2b2c") => {
     const getOrders = seg === "b2b" ? getB2BOrders : getB2B2COrders;
     const orders = getOrders(filteredOrders);
     const allSeg = getOrders(salesData);
-
     const receitaOrders = orders.filter(isRevenueOrder);
     const receitaTotal = receitaOrders.reduce((s, o) => s + getOfficialRevenue(o), 0);
     const totalPedidos = receitaOrders.length;
@@ -497,14 +523,12 @@ const VisaoExecutivaV2 = () => {
       .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
       .sort((a, b) => b.revenue - a.revenue);
     const topClientes = buildTopClientes(orders);
-
     const months12 = getLast12Months(allSeg.length > 0 ? allSeg : salesData);
     const allProdMap = buildProductRevenueMap(allSeg);
     const top5 = Object.entries(allProdMap)
       .sort((a, b) => b[1].revenue - a[1].revenue)
       .slice(0, 5)
       .map(([name]) => name);
-
     const faturamentoPorProduto = months12.map((m) => {
       const mo = allSeg.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       const entry: Record<string, number | string> = { mes: fmtMonth(m) };
@@ -518,7 +542,6 @@ const VisaoExecutivaV2 = () => {
       });
       return entry;
     });
-
     const volumePorProduto = months12.map((m) => {
       const mo = allSeg.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       const entry: Record<string, number | string> = { mes: fmtMonth(m) };
@@ -530,12 +553,10 @@ const VisaoExecutivaV2 = () => {
       });
       return entry;
     });
-
     const pedidosMensais = months12.map((m) => {
       const mo = allSeg.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       return { mes: fmtMonth(m), Pedidos: mo.filter(isRevenueOrder).length };
     });
-
     return {
       receitaTotal,
       totalPedidos,
@@ -548,13 +569,11 @@ const VisaoExecutivaV2 = () => {
       pedidosMensais,
     };
   };
-
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const b2b = useMemo(() => buildOfflineMetrics("b2b"), [filteredOrders, salesData]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const b2b2c = useMemo(() => buildOfflineMetrics("b2b2c"), [filteredOrders, salesData]);
 
-  // ── Consolidated metrics ───────────────────────────────────────────────────
   const consolidated = useMemo(() => {
     const totalReceita = b2c.receitaTotal + b2b.receitaTotal + b2b2c.receitaTotal;
     const totalPedidos = b2c.totalOrders + b2b.totalPedidos + b2b2c.totalPedidos;
@@ -565,13 +584,11 @@ const VisaoExecutivaV2 = () => {
     return { totalReceita, totalPedidos, ticketGeral, b2cPct, b2bPct, b2b2cPct };
   }, [b2c, b2b, b2b2c]);
 
-  // ── Consolidated 12-month trend ────────────────────────────────────────────
   const consolidatedTrend = useMemo(() => {
     const months12 = getLast12Months(salesData);
-    const b2cAll = getB2COrders(salesData);
-    const b2bAll = getB2BOrders(salesData);
-    const b2b2cAll = getB2B2COrders(salesData);
-
+    const b2cAll = getB2COrders(salesData),
+      b2bAll = getB2BOrders(salesData),
+      b2b2cAll = getB2B2COrders(salesData);
     return months12.map((m) => {
       const b2cM = b2cAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       const b2bM = b2bAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
@@ -585,35 +602,82 @@ const VisaoExecutivaV2 = () => {
     });
   }, [salesData]);
 
-  // ── Loading / empty ────────────────────────────────────────────────────────
-  if (isLoadingData) {
+  if (isLoadingData)
     return (
       <div className="p-6 flex items-center justify-center min-h-[60vh]">
         <p className="text-muted-foreground">Carregando dados...</p>
       </div>
     );
-  }
-  if (!salesData.length) {
+  if (!salesData.length)
     return (
       <div className="p-6 flex items-center justify-center min-h-[60vh]">
         <p className="text-muted-foreground">Nenhum dado disponível. Faça o upload dos dados primeiro.</p>
       </div>
     );
-  }
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      {/* ── BANNER CONSOLIDADO ── */}
+      {/* HEADER + SELETOR */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Fotografia Operacional</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {periodLabel}
+            <span className="ml-2 text-xs opacity-60">· gráficos = últimos 12 meses</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {PRESETS.map((p) => (
+            <Button
+              key={p.key}
+              variant={period?.type === p.key ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => lastDate && setPeriod(buildPreset(p.key, lastDate))}
+            >
+              {p.label}
+            </Button>
+          ))}
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={period?.type === "custom" ? "default" : "outline"}
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+              >
+                <CalendarIcon className="h-3.5 w-3.5" />
+                Personalizado
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="range"
+                selected={customRange}
+                onSelect={(range) => {
+                  setCustomRange(range);
+                  if (range?.from && range?.to) {
+                    setPeriod({ type: "custom", start: startOfDay(range.from), end: endOfDay(range.to) });
+                    setCalendarOpen(false);
+                  }
+                }}
+                numberOfMonths={2}
+                locale={ptBR}
+                disabled={{ after: lastDate ?? new Date() }}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      {/* BANNER CONSOLIDADO */}
       <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden shadow-xl">
-        {/* Linha superior — totais da empresa */}
-        <div className="px-6 pt-6 pb-4 border-b border-white/10">
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Fotografia Operacional</p>
+        <div className="px-6 pt-5 pb-4 border-b border-white/10">
           <div className="flex flex-col sm:flex-row sm:items-end gap-4">
             <div>
               <p className="text-xs text-slate-400">Receita Total Empresa</p>
               <p className="text-4xl font-bold tracking-tight">{formatCurrency(consolidated.totalReceita)}</p>
             </div>
-            <div className="flex gap-6 pb-1">
+            <div className="flex gap-6 pb-0.5">
               <div>
                 <p className="text-xs text-slate-400">Total Pedidos / NFs</p>
                 <p className="text-2xl font-bold">{consolidated.totalPedidos.toLocaleString("pt-BR")}</p>
@@ -625,78 +689,61 @@ const VisaoExecutivaV2 = () => {
             </div>
           </div>
         </div>
-
-        {/* Linha inferior — breakdown por segmento */}
         <div className="grid grid-cols-3 divide-x divide-white/10">
-          {/* B2C */}
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#93c5fd" }} />
-              <span className="text-xs text-slate-400 font-medium">B2C · Online</span>
-              <span className="text-xs text-slate-500">{consolidated.b2cPct}%</span>
-            </div>
-            <p className="text-xl font-bold" style={{ color: "#93c5fd" }}>
-              {formatCurrency(b2c.receitaTotal)}
-            </p>
-            <div className="flex gap-4 mt-2">
-              <div>
-                <p className="text-[10px] text-slate-500">Pedidos</p>
-                <p className="text-sm font-semibold text-slate-300">{b2c.totalOrders.toLocaleString("pt-BR")}</p>
+          {[
+            {
+              label: "B2C · Online",
+              pct: consolidated.b2cPct,
+              color: "#93c5fd",
+              receita: b2c.receitaTotal,
+              pedidos: b2c.totalOrders,
+              ticket: b2c.ticketMedio,
+              unit: "Pedidos",
+            },
+            {
+              label: "B2B · Let's Fly",
+              pct: consolidated.b2bPct,
+              color: "#fdba74",
+              receita: b2b.receitaTotal,
+              pedidos: b2b.totalPedidos,
+              ticket: b2b.ticketMedio,
+              unit: "NFs",
+            },
+            {
+              label: "B2B2C · Distrib.",
+              pct: consolidated.b2b2cPct,
+              color: "#d8b4fe",
+              receita: b2b2c.receitaTotal,
+              pedidos: b2b2c.totalPedidos,
+              ticket: b2b2c.ticketMedio,
+              unit: "NFs",
+            },
+          ].map(({ label, pct, color, receita, pedidos, ticket, unit }) => (
+            <div key={label} className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                <span className="text-xs text-slate-400 font-medium">{label}</span>
+                <span className="text-xs text-slate-500">{pct}%</span>
               </div>
-              <div>
-                <p className="text-[10px] text-slate-500">Ticket Médio</p>
-                <p className="text-sm font-semibold text-slate-300">{formatCurrency(b2c.ticketMedio)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* B2B */}
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#fdba74" }} />
-              <span className="text-xs text-slate-400 font-medium">B2B · Let's Fly</span>
-              <span className="text-xs text-slate-500">{consolidated.b2bPct}%</span>
-            </div>
-            <p className="text-xl font-bold" style={{ color: "#fdba74" }}>
-              {formatCurrency(b2b.receitaTotal)}
-            </p>
-            <div className="flex gap-4 mt-2">
-              <div>
-                <p className="text-[10px] text-slate-500">NFs</p>
-                <p className="text-sm font-semibold text-slate-300">{b2b.totalPedidos.toLocaleString("pt-BR")}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500">Ticket Médio</p>
-                <p className="text-sm font-semibold text-slate-300">{formatCurrency(b2b.ticketMedio)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* B2B2C */}
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#d8b4fe" }} />
-              <span className="text-xs text-slate-400 font-medium">B2B2C · Distrib.</span>
-              <span className="text-xs text-slate-500">{consolidated.b2b2cPct}%</span>
-            </div>
-            <p className="text-xl font-bold" style={{ color: "#d8b4fe" }}>
-              {formatCurrency(b2b2c.receitaTotal)}
-            </p>
-            <div className="flex gap-4 mt-2">
-              <div>
-                <p className="text-[10px] text-slate-500">NFs</p>
-                <p className="text-sm font-semibold text-slate-300">{b2b2c.totalPedidos.toLocaleString("pt-BR")}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500">Ticket Médio</p>
-                <p className="text-sm font-semibold text-slate-300">{formatCurrency(b2b2c.ticketMedio)}</p>
+              <p className="text-xl font-bold" style={{ color }}>
+                {formatCurrency(receita)}
+              </p>
+              <div className="flex gap-4 mt-2">
+                <div>
+                  <p className="text-[10px] text-slate-500">{unit}</p>
+                  <p className="text-sm font-semibold text-slate-300">{pedidos.toLocaleString("pt-BR")}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500">Ticket Médio</p>
+                  <p className="text-sm font-semibold text-slate-300">{formatCurrency(ticket)}</p>
+                </div>
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* ── GRÁFICO DE TENDÊNCIA CONSOLIDADA ── */}
+      {/* TENDÊNCIA 12 MESES */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -720,7 +767,7 @@ const VisaoExecutivaV2 = () => {
         </CardContent>
       </Card>
 
-      {/* ════════════ MUNDO ONLINE — B2C ════════════ */}
+      {/* B2C */}
       <SegmentSection
         title="Mundo Online"
         badge="B2C"
@@ -729,7 +776,6 @@ const VisaoExecutivaV2 = () => {
         badgeRevenue={formatCurrency(b2c.receitaTotal)}
         defaultOpen={true}
       >
-        {/* KPI row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KPICard
             icon={TrendingUp}
@@ -759,8 +805,6 @@ const VisaoExecutivaV2 = () => {
             accentColor={B2C_COLOR}
           />
         </div>
-
-        {/* Main chart */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Faturamento mensal — últimos 12 meses</CardTitle>
@@ -779,7 +823,6 @@ const VisaoExecutivaV2 = () => {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -812,7 +855,6 @@ const VisaoExecutivaV2 = () => {
             </CardContent>
           </Card>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -845,7 +887,6 @@ const VisaoExecutivaV2 = () => {
             </CardContent>
           </Card>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -877,7 +918,6 @@ const VisaoExecutivaV2 = () => {
               <DonutChart data={b2c.estadoSamplePie} label="Estados (amostras)" />
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground">Produtos Vendidos (período)</CardTitle>
@@ -894,7 +934,6 @@ const VisaoExecutivaV2 = () => {
               <DonutChart data={b2c.estadoProductPie} label="Estados (produtos)" />
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground">Receita Média / Produto</CardTitle>
@@ -921,7 +960,7 @@ const VisaoExecutivaV2 = () => {
         </div>
       </SegmentSection>
 
-      {/* ════════════ MUNDO OFFLINE — B2B ════════════ */}
+      {/* B2B */}
       <SegmentSection
         title="Mundo Offline"
         badge="B2B"
@@ -1016,7 +1055,7 @@ const VisaoExecutivaV2 = () => {
         )}
       </SegmentSection>
 
-      {/* ════════════ MUNDO OFFLINE — B2B2C ════════════ */}
+      {/* B2B2C */}
       <SegmentSection
         title="Mundo Offline"
         badge="B2B2C"
