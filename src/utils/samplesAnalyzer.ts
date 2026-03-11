@@ -321,8 +321,8 @@ export const calculateCrossSellMetrics = (
   const productsWithSample: Record<string, { product: string; count: number; totalValue: number }> = {};
   samplePlusOrders.forEach((order) => {
     order.produtos.forEach((produto) => {
-      // Não contar produtos que são amostras
-      if (!isSampleProduct(produto)) {
+      // Não contar produtos que são amostras nem materiais de divulgação
+      if (!isSampleProduct(produto) && !isMaterialProduct(produto)) {
         const key = produto.descricaoAjustada;
         if (!productsWithSample[key]) {
           productsWithSample[key] = { product: key, count: 0, totalValue: 0 };
@@ -458,12 +458,7 @@ export const calculateRepurchaseQuality = (
     // Produtos das recompras regulares
     regularRepurchases.forEach((order) => {
       order.produtos.forEach((produto) => {
-        if (!isSampleProduct(produto)) {
-          const key = produto.descricaoAjustada;
-          if (!repurchaseProducts[key]) {
-            repurchaseProducts[key] = { product: key, count: 0 };
-          }
-          repurchaseProducts[key].count++;
+        if (!isSampleProduct(produto) && !isMaterialProduct(produto)) {
         }
       });
     });
