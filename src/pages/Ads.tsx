@@ -33,7 +33,14 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
-import { filterAdsByMonth, filterAdsByObjective, determinePrimaryObjective, getAdObjective } from "@/utils/adsParserV2";
+import {
+  filterAdsByMonth,
+  filterAdsByDateRange,
+  filterAdsByObjective,
+  determinePrimaryObjective,
+  getAdObjective,
+  hasObjective,
+} from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 import { getLast12Months, formatMonthRange } from "@/utils/dateRangeCalculator";
 import { aggregateAdsByMonth } from "@/utils/monthlyAggregator";
@@ -43,29 +50,32 @@ import { AdsData } from "@/types/marketing";
 
 // Helper function for objective detection (uses centralized function from adsParserV2)
 const hasObjective = (data: AdsData[], objective: string): boolean => {
-  return data.some(ad => getAdObjective(ad) === objective);
+  return data.some((ad) => getAdObjective(ad) === objective);
 };
 
 // Decisional status derived from ROAS thresholds
 const getDecisionalStatus = (roas: number, thresholds: { excelente: number; medio: number; minimo: number }) => {
-  if (roas >= thresholds.excelente) return {
-    label: "Escalável",
-    color: "text-green-600",
-    bgColor: "bg-green-50 border-green-200",
-    description: "Performance excelente. Considerar aumentar investimento de forma controlada.",
-  };
-  if (roas >= thresholds.medio) return {
-    label: "Saudável",
-    color: "text-blue-600",
-    bgColor: "bg-blue-50 border-blue-200",
-    description: "Retorno dentro da meta. Manter e otimizar campanhas atuais.",
-  };
-  if (roas >= thresholds.minimo) return {
-    label: "Em observação",
-    color: "text-yellow-600",
-    bgColor: "bg-yellow-50 border-yellow-200",
-    description: "Retorno abaixo da meta. Revisar segmentação e criativos.",
-  };
+  if (roas >= thresholds.excelente)
+    return {
+      label: "Escalável",
+      color: "text-green-600",
+      bgColor: "bg-green-50 border-green-200",
+      description: "Performance excelente. Considerar aumentar investimento de forma controlada.",
+    };
+  if (roas >= thresholds.medio)
+    return {
+      label: "Saudável",
+      color: "text-blue-600",
+      bgColor: "bg-blue-50 border-blue-200",
+      description: "Retorno dentro da meta. Manter e otimizar campanhas atuais.",
+    };
+  if (roas >= thresholds.minimo)
+    return {
+      label: "Em observação",
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-50 border-yellow-200",
+      description: "Retorno abaixo da meta. Revisar segmentação e criativos.",
+    };
   return {
     label: "Prejuízo operacional",
     color: "text-red-600",
@@ -78,57 +88,59 @@ const SESSION_KEY = "ads-manual-objective";
 
 const Ads = () => {
   const navigate = useNavigate();
-  const { 
-    adsData, 
-    monthlySummaries, 
-    hasHierarchicalFormat, 
-    selectedMonth, 
-    availableMonths, 
+  const {
+    adsData,
+    monthlySummaries,
+    hasHierarchicalFormat,
+    availableMonths,
+    dateRange,
+    comparisonDateRange,
     comparisonMode,
-    selectedMonths,
+    lastDataDate,
   } = useDashboard();
-  
+
   // Get goals from database
   const { sectorBenchmarks } = useAppSettings();
 
   // ===== FASE 5: Manual objective filter =====
   const [manualObjective, setManualObjective] = useState<string>(() => {
-    return sessionStorage.getItem(SESSION_KEY) || 'auto';
+    return sessionStorage.getItem(SESSION_KEY) || "auto";
   });
 
   useEffect(() => {
     sessionStorage.setItem(SESSION_KEY, manualObjective);
   }, [manualObjective]);
 
-  // Detect 12-month view
-  const isLast12MonthsView = selectedMonth === "last-12-months";
-  
-  // Get last 12 months
-  const last12Months = useMemo(() => {
-    if (!isLast12MonthsView) return [];
-    return getLast12Months(availableMonths);
-  }, [isLast12MonthsView, availableMonths]);
+  // Months in current date range (for multi-month comparison)
+  const monthsInRange = useMemo(() => {
+    if (!dateRange) return availableMonths;
+    const months: string[] = [];
+    const d = new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), 1);
+    while (d <= dateRange.end) {
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+      d.setMonth(d.getMonth() + 1);
+    }
+    return months.filter((m) => availableMonths.includes(m));
+  }, [dateRange, availableMonths]);
 
   // Comparison mode calculations
   const multiMonthMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length < 2) return null;
-    return calculateAdsMultiMonthMetrics(
-      adsData, 
-      selectedMonths,
-      (data, month) => isLast12MonthsView ? aggregateAdsByMonth(data, [month]) : filterAdsByMonth(data, month)
-    );
-  }, [comparisonMode, selectedMonths, adsData, isLast12MonthsView]);
+    if (!comparisonMode || !comparisonDateRange || monthsInRange.length === 0) return null;
+    const compMonths: string[] = [];
+    const d = new Date(comparisonDateRange.start.getFullYear(), comparisonDateRange.start.getMonth(), 1);
+    while (d <= comparisonDateRange.end) {
+      compMonths.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+      d.setMonth(d.getMonth() + 1);
+    }
+    const allMonths = [...new Set([...monthsInRange, ...compMonths.filter((m) => availableMonths.includes(m))])];
+    if (allMonths.length < 2) return null;
+    return calculateAdsMultiMonthMetrics(adsData, allMonths, (data, month) => filterAdsByMonth(data, month));
+  }, [comparisonMode, comparisonDateRange, monthsInRange, adsData, availableMonths]);
 
   const currentMonthAdsData = useMemo(() => {
-    // selectedMonth null = "Todos os períodos" = retornar todos os dados
-    if (!selectedMonth) {
-      return adsData;
-    }
-    if (isLast12MonthsView) {
-      return aggregateAdsByMonth(adsData, last12Months);
-    }
-    return filterAdsByMonth(adsData, selectedMonth);
-  }, [adsData, selectedMonth, isLast12MonthsView, last12Months]);
+    if (!dateRange) return adsData;
+    return filterAdsByDateRange(adsData, dateRange.start, dateRange.end);
+  }, [adsData, dateRange]);
 
   // ===== FASE 5: effectiveObjective replaces primaryObjective =====
   const detectedObjective = useMemo(() => {
@@ -136,18 +148,21 @@ const Ads = () => {
   }, [currentMonthAdsData]);
 
   const effectiveObjective = useMemo(() => {
-    if (manualObjective === 'auto') return detectedObjective;
+    if (manualObjective === "auto") return detectedObjective;
     // Validate manual selection has data
     if (hasObjective(currentMonthAdsData, manualObjective)) return manualObjective;
     return detectedObjective;
   }, [manualObjective, detectedObjective, currentMonthAdsData]);
 
   // Available objectives for toggle
-  const availableObjectives = useMemo(() => ({
-    sales: hasObjective(currentMonthAdsData, "OUTCOME_SALES"),
-    engagement: hasObjective(currentMonthAdsData, "OUTCOME_ENGAGEMENT"),
-    traffic: hasObjective(currentMonthAdsData, "OUTCOME_TRAFFIC"),
-  }), [currentMonthAdsData]);
+  const availableObjectives = useMemo(
+    () => ({
+      sales: hasObjective(currentMonthAdsData, "OUTCOME_SALES"),
+      engagement: hasObjective(currentMonthAdsData, "OUTCOME_ENGAGEMENT"),
+      traffic: hasObjective(currentMonthAdsData, "OUTCOME_TRAFFIC"),
+    }),
+    [currentMonthAdsData],
+  );
 
   // ===== ACTIVE ADS DATA: Filtered by effective objective =====
   const activeAdsData = useMemo(() => {
@@ -165,13 +180,13 @@ const Ads = () => {
 
   // ===== Objective Detection for Current Data =====
   const objectivesSummary = useMemo(() => {
-    const salesCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_SALES").length;
-    const engagementCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_ENGAGEMENT").length;
-    const trafficCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_TRAFFIC").length;
-    const awarenessCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_AWARENESS").length;
-    const leadsCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "OUTCOME_LEADS").length;
-    const unknownCount = currentMonthAdsData.filter(ad => getAdObjective(ad) === "UNKNOWN").length;
-    
+    const salesCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_SALES").length;
+    const engagementCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_ENGAGEMENT").length;
+    const trafficCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_TRAFFIC").length;
+    const awarenessCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_AWARENESS").length;
+    const leadsCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_LEADS").length;
+    const unknownCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "UNKNOWN").length;
+
     return {
       hasSales: salesCount > 0,
       hasEngagement: engagementCount > 0,
@@ -209,22 +224,13 @@ const Ads = () => {
   const grossMediaResult = metrics.valorConversaoTotal - totalInvestment;
 
   // ROAS corrigido: receita de vendas / investimento total (todos objetivos)
-  const correctedRoas = totalInvestment > 0 
-    ? metrics.valorConversaoTotal / totalInvestment 
-    : 0;
+  const correctedRoas = totalInvestment > 0 ? metrics.valorConversaoTotal / totalInvestment : 0;
 
-  // Calculate trends vs previous month (using same objective filter)
+  // Calculate trends vs comparison period
   const trends = useMemo(() => {
-    if (!selectedMonth || isLast12MonthsView) return null;
-    
-    const sortedMonths = [...availableMonths].sort();
-    const currentIndex = sortedMonths.indexOf(selectedMonth);
-    if (currentIndex <= 0) return null;
+    if (!comparisonDateRange) return null;
 
-    const previousMonth = sortedMonths[currentIndex - 1];
-    let previousData = filterAdsByMonth(adsData, previousMonth);
-    
-    // IMPORTANT: Apply same objective filter to previous month for consistent comparison
+    let previousData = filterAdsByDateRange(adsData, comparisonDateRange.start, comparisonDateRange.end);
     if (effectiveObjective === "OUTCOME_SALES") {
       previousData = filterAdsByObjective(previousData, "OUTCOME_SALES");
     } else if (effectiveObjective === "OUTCOME_ENGAGEMENT") {
@@ -232,9 +238,8 @@ const Ads = () => {
     } else if (effectiveObjective === "OUTCOME_TRAFFIC") {
       previousData = filterAdsByObjective(previousData, "OUTCOME_TRAFFIC");
     }
-    
-    const previousMetrics = calculateAdsMetrics(previousData);
 
+    const previousMetrics = calculateAdsMetrics(previousData);
     const calculateTrend = (current: number, previous: number) => {
       if (previous === 0) return current > 0 ? 100 : 0;
       return ((current - previous) / previous) * 100;
@@ -247,12 +252,11 @@ const Ads = () => {
       conversionsTrend: calculateTrend(metrics.comprasTotal, previousMetrics.comprasTotal),
       cpaTrend: calculateTrend(metrics.custoPorCompra, previousMetrics.custoPorCompra),
       cpcTrend: calculateTrend(metrics.cpcMedio, previousMetrics.cpcMedio),
-      // Engagement trends
       resultsTrend: calculateTrend(metrics.resultadosTotal, previousMetrics.resultadosTotal),
       cpeTrend: calculateTrend(metrics.custoPorResultadoMedio, previousMetrics.custoPorResultadoMedio),
       engagementRateTrend: calculateTrend(metrics.taxaEngajamento, previousMetrics.taxaEngajamento),
     };
-  }, [selectedMonth, availableMonths, adsData, metrics, isLast12MonthsView, effectiveObjective]);
+  }, [comparisonDateRange, adsData, metrics, effectiveObjective]);
 
   // Derived metrics - use ROAS thresholds from database
   const roasGoal = sectorBenchmarks.roasMedio || 3.0;
@@ -261,11 +265,11 @@ const Ads = () => {
   const roasProgress = Math.min((correctedRoas / roasGoal) * 100, 150);
 
   const formatCurrency = (value: number) => {
-    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const formatNumber = (value: number) => {
-    return value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+    return value.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
   };
 
   const formatPercent = (value: number) => {
@@ -278,10 +282,33 @@ const Ads = () => {
 
   // ROAS status and interpretation - use dynamic thresholds
   const getRoasStatus = (roas: number) => {
-    if (roas >= roasExcelente) return { status: 'success' as const, badge: '🏆 Premium', color: 'text-green-600', bgColor: 'bg-green-50 border-green-200' };
-    if (roas >= roasGoal) return { status: 'success' as const, badge: '✓ Meta', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200' };
-    if (roas >= roasMinimo) return { status: 'warning' as const, badge: '⚠️ Baixo', color: 'text-yellow-600', bgColor: 'bg-yellow-50 border-yellow-200' };
-    return { status: 'danger' as const, badge: '🚨 Crítico', color: 'text-red-600', bgColor: 'bg-red-50 border-red-200' };
+    if (roas >= roasExcelente)
+      return {
+        status: "success" as const,
+        badge: "🏆 Premium",
+        color: "text-green-600",
+        bgColor: "bg-green-50 border-green-200",
+      };
+    if (roas >= roasGoal)
+      return {
+        status: "success" as const,
+        badge: "✓ Meta",
+        color: "text-blue-600",
+        bgColor: "bg-blue-50 border-blue-200",
+      };
+    if (roas >= roasMinimo)
+      return {
+        status: "warning" as const,
+        badge: "⚠️ Baixo",
+        color: "text-yellow-600",
+        bgColor: "bg-yellow-50 border-yellow-200",
+      };
+    return {
+      status: "danger" as const,
+      badge: "🚨 Crítico",
+      color: "text-red-600",
+      bgColor: "bg-red-50 border-red-200",
+    };
   };
 
   const getRoasInterpretation = (roas: number) => {
@@ -293,10 +320,28 @@ const Ads = () => {
 
   // Engagement status and interpretation
   const getEngagementStatus = (rate: number) => {
-    if (rate >= 5) return { status: 'success' as const, badge: '🏆 Excelente', color: 'text-green-600', bgColor: 'bg-green-50 border-green-200' };
-    if (rate >= 3) return { status: 'success' as const, badge: '✓ Bom', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200' };
-    if (rate >= 1) return { status: 'warning' as const, badge: '⚠️ Médio', color: 'text-yellow-600', bgColor: 'bg-yellow-50 border-yellow-200' };
-    return { status: 'danger' as const, badge: '📉 Baixo', color: 'text-red-600', bgColor: 'bg-red-50 border-red-200' };
+    if (rate >= 5)
+      return {
+        status: "success" as const,
+        badge: "🏆 Excelente",
+        color: "text-green-600",
+        bgColor: "bg-green-50 border-green-200",
+      };
+    if (rate >= 3)
+      return {
+        status: "success" as const,
+        badge: "✓ Bom",
+        color: "text-blue-600",
+        bgColor: "bg-blue-50 border-blue-200",
+      };
+    if (rate >= 1)
+      return {
+        status: "warning" as const,
+        badge: "⚠️ Médio",
+        color: "text-yellow-600",
+        bgColor: "bg-yellow-50 border-yellow-200",
+      };
+    return { status: "danger" as const, badge: "📉 Baixo", color: "text-red-600", bgColor: "bg-red-50 border-red-200" };
   };
 
   const getEngagementInterpretation = (rate: number) => {
@@ -308,7 +353,11 @@ const Ads = () => {
 
   const roasStatusInfo = getRoasStatus(correctedRoas);
   const engagementStatusInfo = getEngagementStatus(metrics.taxaEngajamento);
-  const decisionalStatus = getDecisionalStatus(correctedRoas, { excelente: roasExcelente, medio: roasGoal, minimo: roasMinimo });
+  const decisionalStatus = getDecisionalStatus(correctedRoas, {
+    excelente: roasExcelente,
+    medio: roasGoal,
+    minimo: roasMinimo,
+  });
 
   // Build objectives label for header
   const objectivesLabel = useMemo(() => {
@@ -335,11 +384,19 @@ const Ads = () => {
             <ToggleGroup
               type="single"
               value={manualObjective}
-              onValueChange={(val) => { if (val) setManualObjective(val); }}
+              onValueChange={(val) => {
+                if (val) setManualObjective(val);
+              }}
               className="bg-muted/50 rounded-lg p-0.5"
             >
-              <ToggleGroupItem value="auto" className="text-xs px-2.5 py-1 h-7 data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-                Auto {manualObjective === 'auto' && detectedObjective !== "ALL" ? `(${detectedObjective.replace('OUTCOME_', '')})` : ''}
+              <ToggleGroupItem
+                value="auto"
+                className="text-xs px-2.5 py-1 h-7 data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md"
+              >
+                Auto{" "}
+                {manualObjective === "auto" && detectedObjective !== "ALL"
+                  ? `(${detectedObjective.replace("OUTCOME_", "")})`
+                  : ""}
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="OUTCOME_SALES"
@@ -364,23 +421,8 @@ const Ads = () => {
               </ToggleGroupItem>
             </ToggleGroup>
           )}
-
-          {/* Inline 12-month indicator */}
-          {isLast12MonthsView && last12Months.length > 0 && (
-            <Badge variant="outline" className="flex items-center gap-1.5">
-              <Calendar className="h-3 w-3" />
-              <span>Últimos {last12Months.length} meses</span>
-            </Badge>
-          )}
         </div>
       </div>
-
-      {/* Period range text for 12-month view */}
-      {isLast12MonthsView && last12Months.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Período: {formatMonthRange(last12Months)}
-        </p>
-      )}
 
       {/* Empty state */}
       {adsData.length === 0 ? (
@@ -399,9 +441,7 @@ const Ads = () => {
       ) : currentMonthAdsData.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              Nenhum dado de anúncios disponível para o período selecionado.
-            </p>
+            <p className="text-muted-foreground">Nenhum dado de anúncios disponível para o período selecionado.</p>
           </CardContent>
         </Card>
       ) : (
@@ -447,7 +487,7 @@ const Ads = () => {
                   tooltipKey="ctr"
                 />
               </div>
-              
+
               {/* Engagement Comparison Cards (if engagement campaigns exist) */}
               {objectivesSummary.hasEngagement && (
                 <>
@@ -496,7 +536,7 @@ const Ads = () => {
                                 <Target className="h-4 w-4 text-primary" />
                                 <span className="text-sm font-semibold text-foreground">ROAS Ads</span>
                               </div>
-                              <Badge 
+                              <Badge
                                 variant={correctedRoas >= roasGoal ? "default" : "destructive"}
                                 className="text-xs"
                               >
@@ -522,21 +562,26 @@ const Ads = () => {
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-muted-foreground">Meta: {roasGoal}x</span>
                                 {trends && (
-                                  <span className={cn(
-                                    "flex items-center gap-0.5",
-                                    trends.roasTrend >= 0 ? "text-green-600" : "text-red-600"
-                                  )}>
-                                    {trends.roasTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                                    {trends.roasTrend >= 0 ? '+' : ''}{trends.roasTrend.toFixed(0)}%
+                                  <span
+                                    className={cn(
+                                      "flex items-center gap-0.5",
+                                      trends.roasTrend >= 0 ? "text-green-600" : "text-red-600",
+                                    )}
+                                  >
+                                    {trends.roasTrend >= 0 ? (
+                                      <TrendingUp className="h-3 w-3" />
+                                    ) : (
+                                      <TrendingDown className="h-3 w-3" />
+                                    )}
+                                    {trends.roasTrend >= 0 ? "+" : ""}
+                                    {trends.roasTrend.toFixed(0)}%
                                   </span>
                                 )}
                               </div>
                               <Progress value={roasProgress} className="h-1.5" />
                             </div>
 
-                            <p className="text-xs font-medium">
-                              {getRoasInterpretation(correctedRoas)}
-                            </p>
+                            <p className="text-xs font-medium">{getRoasInterpretation(correctedRoas)}</p>
                           </div>
                         </CardContent>
                       </Card>
@@ -552,7 +597,9 @@ const Ads = () => {
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <Coins className="h-4 w-4 text-primary" />
-                                    <span className="text-sm font-semibold text-foreground">Resultado Bruto de Mídia</span>
+                                    <span className="text-sm font-semibold text-foreground">
+                                      Resultado Bruto de Mídia
+                                    </span>
                                   </div>
                                   {totalInvestment > 0 && (
                                     <Badge
@@ -564,16 +611,22 @@ const Ads = () => {
                                   )}
                                 </div>
 
-                                <p className={cn(
-                                  "text-3xl font-bold",
-                                  totalInvestment === 0 ? "text-muted-foreground" : grossMediaResult >= 0 ? "text-foreground" : "text-foreground"
-                                )}>
-                                  {totalInvestment === 0 ? "—" : `${grossMediaResult >= 0 ? '+' : ''}${formatCurrency(grossMediaResult)}`}
+                                <p
+                                  className={cn(
+                                    "text-3xl font-bold",
+                                    totalInvestment === 0
+                                      ? "text-muted-foreground"
+                                      : grossMediaResult >= 0
+                                        ? "text-foreground"
+                                        : "text-foreground",
+                                  )}
+                                >
+                                  {totalInvestment === 0
+                                    ? "—"
+                                    : `${grossMediaResult >= 0 ? "+" : ""}${formatCurrency(grossMediaResult)}`}
                                 </p>
 
-                                <p className="text-xs text-muted-foreground">
-                                  Receita - investimento total em mídia
-                                </p>
+                                <p className="text-xs text-muted-foreground">Receita - investimento total em mídia</p>
 
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                   <span>{formatCurrency(metrics.valorConversaoTotal)}</span>
@@ -604,13 +657,9 @@ const Ads = () => {
                             <span className="text-sm font-semibold text-foreground">Status Decisional</span>
                           </div>
 
-                          <p className={cn("text-2xl font-bold", decisionalStatus.color)}>
-                            {decisionalStatus.label}
-                          </p>
+                          <p className={cn("text-2xl font-bold", decisionalStatus.color)}>{decisionalStatus.label}</p>
 
-                          <p className="text-xs text-muted-foreground">
-                            {decisionalStatus.description}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{decisionalStatus.description}</p>
 
                           <div className="text-xs text-muted-foreground space-y-1 pt-1 border-t">
                             <div className="flex justify-between">
@@ -685,7 +734,7 @@ const Ads = () => {
                       status={getStatusFromBenchmark(
                         metrics.valorConversaoTotal,
                         totalInvestment * revenueBenchmarkMultiplier,
-                        { warningThreshold: 0.67, dangerThreshold: 0.5 }
+                        { warningThreshold: 0.67, dangerThreshold: 0.5 },
                       )}
                       size="compact"
                       tooltipKey="receita_ads"
@@ -729,14 +778,18 @@ const Ads = () => {
                           <KPITooltip metricKey="taxa_conversao_carrinho">
                             <div className="text-center flex-1 cursor-help">
                               <p className="text-xs text-muted-foreground">Conv. Cart</p>
-                              <p className="text-lg font-bold text-green-600">{formatPercent(metrics.taxaConversaoCarrinho)}</p>
+                              <p className="text-lg font-bold text-green-600">
+                                {formatPercent(metrics.taxaConversaoCarrinho)}
+                              </p>
                             </div>
                           </KPITooltip>
                           <span className="text-muted-foreground">→</span>
                           <KPITooltip metricKey="taxa_abandono_carrinho">
                             <div className="text-center flex-1 cursor-help">
                               <p className="text-xs text-muted-foreground">Abandono</p>
-                              <p className="text-lg font-bold text-yellow-600">{formatPercent(metrics.taxaAbandonoCarrinho)}</p>
+                              <p className="text-lg font-bold text-yellow-600">
+                                {formatPercent(metrics.taxaAbandonoCarrinho)}
+                              </p>
                             </div>
                           </KPITooltip>
                           <span className="text-muted-foreground">→</span>
@@ -814,10 +867,7 @@ const Ads = () => {
                   <div className="grid gap-4 lg:grid-cols-5">
                     {/* Main Engagement Card - Compact */}
                     <KPITooltip metricKey="taxa_engajamento">
-                      <Card className={cn(
-                        "lg:col-span-2 border-2 relative",
-                        engagementStatusInfo.bgColor
-                      )}>
+                      <Card className={cn("lg:col-span-2 border-2 relative", engagementStatusInfo.bgColor)}>
                         <CardContent className="p-4">
                           <div className="space-y-3">
                             {/* Header with badge */}
@@ -826,7 +876,7 @@ const Ads = () => {
                                 <Heart className="h-4 w-4 text-primary" />
                                 <span className="text-sm font-semibold text-foreground">Taxa de Engajamento</span>
                               </div>
-                              <Badge 
+                              <Badge
                                 variant={metrics.taxaEngajamento >= 3 ? "default" : "secondary"}
                                 className="text-xs"
                               >
@@ -851,12 +901,19 @@ const Ads = () => {
                               <span className="text-muted-foreground">Benchmark: 3%+</span>
                               <div className="flex items-center gap-2">
                                 {trends && (
-                                  <span className={cn(
-                                    "flex items-center gap-0.5",
-                                    trends.engagementRateTrend >= 0 ? "text-green-600" : "text-red-600"
-                                  )}>
-                                    {trends.engagementRateTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                                    {trends.engagementRateTrend >= 0 ? '+' : ''}{trends.engagementRateTrend.toFixed(0)}%
+                                  <span
+                                    className={cn(
+                                      "flex items-center gap-0.5",
+                                      trends.engagementRateTrend >= 0 ? "text-green-600" : "text-red-600",
+                                    )}
+                                  >
+                                    {trends.engagementRateTrend >= 0 ? (
+                                      <TrendingUp className="h-3 w-3" />
+                                    ) : (
+                                      <TrendingDown className="h-3 w-3" />
+                                    )}
+                                    {trends.engagementRateTrend >= 0 ? "+" : ""}
+                                    {trends.engagementRateTrend.toFixed(0)}%
                                   </span>
                                 )}
                               </div>
@@ -890,11 +947,10 @@ const Ads = () => {
                         value={formatNumber(metrics.resultadosTotal)}
                         icon={<Zap className="h-3 w-3" />}
                         trend={trends?.resultsTrend}
-                        status={getStatusFromBenchmark(
-                          metrics.resultadosTotal,
-                          100,
-                          { warningThreshold: 0.5, dangerThreshold: 0.25 }
-                        )}
+                        status={getStatusFromBenchmark(metrics.resultadosTotal, 100, {
+                          warningThreshold: 0.5,
+                          dangerThreshold: 0.25,
+                        })}
                         size="compact"
                         tooltipKey="resultados_engagement"
                       />
@@ -906,11 +962,11 @@ const Ads = () => {
                         icon={<Target className="h-3 w-3" />}
                         trend={trends?.cpeTrend}
                         invertTrend
-                        status={getStatusFromBenchmark(
-                          1.0,
-                          metrics.custoPorResultadoMedio,
-                          { invertComparison: true, warningThreshold: 0.8, dangerThreshold: 0.5 }
-                        )}
+                        status={getStatusFromBenchmark(1.0, metrics.custoPorResultadoMedio, {
+                          invertComparison: true,
+                          warningThreshold: 0.8,
+                          dangerThreshold: 0.5,
+                        })}
                         size="compact"
                         tooltipKey="cpe"
                       />
@@ -1008,7 +1064,9 @@ const Ads = () => {
                           <KPITooltip metricKey="cpe">
                             <div className="text-center cursor-help">
                               <p className="text-xs text-muted-foreground">CPE</p>
-                              <p className="text-lg font-bold text-primary">{formatCurrency(metrics.custoPorResultadoMedio)}</p>
+                              <p className="text-lg font-bold text-primary">
+                                {formatCurrency(metrics.custoPorResultadoMedio)}
+                              </p>
                             </div>
                           </KPITooltip>
                           <KPITooltip metricKey="frequencia">
@@ -1042,12 +1100,21 @@ const Ads = () => {
                           <span className="font-semibold">{formatCurrency(metrics.valorConversaoTotal)}</span>
                         </div>
                         <span className="text-muted-foreground">=</span>
-                        <div className={cn(
-                          "flex items-center gap-2 font-semibold",
-                          grossMediaResult >= 0 ? "text-green-600" : "text-red-600"
-                        )}>
-                          {grossMediaResult >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                          <span>{grossMediaResult >= 0 ? '+' : ''}{formatCurrency(grossMediaResult)}</span>
+                        <div
+                          className={cn(
+                            "flex items-center gap-2 font-semibold",
+                            grossMediaResult >= 0 ? "text-green-600" : "text-red-600",
+                          )}
+                        >
+                          {grossMediaResult >= 0 ? (
+                            <TrendingUp className="h-4 w-4" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4" />
+                          )}
+                          <span>
+                            {grossMediaResult >= 0 ? "+" : ""}
+                            {formatCurrency(grossMediaResult)}
+                          </span>
                         </div>
                       </>
                     )}
@@ -1071,7 +1138,15 @@ const Ads = () => {
               </Card>
 
               {/* ===== ROW 6: Breakdown by Ad (uses activeAdsData for objective-filtered view) ===== */}
-              <AdsBreakdown ads={activeAdsData} selectedMonth={selectedMonth || ""} objective={effectiveObjective} />
+              <AdsBreakdown
+                ads={activeAdsData}
+                selectedMonth={
+                  dateRange
+                    ? `${dateRange.start.getFullYear()}-${String(dateRange.start.getMonth() + 1).padStart(2, "0")}`
+                    : ""
+                }
+                objective={effectiveObjective}
+              />
 
               {/* ===== ROW 7: Classification Chart ===== */}
               <AdClassificationChart adsData={activeAdsData} objective={effectiveObjective} />
