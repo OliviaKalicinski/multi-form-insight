@@ -39,25 +39,16 @@ import { ptBR } from "date-fns/locale";
 
 const queryClient = new QueryClient();
 
-// Helper to format last update date
 const formatLastUpdate = (date: Date | null): string => {
   if (!date) return "—";
-  
-  if (isToday(date)) {
-    return format(date, "HH:mm", { locale: ptBR });
-  }
-  
-  if (isYesterday(date)) {
-    return `Ontem ${format(date, "HH:mm", { locale: ptBR })}`;
-  }
-  
+  if (isToday(date)) return format(date, "HH:mm", { locale: ptBR });
+  if (isYesterday(date)) return `Ontem ${format(date, "HH:mm", { locale: ptBR })}`;
   return format(date, "dd/MM HH:mm", { locale: ptBR });
 };
 
-// Inner layout that can use the Dashboard context
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const { lastDataUpdate } = useDashboard();
-  
+
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full">
@@ -66,21 +57,17 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <header className="flex h-12 items-center border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
             <div className="ml-4 font-semibold text-sm">📊 Dashboard de Marketing</div>
-            
-            {/* Spacer */}
             <div className="flex-1" />
-            
-            {/* Data update indicator */}
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${lastDataUpdate ? 'bg-green-500' : 'bg-muted-foreground/50'}`} />
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${lastDataUpdate ? "bg-green-500" : "bg-muted-foreground/50"}`}
+              />
               <span className="hidden sm:inline">Dados:</span>
               <span>{formatLastUpdate(lastDataUpdate)}</span>
             </div>
           </header>
           <GlobalFilter />
-          <main className="flex-1 bg-background">
-            {children}
-          </main>
+          <main className="flex-1 bg-background">{children}</main>
           <DataChat />
         </SidebarInset>
       </div>
@@ -88,7 +75,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// Layout component for authenticated pages
 const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => (
   <DashboardProvider>
     <DashboardLayout>{children}</DashboardLayout>
@@ -102,199 +88,236 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          {/* Public route */}
           <Route path="/login" element={<Login />} />
-          
-          {/* Protected routes */}
           <Route path="/" element={<Navigate to="/visao-executiva-v2" replace />} />
-          
-          <Route path="/visao-executiva-v2" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <VisaoExecutivaV2 />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ExecutiveDashboard />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/upload" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <AdminRoute>
-                  <Upload />
-                </AdminRoute>
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/settings" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Settings />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/metas" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <AdminRoute>
-                  <Metas />
-                </AdminRoute>
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/seguidores" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Seguidores />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/produtos" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Produtos />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/operacoes" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Operacoes />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/ads" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Ads />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/performance-financeira" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <PerformanceFinanceira />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/comportamento-cliente" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ComportamentoCliente />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          {/* Redirects de rotas antigas */}
+
+          <Route
+            path="/visao-executiva-v2"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <VisaoExecutivaV2 />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ExecutiveDashboard />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/upload"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <AdminRoute>
+                    <Upload />
+                  </AdminRoute>
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Settings />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metas"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <AdminRoute>
+                    <Metas />
+                  </AdminRoute>
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/seguidores"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Seguidores />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/produtos"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Produtos />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/operacoes"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Operacoes />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ads"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Ads />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/performance-financeira"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <PerformanceFinanceira />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comportamento-cliente"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ComportamentoCliente />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route path="/segmentacao-clientes" element={<Navigate to="/comportamento-cliente" replace />} />
           <Route path="/analise-churn" element={<Navigate to="/comportamento-cliente" replace />} />
-          
-          <Route path="/analise-samples" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <AnaliseSamples />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/publico" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Publico />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/analise-critica" element={<Navigate to="/dashboard" replace />} />
-          
-          <Route path="/clientes" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Clientes />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/clientes/:cpfCnpj" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ClientePerfil />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/reclamacoes/nova" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ReclamacaoNova />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/reclamacoes" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Reclamacoes />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/atendimentos" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Atendimentos />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/radar-operacional" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <RadarOperacional />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/kanban-operacional" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <KanbanOperacional />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/distribuidores" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <Distribuidores />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/lets-fly" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <LetsFly />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          
-          {/* Catch-all route */}
+          <Route
+            path="/analise-samples"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <AnaliseSamples />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/publico"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Publico />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/analise-critica" element={<Navigate to="/visao-executiva-v2" replace />} />
+          <Route
+            path="/clientes"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Clientes />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clientes/:cpfCnpj"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ClientePerfil />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reclamacoes/nova"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ReclamacaoNova />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reclamacoes"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Reclamacoes />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/atendimentos"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Atendimentos />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/radar-operacional"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <RadarOperacional />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kanban-operacional"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <KanbanOperacional />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/distribuidores"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Distribuidores />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/lets-fly"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <LetsFly />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
