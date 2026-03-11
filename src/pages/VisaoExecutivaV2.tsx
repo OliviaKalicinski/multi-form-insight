@@ -490,8 +490,8 @@ const VisaoExecutivaV2 = () => {
         multiplos = 0;
       mo.filter(isOnlySampleOrder).forEach((o) => {
         const profile = classifyProductsByAnimal(o.produtos.filter(isSampleProduct));
-        if (profile === "cachorro") cachorro++;
-        else if (profile === "gato") gato++;
+        if (profile === "caes") cachorro++;
+        else if (profile === "gatos") gato++;
         else if (profile === "multiplos") multiplos++;
       });
       return { mes: fmtMonth(m), Cachorro: cachorro, Gato: gato, "Cach.+Gato": multiplos };
