@@ -5,11 +5,8 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatCurrency } from "@/utils/salesCalculator";
-import {
-  isSampleProduct,
-  isOnlySampleOrder,
-  hasRegularProduct,
-} from "@/utils/samplesAnalyzer";
+import { getOfficialRevenue, isRevenueOrder } from "@/utils/revenue";
+import { isSampleProduct, isOnlySampleOrder, hasRegularProduct } from "@/utils/samplesAnalyzer";
 import { classifyProductsByAnimal } from "@/utils/petProfile";
 import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,25 +26,14 @@ const CHART_COLORS = [
   "hsl(160, 60%, 40%)",
 ];
 
-const DonutChart = ({
-  data,
-  label,
-}: {
-  data: { name: string; value: number; pct?: number }[];
-  label?: string;
-}) => {
-  if (data.length === 0)
-    return (
-      <p className="text-sm text-muted-foreground">Dados não disponíveis</p>
-    );
+const DonutChart = ({ data, label }: { data: { name: string; value: number; pct?: number }[]; label?: string }) => {
+  if (data.length === 0) return <p className="text-sm text-muted-foreground">Dados não disponíveis</p>;
 
   const total = data.reduce((s, d) => s + d.value, 0);
 
   return (
     <div className="flex flex-col items-center gap-2">
-      {label && (
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      )}
+      {label && <p className="text-xs font-medium text-muted-foreground">{label}</p>}
       <div className="w-full" style={{ height: 160 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -62,15 +48,10 @@ const DonutChart = ({
               stroke="none"
             >
               {data.map((_, i) => (
-                <Cell
-                  key={i}
-                  fill={CHART_COLORS[i % CHART_COLORS.length]}
-                />
+                <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip
-              formatter={(value: number) => value.toLocaleString("pt-BR")}
-            />
+            <Tooltip formatter={(value: number) => value.toLocaleString("pt-BR")} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -78,10 +59,7 @@ const DonutChart = ({
         {data.map((d, i) => {
           const pct = total > 0 ? ((d.value / total) * 100).toFixed(0) : "0";
           return (
-            <div
-              key={d.name}
-              className="flex items-center justify-between text-xs"
-            >
+            <div key={d.name} className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5">
                 <div
                   className="w-2.5 h-2.5 rounded-sm shrink-0"
@@ -89,9 +67,7 @@ const DonutChart = ({
                     backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
                   }}
                 />
-                <span className="text-muted-foreground truncate max-w-[120px]">
-                  {d.name}
-                </span>
+                <span className="text-muted-foreground truncate max-w-[120px]">{d.name}</span>
               </div>
               <span className="font-medium tabular-nums">
                 {d.value} ({pct}%)
@@ -107,12 +83,8 @@ const DonutChart = ({
 const VisaoExecutivaV2 = () => {
   const { salesData, isLoadingData } = useDashboard();
   const [period, setPeriod] = useState<string>("7d");
-  const [estadoSampleData, setEstadoSampleData] = useState<
-    Record<string, number>
-  >({});
-  const [estadoProductData, setEstadoProductData] = useState<
-    Record<string, number>
-  >({});
+  const [estadoSampleData, setEstadoSampleData] = useState<Record<string, number>>({});
+  const [estadoProductData, setEstadoProductData] = useState<Record<string, number>>({});
 
   // Company-level: uses all segments (no brand filter)
 
@@ -128,9 +100,7 @@ const VisaoExecutivaV2 = () => {
 
     if (period === "1d") {
       const dayStr = format(lastDate, "yyyy-MM-dd");
-      return salesData.filter(
-        (o) => format(o.dataVenda, "yyyy-MM-dd") === dayStr
-      );
+      return salesData.filter((o) => format(o.dataVenda, "yyyy-MM-dd") === dayStr);
     }
 
     const startDate = new Date(lastDate);
@@ -158,10 +128,7 @@ const VisaoExecutivaV2 = () => {
       return;
     }
 
-    const fetchEstados = async (
-      ids: string[],
-      setter: (d: Record<string, number>) => void
-    ) => {
+    const fetchEstados = async (ids: string[], setter: (d: Record<string, number>) => void) => {
       if (ids.length === 0) {
         setter({});
         return;
@@ -190,55 +157,52 @@ const VisaoExecutivaV2 = () => {
     const orders = filteredOrders;
     const totalOrders = orders.length;
 
-    // Revenue
-    const receitaTotal = orders.reduce((sum, o) => sum + o.valorTotal, 0);
+    // Revenue — frete incluído no total (é receita recebida)
+    const receitaProdutos = orders.reduce((sum, o) => sum + o.valorTotal, 0);
     const frete = orders.reduce((sum, o) => sum + o.valorFrete, 0);
-    const fretePercent =
-      receitaTotal > 0 ? ((frete / receitaTotal) * 100).toFixed(1) : "0";
+    const receitaTotal = receitaProdutos + frete;
+    // Denominador correto: frete sobre tudo que entrou no caixa
+    const fretePercent = receitaTotal > 0 ? ((frete / receitaTotal) * 100).toFixed(1) : "0";
 
-    let totalProductRevenue = 0;
     let totalProductQty = 0;
 
-    // Per-product revenue aggregation
-    const productRevenueMap: Record<
-      string,
-      { revenue: number; qty: number }
-    > = {};
+    // Per-product revenue aggregation (apenas produtos reais, sem amostras)
+    const productRevenueMap: Record<string, { revenue: number; qty: number }> = {};
 
     orders.forEach((o) => {
       o.produtos.forEach((p) => {
-        totalProductRevenue += p.preco;
         totalProductQty += p.quantidade;
 
         if (!isSampleProduct(p)) {
           const key = p.descricaoAjustada || p.descricao;
-          if (!productRevenueMap[key])
-            productRevenueMap[key] = { revenue: 0, qty: 0 };
+          if (!productRevenueMap[key]) productRevenueMap[key] = { revenue: 0, qty: 0 };
           productRevenueMap[key].revenue += p.preco;
           productRevenueMap[key].qty += p.quantidade;
         }
       });
     });
 
-    const receitaProdutos = totalProductRevenue;
+    // Receita de produtos reais (exclui amostras R$0,01)
+    const receitaSemAmostras = Object.values(productRevenueMap).reduce((sum, d) => sum + d.revenue, 0);
 
-    // Average revenue per individual product
+    // Average revenue per individual product — mais caro primeiro
     const receitaMediaPorProduto = Object.entries(productRevenueMap)
       .map(([name, d]) => ({
         name,
         avgPrice: d.qty > 0 ? d.revenue / d.qty : 0,
       }))
-      .sort((a, b) => a.avgPrice - b.avgPrice);
+      .sort((a, b) => b.avgPrice - a.avgPrice);
 
     // Orders breakdown
     const onlySampleOrders = orders.filter((o) => isOnlySampleOrder(o));
     const withProductOrders = orders.filter((o) => hasRegularProduct(o));
 
-    // Ticket médio and avg products (excluding samples)
+    // Ticket médio — usa getOfficialRevenue (inclui frete, padrão do sistema)
+    // Filtra apenas pedidos de venda (exclui brindes/bonificações)
+    const revenueProductOrders = withProductOrders.filter(isRevenueOrder);
     const ticketMedio =
-      withProductOrders.length > 0
-        ? withProductOrders.reduce((sum, o) => sum + o.valorTotal, 0) /
-          withProductOrders.length
+      revenueProductOrders.length > 0
+        ? revenueProductOrders.reduce((sum, o) => sum + getOfficialRevenue(o), 0) / revenueProductOrders.length
         : 0;
 
     // Avg products per order (excluding sample items)
@@ -248,10 +212,7 @@ const VisaoExecutivaV2 = () => {
         if (!isSampleProduct(p)) totalNonSampleItems += p.quantidade;
       });
     });
-    const mediaProdutosPorPedido =
-      withProductOrders.length > 0
-        ? totalNonSampleItems / withProductOrders.length
-        : 0;
+    const mediaProdutosPorPedido = withProductOrders.length > 0 ? totalNonSampleItems / withProductOrders.length : 0;
 
     // Sample orders breakdown by pet type
     const samplesByProfile: Partial<Record<BuyerPetProfile, number>> = {};
@@ -267,17 +228,17 @@ const VisaoExecutivaV2 = () => {
       .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
       .sort((a, b) => b.qty - a.qty);
 
-    // Channel distribution
+    // Channel distribution — receita por canal (não apenas volume de pedidos)
     const channelMap: Record<string, { orders: number; revenue: number }> = {};
     orders.forEach((o) => {
       const ch = o.ecommerce || "Outros";
       if (!channelMap[ch]) channelMap[ch] = { orders: 0, revenue: 0 };
       channelMap[ch].orders++;
-      channelMap[ch].revenue += o.valorTotal;
+      channelMap[ch].revenue += getOfficialRevenue(o);
     });
     const channels = Object.entries(channelMap)
       .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.orders - a.orders);
+      .sort((a, b) => b.revenue - a.revenue);
 
     // Estado data for pie charts
     const estadoSamplePie = Object.entries(estadoSampleData)
@@ -292,9 +253,14 @@ const VisaoExecutivaV2 = () => {
       .slice(0, 5)
       .map(([name, value]) => ({ name, value }));
 
+    // Flags de truncamento — avisa se IDs ultrapassaram o limite da query
+    const samplesTruncated = sampleOrderIds.length > 500;
+    const productsTruncated = productOrderIds.length > 500;
+
     return {
       receitaTotal,
       receitaProdutos,
+      receitaSemAmostras,
       frete,
       fretePercent,
       receitaMediaPorProduto,
@@ -308,8 +274,10 @@ const VisaoExecutivaV2 = () => {
       channels,
       estadoSamplePie,
       estadoProductPie,
+      samplesTruncated,
+      productsTruncated,
     };
-  }, [filteredOrders, estadoSampleData, estadoProductData]);
+  }, [filteredOrders, estadoSampleData, estadoProductData, sampleOrderIds, productOrderIds]);
 
   if (isLoadingData) {
     return (
@@ -322,9 +290,7 @@ const VisaoExecutivaV2 = () => {
   if (salesData.length === 0) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[60vh]">
-        <p className="text-muted-foreground">
-          Nenhum dado de vendas disponível. Faça o upload dos dados primeiro.
-        </p>
+        <p className="text-muted-foreground">Nenhum dado de vendas disponível. Faça o upload dos dados primeiro.</p>
       </div>
     );
   }
@@ -332,9 +298,12 @@ const VisaoExecutivaV2 = () => {
   const periodLabel = lastDate
     ? period === "1d"
       ? format(lastDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-      : `${format(new Date(lastDate.getTime() - 6 * 86400000), "dd/MM", {
-          locale: ptBR,
-        })} — ${format(lastDate, "dd/MM/yyyy", { locale: ptBR })}`
+      : (() => {
+          const start = new Date(lastDate);
+          start.setDate(start.getDate() - 6);
+          start.setHours(0, 0, 0, 0);
+          return `${format(start, "dd/MM", { locale: ptBR })} — ${format(lastDate, "dd/MM/yyyy", { locale: ptBR })}`;
+        })()
     : "";
 
   return (
@@ -342,9 +311,7 @@ const VisaoExecutivaV2 = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Fotografia Operacional
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Fotografia Operacional</h1>
           <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
             <Calendar className="h-3.5 w-3.5" />
             <span>{periodLabel}</span>
@@ -392,10 +359,8 @@ const VisaoExecutivaV2 = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <p className="text-xs text-muted-foreground">Receita Total</p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(metrics.receitaTotal)}
-                </p>
+                <p className="text-xs text-muted-foreground">Receita Total (produtos + frete)</p>
+                <p className="text-2xl font-bold">{formatCurrency(metrics.receitaTotal)}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
@@ -408,37 +373,22 @@ const VisaoExecutivaV2 = () => {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">
-                    Receita Produtos
-                  </p>
-                  <p className="font-semibold">
-                    {formatCurrency(metrics.receitaProdutos)}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Produtos (sem amostras)</p>
+                  <p className="font-semibold">{formatCurrency(metrics.receitaSemAmostras)}</p>
                 </div>
               </div>
               <Separator />
               <div>
-                <p className="text-xs text-muted-foreground font-medium mb-2">
-                  Receita média / produto
-                </p>
+                <p className="text-xs text-muted-foreground font-medium mb-2">Receita média / produto</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {metrics.receitaMediaPorProduto.map((p) => (
-                    <div
-                      key={p.name}
-                      className="flex justify-between text-xs"
-                    >
-                      <span className="text-muted-foreground truncate max-w-[60%]">
-                        {p.name}
-                      </span>
-                      <span className="font-medium tabular-nums">
-                        {formatCurrency(p.avgPrice)}
-                      </span>
+                    <div key={p.name} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground truncate max-w-[60%]">{p.name}</span>
+                      <span className="font-medium tabular-nums">{formatCurrency(p.avgPrice)}</span>
                     </div>
                   ))}
                   {metrics.receitaMediaPorProduto.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Sem produtos no período
-                    </p>
+                    <p className="text-xs text-muted-foreground">Sem produtos no período</p>
                   )}
                 </div>
               </div>
@@ -452,22 +402,16 @@ const VisaoExecutivaV2 = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <p className="text-xs text-muted-foreground">
-                  Qtd total de pedidos
-                </p>
+                <p className="text-xs text-muted-foreground">Qtd total de pedidos</p>
                 <p className="text-2xl font-bold">{metrics.totalOrders}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-xs text-muted-foreground">
-                    Somente amostras
-                  </p>
+                  <p className="text-xs text-muted-foreground">Somente amostras</p>
                   <p className="font-semibold">{metrics.onlySampleCount}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">
-                    Ao menos 1 produto
-                  </p>
+                  <p className="text-xs text-muted-foreground">Ao menos 1 produto</p>
                   <p className="font-semibold">{metrics.withProductCount}</p>
                 </div>
               </div>
@@ -480,14 +424,12 @@ const VisaoExecutivaV2 = () => {
           {/* Pedidos somente amostras */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">
-                Pedidos somente amostras
-              </CardTitle>
+              <CardTitle className="text-sm">Pedidos somente amostras</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-1 text-sm">
                 {Object.entries(metrics.samplesByProfile)
-                  .filter(([k]) => k !== 'nao_identificado')
+                  .filter(([k]) => k !== "nao_identificado")
                   .map(([profile, count]) => (
                     <div key={profile} className="flex justify-between">
                       <span className="text-muted-foreground">
@@ -504,10 +446,10 @@ const VisaoExecutivaV2 = () => {
                 ) : null}
               </div>
               <Separator />
-              <DonutChart
-                data={metrics.estadoSamplePie}
-                label="Principais Estados"
-              />
+              {metrics.samplesTruncated && (
+                <p className="text-xs text-amber-600 font-medium">⚠️ Mapa parcial — mais de 500 pedidos no período</p>
+              )}
+              <DonutChart data={metrics.estadoSamplePie} label="Principais Estados" />
             </CardContent>
           </Card>
 
@@ -525,10 +467,10 @@ const VisaoExecutivaV2 = () => {
                 label="Produtos vendidos"
               />
               <Separator />
-              <DonutChart
-                data={metrics.estadoProductPie}
-                label="Principais Estados"
-              />
+              {metrics.productsTruncated && (
+                <p className="text-xs text-amber-600 font-medium">⚠️ Mapa parcial — mais de 500 pedidos no período</p>
+              )}
+              <DonutChart data={metrics.estadoProductPie} label="Principais Estados" />
             </CardContent>
           </Card>
 
@@ -538,20 +480,12 @@ const VisaoExecutivaV2 = () => {
               <CardTitle className="text-sm">Ticket médio por pedido</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-2xl font-bold">
-                {formatCurrency(metrics.ticketMedio)}
-              </p>
+              <p className="text-2xl font-bold">{formatCurrency(metrics.ticketMedio)}</p>
               <Separator />
               <div>
-                <p className="text-xs text-muted-foreground">
-                  Qtd média de produtos
-                </p>
-                <p className="text-xs text-muted-foreground mb-1">
-                  (exclui amostras)
-                </p>
-                <p className="text-2xl font-bold">
-                  {metrics.mediaProdutosPorPedido.toFixed(1)}
-                </p>
+                <p className="text-xs text-muted-foreground">Qtd média de produtos</p>
+                <p className="text-xs text-muted-foreground mb-1">(exclui amostras)</p>
+                <p className="text-2xl font-bold">{metrics.mediaProdutosPorPedido.toFixed(1)}</p>
               </div>
             </CardContent>
           </Card>
@@ -566,7 +500,7 @@ const VisaoExecutivaV2 = () => {
             <DonutChart
               data={metrics.channels.map((ch) => ({
                 name: ch.name,
-                value: ch.orders,
+                value: Math.round(ch.revenue),
               }))}
             />
           </CardContent>
