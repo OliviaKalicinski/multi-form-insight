@@ -64,7 +64,7 @@ export default function LetsFly() {
       <div className="container mx-auto px-6 py-8">
         <EmptyState
           icon={<Truck className="h-8 w-8" />}
-          title="Sem dados Let's Fly"
+          title="Sem dados B2B"
           description="Não há pedidos B2B para o período selecionado. Verifique o filtro de mês ou faça upload de dados com segmento 'b2b'."
           action={{ label: "Ir para Upload", href: "/upload" }}
         />
@@ -75,7 +75,7 @@ export default function LetsFly() {
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">🚀 Let's Fly</h1>
+        <h1 className="text-3xl font-bold">🚀 B2B</h1>
         <p className="text-muted-foreground">Canal B2B — performance por volume e receita</p>
       </div>
 
