@@ -1,9 +1,20 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { Package, Users, ShoppingCart, DollarSign, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Package,
+  Users,
+  ShoppingCart,
+  DollarSign,
+  ChevronDown,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { getOfficialRevenue, getRevenueOrders, getB2B2COrders } from "@/utils/revenue";
 import { filterOrdersByMonth } from "@/utils/salesCalculator";
@@ -12,9 +23,23 @@ import { format } from "date-fns";
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
+type SortField = "nome" | "receita" | "pedidos" | "ticketMedio";
+type SortDir = "asc" | "desc";
+
+function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
+  if (field !== sortField) return <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground/50" />;
+  return sortDir === "asc" ? (
+    <ArrowUp className="h-3 w-3 ml-1 text-primary" />
+  ) : (
+    <ArrowDown className="h-3 w-3 ml-1 text-primary" />
+  );
+}
+
 export default function Distribuidores() {
   const { salesData, selectedMonth } = useDashboard();
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState<SortField>("receita");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const toggleRow = (key: string) => {
     setExpandedRows((prev) => {
@@ -22,6 +47,15 @@ export default function Distribuidores() {
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
+  };
+
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir(field === "nome" ? "asc" : "desc");
+    }
   };
 
   const availableSalesMonths = useMemo(() => {
@@ -53,10 +87,19 @@ export default function Distribuidores() {
       cur.orders.push(o);
       map.set(key, cur);
     });
-    return Array.from(map.entries())
-      .map(([cpf, d]) => ({ cpf, ...d }))
-      .sort((a, b) => b.receita - a.receita);
-  }, [filteredOrders]);
+    const list = Array.from(map.entries()).map(([cpf, d]) => ({
+      cpf,
+      ...d,
+      ticketMedio: d.pedidos > 0 ? d.receita / d.pedidos : 0,
+    }));
+    return list.sort((a, b) => {
+      const dir = sortDir === "asc" ? 1 : -1;
+      if (sortField === "nome") return dir * a.nome.localeCompare(b.nome);
+      if (sortField === "pedidos") return dir * (a.pedidos - b.pedidos);
+      if (sortField === "ticketMedio") return dir * (a.ticketMedio - b.ticketMedio);
+      return dir * (a.receita - b.receita);
+    });
+  }, [filteredOrders, sortField, sortDir]);
 
   if (filteredOrders.length === 0) {
     return (
@@ -74,7 +117,7 @@ export default function Distribuidores() {
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">📦 Distribuidores</h1>
+        <h1 className="text-3xl font-bold">📦 B2B2C</h1>
         <p className="text-muted-foreground">Canal B2B2C — performance por distribuidor</p>
       </div>
 
@@ -120,18 +163,54 @@ export default function Distribuidores() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Top Distribuidores</CardTitle>
+          <CardTitle>Top Parceiros B2B2C</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-6"></TableHead>
-                <TableHead>Distribuidor</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent font-medium"
+                    onClick={() => handleSort("nome")}
+                  >
+                    Distribuidor <SortIcon field="nome" sortField={sortField} sortDir={sortDir} />
+                  </Button>
+                </TableHead>
                 <TableHead>CPF/CNPJ</TableHead>
-                <TableHead className="text-right">Receita</TableHead>
-                <TableHead className="text-right">Pedidos</TableHead>
-                <TableHead className="text-right">Ticket Médio</TableHead>
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent font-medium"
+                    onClick={() => handleSort("receita")}
+                  >
+                    Receita <SortIcon field="receita" sortField={sortField} sortDir={sortDir} />
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent font-medium"
+                    onClick={() => handleSort("pedidos")}
+                  >
+                    Pedidos <SortIcon field="pedidos" sortField={sortField} sortDir={sortDir} />
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent font-medium"
+                    onClick={() => handleSort("ticketMedio")}
+                  >
+                    Ticket Médio <SortIcon field="ticketMedio" sortField={sortField} sortDir={sortDir} />
+                  </Button>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
