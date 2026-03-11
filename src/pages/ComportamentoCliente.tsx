@@ -9,11 +9,9 @@ import { VolumeKPICards } from "@/components/dashboard/VolumeKPICards";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { analyzeOrderVolume, analyzeSalesPeaks } from "@/utils/customerBehaviorMetrics";
-import { formatCurrency, filterOrdersByMonth } from "@/utils/salesCalculator";
+import { formatCurrency, filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { benchmarksPetFood } from "@/data/executiveData";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, parse } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
 import { SegmentRevenueChart } from "@/components/dashboard/SegmentRevenueChart";
@@ -27,10 +25,9 @@ import { getB2COrders } from "@/utils/revenue";
 export default function ComportamentoCliente() {
   const {
     salesData,
-    selectedMonth,
-    availableMonths,
+    dateRange,
+    comparisonDateRange,
     comparisonMode,
-    selectedMonths,
   } = useDashboard();
 
   const { segments, churnMetrics, churnRiskCustomers, summaryMetrics, isLoading: customerLoading } = useCustomerData();
@@ -39,22 +36,10 @@ export default function ComportamentoCliente() {
 
   const [volumeView, setVolumeView] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('daily');
 
-  // Helper para formatar o label do mês selecionado
-  const formatSelectedPeriod = () => {
-    if (!selectedMonth) return 'todos os períodos';
-    if (selectedMonth === 'last-12-months') return 'últimos 12 meses';
-    try {
-      return format(parse(selectedMonth, "yyyy-MM", new Date()), "MMMM 'de' yyyy", { locale: ptBR });
-    } catch {
-      return selectedMonth;
-    }
-  };
-
   const filteredOrders = useMemo(() => {
     if (b2cSalesData.length === 0) return [];
-    if (!selectedMonth || selectedMonth === 'last-12-months') return b2cSalesData;
-    return filterOrdersByMonth(b2cSalesData, selectedMonth, availableMonths);
-  }, [b2cSalesData, selectedMonth, availableMonths]);
+    return dateRange ? filterOrdersByDateRange(b2cSalesData, dateRange.start, dateRange.end) : b2cSalesData;
+  }, [b2cSalesData, dateRange]);
 
   const volumeAnalysisData = useMemo(() => {
     if (filteredOrders.length === 0) return null;
@@ -67,17 +52,12 @@ export default function ComportamentoCliente() {
   }, [filteredOrders]);
 
   const volumeTrend = useMemo(() => {
-    if (b2cSalesData.length === 0 || !selectedMonth || selectedMonth === 'last-12-months') return undefined;
-    const monthIndex = availableMonths.indexOf(selectedMonth);
-    if (monthIndex <= 0) return undefined;
-    const previousMonth = availableMonths[monthIndex - 1];
-    const currentOrders = filterOrdersByMonth(b2cSalesData, selectedMonth, availableMonths);
-    const previousOrders = filterOrdersByMonth(b2cSalesData, previousMonth, availableMonths);
-    const currentTotal = currentOrders.length;
-    const previousTotal = previousOrders.length;
-    if (previousTotal === 0) return undefined;
-    return ((currentTotal - previousTotal) / previousTotal) * 100;
-  }, [b2cSalesData, selectedMonth, availableMonths]);
+    if (!dateRange || !comparisonDateRange || b2cSalesData.length === 0) return undefined;
+    const currentOrders = filterOrdersByDateRange(b2cSalesData, dateRange.start, dateRange.end);
+    const previousOrders = filterOrdersByDateRange(b2cSalesData, comparisonDateRange.start, comparisonDateRange.end);
+    if (previousOrders.length === 0) return undefined;
+    return ((currentOrders.length - previousOrders.length) / previousOrders.length) * 100;
+  }, [b2cSalesData, dateRange, comparisonDateRange]);
 
   const volumeAnalysis = useMemo(() => {
     if (!volumeAnalysisData?.daily || volumeAnalysisData.daily.length === 0) {
@@ -98,27 +78,22 @@ export default function ComportamentoCliente() {
   }, [segments]);
 
   const comparisonMetrics = useMemo(() => {
-    if (!comparisonMode || selectedMonths.length === 0 || b2cSalesData.length === 0) return null;
-
-    const volumePorMes: any[] = [];
-    const COLORS = ["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
-
-    selectedMonths.forEach((month, index) => {
-      const orders = filterOrdersByMonth(b2cSalesData, month, availableMonths);
-      const monthLabel = format(parse(month, "yyyy-MM", new Date()), "MMM yyyy", { locale: ptBR });
-      const color = COLORS[index % COLORS.length];
-      volumePorMes.push({ month, monthLabel, value: orders.length, color });
+    if (!comparisonMode || !comparisonDateRange || b2cSalesData.length === 0) return null;
+    const COLORS = ["#8b5cf6", "#3b82f6"];
+    const periods = [
+      { range: dateRange, label: "Período A", color: COLORS[0] },
+      { range: comparisonDateRange, label: "Período B", color: COLORS[1] },
+    ].filter(p => p.range);
+    const volumePorMes = periods.map(({ range, label, color }) => {
+      const orders = filterOrdersByDateRange(b2cSalesData, range!.start, range!.end);
+      return { month: label.toLowerCase().replace(" ", "-"), monthLabel: label, value: orders.length, color };
     });
-
     if (volumePorMes.length > 1) {
       const base = volumePorMes[0].value;
-      volumePorMes.forEach((item, idx) => {
-        if (idx > 0 && base > 0) item.percentageChange = ((item.value - base) / base) * 100;
-      });
+      volumePorMes.forEach((item, idx) => { if (idx > 0 && base > 0) item.percentageChange = ((item.value - base) / base) * 100; });
     }
-
     return { volumePorMes };
-  }, [comparisonMode, selectedMonths, b2cSalesData, availableMonths]);
+  }, [comparisonMode, comparisonDateRange, dateRange, b2cSalesData]);
 
   if (b2cSalesData.length === 0 && !customerLoading) {
     return (
@@ -170,8 +145,7 @@ export default function ComportamentoCliente() {
               <CardContent className="py-3">
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   💡 <strong>Métricas de cliente:</strong> todo o histórico (banco de dados).
-                  <strong> Volume de pedidos:</strong> {formatSelectedPeriod()}.
-                  {selectedMonth && ' Use o filtro acima para alterar o período de volume.'}
+                  <strong> Volume de pedidos:</strong> período selecionado no filtro.
                 </p>
               </CardContent>
             </Card>
@@ -326,12 +300,7 @@ export default function ComportamentoCliente() {
                     <CardTitle>Evolução de Pedidos</CardTitle>
                     <CardDescription>
                       Volume de pedidos ao longo do tempo
-                      {selectedMonth && selectedMonth !== 'last-12-months' && (
-                        <span className="block text-xs text-primary mt-1">
-                          📅 Período: {selectedMonth}
-                        </span>
-                      )}
-                    </CardDescription>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     {(['daily', 'weekly', 'monthly', 'quarterly'] as const).map(view => (
@@ -364,11 +333,6 @@ export default function ComportamentoCliente() {
                 <CardTitle>⚡ Dias de Pico</CardTitle>
                 <CardDescription>
                   Top 20 dias com maior volume - destaque para picos acima da média + 2σ
-                  {selectedMonth && selectedMonth !== 'last-12-months' && (
-                    <span className="block text-xs text-primary mt-1">
-                      📅 Período: {selectedMonth}
-                    </span>
-                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent>
