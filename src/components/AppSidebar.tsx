@@ -62,7 +62,6 @@ const navSections: NavSection[] = [
       { title: "Fotografia Operacional", url: "/visao-executiva-v2", icon: LayoutDashboard },
       { title: "Visão Executiva", url: "/dashboard", icon: LayoutDashboard },
       { title: "Kanban", url: "/kanban-operacional", icon: ClipboardList },
-      { title: "Radar Operacional", url: "/radar-operacional", icon: Activity },
       { title: "Operações", url: "/operacoes", icon: Truck },
       { title: "Produtos", url: "/produtos", icon: Package },
     ],
@@ -71,6 +70,7 @@ const navSections: NavSection[] = [
     title: "CRM",
     icon: Headset,
     items: [
+      { title: "Radar Operacional", url: "/radar-operacional", icon: Activity },
       { title: "Clientes", url: "/clientes", icon: Users },
       { title: "Reclamações", url: "/reclamacoes", icon: MessageSquareWarning },
       { title: "Atendimentos", url: "/atendimentos", icon: Headset },
