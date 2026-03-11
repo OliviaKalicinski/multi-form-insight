@@ -10,6 +10,7 @@ import {
 import { extractAvailableMonths } from "@/utils/adsParserV2";
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { useDataPersistence } from "@/hooks/useDataPersistence";
+import { SegmentFilter } from "@/utils/revenue";
 
 export interface PeriodState {
   start: Date;
@@ -31,6 +32,9 @@ interface DashboardContextType {
   comparisonMode: boolean;
   lastDataDate: Date | null;
   availableMonths: string[]; // kept for chart utilities that need month list
+  // Segment filtering (global, shared across Produtos / Operacoes / ExecutiveDashboard)
+  selectedSegment: SegmentFilter;
+  setSelectedSegment: (segment: SegmentFilter) => void;
   // Status
   isLoadingData: boolean;
   dataLoaded: boolean;
@@ -75,6 +79,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [comparisonMode, setComparisonModeState] = useState<boolean>(false);
   const [dataLoaded, setDataLoaded] = useState<boolean>(false);
   const [lastDataUpdate, setLastDataUpdate] = useState<Date | null>(null);
+  const [selectedSegment, setSelectedSegmentState] = useState<SegmentFilter>("all");
 
   const {
     isLoading: isLoadingData,
@@ -169,6 +174,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setComparisonModeState(enabled);
     if (!enabled) setComparisonDateRangeState(null);
   };
+  const setSelectedSegment = (segment: SegmentFilter) => setSelectedSegmentState(segment);
 
   const persistSalesData = useCallback(
     async (data: ProcessedOrder[], fileName?: string) => {
@@ -314,6 +320,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     comparisonMode,
     lastDataDate,
     availableMonths,
+    selectedSegment,
+    setSelectedSegment,
     isLoadingData,
     dataLoaded,
     lastDataUpdate,
