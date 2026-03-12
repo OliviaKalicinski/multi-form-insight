@@ -48,6 +48,8 @@ import { aggregateAdsByMonth } from "@/utils/monthlyAggregator";
 import { calculateAdsMultiMonthMetrics } from "@/utils/comparisonCalculator";
 import { cn } from "@/lib/utils";
 import { AdsData } from "@/types/marketing";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 // Helper function for objective detection (uses centralized function from adsParserV2)
 const hasObjective = (data: AdsData[], objective: string): boolean => {
