@@ -3,7 +3,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { DashboardProvider } from "@/contexts/DashboardContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
@@ -35,9 +34,7 @@ const queryClient = new QueryClient();
 
 // Layout component for authenticated pages
 const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => (
-  <DashboardProvider>
-    <DashboardLayout>{children}</DashboardLayout>
-  </DashboardProvider>
+  <DashboardLayout>{children}</DashboardLayout>
 );
 
 const App = () => (

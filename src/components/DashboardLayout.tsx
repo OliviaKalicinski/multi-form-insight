@@ -1,4 +1,4 @@
-import { useDashboard } from "@/contexts/DashboardContext";
+import { useDashboard, DashboardProvider } from "@/contexts/DashboardContext";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { DataChat } from "@/components/dashboard/DataChat";
@@ -13,7 +13,7 @@ const formatLastUpdate = (date: Date | null): string => {
   return format(date, "dd/MM HH:mm", { locale: ptBR });
 };
 
-export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
+const DashboardLayoutInner = ({ children }: { children: React.ReactNode }) => {
   const { lastDataUpdate } = useDashboard();
 
   return (
@@ -41,3 +41,9 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
     </SidebarProvider>
   );
 };
+
+export const DashboardLayout = ({ children }: { children: React.ReactNode }) => (
+  <DashboardProvider>
+    <DashboardLayoutInner>{children}</DashboardLayoutInner>
+  </DashboardProvider>
+);
