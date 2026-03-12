@@ -36,6 +36,7 @@ export interface OperationalOrder {
   created_at: string;
   updated_at: string;
   // Destinatário
+  apelido: string | null;
   destinatario_nome: string | null;
   destinatario_documento: string | null;
   destinatario_email: string | null;
@@ -64,6 +65,8 @@ interface CreateOrderInput {
   responsavel?: string | null;
   observacoes?: string | null;
   items: OrderItem[];
+  apelido?: string | null;
+  apelido?: string | null;
   destinatario_nome?: string | null;
   destinatario_documento?: string | null;
   destinatario_email?: string | null;
@@ -107,11 +110,7 @@ function calcIsFiscalExempt(items: OrderItem[]): boolean {
 
 // --- Document utilities ---
 
-export async function uploadOrderDocument(
-  orderId: string,
-  file: File,
-  type: "nf" | "boleto"
-): Promise<string> {
+export async function uploadOrderDocument(orderId: string, file: File, type: "nf" | "boleto"): Promise<string> {
   if (file.type !== "application/pdf") {
     throw new Error("Apenas arquivos PDF são permitidos");
   }
@@ -127,9 +126,7 @@ export async function uploadOrderDocument(
 }
 
 export async function getSignedUrl(filePath: string): Promise<string> {
-  const { data, error } = await supabase.storage
-    .from("operational-documents")
-    .createSignedUrl(filePath, 60);
+  const { data, error } = await supabase.storage.from("operational-documents").createSignedUrl(filePath, 60);
 
   if (error) throw error;
   return data.signedUrl;
@@ -145,7 +142,7 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
     queryFn: async () => {
       let query = supabase
         .from("operational_orders")
-        .select("*, customer:customer_id(id, nome, cpf_cnpj), items:operational_order_items(*)")
+        .select("*, apelido, customer:customer_id(id, nome, cpf_cnpj), items:operational_order_items(*)")
         .neq("status_operacional", "cancelado")
         .order("created_at", { ascending: false });
 
@@ -192,6 +189,7 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
           is_fiscal_exempt: isFiscalExempt,
           nf_pendente: nfPendente,
           tipo_nf: input.tipo_nf || null,
+          apelido: input.apelido || null,
           destinatario_nome: input.destinatario_nome || null,
           destinatario_documento: input.destinatario_documento || null,
           destinatario_email: input.destinatario_email || null,
@@ -207,18 +205,16 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       if (orderError) throw orderError;
 
       if (input.items.length > 0) {
-        const { error: itemsError } = await supabase
-          .from("operational_order_items")
-          .insert(
-            input.items.map((item) => ({
-              operational_order_id: order.id,
-              produto: item.produto,
-              quantidade: item.quantidade,
-              unidade: item.unidade,
-              lote: item.lote?.trim() || null,
-              valor_unitario: item.valor_unitario ?? null,
-            }))
-          );
+        const { error: itemsError } = await supabase.from("operational_order_items").insert(
+          input.items.map((item) => ({
+            operational_order_id: order.id,
+            produto: item.produto,
+            quantidade: item.quantidade,
+            unidade: item.unidade,
+            lote: item.lote?.trim() || null,
+            valor_unitario: item.valor_unitario ?? null,
+          })),
+        );
         if (itemsError) throw itemsError;
       }
 
@@ -227,7 +223,9 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
     onSuccess: (order: any) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       toast.success("Pedido criado com sucesso");
-      try { logEventSilent(order.id, "pedido_criado", { natureza: order.natureza_pedido }); } catch {}
+      try {
+        logEventSilent(order.id, "pedido_criado", { natureza: order.natureza_pedido });
+      } catch {}
     },
     onError: (err: any) => {
       toast.error("Erro ao criar pedido: " + err.message);
@@ -255,32 +253,24 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
         updateFields.nf_pendente = !fields.numero_nf;
       }
 
-      const { error: orderError } = await supabase
-        .from("operational_orders")
-        .update(updateFields)
-        .eq("id", id);
+      const { error: orderError } = await supabase.from("operational_orders").update(updateFields).eq("id", id);
 
       if (orderError) throw orderError;
 
       if (items) {
-        await supabase
-          .from("operational_order_items")
-          .delete()
-          .eq("operational_order_id", id);
+        await supabase.from("operational_order_items").delete().eq("operational_order_id", id);
 
         if (items.length > 0) {
-          const { error: itemsError } = await supabase
-            .from("operational_order_items")
-            .insert(
-              items.map((item) => ({
-                operational_order_id: id,
-                produto: item.produto,
-                quantidade: item.quantidade,
-                unidade: item.unidade,
-                lote: item.lote?.trim() || null,
-                valor_unitario: item.valor_unitario ?? null,
-              }))
-            );
+          const { error: itemsError } = await supabase.from("operational_order_items").insert(
+            items.map((item) => ({
+              operational_order_id: id,
+              produto: item.produto,
+              quantidade: item.quantidade,
+              unidade: item.unidade,
+              lote: item.lote?.trim() || null,
+              valor_unitario: item.valor_unitario ?? null,
+            })),
+          );
           if (itemsError) throw itemsError;
         }
       }
@@ -288,7 +278,9 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       toast.success("Pedido atualizado");
-      try { logEventSilent(variables.id, "pedido_editado"); } catch {}
+      try {
+        logEventSilent(variables.id, "pedido_editado");
+      } catch {}
     },
     onError: (err: any) => {
       toast.error("Erro ao atualizar: " + err.message);
@@ -296,15 +288,7 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
   });
 
   const uploadDocument = useMutation({
-    mutationFn: async ({
-      orderId,
-      file,
-      type,
-    }: {
-      orderId: string;
-      file: File;
-      type: "nf" | "boleto";
-    }) => {
+    mutationFn: async ({ orderId, file, type }: { orderId: string; file: File; type: "nf" | "boleto" }) => {
       const filePath = await uploadOrderDocument(orderId, file, type);
 
       const updateData: any = {
@@ -318,10 +302,7 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
         updateData.boleto_file_path = filePath;
       }
 
-      const { error } = await supabase
-        .from("operational_orders")
-        .update(updateData)
-        .eq("id", orderId);
+      const { error } = await supabase.from("operational_orders").update(updateData).eq("id", orderId);
 
       if (error) throw error;
       return filePath;
@@ -331,7 +312,9 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
       const label = variables.type === "nf" ? "NF" : "Boleto";
       toast(`${label} anexado com sucesso.`);
       const eventType = variables.type === "nf" ? "nf_anexada" : "boleto_anexado";
-      try { logEventSilent(variables.orderId, eventType); } catch {}
+      try {
+        logEventSilent(variables.orderId, eventType);
+      } catch {}
     },
     onError: (err: any) => {
       toast.error("Erro ao anexar documento: " + err.message);
@@ -346,17 +329,16 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
 
       const updateData: any = { status_operacional: newStatus };
 
-      const { error } = await supabase
-        .from("operational_orders")
-        .update(updateData)
-        .eq("id", id);
+      const { error } = await supabase.from("operational_orders").update(updateData).eq("id", id);
 
       if (error) throw error;
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       toast.success("Status atualizado");
-      try { logEventSilent(variables.id, "status_alterado", { para: variables.newStatus }); } catch {}
+      try {
+        logEventSilent(variables.id, "status_alterado", { para: variables.newStatus });
+      } catch {}
     },
     onError: (err: any) => {
       toast.error(err.message);
@@ -374,7 +356,9 @@ export function useOperationalOrders(statusFilter?: string, naturezaFilter?: str
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["operational-orders"] });
       toast.success("Pedido cancelado");
-      try { logEventSilent(variables, "pedido_cancelado"); } catch {}
+      try {
+        logEventSilent(variables, "pedido_cancelado");
+      } catch {}
     },
     onError: (err: any) => {
       toast.error("Erro ao cancelar: " + err.message);
