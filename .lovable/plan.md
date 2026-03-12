@@ -1,21 +1,18 @@
 
 
-# Inverter prioridade em `resolveAnimalSignal` + adicionar `CD_KIT_AMOSTRAS: 'caes'` ✅ IMPLEMENTADO
+## Plano: Atualizar sync-instagram-organic para v2
 
-## Resumo
-Invertida a ordem de detecção em `resolveAnimalSignal`: raw keyword detection agora tem prioridade sobre o mapa padrão quando `descricaoAjustada === "Kit de Amostras"`. Adicionado `CD_KIT_AMOSTRAS: 'caes'` ao `PRODUCT_ANIMAL_MAP` como fallback seguro.
+### Alteração
+**`supabase/functions/sync-instagram-organic/index.ts`** — substituir conteúdo completo pelo código v2 fornecido.
 
-## Pipeline final
-```
-descricaoAjustada == "Kit de Amostras"
-  → raw tem "gato"?  → gatos
-  → raw tem "grub"?  → exoticos
-  → raw não detectável? → CD_KIT_AMOSTRAS → caes
-```
+Principais mudanças vs v1:
+- Busca cada métrica separadamente via `fetchMetric()` em vez de todas juntas (evita erros de métricas incompatíveis)
+- Usa `Promise.all` para paralelizar as 7 chamadas à API
+- Parse simplificado: itera `item.values` diretamente em vez de `total_value.breakdowns`
 
-## Arquivos alterados
+### Deploy
+A função será deployada automaticamente após salvar o arquivo.
 
-| Arquivo | Ação |
-|---------|------|
-| `src/utils/petProfile.ts` | ✅ Invertida prioridade: raw detection antes do mapa padrão |
-| `src/data/operationalProducts.ts` | ✅ `CD_KIT_AMOSTRAS: 'caes'` adicionado ao `PRODUCT_ANIMAL_MAP` |
+### Teste
+Chamar a Edge Function com body `{}` (usará período padrão: últimos 7 dias) e mostrar o JSON de resposta.
+
