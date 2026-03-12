@@ -105,6 +105,31 @@ const Ads = () => {
   // Get goals from database
   const { sectorBenchmarks } = useAppSettings();
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncMetaAds = async () => {
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-meta-ads', { body: {} });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: "Sincronização concluída",
+        description: `${data.synced} registros sincronizados (${data.period?.since} → ${data.period?.until})`,
+      });
+      // Reload to pick up new data
+      window.location.reload();
+    } catch (err: any) {
+      toast({
+        title: "Erro na sincronização",
+        description: err.message || "Falha ao sincronizar com Meta Ads",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // ===== FASE 5: Manual objective filter =====
   const [manualObjective, setManualObjective] = useState<string>(() => {
     return sessionStorage.getItem(SESSION_KEY) || "auto";
