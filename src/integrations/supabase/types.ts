@@ -614,6 +614,7 @@ export type Database = {
           data: string
           id: string
           novos_seguidores: number | null
+          source: string | null
           total_seguidores: number | null
           unfollows: number | null
           upload_id: string | null
@@ -623,6 +624,7 @@ export type Database = {
           data: string
           id?: string
           novos_seguidores?: number | null
+          source?: string | null
           total_seguidores?: number | null
           unfollows?: number | null
           upload_id?: string | null
@@ -632,6 +634,7 @@ export type Database = {
           data?: string
           id?: string
           novos_seguidores?: number | null
+          source?: string | null
           total_seguidores?: number | null
           unfollows?: number | null
           upload_id?: string | null
@@ -652,6 +655,7 @@ export type Database = {
           data: string
           id: string
           metrica: string | null
+          source: string | null
           upload_id: string | null
           valor: number | null
         }
@@ -660,6 +664,7 @@ export type Database = {
           data: string
           id?: string
           metrica?: string | null
+          source?: string | null
           upload_id?: string | null
           valor?: number | null
         }
@@ -668,6 +673,7 @@ export type Database = {
           data?: string
           id?: string
           metrica?: string | null
+          source?: string | null
           upload_id?: string | null
           valor?: number | null
         }
