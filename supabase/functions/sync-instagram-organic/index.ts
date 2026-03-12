@@ -146,7 +146,7 @@ serve(async (req) => {
 
     // ── 5. Upsert marketing_data ───────────────────────────────────────
     const metricsMap: Record<string, string> = {
-      impressions: "visualizacoes",
+      views: "visualizacoes",
       reach: "alcance",
       profile_views: "visitas",
       website_clicks: "clicks",
