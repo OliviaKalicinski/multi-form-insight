@@ -55,13 +55,13 @@ serve(async (req) => {
 
     // ── 1. Insights diários da conta ──────────────────────────────────
     const insightMetrics = [
-      "impressions",
       "reach",
       "profile_views",
       "website_clicks",
       "accounts_engaged",
       "total_interactions",
       "follows_and_unfollows",
+      "views",
     ].join(",");
 
     const insightsUrl = new URL(
