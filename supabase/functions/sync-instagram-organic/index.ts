@@ -19,7 +19,6 @@ function defaultDateRange(): { since: string; until: string } {
   };
 }
 
-// Busca uma métrica de cada vez no formato correto da API v20
 async function fetchMetric(
   metricName: string,
   since: string,
@@ -83,26 +82,26 @@ serve(async (req) => {
 
     console.log(`Sync Instagram orgânico: ${since} → ${until}`);
 
-    // ── 1. Busca cada métrica separadamente ───────────────────────────
+    // ── 1. Métricas de conta (removidas deprecated: profile_views, website_clicks)
     const [
       impressions,
       reach,
-      profileViews,
-      websiteClicks,
       totalInteractions,
       accountsEngaged,
+      saves,
+      shares,
       followsUnfollows,
     ] = await Promise.all([
       fetchMetric("impressions", since, until, META_TOKEN),
       fetchMetric("reach", since, until, META_TOKEN),
-      fetchMetric("profile_views", since, until, META_TOKEN),
-      fetchMetric("website_clicks", since, until, META_TOKEN),
       fetchMetric("total_interactions", since, until, META_TOKEN),
       fetchMetric("accounts_engaged", since, until, META_TOKEN),
+      fetchMetric("saves", since, until, META_TOKEN),
+      fetchMetric("shares", since, until, META_TOKEN),
       fetchMetric("follows_and_unfollows", since, until, META_TOKEN),
     ]);
 
-    // ── 2. Total de seguidores ─────────────────────────────────────────
+    // ── 2. Total de seguidores atual ──────────────────────────────────
     const profileRes = await fetch(
       `https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}?fields=followers_count&access_token=${META_TOKEN}`
     );
@@ -110,7 +109,7 @@ serve(async (req) => {
     const followersCount = profileJson.followers_count || 0;
     console.log(`Seguidores: ${followersCount}`);
 
-    // ── 3. Organiza por data ───────────────────────────────────────────
+    // ── 3. Organiza por data ──────────────────────────────────────────
     const byDate: Record<string, Record<string, number>> = {};
 
     const addMetric = (entries: Array<{ date: string; value: any }>, key: string) => {
@@ -122,10 +121,10 @@ serve(async (req) => {
 
     addMetric(impressions, "impressions");
     addMetric(reach, "reach");
-    addMetric(profileViews, "profile_views");
-    addMetric(websiteClicks, "website_clicks");
     addMetric(totalInteractions, "total_interactions");
     addMetric(accountsEngaged, "accounts_engaged");
+    addMetric(saves, "saves");
+    addMetric(shares, "shares");
 
     // follows_and_unfollows vem como objeto {FOLLOW: N, UNFOLLOW: N}
     for (const { date, value } of followsUnfollows) {
@@ -135,7 +134,6 @@ serve(async (req) => {
     }
 
     console.log(`Datas com dados: ${Object.keys(byDate).length}`);
-    console.log("Datas:", Object.keys(byDate).sort().join(", "));
 
     if (Object.keys(byDate).length === 0) {
       return new Response(
@@ -146,7 +144,7 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // ── 4. Upsert followers_data ───────────────────────────────────────
+    // ── 4. Upsert followers_data ──────────────────────────────────────
     const followersRows = Object.entries(byDate).map(([date, m]) => ({
       data: date,
       total_seguidores: followersCount,
@@ -161,14 +159,14 @@ serve(async (req) => {
 
     if (followersError) throw new Error(`followers_data: ${followersError.message}`);
 
-    // ── 5. Upsert marketing_data ───────────────────────────────────────
+    // ── 5. Upsert marketing_data (inclui saves e shares agora) ────────
     const metricsMap: Record<string, string> = {
       impressions: "visualizacoes",
       reach: "alcance",
-      profile_views: "visitas",
-      website_clicks: "clicks",
       total_interactions: "interacoes",
       accounts_engaged: "engajamentos",
+      saves: "saves",
+      shares: "shares",
     };
 
     const marketingRows: any[] = [];
@@ -194,6 +192,8 @@ serve(async (req) => {
         followers_current: followersCount,
         period: { since, until },
         marketing_rows: marketingRows.length,
+        metrics_fetched: Object.keys(metricsMap),
+        deprecated_removed: ["profile_views", "website_clicks"],
         message: `${followersRows.length} dias sincronizados (${marketingRows.length} métricas)`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
