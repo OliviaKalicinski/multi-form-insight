@@ -1,11 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { OperationalOrder, getSignedUrl } from "@/hooks/useOperationalOrders";
 import { getProductDisplayName } from "@/data/operationalProducts";
 import { ChevronRight, Edit, MoreVertical, X, FileText, Receipt } from "lucide-react";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, format } from "date-fns";
 import { toast } from "sonner";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -38,7 +43,6 @@ const naturezaColors: Record<string, string> = {
   Seeding: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
 };
 
-
 const handleDocClick = async (filePath: string) => {
   try {
     const url = await getSignedUrl(filePath);
@@ -52,16 +56,17 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
   const daysOpen = differenceInDays(new Date(), new Date(order.created_at));
   const nextStatus = statusFlow[order.status_operacional];
 
-
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: order.id });
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const customerLabel = order.customer?.nome
-    || order.destinatario_nome
-    || "Sem cliente";
+  const customerLabel = order.apelido || order.customer?.nome || order.destinatario_nome || "Sem cliente";
+
+  // Razão social secundária (só mostra se diferente do apelido)
+  const razaoSocial = order.destinatario_nome || order.customer?.nome || null;
+  const showRazao = razaoSocial && order.apelido && razaoSocial !== order.apelido;
 
   const itemsSummary = order.items
     .map((i) => {
@@ -76,15 +81,15 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
   const nfPendenteVisual = !isEnviado && order.nf_pendente && !order.nf_file_path;
 
   return (
-    <Card
-      ref={setNodeRef}
-      style={style}
-      className="hover:shadow-md transition-shadow"
-    >
+    <Card ref={setNodeRef} style={style} className="hover:shadow-md transition-shadow">
       <CardContent className="p-3 space-y-2">
         {/* Top row: Nature + Customer */}
         <div className="flex items-start justify-between gap-2">
-          <div {...listeners} {...attributes} className="flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none select-none">
+          <div
+            {...listeners}
+            {...attributes}
+            className="flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none select-none"
+          >
             <div className="flex items-center gap-1.5 flex-wrap">
               <Badge className={naturezaColors[order.natureza_pedido] || ""} variant="outline">
                 {order.natureza_pedido}
@@ -105,9 +110,8 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
                 </Badge>
               )}
             </div>
-            <p className="text-sm font-medium mt-1 truncate">
-              {customerLabel}
-            </p>
+            <p className="text-sm font-medium mt-1 truncate">{customerLabel}</p>
+            {showRazao && <p className="text-[11px] text-muted-foreground truncate">{razaoSocial}</p>}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -124,10 +128,7 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
                   <ChevronRight className="h-4 w-4 mr-2" /> Mover → {statusLabels[nextStatus]}
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem
-                onClick={() => onCancel(order.id)}
-                className="text-destructive focus:text-destructive"
-              >
+              <DropdownMenuItem onClick={() => onCancel(order.id)} className="text-destructive focus:text-destructive">
                 <X className="h-4 w-4 mr-2" /> Cancelar
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -136,19 +137,21 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
 
         {/* Items — also draggable */}
         <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing touch-none select-none">
-          {itemsSummary && (
-            <p className="text-xs text-muted-foreground line-clamp-2">{itemsSummary}</p>
-          )}
+          {itemsSummary && <p className="text-xs text-muted-foreground line-clamp-2">{itemsSummary}</p>}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span className="text-[10px] text-muted-foreground/70">{format(new Date(order.created_at), "dd/MM/yy")}</span>
           <span>R$ {order.valor_total_informado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
           <div className="flex items-center gap-2">
             {order.nf_file_path && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); handleDocClick(order.nf_file_path!); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDocClick(order.nf_file_path!);
+                }}
                 className="hover:text-foreground transition-colors"
                 title="Ver NF"
               >
@@ -158,7 +161,10 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
             {order.boleto_file_path && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); handleDocClick(order.boleto_file_path!); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDocClick(order.boleto_file_path!);
+                }}
                 className="hover:text-foreground transition-colors"
                 title="Ver Boleto"
               >
