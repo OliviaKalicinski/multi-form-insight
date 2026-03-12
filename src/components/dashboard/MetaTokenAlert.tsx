@@ -22,9 +22,11 @@ export const MetaTokenAlert = () => {
         .eq("setting_key", "meta_token_expiry")
         .single();
 
-      if (!data?.setting_value?.expires_at) return;
+      if (!data?.setting_value) return;
+      const val = data.setting_value as { expires_at?: string };
+      if (!val.expires_at) return;
 
-      const expiry = parseISO(data.setting_value.expires_at);
+      const expiry = parseISO(val.expires_at);
       const days = differenceInDays(expiry, new Date());
       setDaysLeft(days);
       setExpiresAt(format(expiry, "dd/MM/yyyy", { locale: ptBR }));
@@ -39,11 +41,7 @@ export const MetaTokenAlert = () => {
 
   return (
     <Alert
-      className={
-        expired
-          ? "border-red-300 bg-red-50 text-red-900"
-          : "border-amber-300 bg-amber-50 text-amber-900"
-      }
+      className={expired ? "border-red-300 bg-red-50 text-red-900" : "border-amber-300 bg-amber-50 text-amber-900"}
     >
       <AlertTriangle className={`h-4 w-4 ${expired ? "text-red-500" : "text-amber-500"}`} />
       <AlertDescription className="flex items-center justify-between gap-4">
@@ -54,7 +52,9 @@ export const MetaTokenAlert = () => {
             </>
           ) : (
             <>
-              <strong>Token Meta vence em {daysLeft} dia{daysLeft !== 1 ? "s" : ""}</strong>
+              <strong>
+                Token Meta vence em {daysLeft} dia{daysLeft !== 1 ? "s" : ""}
+              </strong>
               {expiresAt && <> ({expiresAt})</>}. Renove antes que o sync pare.
             </>
           )}
@@ -74,10 +74,7 @@ export const MetaTokenAlert = () => {
             Renovar token
           </Button>
           {!expired && (
-            <button
-              onClick={() => setDismissed(true)}
-              className="text-amber-500 hover:text-amber-700"
-            >
+            <button onClick={() => setDismissed(true)} className="text-amber-500 hover:text-amber-700">
               <X className="h-4 w-4" />
             </button>
           )}
