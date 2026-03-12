@@ -66,7 +66,6 @@ interface CreateOrderInput {
   observacoes?: string | null;
   items: OrderItem[];
   apelido?: string | null;
-  apelido?: string | null;
   destinatario_nome?: string | null;
   destinatario_documento?: string | null;
   destinatario_email?: string | null;
@@ -86,6 +85,7 @@ interface UpdateOrderInput {
   forma_pagamento?: string | null;
   responsavel?: string | null;
   observacoes?: string | null;
+  apelido?: string | null;
   lote?: string | null;
   peso_total?: number | null;
   medidas?: string | null;
