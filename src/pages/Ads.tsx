@@ -29,8 +29,8 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
-import { AdClassificationChart } from "@/components/dashboard/AdClassificationChart";
 import { AdPerformanceRanking } from "@/components/dashboard/AdPerformanceRanking";
+import { AdsTrendChart } from "@/components/dashboard/AdsTrendChart";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -111,7 +111,7 @@ const Ads = () => {
   const handleSyncMetaAds = async () => {
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-meta-ads", { body: {} });
+      const { data, error } = await supabase.functions.invoke('sync-meta-ads', { body: {} });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast({
@@ -408,7 +408,13 @@ const Ads = () => {
           <p className="text-sm text-muted-foreground">Performance de campanhas de Meta Ads</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={handleSyncMetaAds} disabled={isSyncing} className="gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncMetaAds}
+            disabled={isSyncing}
+            className="gap-1.5"
+          >
             {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             {isSyncing ? "Sincronizando..." : "Sincronizar Meta Ads"}
           </Button>
@@ -579,8 +585,7 @@ const Ads = () => {
                                 {formatRoas(correctedRoas)}
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                {formatCurrency(metrics.valorConversaoTotal)} receita ·{" "}
-                                {formatCurrency(totalInvestment)} investido
+                                {formatCurrency(metrics.valorConversaoTotal)} receita · {formatCurrency(totalInvestment)} investido
                               </p>
                             </div>
 
@@ -592,23 +597,19 @@ const Ads = () => {
                               <Progress value={roasProgress} className="h-1.5" />
                             </div>
 
-                            <p className="text-xs text-muted-foreground">{decisionalStatus.description}</p>
-
-                            {trends && (
-                              <div
-                                className={cn(
-                                  "flex items-center gap-1 text-xs font-medium",
-                                  trends.roasTrend >= 0 ? "text-emerald-600" : "text-red-500",
-                                )}
-                              >
-                                {trends.roasTrend >= 0 ? (
-                                  <TrendingUp className="h-3 w-3" />
-                                ) : (
-                                  <TrendingDown className="h-3 w-3" />
-                                )}
-                                {trends.roasTrend >= 0 ? "+" : ""}
-                                {trends.roasTrend.toFixed(0)}% vs período anterior
+                            {trends ? (
+                              <div className={cn(
+                                "flex items-center gap-1 text-xs font-medium",
+                                trends.roasTrend >= 0 ? "text-emerald-600" : "text-red-500"
+                              )}>
+                                {trends.roasTrend >= 0
+                                  ? <TrendingUp className="h-3 w-3" />
+                                  : <TrendingDown className="h-3 w-3" />}
+                                {trends.roasTrend >= 0 ? "+" : ""}{trends.roasTrend.toFixed(0)}% vs anterior
+                                <span className="text-muted-foreground font-normal ml-1">· {decisionalStatus.description}</span>
                               </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">{decisionalStatus.description}</p>
                             )}
                           </div>
                         </CardContent>
@@ -623,19 +624,10 @@ const Ads = () => {
                           <p className="text-xs text-muted-foreground mb-1">Investido</p>
                           <p className="text-2xl font-bold">{formatCurrency(totalInvestment)}</p>
                           {trends && (
-                            <p
-                              className={cn(
-                                "text-xs mt-1 flex items-center gap-0.5",
-                                trends.investmentTrend >= 0 ? "text-emerald-600" : "text-red-500",
-                              )}
-                            >
-                              {trends.investmentTrend >= 0 ? (
-                                <TrendingUp className="h-3 w-3" />
-                              ) : (
-                                <TrendingDown className="h-3 w-3" />
-                              )}
-                              {trends.investmentTrend >= 0 ? "+" : ""}
-                              {trends.investmentTrend.toFixed(0)}% vs anterior
+                            <p className={cn("text-xs mt-1 flex items-center gap-0.5",
+                              trends.investmentTrend >= 0 ? "text-emerald-600" : "text-red-500")}>
+                              {trends.investmentTrend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                              {trends.investmentTrend >= 0 ? "+" : ""}{trends.investmentTrend.toFixed(0)}% vs anterior
                             </p>
                           )}
                         </CardContent>
@@ -654,14 +646,9 @@ const Ads = () => {
                       <Card className="border">
                         <CardContent className="p-4">
                           <p className="text-xs text-muted-foreground mb-1">Resultado bruto</p>
-                          <p
-                            className={cn(
-                              "text-2xl font-bold",
-                              grossMediaResult >= 0 ? "text-foreground" : "text-red-500",
-                            )}
-                          >
-                            {grossMediaResult >= 0 ? "+" : ""}
-                            {formatCurrency(grossMediaResult)}
+                          <p className={cn("text-2xl font-bold",
+                            grossMediaResult >= 0 ? "text-foreground" : "text-red-500")}>
+                            {grossMediaResult >= 0 ? "+" : ""}{formatCurrency(grossMediaResult)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">receita − investimento</p>
                         </CardContent>
@@ -680,7 +667,10 @@ const Ads = () => {
                     </div>
                   </section>
 
-                  {/* ===== BLOCO 2: DIAGNÓSTICO RÁPIDO (2x4 grid) — FASE 3 ===== */}
+                  {/* ===== BLOCO 2: TENDÊNCIA ===== */}
+                  <AdsTrendChart ads={activeAdsData} />
+
+                  {/* ===== BLOCO 3: DIAGNÓSTICO RÁPIDO (4 cards) ===== */}}
                   <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {/* Row 1: Efficiency diagnostics */}
                     <StatusMetricCard
@@ -720,46 +710,7 @@ const Ads = () => {
                       tooltipKey="taxa_conversao_carrinho"
                     />
 
-                    {/* Row 2: Scale context */}
-                    <StatusMetricCard
-                      title="Investimento (total)"
-                      value={formatCurrency(totalInvestment)}
-                      icon={<DollarSign className="h-3 w-3" />}
-                      trend={trends?.investmentTrend}
-                      status="neutral"
-                      size="compact"
-                      tooltipKey="investimento_ads"
-                    />
-                    <StatusMetricCard
-                      title="Receita atribuída"
-                      value={formatCurrency(metrics.valorConversaoTotal)}
-                      icon={<Coins className="h-3 w-3" />}
-                      trend={trends?.revenueTrend}
-                      status={getStatusFromBenchmark(
-                        metrics.valorConversaoTotal,
-                        totalInvestment * revenueBenchmarkMultiplier,
-                        { warningThreshold: 0.67, dangerThreshold: 0.5 },
-                      )}
-                      size="compact"
-                      tooltipKey="receita_ads"
-                    />
-                    <StatusMetricCard
-                      title="Conversões"
-                      value={formatNumber(metrics.comprasTotal)}
-                      icon={<ShoppingCart className="h-3 w-3" />}
-                      trend={trends?.conversionsTrend}
-                      status="neutral"
-                      size="compact"
-                      tooltipKey="conversoes_total"
-                    />
-                    <StatusMetricCard
-                      title="CPM"
-                      value={formatCurrency(metrics.cpmMedio)}
-                      icon={<Eye className="h-3 w-3" />}
-                      status="neutral"
-                      size="compact"
-                      tooltipKey="cpm"
-                    />
+
                   </section>
 
                   {/* ===== ROW 3: Compact Funnel + Reach Stats (moved from ROW 2) ===== */}
@@ -843,6 +794,8 @@ const Ads = () => {
                       </CardContent>
                     </Card>
                   </div>
+
+
                 </>
               ) : (
                 // ===== ENGAGEMENT VIEW =====
@@ -1066,8 +1019,13 @@ const Ads = () => {
                 </>
               )}
 
+
+
               {/* ===== ROW 6: Performance Ranking (Top/Bottom performers) ===== */}
-              <AdPerformanceRanking ads={activeAdsData} objective={effectiveObjective} />
+              <AdPerformanceRanking
+                ads={activeAdsData}
+                objective={effectiveObjective}
+              />
 
               {/* ===== ROW 7: Breakdown by Ad (uses activeAdsData for objective-filtered view) ===== */}
               <AdsBreakdown
@@ -1081,7 +1039,6 @@ const Ads = () => {
               />
 
               {/* ===== ROW 7: Classification Chart ===== */}
-              <AdClassificationChart adsData={activeAdsData} objective={effectiveObjective} />
             </>
           )}
         </div>
