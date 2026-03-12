@@ -5,13 +5,13 @@ export interface InstagramPost {
   id: string;
   post_id: string;
   media_type: "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM";
-  posted_at: string;
+  published_at: string;
   likes: number;
   comments: number;
   reach: number;
   saves: number;
   shares: number;
-  thumbnail_url: string | null;
+  caption: string | null;
   permalink: string | null;
 }
 
@@ -42,10 +42,10 @@ export function useInstagramPosts() {
       const { data, error } = await supabase
         .from("instagram_posts")
         .select("*")
-        .order("posted_at", { ascending: false });
+        .order("published_at", { ascending: false });
 
       if (!error && data) {
-        setPosts(data as InstagramPost[]);
+        setPosts(data as unknown as InstagramPost[]);
       }
       setLoading(false);
     }
@@ -53,7 +53,7 @@ export function useInstagramPosts() {
   }, []);
 
   const dayOfWeekStats: DayOfWeekStat[] = DAY_LABELS.map((day, idx) => {
-    const dayPosts = posts.filter(p => new Date(p.posted_at).getDay() === idx);
+    const dayPosts = posts.filter(p => new Date(p.published_at).getDay() === idx);
     const avgLikes = dayPosts.length > 0
       ? Math.round(dayPosts.reduce((s, p) => s + p.likes, 0) / dayPosts.length)
       : 0;
