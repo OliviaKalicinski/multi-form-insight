@@ -145,6 +145,7 @@ const HIDDEN_ROUTES = [
   "/clientes",
   "/radar-operacional",
   "/kanban-operacional",
+  "/kanban-conciliacao",
   "/upload",
   "/metas",
   "/settings",
