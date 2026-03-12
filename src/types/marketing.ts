@@ -75,6 +75,29 @@ export interface AdsData {
   "Veiculação da campanha": string;
   "Início dos relatórios": string;
   "Término dos relatórios": string;
+  // Campos da API Meta (não disponíveis em CSV)
+  quality_ranking?: string;
+  engagement_rate_ranking?: string;
+  conversion_rate_ranking?: string;
+  outbound_clicks?: number;
+  video_p25_watched?: number;
+  video_p50_watched?: number;
+  video_p75_watched?: number;
+  video_p100_watched?: number;
+  hook_rate?: number | null;
+  // Funil granular por anúncio (da API)
+  view_content?: number;
+  add_to_cart?: number;
+  initiate_checkout?: number;
+  purchases?: number;
+  purchase_value?: number;
+  // Hierarquia (da API)
+  campanha?: string;
+  conjunto?: string;
+  ad_id?: string;
+  campaign_id?: string;
+  adset_id?: string;
+  roas_api?: number | null;
 }
 
 export interface AdsMonthSummary {
