@@ -649,6 +649,81 @@ export type Database = {
           },
         ]
       }
+      instagram_demographics: {
+        Row: {
+          breakdown_type: string
+          breakdown_value: string
+          count: number | null
+          id: string
+          synced_at: string | null
+        }
+        Insert: {
+          breakdown_type: string
+          breakdown_value: string
+          count?: number | null
+          id?: string
+          synced_at?: string | null
+        }
+        Update: {
+          breakdown_type?: string
+          breakdown_value?: string
+          count?: number | null
+          id?: string
+          synced_at?: string | null
+        }
+        Relationships: []
+      }
+      instagram_posts: {
+        Row: {
+          caption: string | null
+          comments: number | null
+          engagements: number | null
+          id: string
+          impressions: number | null
+          likes: number | null
+          media_type: string | null
+          permalink: string | null
+          post_id: string
+          published_at: string | null
+          reach: number | null
+          saves: number | null
+          shares: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          caption?: string | null
+          comments?: number | null
+          engagements?: number | null
+          id?: string
+          impressions?: number | null
+          likes?: number | null
+          media_type?: string | null
+          permalink?: string | null
+          post_id: string
+          published_at?: string | null
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          caption?: string | null
+          comments?: number | null
+          engagements?: number | null
+          id?: string
+          impressions?: number | null
+          likes?: number | null
+          media_type?: string | null
+          permalink?: string | null
+          post_id?: string
+          published_at?: string | null
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       marketing_data: {
         Row: {
           created_at: string | null
