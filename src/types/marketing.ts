@@ -5,6 +5,9 @@ export interface MarketingData {
   Interações: string;
   "Clicks no Link": string;
   Alcance: string;
+  Engajamentos: string;
+  Saves: string;
+  Shares: string;
 }
 
 export interface MonthlyMetrics {
@@ -37,8 +40,8 @@ export interface FollowersMetrics {
 }
 
 export interface AdsData {
-  "Mês"?: string; // Novo campo para o formato hierárquico
-  "Objetivo"?: string; // "OUTCOME_SALES" | "OUTCOME_ENGAGEMENT"
+  Mês?: string; // Novo campo para o formato hierárquico
+  Objetivo?: string; // "OUTCOME_SALES" | "OUTCOME_ENGAGEMENT"
   "Status de veiculação"?: string; // Novo JSON
   "Nível de veiculação"?: string; // Novo JSON
   "Nome do anúncio": string;
@@ -53,20 +56,20 @@ export interface AdsData {
   "Custo por visualização da página de destino": string;
   "Adições ao carrinho": string;
   "Custo por adição ao carrinho": string;
-  "Compras": string;
+  Compras: string;
   "Custo por compra": string;
   "Valor de conversão da compra": string;
   "Tipo de resultado": string;
-  "Resultados": string;
+  Resultados: string;
   "Custo por resultado": string;
   "Visitas ao perfil do Instagram": string;
   "CPC (custo por clique no link)": string;
   "Cliques no link": string;
-  "Impressões": string;
-  "Alcance": string;
-  "Frequência": string;
+  Impressões: string;
+  Alcance: string;
+  Frequência: string;
   "Engajamentos com o post": string;
-  "Visualizações": string;
+  Visualizações: string;
   "Tipo de valor de resultado": string;
   "ROAS de resultados": string;
   "Veiculação da campanha": string;
@@ -87,8 +90,8 @@ export interface AdsMetrics {
   cpmMedio: number;
   frequenciaMedia: number;
   cliquesTotal: number;
-  cliquesTodosTotal: number;       // Cliques (todos) para referência
-  clicksForFunnel: number;         // Cliques usados para CTR/CPC/Conversão
+  cliquesTodosTotal: number; // Cliques (todos) para referência
+  clicksForFunnel: number; // Cliques usados para CTR/CPC/Conversão
   ctrMedio: number;
   cpcMedio: number;
   cliquesLinkTotal: number;
@@ -215,10 +218,10 @@ export interface ProcessedOrder {
   fretePorConta?: string;
   municipio?: string;
   uf?: string;
-  fonteDados?: 'nf' | 'ecommerce';
-  segmentoCliente?: 'b2c' | 'b2b2c' | 'b2b';
+  fonteDados?: "nf" | "ecommerce";
+  segmentoCliente?: "b2c" | "b2b2c" | "b2b";
   numeroPedidoPlataforma?: string;
-  tipoMovimento?: 'venda' | 'brinde' | 'bonificacao' | 'doacao' | 'ajuste' | 'devolucao';
+  tipoMovimento?: "venda" | "brinde" | "bonificacao" | "doacao" | "ajuste" | "devolucao";
   observacoesNF?: string;
   emailCliente?: string;
   telefoneCliente?: string;
@@ -228,14 +231,14 @@ export interface ProcessedOrder {
 export interface InvoiceRawData {
   "ID Nota": string;
   "Numero Nota": string;
-  "Serie": string;
+  Serie: string;
   "Chave de Acesso"?: string;
   "Data emissao": string;
   "Data saida"?: string;
   "Natureza da operacao"?: string;
   "Regime Tributario"?: string;
-  "CFOP"?: string;
-  "NCM"?: string;
+  CFOP?: string;
+  NCM?: string;
   "Item Descricao": string;
   "Item Codigo"?: string;
   "Item Quantidade": string;
@@ -243,19 +246,19 @@ export interface InvoiceRawData {
   "Item Valor Total": string;
   "Item Unidade"?: string;
   "Valor Produtos": string;
-  "Frete": string;
-  "Desconto": string;
+  Frete: string;
+  Desconto: string;
   "Total Faturado": string;
   "Peso Liquido"?: string;
   "Peso Bruto"?: string;
   "Frete por conta"?: string;
-  "Municipio"?: string;
-  "UF"?: string;
-  "Observacoes"?: string;
+  Municipio?: string;
+  UF?: string;
+  Observacoes?: string;
   "Nome Cliente"?: string;
   "CPF/CNPJ Cliente"?: string;
   "E-mail"?: string;
-  "Fone"?: string;
+  Fone?: string;
 }
 
 // Sales Metrics
@@ -450,13 +453,13 @@ export interface NFIssuanceDistribution {
 }
 
 export interface CustomerSegment {
-  segment: 'Primeira Compra' | 'Recorrente' | 'Fiel' | 'VIP';
+  segment: "Primeira Compra" | "Recorrente" | "Fiel" | "VIP";
   count: number;
   percentage: number;
   totalRevenue: number;
   totalOrders: number;
-  ticketMedio: number;    // totalRevenue / totalOrders (receita por pedido)
-  arpu: number;           // totalRevenue / count (receita por cliente)
+  ticketMedio: number; // totalRevenue / totalOrders (receita por pedido)
+  arpu: number; // totalRevenue / count (receita por cliente)
   criteria: string;
 }
 
@@ -469,11 +472,11 @@ export interface CustomerSnapshot {
   firstOrderDate: Date;
   lastOrderDate: Date;
   averageDaysBetweenPurchases: number | null;
-  segment: 'Primeira Compra' | 'Recorrente' | 'Fiel' | 'VIP';
+  segment: "Primeira Compra" | "Recorrente" | "Fiel" | "VIP";
   ticketMedio: number;
   // Calculados dinamicamente (da view, não persistidos)
   daysSinceLastPurchase?: number;
-  churnStatus?: 'active' | 'at_risk' | 'inactive' | 'churned';
+  churnStatus?: "active" | "at_risk" | "inactive" | "churned";
   // CRM (operacionais)
   tags?: string[];
   observacoes?: string;
@@ -487,7 +490,7 @@ export interface ChurnRiskCustomer {
   diasSemComprar: number;
   totalPedidos: number;
   valorTotal: number;
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  riskLevel: "low" | "medium" | "high" | "critical";
 }
 
 export interface SalesPeak {
@@ -584,12 +587,17 @@ export interface SampleMetrics {
       avgDaysToRepurchase: number;
     }[];
   };
-  byPetType: Partial<Record<import("@/data/operationalProducts").BuyerPetProfile, {
-    uniqueCustomers: number;
-    repurchaseRate: number;
-    avgTicket: number;
-    customersWhoRepurchased: number;
-  }>>;
+  byPetType: Partial<
+    Record<
+      import("@/data/operationalProducts").BuyerPetProfile,
+      {
+        uniqueCustomers: number;
+        repurchaseRate: number;
+        avgTicket: number;
+        customersWhoRepurchased: number;
+      }
+    >
+  >;
 }
 
 export interface CustomerPurchaseHistory {
