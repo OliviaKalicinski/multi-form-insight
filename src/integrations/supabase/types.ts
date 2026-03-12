@@ -41,6 +41,7 @@ export type Database = {
           custo_por_resultado: number | null
           custo_por_visualizacao: number | null
           data: string
+          effective_status: string | null
           engagement_rate_ranking: string | null
           engajamentos: number | null
           frequencia: number | null
@@ -99,6 +100,7 @@ export type Database = {
           custo_por_resultado?: number | null
           custo_por_visualizacao?: number | null
           data: string
+          effective_status?: string | null
           engagement_rate_ranking?: string | null
           engajamentos?: number | null
           frequencia?: number | null
@@ -157,6 +159,7 @@ export type Database = {
           custo_por_resultado?: number | null
           custo_por_visualizacao?: number | null
           data?: string
+          effective_status?: string | null
           engagement_rate_ranking?: string | null
           engajamentos?: number | null
           frequencia?: number | null

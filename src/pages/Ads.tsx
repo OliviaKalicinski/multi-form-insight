@@ -670,7 +670,7 @@ const Ads = () => {
                   {/* ===== BLOCO 2: TENDÊNCIA ===== */}
                   <AdsTrendChart ads={activeAdsData} />
 
-                  {/* ===== BLOCO 3: DIAGNÓSTICO RÁPIDO (4 cards) ===== */}}
+                  {/* ===== BLOCO 3: DIAGNÓSTICO RÁPIDO (4 cards) ===== */}
                   <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {/* Row 1: Efficiency diagnostics */}
                     <StatusMetricCard
