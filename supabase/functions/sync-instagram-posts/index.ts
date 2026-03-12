@@ -72,13 +72,15 @@ async function fetchPostBasicMetrics(postId: string, token: string): Promise<Rec
 
 // ── Demographics da audiência ────────────────────────────────────────
 async function fetchDemographics(token: string): Promise<Array<{ type: string; value: string; count: number }>> {
+  // Endpoint correto para audience demographics: follower_demographics com metric_type=total_value
   const breakdowns = ["country", "city", "age", "gender"];
   const results: Array<{ type: string; value: string; count: number }> = [];
 
   for (const breakdown of breakdowns) {
     const url = new URL(`https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}/insights`);
-    url.searchParams.set("metric", "reach");
+    url.searchParams.set("metric", "follower_demographics");
     url.searchParams.set("period", "lifetime");
+    url.searchParams.set("metric_type", "total_value");
     url.searchParams.set("breakdown", breakdown);
     url.searchParams.set("access_token", token);
 
@@ -90,14 +92,12 @@ async function fetchDemographics(token: string): Promise<Array<{ type: string; v
       continue;
     }
 
-    // Formato v20: data[].total_value.breakdowns[].results[]
+    // Formato: data[0].total_value.breakdowns[0].results[]
     const items = json.data?.[0]?.total_value?.breakdowns?.[0]?.results || [];
     for (const item of items) {
-      results.push({
-        type: breakdown,
-        value: String(item.dimension_values?.[0] ?? item.value ?? ""),
-        count: item.value ?? 0,
-      });
+      const value = String(item.dimension_values?.[0] ?? "");
+      const count = item.value ?? 0;
+      if (value) results.push({ type: breakdown, value, count });
     }
   }
 
