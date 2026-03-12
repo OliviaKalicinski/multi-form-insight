@@ -25,25 +25,49 @@ async function fetchRecentPosts(token: string, limit = 50): Promise<{ posts: any
   return { posts: json.data || [], error: null };
 }
 
-async function fetchPostInsights(postId: string, token: string): Promise<Record<string, number>> {
-  // Métricas disponíveis por post (não deprecated)
-  const metrics = "impressions,reach,likes,comments,saved,shares";
+async function fetchPostInsights(postId: string, mediaType: string, token: string): Promise<Record<string, number>> {
+  // Métricas variam por tipo de mídia
+  let metrics: string;
+  if (mediaType === "VIDEO" || mediaType === "REEL") {
+    metrics = "impressions,reach,saved,shares,comments,likes,plays";
+  } else {
+    metrics = "impressions,reach,saved,shares,comments,likes";
+  }
+
   const url = new URL(`https://graph.facebook.com/v20.0/${postId}/insights`);
   url.searchParams.set("metric", metrics);
   url.searchParams.set("access_token", token);
 
   const res = await fetch(url.toString());
   const json = await res.json();
+
   if (json.error) {
-    console.warn(`Insights indisponíveis para post ${postId}:`, json.error.message);
-    return {};
+    console.warn(`Insights indisponíveis para post ${postId} (${mediaType}):`, json.error.message);
+    // Tenta buscar métricas básicas como fallback
+    return await fetchPostBasicMetrics(postId, token);
   }
 
   const result: Record<string, number> = {};
-  for (const item of (json.data || [])) {
+  for (const item of json.data || []) {
     result[item.name] = item.values?.[0]?.value ?? item.value ?? 0;
   }
   return result;
+}
+
+async function fetchPostBasicMetrics(postId: string, token: string): Promise<Record<string, number>> {
+  // Busca likes e comments direto no objeto de mídia (sempre disponível)
+  const url = new URL(`https://graph.facebook.com/v20.0/${postId}`);
+  url.searchParams.set("fields", "like_count,comments_count");
+  url.searchParams.set("access_token", token);
+
+  const res = await fetch(url.toString());
+  const json = await res.json();
+  if (json.error) return {};
+
+  return {
+    likes: json.like_count ?? 0,
+    comments: json.comments_count ?? 0,
+  };
 }
 
 // ── Demographics da audiência ────────────────────────────────────────
@@ -91,17 +115,19 @@ serve(async (req) => {
     const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     if (!META_TOKEN) {
-      return new Response(
-        JSON.stringify({ error: "META_ACCESS_TOKEN não configurado" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "META_ACCESS_TOKEN não configurado" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     let postLimit = 50;
     try {
       const body = await req.json();
       postLimit = body.post_limit || 50;
-    } catch { /* usa default */ }
+    } catch {
+      /* usa default */
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -112,14 +138,18 @@ serve(async (req) => {
 
     if (postsError) {
       return new Response(
-        JSON.stringify({ success: false, error: postsError, hint: "Verifique permissões do token: instagram_basic, instagram_manage_insights" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          success: false,
+          error: postsError,
+          hint: "Verifique permissões do token: instagram_basic, instagram_manage_insights",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const postRows: any[] = [];
     for (const post of posts) {
-      const insights = await fetchPostInsights(post.id, META_TOKEN);
+      const insights = await fetchPostInsights(post.id, post.media_type || "IMAGE", META_TOKEN);
       postRows.push({
         post_id: post.id,
         permalink: post.permalink || null,
@@ -136,7 +166,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       });
       // Pequeno delay para não bater rate limit
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 50));
     }
 
     if (postRows.length > 0) {
@@ -152,7 +182,7 @@ serve(async (req) => {
     console.log(`Demographics encontradas: ${demographics.length} segmentos`);
 
     const syncedAt = new Date().toISOString();
-    const demoRows = demographics.map(d => ({
+    const demoRows = demographics.map((d) => ({
       synced_at: syncedAt,
       breakdown_type: d.type,
       breakdown_value: d.value,
@@ -160,9 +190,7 @@ serve(async (req) => {
     }));
 
     if (demoRows.length > 0) {
-      const { error: demoError } = await supabase
-        .from("instagram_demographics")
-        .insert(demoRows); // insert sempre (é snapshot)
+      const { error: demoError } = await supabase.from("instagram_demographics").insert(demoRows); // insert sempre (é snapshot)
       if (demoError) console.warn("Demographics insert error:", demoError.message);
     }
 
@@ -173,14 +201,13 @@ serve(async (req) => {
         demographics_segments: demoRows.length,
         message: `${postRows.length} posts e ${demoRows.length} segmentos de audiência sincronizados`,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (err: any) {
     console.error("Erro:", err);
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
