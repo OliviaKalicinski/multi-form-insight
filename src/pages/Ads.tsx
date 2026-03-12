@@ -18,6 +18,8 @@ import {
   Megaphone,
   Info,
   Shield,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +48,8 @@ import { aggregateAdsByMonth } from "@/utils/monthlyAggregator";
 import { calculateAdsMultiMonthMetrics } from "@/utils/comparisonCalculator";
 import { cn } from "@/lib/utils";
 import { AdsData } from "@/types/marketing";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 // Helper function for objective detection (uses centralized function from adsParserV2)
 const hasObjective = (data: AdsData[], objective: string): boolean => {
@@ -100,6 +104,31 @@ const Ads = () => {
 
   // Get goals from database
   const { sectorBenchmarks } = useAppSettings();
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncMetaAds = async () => {
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-meta-ads', { body: {} });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: "Sincronização concluída",
+        description: `${data.synced} registros sincronizados (${data.period?.since} → ${data.period?.until})`,
+      });
+      // Reload to pick up new data
+      window.location.reload();
+    } catch (err: any) {
+      toast({
+        title: "Erro na sincronização",
+        description: err.message || "Falha ao sincronizar com Meta Ads",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // ===== FASE 5: Manual objective filter =====
   const [manualObjective, setManualObjective] = useState<string>(() => {
@@ -378,6 +407,16 @@ const Ads = () => {
           <p className="text-sm text-muted-foreground">Performance de campanhas de Meta Ads</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncMetaAds}
+            disabled={isSyncing}
+            className="gap-1.5"
+          >
+            {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {isSyncing ? "Sincronizando..." : "Sincronizar Meta Ads"}
+          </Button>
           {/* FASE 5: Manual Objective Toggle */}
           {currentMonthAdsData.length > 0 && (
             <ToggleGroup
