@@ -466,20 +466,36 @@ export const useDataPersistence = () => {
         _source: row.source || "csv",
       }));
 
-      // Transform followers data
+      // Transform followers data — usa novos_seguidores (follows diários), não total acumulado
       const followersData: FollowersData[] = (followersRaw || []).map((row: any) => ({
         Data: row.data,
-        Seguidores: String(row.total_seguidores || 0),
+        Seguidores: String(row.novos_seguidores ?? row.total_seguidores ?? 0),
       }));
 
-      // Transform marketing data
-      const marketingData: MarketingData[] = (marketingRaw || []).map((row: any) => ({
-        Data: row.data,
-        Visualizações: row.metrica === "visualizacoes" ? String(row.valor || 0) : "0",
-        Visitas: row.metrica === "visitas" ? String(row.valor || 0) : "0",
-        Interações: row.metrica === "interacoes" ? String(row.valor || 0) : "0",
-        "Clicks no Link": row.metrica === "clicks" ? String(row.valor || 0) : "0",
-        Alcance: row.metrica === "alcance" ? String(row.valor || 0) : "0",
+      // Transform marketing data — pivot long→wide: agrupa por data antes de mapear
+      const marketingByDate = new Map<
+        string,
+        { visualizacoes: number; alcance: number; visitas: number; clicks: number; interacoes: number }
+      >();
+      for (const row of marketingRaw || []) {
+        if (!marketingByDate.has(row.data)) {
+          marketingByDate.set(row.data, { visualizacoes: 0, alcance: 0, visitas: 0, clicks: 0, interacoes: 0 });
+        }
+        const entry = marketingByDate.get(row.data)!;
+        const val = Number(row.valor) || 0;
+        if (row.metrica === "visualizacoes") entry.visualizacoes = val;
+        else if (row.metrica === "alcance") entry.alcance = val;
+        else if (row.metrica === "visitas") entry.visitas = val;
+        else if (row.metrica === "clicks") entry.clicks = val;
+        else if (row.metrica === "interacoes") entry.interacoes = val;
+      }
+      const marketingData: MarketingData[] = Array.from(marketingByDate.entries()).map(([date, m]) => ({
+        Data: date,
+        Visualizações: String(m.visualizacoes),
+        Visitas: String(m.visitas),
+        Interações: String(m.interacoes),
+        "Clicks no Link": String(m.clicks),
+        Alcance: String(m.alcance),
       }));
 
       setStats({
