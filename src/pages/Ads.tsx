@@ -30,6 +30,7 @@ import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCar
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
 import { AdClassificationChart } from "@/components/dashboard/AdClassificationChart";
+import { AdPerformanceRanking } from "@/components/dashboard/AdPerformanceRanking";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -110,7 +111,7 @@ const Ads = () => {
   const handleSyncMetaAds = async () => {
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-meta-ads', { body: {} });
+      const { data, error } = await supabase.functions.invoke("sync-meta-ads", { body: {} });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast({
@@ -407,13 +408,7 @@ const Ads = () => {
           <p className="text-sm text-muted-foreground">Performance de campanhas de Meta Ads</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSyncMetaAds}
-            disabled={isSyncing}
-            className="gap-1.5"
-          >
+          <Button variant="outline" size="sm" onClick={handleSyncMetaAds} disabled={isSyncing} className="gap-1.5">
             {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             {isSyncing ? "Sincronizando..." : "Sincronizar Meta Ads"}
           </Button>
@@ -877,26 +872,6 @@ const Ads = () => {
                       </CardContent>
                     </Card>
                   </div>
-
-                  {/* ===== ROW 4: Métricas Adicionais (Ticket Médio only, ROI moved to BLOCO 1) ===== */}
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <StatusMetricCard
-                      title="Ticket Médio Ads"
-                      value={formatCurrency(metrics.ticketMedio)}
-                      icon={<Coins className="h-3 w-3" />}
-                      status="neutral"
-                      size="compact"
-                      tooltipKey="ticket_medio_ads"
-                    />
-                    <StatusMetricCard
-                      title="Frequência Média"
-                      value={metrics.frequenciaMedia.toFixed(2)}
-                      icon={<Eye className="h-3 w-3" />}
-                      status="neutral"
-                      size="compact"
-                      tooltipKey="frequencia"
-                    />
-                  </div>
                 </>
               ) : (
                 // ===== ENGAGEMENT VIEW =====
@@ -1120,62 +1095,10 @@ const Ads = () => {
                 </>
               )}
 
-              {/* ===== ROW 5: Inline Financial Summary (both views) — FASE 1 fix ===== */}
-              <Card className="bg-muted/30">
-                <CardContent className="py-3 px-4">
-                  <div className="flex flex-wrap items-center justify-center gap-6 text-sm">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Investido (total mídia):</span>
-                      <span className="font-semibold">{formatCurrency(totalInvestment)}</span>
-                    </div>
-                    {objectivesSummary.hasSales && (
-                      <>
-                        <span className="text-muted-foreground">→</span>
-                        <div className="flex items-center gap-2">
-                          <Coins className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">Gerou:</span>
-                          <span className="font-semibold">{formatCurrency(metrics.valorConversaoTotal)}</span>
-                        </div>
-                        <span className="text-muted-foreground">=</span>
-                        <div
-                          className={cn(
-                            "flex items-center gap-2 font-semibold",
-                            grossMediaResult >= 0 ? "text-green-600" : "text-red-600",
-                          )}
-                        >
-                          {grossMediaResult >= 0 ? (
-                            <TrendingUp className="h-4 w-4" />
-                          ) : (
-                            <TrendingDown className="h-4 w-4" />
-                          )}
-                          <span>
-                            {grossMediaResult >= 0 ? "+" : ""}
-                            {formatCurrency(grossMediaResult)}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                    {!objectivesSummary.hasSales && objectivesSummary.hasEngagement && (
-                      <>
-                        <span className="text-muted-foreground">→</span>
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">Resultados:</span>
-                          <span className="font-semibold">{formatNumber(metrics.resultadosTotal)}</span>
-                        </div>
-                        <span className="text-muted-foreground">=</span>
-                        <div className="flex items-center gap-2 font-semibold text-primary">
-                          <Target className="h-4 w-4" />
-                          <span>{formatCurrency(metrics.custoPorResultadoMedio)}/resultado</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              {/* ===== ROW 6: Performance Ranking (Top/Bottom performers) ===== */}
+              <AdPerformanceRanking ads={activeAdsData} objective={effectiveObjective} />
 
-              {/* ===== ROW 6: Breakdown by Ad (uses activeAdsData for objective-filtered view) ===== */}
+              {/* ===== ROW 7: Breakdown by Ad (uses activeAdsData for objective-filtered view) ===== */}
               <AdsBreakdown
                 ads={activeAdsData}
                 selectedMonth={
