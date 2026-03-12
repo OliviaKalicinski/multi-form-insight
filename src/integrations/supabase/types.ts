@@ -28,6 +28,7 @@ export type Database = {
           cliques_link: number | null
           cliques_saida: number | null
           conjunto: string | null
+          conversion_rate_ranking: string | null
           conversoes: number | null
           cpc: number | null
           cpm: number | null
@@ -40,17 +41,21 @@ export type Database = {
           custo_por_resultado: number | null
           custo_por_visualizacao: number | null
           data: string
+          engagement_rate_ranking: string | null
           engajamentos: number | null
           frequencia: number | null
           gasto: number | null
+          hook_rate: number | null
           id: string
           impressoes: number | null
           initiate_checkout: number | null
           leads: number | null
           nivel_veiculacao: string | null
           objetivo: string | null
+          outbound_clicks: number | null
           purchase_value: number | null
           purchases: number | null
+          quality_ranking: string | null
           receita: number | null
           resultados: number | null
           roas: number | null
@@ -59,6 +64,10 @@ export type Database = {
           status_veiculacao: string | null
           tipo_resultado: string | null
           upload_id: string | null
+          video_p100_watched: number | null
+          video_p25_watched: number | null
+          video_p50_watched: number | null
+          video_p75_watched: number | null
           view_content: number | null
           visitas_perfil: number | null
           visualizacoes: number | null
@@ -77,6 +86,7 @@ export type Database = {
           cliques_link?: number | null
           cliques_saida?: number | null
           conjunto?: string | null
+          conversion_rate_ranking?: string | null
           conversoes?: number | null
           cpc?: number | null
           cpm?: number | null
@@ -89,17 +99,21 @@ export type Database = {
           custo_por_resultado?: number | null
           custo_por_visualizacao?: number | null
           data: string
+          engagement_rate_ranking?: string | null
           engajamentos?: number | null
           frequencia?: number | null
           gasto?: number | null
+          hook_rate?: number | null
           id?: string
           impressoes?: number | null
           initiate_checkout?: number | null
           leads?: number | null
           nivel_veiculacao?: string | null
           objetivo?: string | null
+          outbound_clicks?: number | null
           purchase_value?: number | null
           purchases?: number | null
+          quality_ranking?: string | null
           receita?: number | null
           resultados?: number | null
           roas?: number | null
@@ -108,6 +122,10 @@ export type Database = {
           status_veiculacao?: string | null
           tipo_resultado?: string | null
           upload_id?: string | null
+          video_p100_watched?: number | null
+          video_p25_watched?: number | null
+          video_p50_watched?: number | null
+          video_p75_watched?: number | null
           view_content?: number | null
           visitas_perfil?: number | null
           visualizacoes?: number | null
@@ -126,6 +144,7 @@ export type Database = {
           cliques_link?: number | null
           cliques_saida?: number | null
           conjunto?: string | null
+          conversion_rate_ranking?: string | null
           conversoes?: number | null
           cpc?: number | null
           cpm?: number | null
@@ -138,17 +157,21 @@ export type Database = {
           custo_por_resultado?: number | null
           custo_por_visualizacao?: number | null
           data?: string
+          engagement_rate_ranking?: string | null
           engajamentos?: number | null
           frequencia?: number | null
           gasto?: number | null
+          hook_rate?: number | null
           id?: string
           impressoes?: number | null
           initiate_checkout?: number | null
           leads?: number | null
           nivel_veiculacao?: string | null
           objetivo?: string | null
+          outbound_clicks?: number | null
           purchase_value?: number | null
           purchases?: number | null
+          quality_ranking?: string | null
           receita?: number | null
           resultados?: number | null
           roas?: number | null
@@ -157,6 +180,10 @@ export type Database = {
           status_veiculacao?: string | null
           tipo_resultado?: string | null
           upload_id?: string | null
+          video_p100_watched?: number | null
+          video_p25_watched?: number | null
+          video_p50_watched?: number | null
+          video_p75_watched?: number | null
           view_content?: number | null
           visitas_perfil?: number | null
           visualizacoes?: number | null
