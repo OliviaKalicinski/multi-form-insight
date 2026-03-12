@@ -175,7 +175,7 @@ export function AdPerformanceRanking({ ads, objective }: Props) {
         const roas = roasCsv > 0 ? roasCsv : investment > 0 && revenue > 0 ? revenue / investment : 0;
 
         return {
-          name: ad["Nome do anúncio"] || ad.anuncio || "—",
+          name: ad["Nome do anúncio"] || "—",
           investment,
           revenue,
           roas,
