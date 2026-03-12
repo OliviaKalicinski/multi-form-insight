@@ -102,7 +102,7 @@ const Ads = () => {
     comparisonDateRange,
     comparisonMode,
     lastDataDate,
-    isLoading: isLoadingData,
+    isLoadingData,
   } = useDashboard();
 
   // Get goals from database
