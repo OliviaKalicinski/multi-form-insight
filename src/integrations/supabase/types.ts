@@ -16,9 +16,13 @@ export type Database = {
     Tables: {
       ads_data: {
         Row: {
+          ad_id: string | null
+          add_to_cart: number | null
           adicoes_carrinho: number | null
+          adset_id: string | null
           alcance: number | null
           anuncio: string | null
+          campaign_id: string | null
           campanha: string | null
           cliques: number | null
           cliques_link: number | null
@@ -27,6 +31,7 @@ export type Database = {
           conversoes: number | null
           cpc: number | null
           cpm: number | null
+          cpp: number | null
           created_at: string | null
           ctr: number | null
           ctr_saida: number | null
@@ -40,22 +45,33 @@ export type Database = {
           gasto: number | null
           id: string
           impressoes: number | null
+          initiate_checkout: number | null
+          leads: number | null
           nivel_veiculacao: string | null
           objetivo: string | null
+          purchase_value: number | null
+          purchases: number | null
           receita: number | null
           resultados: number | null
+          roas: number | null
           roas_resultados: number | null
+          source: string | null
           status_veiculacao: string | null
           tipo_resultado: string | null
           upload_id: string | null
+          view_content: number | null
           visitas_perfil: number | null
           visualizacoes: number | null
           visualizacoes_pagina: number | null
         }
         Insert: {
+          ad_id?: string | null
+          add_to_cart?: number | null
           adicoes_carrinho?: number | null
+          adset_id?: string | null
           alcance?: number | null
           anuncio?: string | null
+          campaign_id?: string | null
           campanha?: string | null
           cliques?: number | null
           cliques_link?: number | null
@@ -64,6 +80,7 @@ export type Database = {
           conversoes?: number | null
           cpc?: number | null
           cpm?: number | null
+          cpp?: number | null
           created_at?: string | null
           ctr?: number | null
           ctr_saida?: number | null
@@ -77,22 +94,33 @@ export type Database = {
           gasto?: number | null
           id?: string
           impressoes?: number | null
+          initiate_checkout?: number | null
+          leads?: number | null
           nivel_veiculacao?: string | null
           objetivo?: string | null
+          purchase_value?: number | null
+          purchases?: number | null
           receita?: number | null
           resultados?: number | null
+          roas?: number | null
           roas_resultados?: number | null
+          source?: string | null
           status_veiculacao?: string | null
           tipo_resultado?: string | null
           upload_id?: string | null
+          view_content?: number | null
           visitas_perfil?: number | null
           visualizacoes?: number | null
           visualizacoes_pagina?: number | null
         }
         Update: {
+          ad_id?: string | null
+          add_to_cart?: number | null
           adicoes_carrinho?: number | null
+          adset_id?: string | null
           alcance?: number | null
           anuncio?: string | null
+          campaign_id?: string | null
           campanha?: string | null
           cliques?: number | null
           cliques_link?: number | null
@@ -101,6 +129,7 @@ export type Database = {
           conversoes?: number | null
           cpc?: number | null
           cpm?: number | null
+          cpp?: number | null
           created_at?: string | null
           ctr?: number | null
           ctr_saida?: number | null
@@ -114,14 +143,21 @@ export type Database = {
           gasto?: number | null
           id?: string
           impressoes?: number | null
+          initiate_checkout?: number | null
+          leads?: number | null
           nivel_veiculacao?: string | null
           objetivo?: string | null
+          purchase_value?: number | null
+          purchases?: number | null
           receita?: number | null
           resultados?: number | null
+          roas?: number | null
           roas_resultados?: number | null
+          source?: string | null
           status_veiculacao?: string | null
           tipo_resultado?: string | null
           upload_id?: string | null
+          view_content?: number | null
           visitas_perfil?: number | null
           visualizacoes?: number | null
           visualizacoes_pagina?: number | null
