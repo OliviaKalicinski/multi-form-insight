@@ -14,6 +14,11 @@ import {
   BarChart3,
   ExternalLink,
 } from "lucide-react";
+import { InstagramFunnel } from "@/components/dashboard/InstagramFunnel";
+import { DayOfWeekChart } from "@/components/dashboard/DayOfWeekChart";
+import { HistoricalBenchmarkTable } from "@/components/dashboard/HistoricalBenchmarkTable";
+import { useInstagramPosts } from "@/hooks/useInstagramPosts";
+import { buildInstagramFunnel, calculateHistoricalBenchmarks } from "@/utils/metricsCalculator";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { AccumulatedFollowersChart } from "@/components/dashboard/AccumulatedFollowersChart";
@@ -58,14 +63,8 @@ import {
 import { detectIncompleteMonth, calculateProjection } from "@/utils/incompleteMonthDetector";
 
 const Seguidores = () => {
-  const {
-    marketingData,
-    followersData,
-    availableMonths,
-    dateRange,
-    comparisonDateRange,
-    comparisonMode,
-  } = useDashboard();
+  const { marketingData, followersData, availableMonths, dateRange, comparisonDateRange, comparisonMode } =
+    useDashboard();
 
   const [chartViewMode, setChartViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
 
@@ -272,6 +271,18 @@ const Seguidores = () => {
 
   const hasFollowersData = followersData && followersData.length > 0;
   const hasMarketingData = marketingData && marketingData.length > 0;
+
+  // Instagram Posts (day of week analysis)
+  const { dayOfWeekStats, bestDayToPost, loading: postsLoading } = useInstagramPosts();
+
+  // Funnel
+  const funnelSteps = useMemo(() => buildInstagramFunnel(currentMonthMarketingData), [currentMonthMarketingData]);
+
+  // Historical benchmarks (only for single-month view)
+  const historicalBenchmarks = useMemo(() => {
+    if (!hasMarketingData || isMultiMonthView || isAllPeriodsView) return [];
+    return calculateHistoricalBenchmarks(marketingData, referenceMonth);
+  }, [marketingData, hasMarketingData, isMultiMonthView, isAllPeriodsView, referenceMonth]);
 
   // Prepare chart data for FollowersTrendChart
   const followersChartData = useMemo(() => {
@@ -621,6 +632,17 @@ const Seguidores = () => {
                     tooltipKey="taxa_visita_clique"
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Funil + Benchmarks + Dia da Semana */}
+            {hasMarketingData && currentMonthMarketingData.length > 0 && !isMultiMonthView && (
+              <div className="grid gap-6 lg:grid-cols-3">
+                <InstagramFunnel steps={funnelSteps} />
+                <HistoricalBenchmarkTable benchmarks={historicalBenchmarks} />
+                {!postsLoading && dayOfWeekStats.some((s) => s.posts > 0) && (
+                  <DayOfWeekChart stats={dayOfWeekStats} bestDay={bestDayToPost} />
+                )}
               </div>
             )}
 
