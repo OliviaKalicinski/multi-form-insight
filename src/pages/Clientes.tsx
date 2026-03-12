@@ -263,16 +263,30 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold">Clientes</h1>
           <p className="text-sm text-muted-foreground">Lista operacional • {filtered.length} clientes</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExportCSV}
-          disabled={sorted.length === 0}
-          className="flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Exportar para remarketing ({sorted.length})
-        </Button>
+        <div className="flex items-center gap-3">
+          {phoneMap.size > 0 &&
+            sorted.length > 0 &&
+            (() => {
+              const comTel = sorted.filter((c) => phoneMap.has(c.cpf_cnpj?.replace(/\D/g, "") ?? "")).length;
+              const pct = Math.round((comTel / sorted.length) * 100);
+              const color = pct >= 60 ? "text-green-600" : pct >= 30 ? "text-amber-600" : "text-red-500";
+              return (
+                <span className={`text-xs font-medium ${color}`}>
+                  📞 {comTel}/{sorted.length} com telefone ({pct}%)
+                </span>
+              );
+            })()}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCSV}
+            disabled={sorted.length === 0}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Exportar para remarketing ({sorted.length})
+          </Button>
+        </div>
       </div>
 
       <CustomerFilters
