@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Funnel, ArrowDown } from "lucide-react";
+import { Filter, ArrowDown } from "lucide-react";
 
 export interface FunnelStep {
   label: string;
