@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { format } from "date-fns";
+import { useMemo, useState, useEffect } from "react";
+import { format, startOfMonth, endOfDay } from "date-fns";
 import {
   Users,
   UserPlus,
@@ -63,10 +63,26 @@ import {
 import { detectIncompleteMonth, calculateProjection } from "@/utils/incompleteMonthDetector";
 
 const Seguidores = () => {
-  const { marketingData, followersData, availableMonths, dateRange, comparisonDateRange, comparisonMode } =
-    useDashboard();
+  const {
+    marketingData,
+    followersData,
+    availableMonths,
+    dateRange,
+    setDateRange,
+    comparisonDateRange,
+    comparisonMode,
+    lastDataDate,
+  } = useDashboard();
 
   const [chartViewMode, setChartViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
+
+  // Default para mês atual ao entrar nesta página
+  useEffect(() => {
+    if (lastDataDate && (!dateRange || dateRange.label === "30d")) {
+      const anchor = lastDataDate;
+      setDateRange({ start: startOfMonth(anchor), end: endOfDay(anchor), label: "current_month" });
+    }
+  }, [lastDataDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { instagramGoals } = useAppSettings();
 
@@ -280,9 +296,9 @@ const Seguidores = () => {
 
   // Historical benchmarks (only for single-month view)
   const historicalBenchmarks = useMemo(() => {
-    if (!hasMarketingData || isMultiMonthView || isAllPeriodsView) return [];
+    if (!hasMarketingData || isMultiMonthView) return [];
     return calculateHistoricalBenchmarks(marketingData, referenceMonth);
-  }, [marketingData, hasMarketingData, isMultiMonthView, isAllPeriodsView, referenceMonth]);
+  }, [marketingData, hasMarketingData, isMultiMonthView, referenceMonth]);
 
   // Prepare chart data for FollowersTrendChart
   const followersChartData = useMemo(() => {
@@ -325,19 +341,28 @@ const Seguidores = () => {
 
         {/* Period indicator for "Todos os Períodos" */}
         {isAllPeriodsView && hasFollowersData && (
-          <Card className="border-blue-500/50 bg-blue-500/5">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-blue-500" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">📅 Visão Completa - Todos os Períodos</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Mostrando dados de {availableMonths.length} meses disponíveis
-                  </p>
+          <>
+            <Card className="border-blue-500/50 bg-blue-500/5">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">📅 Visão Completa - Todos os Períodos</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Mostrando dados de {availableMonths.length} meses disponíveis
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+            {/* Análise estrutural disponível em qualquer filtro */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              {hasMarketingData && <InstagramFunnel steps={buildInstagramFunnel(marketingData)} />}
+              {!postsLoading && dayOfWeekStats.some((s) => s.posts > 0) && (
+                <DayOfWeekChart stats={dayOfWeekStats} bestDay={bestDayToPost} />
+              )}
+            </div>
+          </>
         )}
 
         {/* Show metrics only if month is selected and data exists */}
@@ -636,15 +661,13 @@ const Seguidores = () => {
             )}
 
             {/* Funil + Benchmarks + Dia da Semana */}
-            {hasMarketingData && currentMonthMarketingData.length > 0 && !isMultiMonthView && (
-              <div className="grid gap-6 lg:grid-cols-3">
-                <InstagramFunnel steps={funnelSteps} />
-                <HistoricalBenchmarkTable benchmarks={historicalBenchmarks} />
-                {!postsLoading && dayOfWeekStats.some((s) => s.posts > 0) && (
-                  <DayOfWeekChart stats={dayOfWeekStats} bestDay={bestDayToPost} />
-                )}
-              </div>
-            )}
+            <div className="grid gap-6 lg:grid-cols-3">
+              {hasMarketingData && currentMonthMarketingData.length > 0 && <InstagramFunnel steps={funnelSteps} />}
+              {historicalBenchmarks.length > 0 && <HistoricalBenchmarkTable benchmarks={historicalBenchmarks} />}
+              {!postsLoading && dayOfWeekStats.some((s) => s.posts > 0) && (
+                <DayOfWeekChart stats={dayOfWeekStats} bestDay={bestDayToPost} />
+              )}
+            </div>
 
             {/* Main Trend Chart with Toggle */}
             {followersChartData.length > 0 && (
