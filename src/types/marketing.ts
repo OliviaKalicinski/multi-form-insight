@@ -98,6 +98,7 @@ export interface AdsData {
   campaign_id?: string;
   adset_id?: string;
   roas_api?: number | null;
+  effective_status?: string; // 'ACTIVE' | 'PAUSED' | 'DELETED' | 'ARCHIVED' | 'WITH_ISSUES'
 }
 
 export interface AdsMonthSummary {
