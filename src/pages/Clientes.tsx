@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useCustomerData } from "@/hooks/useCustomerData";
 import { useDashboard } from "@/contexts/DashboardContext";
@@ -64,16 +65,36 @@ export default function Clientes() {
 
   const petMap = useMemo(() => buildClientPetMap(salesData), [salesData]);
 
-  const phoneMap = useMemo(() => {
-    const map = new Map<string, string>();
-    const sorted = [...salesData].sort((a, b) => b.dataVenda.getTime() - a.dataVenda.getTime());
-    for (const order of sorted) {
-      if (!order.telefoneCliente) continue;
-      const key = order.cpfCnpj?.replace(/\D/g, "") ?? "";
-      if (key && !map.has(key)) map.set(key, order.telefoneCliente);
-    }
-    return map;
-  }, [salesData]);
+  const [phoneMap, setPhoneMap] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const fetchPhones = async () => {
+      // customer_identifier stores phones keyed by customer_id
+      // customers have cpf_cnpj; we join via customer.id
+      const { data: identifiers } = await supabase
+        .from("customer_identifier")
+        .select("customer_id, value")
+        .eq("type", "phone");
+
+      if (!identifiers?.length) return;
+
+      // Build map: customer_id → phone
+      const idToPhone = new Map<string, string>();
+      for (const row of identifiers) {
+        if (!idToPhone.has(row.customer_id)) idToPhone.set(row.customer_id, row.value);
+      }
+
+      // customers already have id + cpf_cnpj — map cpf_cnpj_normalized → phone
+      const map = new Map<string, string>();
+      for (const c of customers) {
+        if (!c.id || !c.cpf_cnpj) continue;
+        const phone = idToPhone.get(c.id);
+        if (phone) map.set(c.cpf_cnpj.replace(/\D/g, ""), phone);
+      }
+      setPhoneMap(map);
+    };
+    if (customers.length > 0) fetchPhones();
+  }, [customers]);
 
   const speciesCache = useMemo(() => {
     const cache = new Map<string, string>();
