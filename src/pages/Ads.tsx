@@ -31,6 +31,7 @@ import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
 import { AdPerformanceRanking } from "@/components/dashboard/AdPerformanceRanking";
 import { AdsTrendChart } from "@/components/dashboard/AdsTrendChart";
+import { MetaTokenAlert } from "@/components/dashboard/MetaTokenAlert";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -101,6 +102,7 @@ const Ads = () => {
     comparisonDateRange,
     comparisonMode,
     lastDataDate,
+    isLoading: isLoadingData,
   } = useDashboard();
 
   // Get goals from database
@@ -121,9 +123,14 @@ const Ads = () => {
       // Reload to pick up new data
       window.location.reload();
     } catch (err: any) {
+      // Se o erro menciona token, provavelmente expirou
+      const msg = err.message || "";
+      const tokenError = msg.toLowerCase().includes("token") || msg.includes("190") || msg.includes("401");
       toast({
-        title: "Erro na sincronização",
-        description: err.message || "Falha ao sincronizar com Meta Ads",
+        title: tokenError ? "Token Meta expirado" : "Erro na sincronização",
+        description: tokenError
+          ? "O token de acesso expirou. Renove em developers.facebook.com/tools/explorer"
+          : msg || "Falha ao sincronizar com Meta Ads",
         variant: "destructive",
       });
     } finally {
@@ -463,8 +470,11 @@ const Ads = () => {
         </div>
       </div>
 
+      {/* Token expiry alert */}
+      <MetaTokenAlert />
+
       {/* Empty state */}
-      {adsData.length === 0 ? (
+      {isLoadingData ? null : adsData.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center space-y-4">
             <p className="text-muted-foreground">
@@ -670,7 +680,7 @@ const Ads = () => {
                   {/* ===== BLOCO 2: TENDÊNCIA ===== */}
                   <AdsTrendChart ads={activeAdsData} />
 
-                  {/* ===== BLOCO 3: DIAGNÓSTICO RÁPIDO (4 cards) ===== */}
+                  {/* ===== BLOCO 3: DIAGNÓSTICO RÁPIDO (4 cards) ===== */}}
                   <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {/* Row 1: Efficiency diagnostics */}
                     <StatusMetricCard
