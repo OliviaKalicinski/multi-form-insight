@@ -9,7 +9,7 @@ const corsHeaders = {
 const IG_ACCOUNT_ID = "17841470017662704";
 
 // ── Posts individuais ─────────────────────────────────────────────────
-async function fetchRecentPosts(token: string, limit = 50): Promise<any[]> {
+async function fetchRecentPosts(token: string, limit = 50): Promise<{ posts: any[]; error: string | null }> {
   const url = new URL(`https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}/media`);
   url.searchParams.set("fields", "id,permalink,media_type,caption,timestamp");
   url.searchParams.set("limit", String(limit));
@@ -18,10 +18,11 @@ async function fetchRecentPosts(token: string, limit = 50): Promise<any[]> {
   const res = await fetch(url.toString());
   const json = await res.json();
   if (json.error) {
-    console.error("Erro ao buscar posts:", JSON.stringify(json.error));
-    return [];
+    const errMsg = `${json.error.code}: ${json.error.message} (${json.error.type})`;
+    console.error("Erro ao buscar posts:", errMsg);
+    return { posts: [], error: errMsg };
   }
-  return json.data || [];
+  return { posts: json.data || [], error: null };
 }
 
 async function fetchPostInsights(postId: string, token: string): Promise<Record<string, number>> {
@@ -106,11 +107,17 @@ serve(async (req) => {
 
     // ── 1. Posts ──────────────────────────────────────────────────────
     console.log(`Buscando últimos ${postLimit} posts...`);
-    const posts = await fetchRecentPosts(META_TOKEN, postLimit);
+    const { posts, error: postsError } = await fetchRecentPosts(META_TOKEN, postLimit);
     console.log(`Posts encontrados: ${posts.length}`);
 
+    if (postsError) {
+      return new Response(
+        JSON.stringify({ success: false, error: postsError, hint: "Verifique permissões do token: instagram_basic, instagram_manage_insights" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const postRows: any[] = [];
-    // Busca insights de cada post (com delay para evitar rate limit)
     for (const post of posts) {
       const insights = await fetchPostInsights(post.id, META_TOKEN);
       postRows.push({
