@@ -1,3 +1,4 @@
+// DashboardProvider + consumer co-located to prevent HMR context desync
 import { useDashboard, DashboardProvider } from "@/contexts/DashboardContext";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
