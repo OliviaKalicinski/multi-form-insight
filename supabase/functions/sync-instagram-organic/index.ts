@@ -3,21 +3,52 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const IG_ACCOUNT_ID = "17841470017662704"; // Comida de Dragão
 
 function defaultDateRange(): { since: string; until: string } {
   const until = new Date();
-  until.setDate(until.getDate() - 1); // ontem
+  until.setDate(until.getDate() - 1);
   const since = new Date(until);
-  since.setDate(since.getDate() - 6); // últimos 7 dias
+  since.setDate(since.getDate() - 6);
   return {
     since: since.toISOString().split("T")[0],
     until: until.toISOString().split("T")[0],
   };
+}
+
+// Busca uma métrica de cada vez no formato correto da API v20
+async function fetchMetric(
+  metricName: string,
+  since: string,
+  until: string,
+  token: string
+): Promise<Array<{ date: string; value: any }>> {
+  const url = new URL(`https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}/insights`);
+  url.searchParams.set("metric", metricName);
+  url.searchParams.set("period", "day");
+  url.searchParams.set("since", since);
+  url.searchParams.set("until", until);
+  url.searchParams.set("access_token", token);
+
+  const res = await fetch(url.toString());
+  const json = await res.json();
+
+  if (json.error) {
+    console.error(`Erro na métrica ${metricName}:`, JSON.stringify(json.error));
+    return [];
+  }
+
+  const results: Array<{ date: string; value: any }> = [];
+  for (const item of (json.data || [])) {
+    for (const v of (item.values || [])) {
+      const date = (v.end_time || "").split("T")[0];
+      if (date) results.push({ date, value: v.value });
+    }
+  }
+  return results;
 }
 
 serve(async (req) => {
@@ -39,92 +70,76 @@ serve(async (req) => {
 
     let since: string;
     let until: string;
-
     try {
       const body = await req.json();
-      const defaults = defaultDateRange();
-      since = body.date_start || defaults.since;
-      until = body.date_stop || defaults.until;
+      const d = defaultDateRange();
+      since = body.date_start || d.since;
+      until = body.date_stop || d.until;
     } catch {
-      const defaults = defaultDateRange();
-      since = defaults.since;
-      until = defaults.until;
+      const d = defaultDateRange();
+      since = d.since;
+      until = d.until;
     }
 
-    console.log(`Sincronizando Instagram orgânico: ${since} → ${until}`);
+    console.log(`Sync Instagram orgânico: ${since} → ${until}`);
 
-    // ── 1. Insights diários da conta ──────────────────────────────────
-    const insightMetrics = [
-      "reach",
-      "profile_views",
-      "website_clicks",
-      "accounts_engaged",
-      "total_interactions",
-      "follows_and_unfollows",
-      "views",
-    ].join(",");
+    // ── 1. Busca cada métrica separadamente ───────────────────────────
+    const [
+      impressions,
+      reach,
+      profileViews,
+      websiteClicks,
+      totalInteractions,
+      accountsEngaged,
+      followsUnfollows,
+    ] = await Promise.all([
+      fetchMetric("impressions", since, until, META_TOKEN),
+      fetchMetric("reach", since, until, META_TOKEN),
+      fetchMetric("profile_views", since, until, META_TOKEN),
+      fetchMetric("website_clicks", since, until, META_TOKEN),
+      fetchMetric("total_interactions", since, until, META_TOKEN),
+      fetchMetric("accounts_engaged", since, until, META_TOKEN),
+      fetchMetric("follows_and_unfollows", since, until, META_TOKEN),
+    ]);
 
-    const insightsUrl = new URL(
-      `https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}/insights`
+    // ── 2. Total de seguidores ─────────────────────────────────────────
+    const profileRes = await fetch(
+      `https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}?fields=followers_count&access_token=${META_TOKEN}`
     );
-    insightsUrl.searchParams.set("metric", insightMetrics);
-    insightsUrl.searchParams.set("period", "day");
-    insightsUrl.searchParams.set("since", since);
-    insightsUrl.searchParams.set("until", until);
-    insightsUrl.searchParams.set("metric_type", "total_value");
-    insightsUrl.searchParams.set("access_token", META_TOKEN);
-
-    const insightsRes = await fetch(insightsUrl.toString());
-    if (!insightsRes.ok) {
-      const err = await insightsRes.json();
-      throw new Error(`Instagram Insights API erro: ${JSON.stringify(err)}`);
-    }
-    const insightsJson = await insightsRes.json();
-
-    // ── 2. Total de seguidores atual ───────────────────────────────────
-    const profileUrl = new URL(
-      `https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}`
-    );
-    profileUrl.searchParams.set("fields", "followers_count");
-    profileUrl.searchParams.set("access_token", META_TOKEN);
-
-    const profileRes = await fetch(profileUrl.toString());
     const profileJson = await profileRes.json();
     const followersCount = profileJson.followers_count || 0;
-
-    console.log(`Seguidores atuais: ${followersCount}`);
-    console.log(`Insights recebidos: ${insightsJson.data?.length || 0} métricas`);
-    console.log(`Insights raw sample:`, JSON.stringify(insightsJson.data?.[0] || {}).substring(0, 1000));
-    if (insightsJson.data?.[1]) console.log(`Insights raw sample 2:`, JSON.stringify(insightsJson.data[1]).substring(0, 1000));
+    console.log(`Seguidores: ${followersCount}`);
 
     // ── 3. Organiza por data ───────────────────────────────────────────
     const byDate: Record<string, Record<string, number>> = {};
 
-    for (const metric of (insightsJson.data || [])) {
-      const metricName = metric.name;
-      const values = metric.total_value?.breakdowns?.[0]?.results ||
-                     metric.values || [];
-
-      for (const entry of values) {
-        const date = (entry.end_time || entry.period?.since || "").split("T")[0];
-        if (!date) continue;
+    const addMetric = (entries: Array<{ date: string; value: any }>, key: string) => {
+      for (const { date, value } of entries) {
         if (!byDate[date]) byDate[date] = {};
-
-        if (metricName === "follows_and_unfollows") {
-          const items = entry.value?.breakdown || entry.value || {};
-          byDate[date]["follows"] = items["FOLLOW"] || items["follow"] || 0;
-          byDate[date]["unfollows"] = items["UNFOLLOW"] || items["unfollow"] || 0;
-        } else {
-          byDate[date][metricName] = entry.value || 0;
-        }
+        byDate[date][key] = typeof value === "number" ? value : 0;
       }
+    };
+
+    addMetric(impressions, "impressions");
+    addMetric(reach, "reach");
+    addMetric(profileViews, "profile_views");
+    addMetric(websiteClicks, "website_clicks");
+    addMetric(totalInteractions, "total_interactions");
+    addMetric(accountsEngaged, "accounts_engaged");
+
+    // follows_and_unfollows vem como objeto {FOLLOW: N, UNFOLLOW: N}
+    for (const { date, value } of followsUnfollows) {
+      if (!byDate[date]) byDate[date] = {};
+      byDate[date]["follows"] = value?.FOLLOW ?? value?.follow ?? 0;
+      byDate[date]["unfollows"] = value?.UNFOLLOW ?? value?.unfollow ?? 0;
     }
 
     console.log(`Datas com dados: ${Object.keys(byDate).length}`);
+    console.log("Datas:", Object.keys(byDate).sort().join(", "));
 
     if (Object.keys(byDate).length === 0) {
       return new Response(
-        JSON.stringify({ success: true, synced: 0, followers: followersCount, message: "Nenhum dado no período" }),
+        JSON.stringify({ success: true, synced: 0, followers_current: followersCount, message: "Nenhum dado no período" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -132,11 +147,11 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // ── 4. Upsert followers_data ───────────────────────────────────────
-    const followersRows = Object.entries(byDate).map(([date, metrics]) => ({
+    const followersRows = Object.entries(byDate).map(([date, m]) => ({
       data: date,
       total_seguidores: followersCount,
-      novos_seguidores: metrics["follows"] || 0,
-      unfollows: metrics["unfollows"] || 0,
+      novos_seguidores: m["follows"] || 0,
+      unfollows: m["unfollows"] || 0,
       source: "api",
     }));
 
@@ -144,11 +159,11 @@ serve(async (req) => {
       .from("followers_data")
       .upsert(followersRows, { onConflict: "data", ignoreDuplicates: false });
 
-    if (followersError) throw new Error(`followers_data upsert: ${followersError.message}`);
+    if (followersError) throw new Error(`followers_data: ${followersError.message}`);
 
     // ── 5. Upsert marketing_data ───────────────────────────────────────
     const metricsMap: Record<string, string> = {
-      views: "visualizacoes",
+      impressions: "visualizacoes",
       reach: "alcance",
       profile_views: "visitas",
       website_clicks: "clicks",
@@ -157,43 +172,35 @@ serve(async (req) => {
     };
 
     const marketingRows: any[] = [];
-    for (const [date, metrics] of Object.entries(byDate)) {
+    for (const [date, m] of Object.entries(byDate)) {
       for (const [apiKey, dbKey] of Object.entries(metricsMap)) {
-        if (metrics[apiKey] !== undefined) {
-          marketingRows.push({
-            data: date,
-            metrica: dbKey,
-            valor: metrics[apiKey],
-            source: "api",
-          });
+        if (m[apiKey] !== undefined) {
+          marketingRows.push({ data: date, metrica: dbKey, valor: m[apiKey], source: "api" });
         }
       }
     }
 
     if (marketingRows.length > 0) {
-      const { error: marketingError } = await supabase
+      const { error: mktError } = await supabase
         .from("marketing_data")
         .upsert(marketingRows, { onConflict: "data,metrica", ignoreDuplicates: false });
-
-      if (marketingError) throw new Error(`marketing_data upsert: ${marketingError.message}`);
+      if (mktError) throw new Error(`marketing_data: ${mktError.message}`);
     }
-
-    const totalSynced = followersRows.length;
 
     return new Response(
       JSON.stringify({
         success: true,
-        synced: totalSynced,
+        synced: followersRows.length,
         followers_current: followersCount,
         period: { since, until },
         marketing_rows: marketingRows.length,
-        message: `${totalSynced} dias sincronizados (${marketingRows.length} métricas)`,
+        message: `${followersRows.length} dias sincronizados (${marketingRows.length} métricas)`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (err: any) {
-    console.error("Erro na Edge Function:", err);
+    console.error("Erro:", err);
     return new Response(
       JSON.stringify({ error: err.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
