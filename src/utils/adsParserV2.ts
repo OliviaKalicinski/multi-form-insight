@@ -202,9 +202,20 @@ export const filterAdsByMonth = (data: AdsData[], month: string): AdsData[] => {
  * Como dados de ads têm granularidade mensal, inclui meses que se sobrepõem ao intervalo.
  */
 export const filterAdsByDateRange = (data: AdsData[], start: Date, end: Date): AdsData[] => {
-  const startMonth = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
-  const endMonth = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}`;
+  const startStr = start.toISOString().split("T")[0]; // YYYY-MM-DD
+  const endStr = end.toISOString().split("T")[0];
+  const startMonth = startStr.substring(0, 7); // YYYY-MM
+  const endMonth = endStr.substring(0, 7);
+
   return data.filter((ad) => {
+    const dateField = ad["Início dos relatórios"] || "";
+
+    // Formato diário YYYY-MM-DD (dados da Meta API)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateField.trim())) {
+      return dateField >= startStr && dateField <= endStr;
+    }
+
+    // Formato mensal legado (dados CSV)
     const month = extractMonth(ad);
     return month >= startMonth && month <= endMonth;
   });
