@@ -3,24 +3,14 @@ import { useDashboard } from "@/contexts/DashboardContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { InstagramMetricsUploader } from "@/components/dashboard/InstagramMetricsUploader";
-import { AdsUploader } from "@/components/dashboard/AdsUploader";
 import { SalesUploader } from "@/components/dashboard/SalesUploader";
 import { UploadHistory } from "@/components/dashboard/UploadHistory";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Upload as UploadIcon,
-  BarChart3,
-  Instagram,
-  TrendingUp,
-  ShoppingCart,
-  CalendarDays,
-  ExternalLink,
-} from "lucide-react";
+import { Upload as UploadIcon, BarChart3, Instagram, ShoppingCart, CalendarDays, ExternalLink } from "lucide-react";
 
 const EXTERNAL_LINKS = {
-  ads: "https://adsmanager.facebook.com/adsmanager/reporting/view?act=539294475386018&business_id=458832849232355&selected_report_id=120227439365750622&ads_manager_write_regions=true#",
   instagram:
     "https://business.facebook.com/latest/insights/results?business_id=458832849232355&asset_id=444099275461175&time_range=%257B%2522end%2522%253A%25222026-02-22%2522%252C%2522start%2522%253A%25222026-02-11%2522%257D&platform=Instagram",
   vendas: "https://erp.olist.com/relatorios_personalizados#/view/4449",
@@ -83,7 +73,10 @@ export default function Upload() {
             <UploadIcon className="h-8 w-8" />
             Upload de Dados
           </h1>
-          <p className="text-muted-foreground mt-1">Faça upload dos arquivos CSV para alimentar o dashboard</p>
+          <p className="text-muted-foreground mt-1">
+            Faça upload dos arquivos CSV para alimentar o dashboard. Dados de anúncios são sincronizados automaticamente
+            via Meta API.
+          </p>
         </div>
 
         {hasAnyData && (
@@ -172,36 +165,6 @@ export default function Upload() {
             </CardHeader>
             <CardContent className="pt-2">
               <SalesUploader onDataLoaded={handleUploadComplete} />
-            </CardContent>
-          </Card>
-
-          {/* Anúncios */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <TrendingUp className="h-5 w-5 text-blue-500" />
-                  <CardTitle className="text-base">Anúncios (Meta)</CardTitle>
-                </div>
-                <div className="flex items-center gap-2">
-                  {adsData.length > 0 && (
-                    <Badge variant="secondary" className="font-normal text-xs">
-                      {adsData.length} registros
-                    </Badge>
-                  )}
-                  <a
-                    href={EXTERNAL_LINKS.ads}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-                  >
-                    Exportar <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-2">
-              <AdsUploader onDataLoaded={handleUploadComplete} />
             </CardContent>
           </Card>
         </div>
