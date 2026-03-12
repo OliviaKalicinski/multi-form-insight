@@ -4,6 +4,33 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
+import Login from "./pages/Login";
+import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+import Upload from "./pages/Upload";
+import Settings from "./pages/Settings";
+import Metas from "./pages/Metas";
+import Seguidores from "./pages/Seguidores";
+import Produtos from "./pages/Produtos";
+import Operacoes from "./pages/Operacoes";
+import Ads from "./pages/Ads";
+import PerformanceFinanceira from "./pages/PerformanceFinanceira";
+import ComportamentoCliente from "./pages/ComportamentoCliente";
+import AnaliseSamples from "./pages/AnaliseSamples";
+import Publico from "./pages/Publico";
+import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
+import Clientes from "./pages/Clientes";
+import ClientePerfil from "./pages/ClientePerfil";
+import Reclamacoes from "./pages/Reclamacoes";
+import Atendimentos from "./pages/Atendimentos";
+import ReclamacaoNova from "./pages/ReclamacaoNova";
+import RadarOperacional from "./pages/RadarOperacional";
+import KanbanOperacional from "./pages/KanbanOperacional";
+import Distribuidores from "./pages/Distribuidores";
+import LetsFly from "./pages/LetsFly";
+import NotFound from "./pages/NotFound";
+const queryClient = new QueryClient();
 
 // Layout component for authenticated pages
 const AuthenticatedLayout = ({ children }: { children: React.ReactNode }) => (
