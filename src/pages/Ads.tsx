@@ -407,6 +407,16 @@ const Ads = () => {
           <p className="text-sm text-muted-foreground">Performance de campanhas de Meta Ads</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncMetaAds}
+            disabled={isSyncing}
+            className="gap-1.5"
+          >
+            {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {isSyncing ? "Sincronizando..." : "Sincronizar Meta Ads"}
+          </Button>
           {/* FASE 5: Manual Objective Toggle */}
           {currentMonthAdsData.length > 0 && (
             <ToggleGroup
