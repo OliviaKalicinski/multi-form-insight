@@ -1,21 +1,24 @@
 
 
-# Inverter prioridade em `resolveAnimalSignal` + adicionar `CD_KIT_AMOSTRAS: 'caes'` ✅ IMPLEMENTADO
+## Plano: Limpar dados CSV + Botão "Sincronizar Meta Ads"
 
-## Resumo
-Invertida a ordem de detecção em `resolveAnimalSignal`: raw keyword detection agora tem prioridade sobre o mapa padrão quando `descricaoAjustada === "Kit de Amostras"`. Adicionado `CD_KIT_AMOSTRAS: 'caes'` ao `PRODUCT_ANIMAL_MAP` como fallback seguro.
-
-## Pipeline final
-```
-descricaoAjustada == "Kit de Amostras"
-  → raw tem "gato"?  → gatos
-  → raw tem "grub"?  → exoticos
-  → raw não detectável? → CD_KIT_AMOSTRAS → caes
+### 1. Limpar dados CSV antigos (via insert tool)
+Executar DELETE para remover registros com `source = 'csv'` ou `source IS NULL`:
+```sql
+DELETE FROM ads_data WHERE source = 'csv' OR source IS NULL;
 ```
 
-## Arquivos alterados
+### 2. Botão "Sincronizar Meta Ads" na página Ads.tsx
 
-| Arquivo | Ação |
-|---------|------|
-| `src/utils/petProfile.ts` | ✅ Invertida prioridade: raw detection antes do mapa padrão |
-| `src/data/operationalProducts.ts` | ✅ `CD_KIT_AMOSTRAS: 'caes'` adicionado ao `PRODUCT_ANIMAL_MAP` |
+Adicionar um botão no header da página (ao lado do ToggleGroup de objetivos) que:
+- Mostra ícone de refresh + texto "Sincronizar Meta Ads"
+- Ao clicar, faz POST para a Edge Function usando `supabase.functions.invoke('sync-meta-ads', { body: {} })`
+- Mostra estado de loading (spinner) durante a requisição
+- Exibe toast de sucesso com número de registros sincronizados ou toast de erro
+- Usa `useState` para controlar `isSyncing`
+
+**Chamada:** `supabase.functions.invoke('sync-meta-ads', { body: {} })` (seguindo a regra de nunca usar path direto)
+
+### Arquivos alterados
+- `src/pages/Ads.tsx` — adicionar botão + lógica de sync
+
