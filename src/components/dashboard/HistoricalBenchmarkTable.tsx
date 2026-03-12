@@ -1,67 +1,61 @@
+import { HistoricalBenchmark } from "@/utils/metricsCalculator";
+import { formatNumber } from "@/utils/metricsCalculator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import type { HistoricalBenchmark } from "@/utils/metricsCalculator";
 
-interface HistoricalBenchmarkTableProps {
+interface Props {
   benchmarks: HistoricalBenchmark[];
 }
 
-export function HistoricalBenchmarkTable({ benchmarks }: HistoricalBenchmarkTableProps) {
-  if (!benchmarks || benchmarks.length === 0) {
-    return (
-      <Card className="h-full">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Benchmarks Históricos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Dados históricos insuficientes para comparação.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+function Delta({ value }: { value: number }) {
+  if (Math.abs(value) < 1) return <span className="text-muted-foreground">-</span>;
+  const up = value > 0;
+  return (
+    <span className={`flex items-center gap-1 ${up ? "text-green-600" : "text-red-600"}`}>
+      {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {up ? "+" : ""}{value.toFixed(1)}%
+    </span>
+  );
+}
 
-  const getTrendIcon = (percentChange: number) => {
-    if (percentChange > 5) return <TrendingUp className="h-4 w-4 text-green-500" />;
-    if (percentChange < -5) return <TrendingDown className="h-4 w-4 text-red-500" />;
-    return <Minus className="h-4 w-4 text-muted-foreground" />;
-  };
-
-  const getTrendClass = (percentChange: number) => {
-    if (percentChange > 5) return "text-green-600";
-    if (percentChange < -5) return "text-red-600";
-    return "text-muted-foreground";
-  };
+export function HistoricalBenchmarkTable({ benchmarks }: Props) {
+  if (!benchmarks.length) return null;
 
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Benchmarks Históricos</CardTitle>
+        <CardTitle className="text-base">📊 Benchmarks Históricos</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {benchmarks.map((b) => (
-            <div key={b.metric} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-              <span className="text-sm font-medium">{b.metric}</span>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <span className="text-sm font-semibold">
-                    {b.currentValue.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
-                  </span>
-                  <span className="text-xs text-muted-foreground ml-2">
-                    vs {b.avg3months.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} méd. 3m
-                  </span>
-                </div>
-                <div className={`flex items-center gap-1 ${getTrendClass(b.vsAvg3)}`}>
-                  {getTrendIcon(b.vsAvg3)}
-                  <span className="text-xs font-medium">
-                    {b.vsAvg3 > 0 ? "+" : ""}{b.vsAvg3.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 font-medium">Métrica</th>
+                <th className="text-right py-2 font-medium">Atual</th>
+                <th className="text-right py-2 font-medium">Média 3m</th>
+                <th className="text-right py-2 font-medium">vs 3m</th>
+                <th className="text-right py-2 font-medium">Média 6m</th>
+                <th className="text-right py-2 font-medium">vs 6m</th>
+              </tr>
+            </thead>
+            <tbody>
+              {benchmarks.map(b => (
+                <tr key={b.metric} className="border-b last:border-0">
+                  <td className="py-2 font-medium">{b.metric}</td>
+                  <td className="text-right py-2">{formatNumber(b.currentValue)}</td>
+                  <td className="text-right py-2 text-muted-foreground">{formatNumber(b.avg3months)}</td>
+                  <td className="text-right py-2">
+                    <Delta value={b.vsAvg3} />
+                  </td>
+                  <td className="text-right py-2 text-muted-foreground">{formatNumber(b.avg6months)}</td>
+                  <td className="text-right py-2">
+                    <Delta value={b.vsAvg6} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </CardContent>
     </Card>
