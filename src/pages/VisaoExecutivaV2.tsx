@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { formatCurrency } from "@/utils/salesCalculator";
 import { getOfficialRevenue, isRevenueOrder, getB2COrders, getB2BOrders, getB2B2COrders } from "@/utils/revenue";
 import { isSampleProduct, isOnlySampleOrder, hasRegularProduct, isMaterialProduct } from "@/utils/samplesAnalyzer";
+import { breakdownOrders } from "@/utils/orderBreakdown";
 import { classifyProductsByAnimal } from "@/utils/petProfile";
 import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,8 +104,9 @@ function fmtMonth(yyyyMM: string): string {
   return format(new Date(Number(y), Number(m) - 1, 1), "MMM/yy", { locale: ptBR });
 }
 function buildProductRevenueMap(orders: ProcessedOrder[]) {
+  const exploded = breakdownOrders(orders);
   const map: Record<string, { revenue: number; qty: number }> = {};
-  orders.forEach((o) =>
+  exploded.forEach((o) =>
     o.produtos.forEach((p) => {
       if (!isSampleProduct(p) && !isMaterialProduct(p)) {
         const k = p.descricaoAjustada || p.descricao;
