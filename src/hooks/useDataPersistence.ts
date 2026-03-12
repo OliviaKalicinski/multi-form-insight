@@ -1,6 +1,13 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ProcessedOrder, AdsData, FollowersData, MarketingData, AdsMonthSummary, AudienceData } from "@/types/marketing";
+import {
+  ProcessedOrder,
+  AdsData,
+  FollowersData,
+  MarketingData,
+  AdsMonthSummary,
+  AudienceData,
+} from "@/types/marketing";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, parse } from "date-fns";
 
@@ -24,20 +31,26 @@ const createUploadHistory = async (
   recordCount: number,
   fileName: string | null,
   dateRangeStart: string | null,
-  dateRangeEnd: string | null
+  dateRangeEnd: string | null,
 ): Promise<string | null> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const { data, error } = await supabase.from("upload_history").insert({
-      data_type: dataType,
-      record_count: recordCount,
-      file_name: fileName,
-      user_id: user.id,
-      date_range_start: dateRangeStart,
-      date_range_end: dateRangeEnd,
-    }).select("id").single();
+    const { data, error } = await supabase
+      .from("upload_history")
+      .insert({
+        data_type: dataType,
+        record_count: recordCount,
+        file_name: fileName,
+        user_id: user.id,
+        date_range_start: dateRangeStart,
+        date_range_end: dateRangeEnd,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       console.error("Error creating upload history:", error);
@@ -54,17 +67,17 @@ const createUploadHistory = async (
 // Helper to parse various date formats
 const parseDateString = (dateStr: string): Date | null => {
   if (!dateStr) return null;
-  
+
   // Try ISO format first (YYYY-MM-DD)
   if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
     return parseISO(dateStr);
   }
-  
+
   // Try DD/MM/YYYY format
   if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
     return parse(dateStr, "dd/MM/yyyy", new Date());
   }
-  
+
   // Try to create a Date object
   const date = new Date(dateStr);
   return isNaN(date.getTime()) ? null : date;
@@ -73,7 +86,7 @@ const parseDateString = (dateStr: string): Date | null => {
 // Helper to fetch all rows with pagination (bypasses 1000 row limit)
 const fetchAllRows = async (
   tableName: "sales_data" | "ads_data" | "followers_data" | "marketing_data",
-  orderColumn: string
+  orderColumn: string,
 ): Promise<any[]> => {
   const PAGE_SIZE = 1000;
   let allData: any[] = [];
@@ -107,21 +120,16 @@ const fetchAllRows = async (
 function reconcileNFIdentity(orders: ProcessedOrder[]): ProcessedOrder[] {
   if (!orders || orders.length === 0) return orders;
 
-  const normalize = (value?: string | null): string =>
-    (value ?? "").toString().trim();
+  const normalize = (value?: string | null): string => (value ?? "").toString().trim();
 
-  const isEmptyId = (value?: string | null): boolean =>
-    !value || normalize(value) === "";
+  const isEmptyId = (value?: string | null): boolean => !value || normalize(value) === "";
 
   // 1. Indexar e-commerce por numeroPedidoPlataforma E numeroPedido
   const ecomMap = new Map<string, ProcessedOrder>();
-  orders.forEach(order => {
+  orders.forEach((order) => {
     if (order.fonteDados !== "ecommerce") return;
-    const keys = [
-      normalize(order.numeroPedidoPlataforma),
-      normalize(order.numeroPedido),
-    ].filter(k => k !== "");
-    keys.forEach(key => {
+    const keys = [normalize(order.numeroPedidoPlataforma), normalize(order.numeroPedido)].filter((k) => k !== "");
+    keys.forEach((key) => {
       if (!ecomMap.has(key)) ecomMap.set(key, order);
     });
   });
@@ -132,7 +140,7 @@ function reconcileNFIdentity(orders: ProcessedOrder[]): ProcessedOrder[] {
   let syntheticCount = 0;
   let alreadyIdentified = 0;
 
-  const reconciled = orders.map(order => {
+  const reconciled = orders.map((order) => {
     if (order.fonteDados !== "nf") return order;
 
     if (!isEmptyId(order.cpfCnpj)) {
@@ -145,10 +153,7 @@ function reconcileNFIdentity(orders: ProcessedOrder[]): ProcessedOrder[] {
     const platformKey = normalize(order.numeroPedidoPlataforma);
     const ownKey = normalize(order.numeroPedido);
 
-    const match =
-      (platformKey && ecomMap.get(platformKey)) ||
-      (ownKey && ecomMap.get(ownKey)) ||
-      null;
+    const match = (platformKey && ecomMap.get(platformKey)) || (ownKey && ecomMap.get(ownKey)) || null;
 
     if (match && !isEmptyId(match.cpfCnpj)) {
       matchCount++;
@@ -161,9 +166,13 @@ function reconcileNFIdentity(orders: ProcessedOrder[]): ProcessedOrder[] {
 
     // Fallback sintético — garante ID único
     syntheticCount++;
-    const rawKey = order.numeroPedido || order.numeroNota || order.idNota || `${new Date(order.dataVenda).toISOString()}-${order.valorTotal}`;
+    const rawKey =
+      order.numeroPedido ||
+      order.numeroNota ||
+      order.idNota ||
+      `${new Date(order.dataVenda).toISOString()}-${order.valorTotal}`;
     const encoded = btoa(unescape(encodeURIComponent(rawKey)));
-    const syntheticId = `nf-${encoded.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)}`;
+    const syntheticId = `nf-${encoded.replace(/[^a-zA-Z0-9]/g, "").slice(0, 20)}`;
     return { ...order, cpfCnpj: syntheticId };
   });
 
@@ -185,7 +194,7 @@ Taxa de reconciliação:    ${rate}%
 }
 
 // ── Sync de identificadores NF → customer_identifier ────────────────
-const normalizeCpf = (cpf: string) => cpf.replace(/\D/g, '').trim();
+const normalizeCpf = (cpf: string) => cpf.replace(/\D/g, "").trim();
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -216,7 +225,7 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
       if (!cpfRaw) continue;
 
       // Filtrar CPFs sintéticos
-      if (cpfRaw.startsWith('nf-')) {
+      if (cpfRaw.startsWith("nf-")) {
         syntheticCount++;
         continue;
       }
@@ -241,12 +250,12 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
 
     const allNormalizedCpfs = [...new Set([...emailMap.keys(), ...phoneMap.keys()])];
     if (allNormalizedCpfs.length === 0) {
-      console.log('[NF-IDENTIFIERS] Nenhum email/telefone válido encontrado');
+      console.log("[NF-IDENTIFIERS] Nenhum email/telefone válido encontrado");
       return;
     }
 
     // Coletar todos os CPFs originais únicos para lookup no banco
-    const allOriginalCpfs = [...new Set(allNormalizedCpfs.map(n => normalizedToOriginal.get(n)!))];
+    const allOriginalCpfs = [...new Set(allNormalizedCpfs.map((n) => normalizedToOriginal.get(n)!))];
 
     // Etapa 2: Batch lookup de customer.id em lotes de 200
     const LOOKUP_BATCH = 200;
@@ -257,9 +266,9 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
     for (let i = 0; i < lookupChunks.length; i++) {
       const chunk = lookupChunks[i];
       const { data: customers, error: lookupError } = await supabase
-        .from('customer')
-        .select('id, cpf_cnpj')
-        .in('cpf_cnpj', chunk);
+        .from("customer")
+        .select("id, cpf_cnpj")
+        .in("cpf_cnpj", chunk);
 
       if (lookupError) {
         console.error(`[NF-IDENTIFIERS] Erro batch lookup ${i + 1}/${lookupBatches}:`, lookupError);
@@ -267,7 +276,7 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
         continue;
       }
 
-      (customers || []).forEach(c => {
+      (customers || []).forEach((c) => {
         cpfToId.set(normalizeCpf(c.cpf_cnpj), c.id);
       });
     }
@@ -280,17 +289,17 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
     emailMap.forEach((emails, cpfNorm) => {
       const customerId = cpfToId.get(cpfNorm);
       if (!customerId) return;
-      emails.forEach(email => identifiers.push({ customer_id: customerId, type: 'email', value: email }));
+      emails.forEach((email) => identifiers.push({ customer_id: customerId, type: "email", value: email }));
     });
 
     phoneMap.forEach((phones, cpfNorm) => {
       const customerId = cpfToId.get(cpfNorm);
       if (!customerId) return;
-      phones.forEach(phone => identifiers.push({ customer_id: customerId, type: 'phone', value: phone }));
+      phones.forEach((phone) => identifiers.push({ customer_id: customerId, type: "phone", value: phone }));
     });
 
-    const emailCount = identifiers.filter(i => i.type === 'email').length;
-    const phoneCount = identifiers.filter(i => i.type === 'phone').length;
+    const emailCount = identifiers.filter((i) => i.type === "email").length;
+    const phoneCount = identifiers.filter((i) => i.type === "phone").length;
 
     // Etapa 4: Batch upsert em lotes de 500
     if (identifiers.length > 0) {
@@ -301,8 +310,8 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
       for (let i = 0; i < upsertChunks.length; i++) {
         const chunk = upsertChunks[i];
         const { error: upsertError } = await supabase
-          .from('customer_identifier')
-          .upsert(chunk, { onConflict: 'type,value', ignoreDuplicates: true });
+          .from("customer_identifier")
+          .upsert(chunk, { onConflict: "type,value", ignoreDuplicates: true });
 
         if (upsertError) {
           console.error(`[NF-IDENTIFIERS] Erro batch upsert ${i + 1}/${upsertBatches}:`, upsertError);
@@ -327,7 +336,7 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
   - Identificadores sincronizados: ${upsertedCount}
   - Tempo total: ${elapsed}s`);
   } catch (err) {
-    console.error('[NF-IDENTIFIERS] Erro inesperado:', err);
+    console.error("[NF-IDENTIFIERS] Erro inesperado:", err);
   }
 }
 
@@ -365,9 +374,7 @@ export const useDataPersistence = () => {
           .maybeSingle(),
       ]);
 
-      const lastUpdated = latestUploadRaw.data?.created_at 
-        ? new Date(latestUploadRaw.data.created_at) 
-        : null;
+      const lastUpdated = latestUploadRaw.data?.created_at ? new Date(latestUploadRaw.data.created_at) : null;
 
       // Transform sales data back to ProcessedOrder format
       const salesData: ProcessedOrder[] = (salesRaw || []).map((row: any) => ({
@@ -401,10 +408,10 @@ export const useDataPersistence = () => {
         fretePorConta: row.frete_por_conta || undefined,
         municipio: row.municipio || undefined,
         uf: row.uf || undefined,
-        fonteDados: (row.fonte_dados as 'nf' | 'ecommerce') || 'ecommerce',
+        fonteDados: (row.fonte_dados as "nf" | "ecommerce") || "ecommerce",
         segmentoCliente: row.segmento_cliente || undefined,
         numeroPedidoPlataforma: row.numero_pedido_plataforma || undefined,
-        tipoMovimento: row.tipo_movimento || 'venda',
+        tipoMovimento: row.tipo_movimento || "venda",
         observacoesNF: row.observacoes_nf || undefined,
       }));
 
@@ -415,22 +422,27 @@ export const useDataPersistence = () => {
       const adsData: AdsData[] = (adsRaw || []).map((row: any) => ({
         "Nome do anúncio": row.anuncio || "",
         "Nome do conjunto de anúncios": row.conjunto || "",
+        "Nome da campanha": row.campanha || "",
         "Valor usado (BRL)": String(row.gasto || 0),
-        "Impressões": String(row.impressoes || 0),
+        Impressões: String(row.impressoes || 0),
         "Cliques (todos)": String(row.cliques || 0),
-        "Compras": String(row.conversoes || 0),
-        "Valor de conversão da compra": String(row.receita || 0),
+        Compras: String(row.purchases ?? row.conversoes ?? 0),
+        "Valor de conversão da compra": String(row.purchase_value ?? row.receita ?? 0),
         "Início dos relatórios": row.data || "",
         "Término dos relatórios": row.data || "",
+        "Adições ao carrinho": String(row.add_to_cart ?? row.adicoes_carrinho ?? 0),
+        "Checkouts iniciados": String(row.initiate_checkout || 0),
+        "Visualizações de conteúdo": String(row.view_content || 0),
+        Leads: String(row.leads || 0),
+        "ROAS de resultados": String(row.roas ?? row.roas_resultados ?? 0),
         // Core metrics from database
-        "Alcance": String(row.alcance || 0),
-        "Resultados": String(row.resultados || 0),
+        Alcance: String(row.alcance || 0),
+        Resultados: String(row.resultados || 0),
         "Engajamentos com o post": String(row.engajamentos || 0),
         "Tipo de resultado": row.tipo_resultado || "",
         "Custo por resultado": String(row.custo_por_resultado || 0),
         "Visitas ao perfil do Instagram": String(row.visitas_perfil || 0),
-        // New fields from JSON format
-        "Objetivo": row.objetivo || "",
+        Objetivo: row.objetivo || "",
         "Status de veiculação": row.status_veiculacao || "",
         "Nível de veiculação": row.nivel_veiculacao || "",
         "CPM (custo por 1.000 impressões)": String(row.cpm || 0),
@@ -439,16 +451,19 @@ export const useDataPersistence = () => {
         "Cliques de saída": String(row.cliques_saida || 0),
         "Visualizações da página de destino do site": String(row.visualizacoes_pagina || 0),
         "Custo por visualização da página de destino": String(row.custo_por_visualizacao || 0),
-        "Adições ao carrinho": String(row.adicoes_carrinho || 0),
         "Custo por adição ao carrinho": String(row.custo_adicao_carrinho || 0),
         "Custo por compra": String(row.custo_por_compra || 0),
         "CPC (custo por clique no link)": String(row.cpc || 0),
+        "CPP (custo por alcance)": String(row.cpp || 0),
         "Cliques no link": String(row.cliques_link || 0),
-        "Frequência": String(row.frequencia || 0),
-        "Visualizações": String(row.visualizacoes || 0),
+        Frequência: String(row.frequencia || 0),
+        Visualizações: String(row.visualizacoes || 0),
         "Tipo de valor de resultado": "",
-        "ROAS de resultados": String(row.roas_resultados || 0),
         "Veiculação da campanha": row.status_veiculacao || "",
+        _ad_id: row.ad_id || "",
+        _campaign_id: row.campaign_id || "",
+        _adset_id: row.adset_id || "",
+        _source: row.source || "csv",
       }));
 
       // Transform followers data
@@ -501,18 +516,18 @@ export const useDataPersistence = () => {
     if (orders.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
     try {
-      const dates = orders.map(o => o.dataVenda).filter(d => d instanceof Date && !isNaN(d.getTime()));
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+      const dates = orders.map((o) => o.dataVenda).filter((d) => d instanceof Date && !isNaN(d.getTime()));
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map((d) => d.getTime()))) : null;
 
-      const isNFData = orders[0]?.fonteDados === 'nf';
+      const isNFData = orders[0]?.fonteDados === "nf";
 
       const uploadId = await createUploadHistory(
         isNFData ? "sales-nf" : "sales",
         orders.length,
         fileName || null,
         minDate ? format(minDate, "yyyy-MM-dd") : null,
-        maxDate ? format(maxDate, "yyyy-MM-dd") : null
+        maxDate ? format(maxDate, "yyyy-MM-dd") : null,
       );
 
       if (isNFData) {
@@ -556,15 +571,17 @@ export const useDataPersistence = () => {
           fonte_dados: "nf",
           segmento_cliente: order.segmentoCliente || null,
           numero_pedido_plataforma: order.numeroPedidoPlataforma || null,
-          tipo_movimento: order.tipoMovimento || 'venda',
+          tipo_movimento: order.tipoMovimento || "venda",
           observacoes_nf: order.observacoesNF || null,
         }));
 
         // --- Idempotência: snapshot + purge antes do upsert ---
-        const pedidos = [...new Set(rows.map(r => r.numero_pedido).filter(Boolean))] as string[];
-        const { data: { user } } = await supabase.auth.getUser();
+        const pedidos = [...new Set(rows.map((r) => r.numero_pedido).filter(Boolean))] as string[];
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-        const { data: purgedCount, error: rpcError } = await supabase.rpc('nf_snapshot_and_purge', {
+        const { data: purgedCount, error: rpcError } = await supabase.rpc("nf_snapshot_and_purge", {
           p_numero_pedidos: pedidos,
           p_upload_id: uploadId,
           p_usuario_id: user?.id,
@@ -572,13 +589,13 @@ export const useDataPersistence = () => {
         });
 
         if (rpcError) {
-          console.error('[NF-REPLACE] Erro na RPC:', rpcError);
+          console.error("[NF-REPLACE] Erro na RPC:", rpcError);
           if (uploadId) await supabase.from("upload_history").delete().eq("id", uploadId);
           throw rpcError;
         }
 
         if (purgedCount && purgedCount > 0) {
-          console.log(`[NF-REPLACE] ${purgedCount} registros substituídos: ${pedidos.join(', ')}`);
+          console.log(`[NF-REPLACE] ${purgedCount} registros substituídos: ${pedidos.join(", ")}`);
         }
 
         // Upsert com conflict em (numero_nota, serie) via index
@@ -594,10 +611,13 @@ export const useDataPersistence = () => {
 
         // Atualizar upload_history com stats de substituição
         if (uploadId && purgedCount && purgedCount > 0) {
-          await supabase.from("upload_history").update({
-            registros_substituidos: purgedCount,
-            pedidos_substituidos: pedidos,
-          } as any).eq("id", uploadId);
+          await supabase
+            .from("upload_history")
+            .update({
+              registros_substituidos: purgedCount,
+              pedidos_substituidos: pedidos,
+            } as any)
+            .eq("id", uploadId);
         }
 
         const result = { inserted: data?.length || 0, updated: 0, total: orders.length };
@@ -607,13 +627,12 @@ export const useDataPersistence = () => {
         await syncIdentifiers(orders);
 
         return result;
-
       } else {
         // --- Fluxo E-commerce (legado) ---
         // Verificar precedência: se já existe NF com mesmo numero_pedido, pular
-        const numeroPedidos = orders.map(o => o.numeroPedido).filter(Boolean);
+        const numeroPedidos = orders.map((o) => o.numeroPedido).filter(Boolean);
         let nfExistingPedidos = new Set<string>();
-        
+
         if (numeroPedidos.length > 0) {
           // Consultar em batches de 100
           for (let i = 0; i < numeroPedidos.length; i += 100) {
@@ -623,7 +642,7 @@ export const useDataPersistence = () => {
               .select("numero_pedido")
               .in("numero_pedido", batch)
               .eq("fonte_dados", "nf") as any);
-            
+
             if (existing) {
               existing.forEach((row: any) => {
                 if (row.numero_pedido) nfExistingPedidos.add(row.numero_pedido);
@@ -633,7 +652,7 @@ export const useDataPersistence = () => {
         }
 
         // Filtrar orders que já têm NF correspondente
-        const filteredOrders = orders.filter(o => !nfExistingPedidos.has(o.numeroPedido));
+        const filteredOrders = orders.filter((o) => !nfExistingPedidos.has(o.numeroPedido));
         const skipped = orders.length - filteredOrders.length;
         if (skipped > 0) {
           console.log(`🔒 [Precedência NF] ${skipped} pedidos ignorados (já existem como NF)`);
@@ -698,37 +717,37 @@ export const useDataPersistence = () => {
   const parseMonetaryValue = (value: string): number => {
     if (!value) return 0;
     const cleaned = value.trim();
-    
+
     // Check if it's a simple number without separators
     if (/^[\d]+\.?\d*$/.test(cleaned)) {
       return parseFloat(cleaned) || 0;
     }
-    
+
     // Detect format by checking position of last comma vs last dot
-    const lastComma = cleaned.lastIndexOf(',');
-    const lastDot = cleaned.lastIndexOf('.');
-    
+    const lastComma = cleaned.lastIndexOf(",");
+    const lastDot = cleaned.lastIndexOf(".");
+
     if (lastComma > -1 && lastDot > -1) {
       if (lastComma > lastDot) {
         // Brazilian format: 1.234,56 (comma is decimal separator)
-        return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+        return parseFloat(cleaned.replace(/\./g, "").replace(",", ".")) || 0;
       } else {
         // American format: 1,234.56 (dot is decimal separator)
-        return parseFloat(cleaned.replace(/,/g, '')) || 0;
+        return parseFloat(cleaned.replace(/,/g, "")) || 0;
       }
     }
-    
+
     if (lastComma > -1) {
       // Only comma: could be "1234,56" (Brazilian decimal)
       // Check if there are exactly 2 digits after comma
       const afterComma = cleaned.slice(lastComma + 1);
       if (afterComma.length <= 2) {
-        return parseFloat(cleaned.replace(',', '.')) || 0;
+        return parseFloat(cleaned.replace(",", ".")) || 0;
       }
       // Otherwise it's a thousand separator: "1,234"
-      return parseFloat(cleaned.replace(/,/g, '')) || 0;
+      return parseFloat(cleaned.replace(/,/g, "")) || 0;
     }
-    
+
     // Only dot or no separator
     return parseFloat(cleaned) || 0;
   };
@@ -752,292 +771,334 @@ export const useDataPersistence = () => {
   };
 
   // Save/upsert ads data with deduplication and upload_id (accumulates data instead of replacing)
-  const saveAdsData = useCallback(async (ads: AdsData[], fileName?: string): Promise<UpsertResult & { duplicatesAggregated: number }> => {
-    if (ads.length === 0) return { inserted: 0, updated: 0, total: 0, duplicatesAggregated: 0 };
+  const saveAdsData = useCallback(
+    async (ads: AdsData[], fileName?: string): Promise<UpsertResult & { duplicatesAggregated: number }> => {
+      if (ads.length === 0) return { inserted: 0, updated: 0, total: 0, duplicatesAggregated: 0 };
 
-    try {
-      console.log("📊 Adicionando novos dados de ads (modo acumulativo)...");
+      try {
+        console.log("📊 Adicionando novos dados de ads (modo acumulativo)...");
 
-      // Helper to get integer value from various possible column names
-      const getIntValue = (ad: AdsData, keys: string[]): number => {
-        for (const key of keys) {
-          const value = (ad as unknown as Record<string, string>)[key];
-          if (value !== undefined && value !== "" && value !== null) {
-            return parseInt(String(value).replace(/\./g, "").replace(/,/g, "")) || 0;
+        // Helper to get integer value from various possible column names
+        const getIntValue = (ad: AdsData, keys: string[]): number => {
+          for (const key of keys) {
+            const value = (ad as unknown as Record<string, string>)[key];
+            if (value !== undefined && value !== "" && value !== null) {
+              return parseInt(String(value).replace(/\./g, "").replace(/,/g, "")) || 0;
+            }
           }
-        }
-        return 0;
-      };
-
-      // Parse all rows with all new JSON fields
-      const rawRows = ads.map((ad) => {
-        // Extract date: prioritize "Início dos relatórios", then extract from "Mês"
-        const dataValue = ad["Início dos relatórios"] || extractDateFromMonth(ad["Mês"] || "") || "";
-        
-        return {
-          data: dataValue,
-          campanha: "",
-          conjunto: ad["Nome do conjunto de anúncios"] || "",
-          anuncio: ad["Nome do anúncio"] || "",
-          impressoes: getIntValue(ad, ["Impressões", "Impressoes"]),
-          cliques: getIntValue(ad, ["Cliques (todos)"]),
-          gasto: parseAndLimitMonetary(ad["Valor usado (BRL)"] || "0"),
-          conversoes: getIntValue(ad, ["Compras"]),
-          receita: parseAndLimitMonetary(ad["Valor de conversão da compra"] || "0"),
-          // Core engagement metrics
-          alcance: getIntValue(ad, ["Alcance", "Reach"]),
-          resultados: getIntValue(ad, ["Resultados", "Results"]),
-          engajamentos: getIntValue(ad, ["Engajamentos com o post", "Engajamentos"]),
-          tipo_resultado: ad["Tipo de resultado"] || "",
-          custo_por_resultado: parseAndLimitMonetary(ad["Custo por resultado"] || "0"),
-          visitas_perfil: getIntValue(ad, ["Visitas ao perfil do Instagram"]),
-          // NEW JSON FIELDS
-          objetivo: ad["Objetivo"] || "",
-          status_veiculacao: ad["Status de veiculação"] || "",
-          nivel_veiculacao: ad["Nível de veiculação"] || "",
-          frequencia: parseAndLimitMonetary(ad["Frequência"] || "0"),
-          visualizacoes: getIntValue(ad, ["Visualizações"]),
-          ctr: parseAndLimitPercentage(ad["CTR (todos)"] || "0"),
-          cpm: parseAndLimitMonetary(ad["CPM (custo por 1.000 impressões)"] || "0"),
-          ctr_saida: parseAndLimitPercentage(ad["CTR de saída"] || "0"),
-          cliques_saida: getIntValue(ad, ["Cliques de saída"]),
-          visualizacoes_pagina: getIntValue(ad, ["Visualizações da página de destino do site"]),
-          custo_por_visualizacao: parseAndLimitMonetary(ad["Custo por visualização da página de destino"] || "0"),
-          adicoes_carrinho: getIntValue(ad, ["Adições ao carrinho"]),
-          custo_adicao_carrinho: parseAndLimitMonetary(ad["Custo por adição ao carrinho"] || "0"),
-          custo_por_compra: parseAndLimitMonetary(ad["Custo por compra"] || "0"),
-          cpc: parseAndLimitMonetary(ad["CPC (custo por clique no link)"] || "0"),
-          cliques_link: getIntValue(ad, ["Cliques no link"]),
-          roas_resultados: parseAndLimitMonetary(ad["ROAS de resultados"] || "0"),
+          return 0;
         };
-      });
 
-      // Helper para preencher campo de texto se vazio
-      const fillIfEmpty = (
-        existing: Record<string, any>, 
-        incoming: Record<string, any>, 
-        field: string
-      ): void => {
-        if ((!existing[field] || existing[field] === "") && incoming[field]) {
-          existing[field] = incoming[field];
+        // Parse all rows with all new JSON fields
+        const rawRows = ads.map((ad) => {
+          // Extract date: prioritize "Início dos relatórios", then extract from "Mês"
+          const dataValue = ad["Início dos relatórios"] || extractDateFromMonth(ad["Mês"] || "") || "";
+
+          return {
+            data: dataValue,
+            campanha: "",
+            conjunto: ad["Nome do conjunto de anúncios"] || "",
+            anuncio: ad["Nome do anúncio"] || "",
+            impressoes: getIntValue(ad, ["Impressões", "Impressoes"]),
+            cliques: getIntValue(ad, ["Cliques (todos)"]),
+            gasto: parseAndLimitMonetary(ad["Valor usado (BRL)"] || "0"),
+            conversoes: getIntValue(ad, ["Compras"]),
+            receita: parseAndLimitMonetary(ad["Valor de conversão da compra"] || "0"),
+            // Core engagement metrics
+            alcance: getIntValue(ad, ["Alcance", "Reach"]),
+            resultados: getIntValue(ad, ["Resultados", "Results"]),
+            engajamentos: getIntValue(ad, ["Engajamentos com o post", "Engajamentos"]),
+            tipo_resultado: ad["Tipo de resultado"] || "",
+            custo_por_resultado: parseAndLimitMonetary(ad["Custo por resultado"] || "0"),
+            visitas_perfil: getIntValue(ad, ["Visitas ao perfil do Instagram"]),
+            // NEW JSON FIELDS
+            objetivo: ad["Objetivo"] || "",
+            status_veiculacao: ad["Status de veiculação"] || "",
+            nivel_veiculacao: ad["Nível de veiculação"] || "",
+            frequencia: parseAndLimitMonetary(ad["Frequência"] || "0"),
+            visualizacoes: getIntValue(ad, ["Visualizações"]),
+            ctr: parseAndLimitPercentage(ad["CTR (todos)"] || "0"),
+            cpm: parseAndLimitMonetary(ad["CPM (custo por 1.000 impressões)"] || "0"),
+            ctr_saida: parseAndLimitPercentage(ad["CTR de saída"] || "0"),
+            cliques_saida: getIntValue(ad, ["Cliques de saída"]),
+            visualizacoes_pagina: getIntValue(ad, ["Visualizações da página de destino do site"]),
+            custo_por_visualizacao: parseAndLimitMonetary(ad["Custo por visualização da página de destino"] || "0"),
+            adicoes_carrinho: getIntValue(ad, ["Adições ao carrinho"]),
+            custo_adicao_carrinho: parseAndLimitMonetary(ad["Custo por adição ao carrinho"] || "0"),
+            custo_por_compra: parseAndLimitMonetary(ad["Custo por compra"] || "0"),
+            cpc: parseAndLimitMonetary(ad["CPC (custo por clique no link)"] || "0"),
+            cliques_link: getIntValue(ad, ["Cliques no link"]),
+            roas_resultados: parseAndLimitMonetary(ad["ROAS de resultados"] || "0"),
+          };
+        });
+
+        // Helper para preencher campo de texto se vazio
+        const fillIfEmpty = (existing: Record<string, any>, incoming: Record<string, any>, field: string): void => {
+          if ((!existing[field] || existing[field] === "") && incoming[field]) {
+            existing[field] = incoming[field];
+          }
+        };
+
+        // Deduplicate by aggregating values for identical keys
+        const uniqueRowsMap = new Map<string, (typeof rawRows)[0]>();
+
+        rawRows.forEach((row) => {
+          const key = `${row.data}|${row.campanha}|${row.conjunto}|${row.anuncio}|${row.objetivo}`;
+
+          if (uniqueRowsMap.has(key)) {
+            // Aggregate values for duplicate entries
+            const existing = uniqueRowsMap.get(key)!;
+            existing.impressoes += row.impressoes;
+            existing.cliques += row.cliques;
+            existing.gasto += row.gasto;
+            existing.conversoes += row.conversoes;
+            existing.receita += row.receita;
+            existing.alcance += row.alcance;
+            existing.resultados += row.resultados;
+            existing.engajamentos += row.engajamentos;
+            existing.visitas_perfil += row.visitas_perfil;
+            existing.visualizacoes += row.visualizacoes;
+            existing.cliques_saida += row.cliques_saida;
+            existing.visualizacoes_pagina += row.visualizacoes_pagina;
+            existing.adicoes_carrinho += row.adicoes_carrinho;
+            existing.cliques_link += row.cliques_link;
+
+            // Preservar/atualizar campos de texto (fix: bug do objetivo vazio)
+            fillIfEmpty(existing, row, "objetivo");
+            fillIfEmpty(existing, row, "tipo_resultado");
+            fillIfEmpty(existing, row, "status_veiculacao");
+            fillIfEmpty(existing, row, "nivel_veiculacao");
+            fillIfEmpty(existing, row, "campanha");
+            fillIfEmpty(existing, row, "conjunto");
+            fillIfEmpty(existing, row, "anuncio");
+          } else {
+            uniqueRowsMap.set(key, { ...row });
+          }
+        });
+
+        const uniqueRows = Array.from(uniqueRowsMap.values());
+        const duplicatesAggregated = rawRows.length - uniqueRows.length;
+
+        console.log(
+          `📊 Deduplicação de anúncios: ${rawRows.length} linhas originais → ${uniqueRows.length} únicas (${duplicatesAggregated} duplicatas agregadas)`,
+        );
+
+        // Calculate date range
+        const dateStrings = uniqueRows.map((r) => r.data).filter(Boolean);
+        const dates = dateStrings.map((d) => parseDateString(d)).filter((d): d is Date => d !== null);
+        const minDate = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
+        const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map((d) => d.getTime()))) : null;
+
+        // Create upload history FIRST and get the ID
+        const uploadId = await createUploadHistory(
+          "ads",
+          uniqueRows.length,
+          fileName || null,
+          minDate ? format(minDate, "yyyy-MM-dd") : null,
+          maxDate ? format(maxDate, "yyyy-MM-dd") : null,
+        );
+
+        // Add upload_id to all rows
+        const rowsWithUploadId = uniqueRows.map((row) => ({
+          ...row,
+          upload_id: uploadId,
+        }));
+
+        // Use UPSERT to accumulate data - update existing rows, insert new ones
+        const { data, error } = await supabase
+          .from("ads_data")
+          .upsert(rowsWithUploadId, {
+            onConflict: "data,campanha,conjunto,anuncio,objetivo",
+            ignoreDuplicates: false,
+          })
+          .select();
+
+        if (error) {
+          // If insert fails, delete the upload history record
+          if (uploadId) {
+            await supabase.from("upload_history").delete().eq("id", uploadId);
+          }
+          throw error;
         }
-      };
 
-      // Deduplicate by aggregating values for identical keys
-      const uniqueRowsMap = new Map<string, typeof rawRows[0]>();
-      
-      rawRows.forEach((row) => {
-        const key = `${row.data}|${row.campanha}|${row.conjunto}|${row.anuncio}|${row.objetivo}`;
-        
-        if (uniqueRowsMap.has(key)) {
-          // Aggregate values for duplicate entries
-          const existing = uniqueRowsMap.get(key)!;
-          existing.impressoes += row.impressoes;
-          existing.cliques += row.cliques;
-          existing.gasto += row.gasto;
-          existing.conversoes += row.conversoes;
-          existing.receita += row.receita;
-          existing.alcance += row.alcance;
-          existing.resultados += row.resultados;
-          existing.engajamentos += row.engajamentos;
-          existing.visitas_perfil += row.visitas_perfil;
-          existing.visualizacoes += row.visualizacoes;
-          existing.cliques_saida += row.cliques_saida;
-          existing.visualizacoes_pagina += row.visualizacoes_pagina;
-          existing.adicoes_carrinho += row.adicoes_carrinho;
-          existing.cliques_link += row.cliques_link;
-          
-          // Preservar/atualizar campos de texto (fix: bug do objetivo vazio)
-          fillIfEmpty(existing, row, "objetivo");
-          fillIfEmpty(existing, row, "tipo_resultado");
-          fillIfEmpty(existing, row, "status_veiculacao");
-          fillIfEmpty(existing, row, "nivel_veiculacao");
-          fillIfEmpty(existing, row, "campanha");
-          fillIfEmpty(existing, row, "conjunto");
-          fillIfEmpty(existing, row, "anuncio");
-        } else {
-          uniqueRowsMap.set(key, { ...row });
-        }
-      });
+        const result = {
+          inserted: data?.length || 0,
+          updated: 0,
+          total: ads.length,
+          duplicatesAggregated,
+        };
 
-      const uniqueRows = Array.from(uniqueRowsMap.values());
-      const duplicatesAggregated = rawRows.length - uniqueRows.length;
+        setStats((prev) => ({ ...prev, adsCount: result.inserted, lastUpdated: new Date() }));
 
-      console.log(`📊 Deduplicação de anúncios: ${rawRows.length} linhas originais → ${uniqueRows.length} únicas (${duplicatesAggregated} duplicatas agregadas)`);
-
-      // Calculate date range
-      const dateStrings = uniqueRows.map(r => r.data).filter(Boolean);
-      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
-
-      // Create upload history FIRST and get the ID
-      const uploadId = await createUploadHistory(
-        "ads",
-        uniqueRows.length,
-        fileName || null,
-        minDate ? format(minDate, "yyyy-MM-dd") : null,
-        maxDate ? format(maxDate, "yyyy-MM-dd") : null
-      );
-
-      // Add upload_id to all rows
-      const rowsWithUploadId = uniqueRows.map(row => ({
-        ...row,
-        upload_id: uploadId,
-      }));
-
-      // Use UPSERT to accumulate data - update existing rows, insert new ones
-      const { data, error } = await supabase
-        .from("ads_data")
-        .upsert(rowsWithUploadId, { 
-          onConflict: "data,campanha,conjunto,anuncio,objetivo",
-          ignoreDuplicates: false 
-        })
-        .select();
-
-      if (error) {
-        // If insert fails, delete the upload history record
-        if (uploadId) {
-          await supabase.from("upload_history").delete().eq("id", uploadId);
-        }
+        return result;
+      } catch (error) {
+        console.error("Erro ao salvar anúncios:", error);
         throw error;
       }
-
-      const result = {
-        inserted: data?.length || 0,
-        updated: 0,
-        total: ads.length,
-        duplicatesAggregated,
-      };
-
-      setStats((prev) => ({ ...prev, adsCount: result.inserted, lastUpdated: new Date() }));
-
-      return result;
-    } catch (error) {
-      console.error("Erro ao salvar anúncios:", error);
-      throw error;
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Save/upsert followers data with upload_id
-  const saveFollowersData = useCallback(async (followers: FollowersData[], fileName?: string): Promise<UpsertResult> => {
-    if (followers.length === 0) return { inserted: 0, updated: 0, total: 0 };
+  const saveFollowersData = useCallback(
+    async (followers: FollowersData[], fileName?: string): Promise<UpsertResult> => {
+      if (followers.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
-    try {
-      // Calculate date range from followers data
-      const dateStrings = followers.map(f => f.Data).filter(Boolean);
-      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+      try {
+        // Calculate date range from followers data
+        const dateStrings = followers.map((f) => f.Data).filter(Boolean);
+        const dates = dateStrings.map((d) => parseDateString(d)).filter((d): d is Date => d !== null);
+        const minDate = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
+        const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map((d) => d.getTime()))) : null;
 
-      // Create upload history FIRST and get the ID
-      const uploadId = await createUploadHistory(
-        "followers",
-        followers.length,
-        fileName || null,
-        minDate ? format(minDate, "yyyy-MM-dd") : null,
-        maxDate ? format(maxDate, "yyyy-MM-dd") : null
-      );
+        // Create upload history FIRST and get the ID
+        const uploadId = await createUploadHistory(
+          "followers",
+          followers.length,
+          fileName || null,
+          minDate ? format(minDate, "yyyy-MM-dd") : null,
+          maxDate ? format(maxDate, "yyyy-MM-dd") : null,
+        );
 
-      const rows = followers.map((f) => ({
-        data: f.Data,
-        total_seguidores: parseInt(f.Seguidores?.replace(/\./g, "") || "0"),
-        novos_seguidores: 0,
-        unfollows: 0,
-        upload_id: uploadId,
-      }));
+        const rows = followers.map((f) => ({
+          data: f.Data,
+          total_seguidores: parseInt(f.Seguidores?.replace(/\./g, "") || "0"),
+          novos_seguidores: 0,
+          unfollows: 0,
+          upload_id: uploadId,
+        }));
 
-      const { data, error } = await supabase
-        .from("followers_data")
-        .upsert(rows, { onConflict: "data", ignoreDuplicates: false })
-        .select();
+        const { data, error } = await supabase
+          .from("followers_data")
+          .upsert(rows, { onConflict: "data", ignoreDuplicates: false })
+          .select();
 
-      if (error) {
-        // If insert fails, delete the upload history record
-        if (uploadId) {
-          await supabase.from("upload_history").delete().eq("id", uploadId);
+        if (error) {
+          // If insert fails, delete the upload history record
+          if (uploadId) {
+            await supabase.from("upload_history").delete().eq("id", uploadId);
+          }
+          throw error;
         }
+
+        const result = {
+          inserted: data?.length || 0,
+          updated: 0,
+          total: followers.length,
+        };
+
+        setStats((prev) => ({
+          ...prev,
+          followersCount: prev.followersCount + result.inserted,
+          lastUpdated: new Date(),
+        }));
+
+        return result;
+      } catch (error) {
+        console.error("Erro ao salvar seguidores:", error);
         throw error;
       }
-
-      const result = {
-        inserted: data?.length || 0,
-        updated: 0,
-        total: followers.length,
-      };
-
-      setStats((prev) => ({ ...prev, followersCount: prev.followersCount + result.inserted, lastUpdated: new Date() }));
-
-      return result;
-    } catch (error) {
-      console.error("Erro ao salvar seguidores:", error);
-      throw error;
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Save/upsert marketing data with upload_id
-  const saveMarketingData = useCallback(async (marketing: MarketingData[], fileName?: string): Promise<UpsertResult> => {
-    if (marketing.length === 0) return { inserted: 0, updated: 0, total: 0 };
+  const saveMarketingData = useCallback(
+    async (marketing: MarketingData[], fileName?: string): Promise<UpsertResult> => {
+      if (marketing.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
-    try {
-      // Calculate date range from marketing data
-      const dateStrings = marketing.map(m => m.Data).filter(Boolean);
-      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+      try {
+        // Calculate date range from marketing data
+        const dateStrings = marketing.map((m) => m.Data).filter(Boolean);
+        const dates = dateStrings.map((d) => parseDateString(d)).filter((d): d is Date => d !== null);
+        const minDate = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
+        const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map((d) => d.getTime()))) : null;
 
-      // Create upload history FIRST and get the ID
-      const uploadId = await createUploadHistory(
-        "marketing",
-        marketing.length,
-        fileName || null,
-        minDate ? format(minDate, "yyyy-MM-dd") : null,
-        maxDate ? format(maxDate, "yyyy-MM-dd") : null
-      );
-
-      // Each marketing row has multiple metrics, save each as separate row
-      const rows: { data: string; metrica: string; valor: number; upload_id: string | null }[] = [];
-
-      marketing.forEach((m) => {
-        rows.push(
-          { data: m.Data, metrica: "visualizacoes", valor: parseFloat(m.Visualizações?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId },
-          { data: m.Data, metrica: "visitas", valor: parseFloat(m.Visitas?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId },
-          { data: m.Data, metrica: "interacoes", valor: parseFloat(m.Interações?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId },
-          { data: m.Data, metrica: "clicks", valor: parseFloat(m["Clicks no Link"]?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId },
-          { data: m.Data, metrica: "alcance", valor: parseFloat(m.Alcance?.replace(/\./g, "").replace(",", ".") || "0"), upload_id: uploadId }
+        // Create upload history FIRST and get the ID
+        const uploadId = await createUploadHistory(
+          "marketing",
+          marketing.length,
+          fileName || null,
+          minDate ? format(minDate, "yyyy-MM-dd") : null,
+          maxDate ? format(maxDate, "yyyy-MM-dd") : null,
         );
-      });
 
-      const { data, error } = await supabase
-        .from("marketing_data")
-        .upsert(rows, { onConflict: "data,metrica", ignoreDuplicates: false })
-        .select();
+        // Each marketing row has multiple metrics, save each as separate row
+        const rows: { data: string; metrica: string; valor: number; upload_id: string | null }[] = [];
 
-      if (error) {
-        // If insert fails, delete the upload history record
-        if (uploadId) {
-          await supabase.from("upload_history").delete().eq("id", uploadId);
+        marketing.forEach((m) => {
+          rows.push(
+            {
+              data: m.Data,
+              metrica: "visualizacoes",
+              valor: parseFloat(m.Visualizações?.replace(/\./g, "").replace(",", ".") || "0"),
+              upload_id: uploadId,
+            },
+            {
+              data: m.Data,
+              metrica: "visitas",
+              valor: parseFloat(m.Visitas?.replace(/\./g, "").replace(",", ".") || "0"),
+              upload_id: uploadId,
+            },
+            {
+              data: m.Data,
+              metrica: "interacoes",
+              valor: parseFloat(m.Interações?.replace(/\./g, "").replace(",", ".") || "0"),
+              upload_id: uploadId,
+            },
+            {
+              data: m.Data,
+              metrica: "clicks",
+              valor: parseFloat(m["Clicks no Link"]?.replace(/\./g, "").replace(",", ".") || "0"),
+              upload_id: uploadId,
+            },
+            {
+              data: m.Data,
+              metrica: "alcance",
+              valor: parseFloat(m.Alcance?.replace(/\./g, "").replace(",", ".") || "0"),
+              upload_id: uploadId,
+            },
+          );
+        });
+
+        const { data, error } = await supabase
+          .from("marketing_data")
+          .upsert(rows, { onConflict: "data,metrica", ignoreDuplicates: false })
+          .select();
+
+        if (error) {
+          // If insert fails, delete the upload history record
+          if (uploadId) {
+            await supabase.from("upload_history").delete().eq("id", uploadId);
+          }
+          throw error;
         }
+
+        const result = {
+          inserted: data?.length || 0,
+          updated: 0,
+          total: marketing.length,
+        };
+
+        setStats((prev) => ({
+          ...prev,
+          marketingCount: prev.marketingCount + result.inserted,
+          lastUpdated: new Date(),
+        }));
+
+        return result;
+      } catch (error) {
+        console.error("Erro ao salvar marketing:", error);
         throw error;
       }
-
-      const result = {
-        inserted: data?.length || 0,
-        updated: 0,
-        total: marketing.length,
-      };
-
-      setStats((prev) => ({ ...prev, marketingCount: prev.marketingCount + result.inserted, lastUpdated: new Date() }));
-
-      return result;
-    } catch (error) {
-      console.error("Erro ao salvar marketing:", error);
-      throw error;
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Helper to map data type to table name
-  const getDataTableForType = (dataType: string): "sales_data" | "ads_data" | "followers_data" | "marketing_data" | null => {
+  const getDataTableForType = (
+    dataType: string,
+  ): "sales_data" | "ads_data" | "followers_data" | "marketing_data" | null => {
     const mapping: Record<string, "sales_data" | "ads_data" | "followers_data" | "marketing_data"> = {
       sales: "sales_data",
       ads: "ads_data",
@@ -1048,74 +1109,71 @@ export const useDataPersistence = () => {
   };
 
   // Delete a specific upload and its associated data
-  const deleteUpload = useCallback(async (uploadId: string): Promise<void> => {
-    try {
-      // First, fetch the data_type to know which table to clean
-      const { data: uploadEntry, error: fetchError } = await supabase
-        .from("upload_history")
-        .select("data_type")
-        .eq("id", uploadId)
-        .maybeSingle();
+  const deleteUpload = useCallback(
+    async (uploadId: string): Promise<void> => {
+      try {
+        // First, fetch the data_type to know which table to clean
+        const { data: uploadEntry, error: fetchError } = await supabase
+          .from("upload_history")
+          .select("data_type")
+          .eq("id", uploadId)
+          .maybeSingle();
 
-      if (fetchError) throw fetchError;
+        if (fetchError) throw fetchError;
 
-      if (!uploadEntry) {
-        throw new Error("Upload não encontrado");
-      }
-
-      // Delete data from the corresponding table by upload_id
-      const dataTable = getDataTableForType(uploadEntry.data_type);
-      if (dataTable) {
-        console.log(`🗑️ Deletando dados de ${dataTable} para upload_id: ${uploadId}`);
-        const { error: dataError } = await supabase
-          .from(dataTable)
-          .delete()
-          .eq("upload_id", uploadId);
-        
-        if (dataError) {
-          console.error(`Erro ao deletar dados de ${dataTable}:`, dataError);
-          // Continue to delete the upload history even if data deletion fails
+        if (!uploadEntry) {
+          throw new Error("Upload não encontrado");
         }
+
+        // Delete data from the corresponding table by upload_id
+        const dataTable = getDataTableForType(uploadEntry.data_type);
+        if (dataTable) {
+          console.log(`🗑️ Deletando dados de ${dataTable} para upload_id: ${uploadId}`);
+          const { error: dataError } = await supabase.from(dataTable).delete().eq("upload_id", uploadId);
+
+          if (dataError) {
+            console.error(`Erro ao deletar dados de ${dataTable}:`, dataError);
+            // Continue to delete the upload history even if data deletion fails
+          }
+        }
+
+        // Then delete the upload history record
+        const { error: historyError } = await supabase.from("upload_history").delete().eq("id", uploadId);
+
+        if (historyError) throw historyError;
+
+        // Reload stats after deletion
+        const [salesCount, adsCount, followersCount, marketingCount] = await Promise.all([
+          supabase.from("sales_data").select("id", { count: "exact", head: true }),
+          supabase.from("ads_data").select("id", { count: "exact", head: true }),
+          supabase.from("followers_data").select("id", { count: "exact", head: true }),
+          supabase.from("marketing_data").select("id", { count: "exact", head: true }),
+        ]);
+
+        setStats({
+          salesCount: salesCount.count || 0,
+          adsCount: adsCount.count || 0,
+          followersCount: followersCount.count || 0,
+          marketingCount: marketingCount.count || 0,
+          lastUpdated: new Date(),
+        });
+
+        toast({
+          title: "Importação excluída",
+          description: "Os dados foram removidos com sucesso.",
+        });
+      } catch (error) {
+        console.error("Erro ao excluir importação:", error);
+        toast({
+          title: "Erro ao excluir",
+          description: "Não foi possível excluir a importação.",
+          variant: "destructive",
+        });
+        throw error;
       }
-
-      // Then delete the upload history record
-      const { error: historyError } = await supabase
-        .from("upload_history")
-        .delete()
-        .eq("id", uploadId);
-
-      if (historyError) throw historyError;
-
-      // Reload stats after deletion
-      const [salesCount, adsCount, followersCount, marketingCount] = await Promise.all([
-        supabase.from("sales_data").select("id", { count: "exact", head: true }),
-        supabase.from("ads_data").select("id", { count: "exact", head: true }),
-        supabase.from("followers_data").select("id", { count: "exact", head: true }),
-        supabase.from("marketing_data").select("id", { count: "exact", head: true }),
-      ]);
-
-      setStats({
-        salesCount: salesCount.count || 0,
-        adsCount: adsCount.count || 0,
-        followersCount: followersCount.count || 0,
-        marketingCount: marketingCount.count || 0,
-        lastUpdated: new Date(),
-      });
-
-      toast({
-        title: "Importação excluída",
-        description: "Os dados foram removidos com sucesso.",
-      });
-    } catch (error) {
-      console.error("Erro ao excluir importação:", error);
-      toast({
-        title: "Erro ao excluir",
-        description: "Não foi possível excluir a importação.",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  }, [toast]);
+    },
+    [toast],
+  );
 
   // Clear all data
   const clearAllData = useCallback(async () => {
@@ -1173,62 +1231,66 @@ export const useDataPersistence = () => {
   }, [toast]);
 
   // Save Instagram individual metrics (from new format)
-  const saveInstagramMetrics = useCallback(async (
-    metrics: { data: string; metrica: string; valor: number }[],
-    fileName?: string
-  ): Promise<UpsertResult> => {
-    if (metrics.length === 0) return { inserted: 0, updated: 0, total: 0 };
+  const saveInstagramMetrics = useCallback(
+    async (metrics: { data: string; metrica: string; valor: number }[], fileName?: string): Promise<UpsertResult> => {
+      if (metrics.length === 0) return { inserted: 0, updated: 0, total: 0 };
 
-    try {
-      // Calculate date range
-      const dateStrings = metrics.map(m => m.data).filter(Boolean);
-      const dates = dateStrings.map(d => parseDateString(d)).filter((d): d is Date => d !== null);
-      const minDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : null;
-      const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
+      try {
+        // Calculate date range
+        const dateStrings = metrics.map((m) => m.data).filter(Boolean);
+        const dates = dateStrings.map((d) => parseDateString(d)).filter((d): d is Date => d !== null);
+        const minDate = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
+        const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map((d) => d.getTime()))) : null;
 
-      // Create upload history
-      const uploadId = await createUploadHistory(
-        "marketing",
-        metrics.length,
-        fileName || "Instagram Metrics",
-        minDate ? format(minDate, "yyyy-MM-dd") : null,
-        maxDate ? format(maxDate, "yyyy-MM-dd") : null
-      );
+        // Create upload history
+        const uploadId = await createUploadHistory(
+          "marketing",
+          metrics.length,
+          fileName || "Instagram Metrics",
+          minDate ? format(minDate, "yyyy-MM-dd") : null,
+          maxDate ? format(maxDate, "yyyy-MM-dd") : null,
+        );
 
-      // Prepare rows for insertion
-      const rows = metrics.map(m => ({
-        data: m.data,
-        metrica: m.metrica,
-        valor: m.valor,
-        upload_id: uploadId,
-      }));
+        // Prepare rows for insertion
+        const rows = metrics.map((m) => ({
+          data: m.data,
+          metrica: m.metrica,
+          valor: m.valor,
+          upload_id: uploadId,
+        }));
 
-      const { data, error } = await supabase
-        .from("marketing_data")
-        .upsert(rows, { onConflict: "data,metrica", ignoreDuplicates: false })
-        .select();
+        const { data, error } = await supabase
+          .from("marketing_data")
+          .upsert(rows, { onConflict: "data,metrica", ignoreDuplicates: false })
+          .select();
 
-      if (error) {
-        if (uploadId) {
-          await supabase.from("upload_history").delete().eq("id", uploadId);
+        if (error) {
+          if (uploadId) {
+            await supabase.from("upload_history").delete().eq("id", uploadId);
+          }
+          throw error;
         }
+
+        const result = {
+          inserted: data?.length || 0,
+          updated: 0,
+          total: metrics.length,
+        };
+
+        setStats((prev) => ({
+          ...prev,
+          marketingCount: prev.marketingCount + result.inserted,
+          lastUpdated: new Date(),
+        }));
+
+        return result;
+      } catch (error) {
+        console.error("Erro ao salvar métricas do Instagram:", error);
         throw error;
       }
-
-      const result = {
-        inserted: data?.length || 0,
-        updated: 0,
-        total: metrics.length,
-      };
-
-      setStats((prev) => ({ ...prev, marketingCount: prev.marketingCount + result.inserted, lastUpdated: new Date() }));
-
-      return result;
-    } catch (error) {
-      console.error("Erro ao salvar métricas do Instagram:", error);
-      throw error;
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Save audience data
   const saveAudienceData = useCallback(async (data: AudienceData, fileName?: string): Promise<UpsertResult> => {
@@ -1238,7 +1300,7 @@ export const useDataPersistence = () => {
         1,
         fileName || null,
         data.dataReferencia,
-        data.dataReferencia
+        data.dataReferencia,
       );
 
       const row = {
@@ -1250,9 +1312,7 @@ export const useDataPersistence = () => {
         upload_id: uploadId,
       };
 
-      const { error } = await supabase
-        .from("audience_data")
-        .upsert([row], { onConflict: "data_referencia" });
+      const { error } = await supabase.from("audience_data").upsert([row], { onConflict: "data_referencia" });
 
       if (error) throw error;
 
