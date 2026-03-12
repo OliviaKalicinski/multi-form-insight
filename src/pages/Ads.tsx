@@ -62,29 +62,29 @@ const getDecisionalStatus = (roas: number, thresholds: { excelente: number; medi
   if (roas >= thresholds.excelente)
     return {
       label: "Escalável",
-      color: "text-green-600",
-      bgColor: "bg-green-50 border-green-200",
-      description: "Performance excelente. Considerar aumentar investimento de forma controlada.",
+      color: "text-emerald-600",
+      dot: "bg-emerald-500",
+      description: "Performance dentro da meta. Candidato a escala controlada.",
     };
   if (roas >= thresholds.medio)
     return {
       label: "Saudável",
       color: "text-blue-600",
-      bgColor: "bg-blue-50 border-blue-200",
-      description: "Retorno dentro da meta. Manter e otimizar campanhas atuais.",
+      dot: "bg-blue-500",
+      description: "Retorno dentro da meta. Manter e otimizar.",
     };
   if (roas >= thresholds.minimo)
     return {
       label: "Em observação",
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-50 border-yellow-200",
-      description: "Retorno abaixo da meta. Revisar segmentação e criativos.",
+      color: "text-amber-600",
+      dot: "bg-amber-500",
+      description: "Abaixo da meta. Revisar segmentação e criativos.",
     };
   return {
-    label: "Prejuízo operacional",
-    color: "text-red-600",
-    bgColor: "bg-red-50 border-red-200",
-    description: "Investimento não se paga. Ação urgente necessária.",
+    label: "Abaixo da meta",
+    color: "text-red-500",
+    dot: "bg-red-500",
+    description: "ROAS abaixo do mínimo. Revisar campanhas antes de aumentar investimento.",
   };
 };
 
@@ -557,156 +557,127 @@ const Ads = () => {
               {objectivesSummary.isSalesView ? (
                 // ===== SALES VIEW =====
                 <>
-                  {/* ===== BLOCO 1: DECISÃO (3 cards) — FASE 2 ===== */}
-                  <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Card 1 — ROAS do Negócio */}
+                  {/* ===== BLOCO 1: DECISÃO — 1 card principal + satélites ===== */}
+                  <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Card principal — ROAS */}
                     <KPITooltip metricKey="roas">
-                      <Card className={cn("border-2 relative", roasStatusInfo.bgColor)}>
-                        <CardContent className="p-4">
-                          <div className="space-y-3">
+                      <Card className="lg:col-span-1 border relative">
+                        <CardContent className="p-5">
+                          <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Target className="h-4 w-4 text-primary" />
-                                <span className="text-sm font-semibold text-foreground">ROAS Ads</span>
+                              <span className="text-sm font-medium text-muted-foreground">ROAS</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className={cn("w-2 h-2 rounded-full", decisionalStatus.dot)} />
+                                <span className={cn("text-xs font-semibold", decisionalStatus.color)}>
+                                  {decisionalStatus.label}
+                                </span>
                               </div>
-                              <Badge
-                                variant={correctedRoas >= roasGoal ? "default" : "destructive"}
-                                className="text-xs"
-                              >
-                                {roasStatusInfo.badge}
-                              </Badge>
                             </div>
 
-                            <p className={cn("text-3xl font-bold", roasStatusInfo.color)}>
-                              {formatRoas(correctedRoas)}
-                            </p>
-
-                            <p className="text-xs text-muted-foreground">
-                              Receita pixel Meta ÷ investimento total em mídia
-                            </p>
-
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>{formatCurrency(metrics.valorConversaoTotal)}</span>
-                              <span>/</span>
-                              <span>{formatCurrency(totalInvestment)}</span>
+                            <div>
+                              <p className={cn("text-5xl font-bold tracking-tight", roasStatusInfo.color)}>
+                                {formatRoas(correctedRoas)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {formatCurrency(metrics.valorConversaoTotal)} receita ·{" "}
+                                {formatCurrency(totalInvestment)} investido
+                              </p>
                             </div>
 
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground">Meta: {roasGoal}x</span>
-                                {trends && (
-                                  <span
-                                    className={cn(
-                                      "flex items-center gap-0.5",
-                                      trends.roasTrend >= 0 ? "text-green-600" : "text-red-600",
-                                    )}
-                                  >
-                                    {trends.roasTrend >= 0 ? (
-                                      <TrendingUp className="h-3 w-3" />
-                                    ) : (
-                                      <TrendingDown className="h-3 w-3" />
-                                    )}
-                                    {trends.roasTrend >= 0 ? "+" : ""}
-                                    {trends.roasTrend.toFixed(0)}%
-                                  </span>
-                                )}
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Meta: {roasGoal}x</span>
+                                <span>{Math.round(roasProgress)}%</span>
                               </div>
                               <Progress value={roasProgress} className="h-1.5" />
                             </div>
 
-                            <p className="text-xs font-medium">{getRoasInterpretation(correctedRoas)}</p>
+                            <p className="text-xs text-muted-foreground">{decisionalStatus.description}</p>
+
+                            {trends && (
+                              <div
+                                className={cn(
+                                  "flex items-center gap-1 text-xs font-medium",
+                                  trends.roasTrend >= 0 ? "text-emerald-600" : "text-red-500",
+                                )}
+                              >
+                                {trends.roasTrend >= 0 ? (
+                                  <TrendingUp className="h-3 w-3" />
+                                ) : (
+                                  <TrendingDown className="h-3 w-3" />
+                                )}
+                                {trends.roasTrend >= 0 ? "+" : ""}
+                                {trends.roasTrend.toFixed(0)}% vs período anterior
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
                     </KPITooltip>
 
-                    {/* Card 2 — Resultado Bruto de Mídia */}
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Card className="border relative">
-                            <CardContent className="p-4">
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Coins className="h-4 w-4 text-primary" />
-                                    <span className="text-sm font-semibold text-foreground">
-                                      Resultado Bruto de Mídia
-                                    </span>
-                                  </div>
-                                  {totalInvestment > 0 && (
-                                    <Badge
-                                      variant={grossMediaResult >= 0 ? "default" : "destructive"}
-                                      className="text-xs"
-                                    >
-                                      {grossMediaResult >= 0 ? "Positivo" : "Negativo"}
-                                    </Badge>
-                                  )}
-                                </div>
+                    {/* Satélites — 2x2 grid */}
+                    <div className="lg:col-span-2 grid grid-cols-2 gap-3">
+                      {/* Investimento */}
+                      <Card className="border">
+                        <CardContent className="p-4">
+                          <p className="text-xs text-muted-foreground mb-1">Investido</p>
+                          <p className="text-2xl font-bold">{formatCurrency(totalInvestment)}</p>
+                          {trends && (
+                            <p
+                              className={cn(
+                                "text-xs mt-1 flex items-center gap-0.5",
+                                trends.investmentTrend >= 0 ? "text-emerald-600" : "text-red-500",
+                              )}
+                            >
+                              {trends.investmentTrend >= 0 ? (
+                                <TrendingUp className="h-3 w-3" />
+                              ) : (
+                                <TrendingDown className="h-3 w-3" />
+                              )}
+                              {trends.investmentTrend >= 0 ? "+" : ""}
+                              {trends.investmentTrend.toFixed(0)}% vs anterior
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
 
-                                <p
-                                  className={cn(
-                                    "text-3xl font-bold",
-                                    totalInvestment === 0
-                                      ? "text-muted-foreground"
-                                      : grossMediaResult >= 0
-                                        ? "text-foreground"
-                                        : "text-foreground",
-                                  )}
-                                >
-                                  {totalInvestment === 0
-                                    ? "—"
-                                    : `${grossMediaResult >= 0 ? "+" : ""}${formatCurrency(grossMediaResult)}`}
-                                </p>
+                      {/* Receita atribuída */}
+                      <Card className="border">
+                        <CardContent className="p-4">
+                          <p className="text-xs text-muted-foreground mb-1">Receita atribuída</p>
+                          <p className="text-2xl font-bold">{formatCurrency(metrics.valorConversaoTotal)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">via pixel Meta</p>
+                        </CardContent>
+                      </Card>
 
-                                <p className="text-xs text-muted-foreground">Receita - investimento total em mídia</p>
+                      {/* Resultado bruto */}
+                      <Card className="border">
+                        <CardContent className="p-4">
+                          <p className="text-xs text-muted-foreground mb-1">Resultado bruto</p>
+                          <p
+                            className={cn(
+                              "text-2xl font-bold",
+                              grossMediaResult >= 0 ? "text-foreground" : "text-red-500",
+                            )}
+                          >
+                            {grossMediaResult >= 0 ? "+" : ""}
+                            {formatCurrency(grossMediaResult)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">receita − investimento</p>
+                        </CardContent>
+                      </Card>
 
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span>{formatCurrency(metrics.valorConversaoTotal)}</span>
-                                  <span>−</span>
-                                  <span>{formatCurrency(totalInvestment)}</span>
-                                </div>
-
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Info className="h-3 w-3" />
-                                  <span>Não considera custos operacionais</span>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="max-w-xs">
-                          <p>Receita de vendas menos investimento total em mídia. Não considera custos operacionais.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    {/* Card 3 — Status Decisional */}
-                    <Card className={cn("border-2 relative", decisionalStatus.bgColor)}>
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Shield className="h-4 w-4 text-primary" />
-                            <span className="text-sm font-semibold text-foreground">Status Decisional</span>
-                          </div>
-
-                          <p className={cn("text-2xl font-bold", decisionalStatus.color)}>{decisionalStatus.label}</p>
-
-                          <p className="text-xs text-muted-foreground">{decisionalStatus.description}</p>
-
-                          <div className="text-xs text-muted-foreground space-y-1 pt-1 border-t">
-                            <div className="flex justify-between">
-                              <span>ROAS atual:</span>
-                              <span className="font-medium">{formatRoas(correctedRoas)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Meta mínima:</span>
-                              <span className="font-medium">{formatRoas(roasMinimo)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                      {/* Conversões */}
+                      <Card className="border">
+                        <CardContent className="p-4">
+                          <p className="text-xs text-muted-foreground mb-1">Conversões</p>
+                          <p className="text-2xl font-bold">{formatNumber(metrics.comprasTotal)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            CPA: {formatCurrency(metrics.custoPorCompra)}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
                   </section>
 
                   {/* ===== BLOCO 2: DIAGNÓSTICO RÁPIDO (2x4 grid) — FASE 3 ===== */}
