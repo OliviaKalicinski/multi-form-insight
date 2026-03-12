@@ -1,0 +1,1 @@
+DELETE FROM ads_data WHERE source = 'csv' OR source IS NULL;
