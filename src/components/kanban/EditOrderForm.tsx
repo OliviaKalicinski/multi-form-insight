@@ -26,6 +26,7 @@ interface EditOrderFormProps {
     forma_pagamento?: string | null;
     responsavel?: string | null;
     observacoes?: string | null;
+    apelido?: string | null;
     lote?: string | null;
     peso_total?: number | null;
     medidas?: string | null;
