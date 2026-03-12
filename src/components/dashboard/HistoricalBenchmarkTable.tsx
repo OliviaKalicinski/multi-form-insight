@@ -1,16 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-
-export interface Benchmark {
-  metric: string;
-  current: number;
-  previous: number;
-  avg: number;
-  percentChange: number;
-}
+import type { HistoricalBenchmark } from "@/utils/metricsCalculator";
 
 interface HistoricalBenchmarkTableProps {
-  benchmarks: Benchmark[];
+  benchmarks: HistoricalBenchmark[];
 }
 
 export function HistoricalBenchmarkTable({ benchmarks }: HistoricalBenchmarkTableProps) {
@@ -54,16 +47,16 @@ export function HistoricalBenchmarkTable({ benchmarks }: HistoricalBenchmarkTabl
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <span className="text-sm font-semibold">
-                    {b.current.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                    {b.currentValue.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
                   </span>
                   <span className="text-xs text-muted-foreground ml-2">
-                    vs {b.avg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} méd.
+                    vs {b.avg3months.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} méd. 3m
                   </span>
                 </div>
-                <div className={`flex items-center gap-1 ${getTrendClass(b.percentChange)}`}>
-                  {getTrendIcon(b.percentChange)}
+                <div className={`flex items-center gap-1 ${getTrendClass(b.vsAvg3)}`}>
+                  {getTrendIcon(b.vsAvg3)}
                   <span className="text-xs font-medium">
-                    {b.percentChange > 0 ? "+" : ""}{b.percentChange.toFixed(1)}%
+                    {b.vsAvg3 > 0 ? "+" : ""}{b.vsAvg3.toFixed(1)}%
                   </span>
                 </div>
               </div>
