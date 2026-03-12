@@ -466,11 +466,22 @@ export const useDataPersistence = () => {
         _source: row.source || "csv",
       }));
 
-      // Transform followers data — usa novos_seguidores (follows diários), não total acumulado
-      const followersData: FollowersData[] = (followersRaw || []).map((row: any) => ({
-        Data: row.data,
-        Seguidores: String(row.novos_seguidores ?? row.total_seguidores ?? 0),
-      }));
+      // Transform followers data — calcula novos_seguidores como delta do total acumulado
+      // Ordena por data crescente para calcular o delta corretamente
+      const followersRawSorted = [...(followersRaw || [])].sort((a, b) =>
+        a.data < b.data ? -1 : a.data > b.data ? 1 : 0,
+      );
+      const followersData: FollowersData[] = followersRawSorted.map((row: any, i: number) => {
+        const totalHoje = Number(row.total_seguidores) || 0;
+        const totalOntem = i > 0 ? Number(followersRawSorted[i - 1].total_seguidores) || 0 : 0;
+        const delta = i === 0 ? 0 : totalHoje - totalOntem;
+        // Usa novos_seguidores da API se disponível e > 0, senão usa delta
+        const novos = Number(row.novos_seguidores) > 0 ? Number(row.novos_seguidores) : Math.max(0, delta);
+        return {
+          Data: row.data,
+          Seguidores: String(novos),
+        };
+      });
 
       // Transform marketing data — pivot long→wide: agrupa por data antes de mapear
       const marketingByDate = new Map<
