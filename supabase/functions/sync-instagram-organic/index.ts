@@ -94,6 +94,7 @@ serve(async (req) => {
 
     console.log(`Seguidores atuais: ${followersCount}`);
     console.log(`Insights recebidos: ${insightsJson.data?.length || 0} métricas`);
+    console.log(`Insights raw sample:`, JSON.stringify(insightsJson.data?.[0] || {}).substring(0, 500));
 
     // ── 3. Organiza por data ───────────────────────────────────────────
     const byDate: Record<string, Record<string, number>> = {};
