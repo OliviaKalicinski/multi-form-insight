@@ -2,23 +2,20 @@ import { useState, useEffect, useCallback } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { InstagramMetricsUploader } from "@/components/dashboard/InstagramMetricsUploader";
 import { SalesUploader } from "@/components/dashboard/SalesUploader";
 import { UploadHistory } from "@/components/dashboard/UploadHistory";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload as UploadIcon, BarChart3, Instagram, ShoppingCart, CalendarDays, ExternalLink } from "lucide-react";
+import { Upload as UploadIcon, BarChart3, ShoppingCart, CalendarDays, ExternalLink } from "lucide-react";
 
 const EXTERNAL_LINKS = {
-  instagram:
-    "https://business.facebook.com/latest/insights/results?business_id=458832849232355&asset_id=444099275461175&time_range=%257B%2522end%2522%253A%25222026-02-22%2522%252C%2522start%2522%253A%25222026-02-11%2522%257D&platform=Instagram",
   vendas: "https://erp.olist.com/relatorios_personalizados#/view/4449",
 };
 
 export default function Upload() {
   const navigate = useNavigate();
-  const { marketingData, followersData, adsData, salesData, refreshFromDatabase } = useDashboard();
+  const { followersData, adsData, salesData, refreshFromDatabase } = useDashboard();
 
   const [latestDate, setLatestDate] = useState<string | null>(null);
 
@@ -62,7 +59,6 @@ export default function Upload() {
   };
 
   const hasAnyData = salesData.length > 0 || adsData.length > 0 || followersData.length > 0;
-  const instagramMetricsCount = marketingData.length + followersData.length;
 
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
@@ -100,28 +96,23 @@ export default function Upload() {
       </div>
 
       {/* Main Upload Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Instagram Metrics - Featured */}
-        <Card className="lg:col-span-1 border-primary/20">
-          <CardHeader>
+      <div className="grid grid-cols-1 gap-6">
+        {/* Vendas */}
+        <Card>
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
-                  <Instagram className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg">Métricas do Instagram</CardTitle>
-                  <CardDescription>Upload múltiplo de CSVs do Instagram</CardDescription>
-                </div>
+                <ShoppingCart className="h-5 w-5 text-emerald-500" />
+                <CardTitle className="text-base">Vendas</CardTitle>
               </div>
               <div className="flex items-center gap-2">
-                {instagramMetricsCount > 0 && (
-                  <Badge variant="secondary" className="font-normal">
-                    {instagramMetricsCount} registros
+                {salesData.length > 0 && (
+                  <Badge variant="secondary" className="font-normal text-xs">
+                    {salesData.length} pedidos
                   </Badge>
                 )}
                 <a
-                  href={EXTERNAL_LINKS.instagram}
+                  href={EXTERNAL_LINKS.vendas}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
@@ -131,43 +122,10 @@ export default function Upload() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <InstagramMetricsUploader onUploadComplete={handleUploadComplete} />
+          <CardContent className="pt-2">
+            <SalesUploader onDataLoaded={handleUploadComplete} />
           </CardContent>
         </Card>
-
-        {/* Other Uploads */}
-        <div className="space-y-4">
-          {/* Vendas */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <ShoppingCart className="h-5 w-5 text-emerald-500" />
-                  <CardTitle className="text-base">Vendas</CardTitle>
-                </div>
-                <div className="flex items-center gap-2">
-                  {salesData.length > 0 && (
-                    <Badge variant="secondary" className="font-normal text-xs">
-                      {salesData.length} pedidos
-                    </Badge>
-                  )}
-                  <a
-                    href={EXTERNAL_LINKS.vendas}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-                  >
-                    Exportar <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-2">
-              <SalesUploader onDataLoaded={handleUploadComplete} />
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       {/* Upload History */}
