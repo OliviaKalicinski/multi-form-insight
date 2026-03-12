@@ -71,7 +71,7 @@ serve(async (req) => {
     insightsUrl.searchParams.set("period", "day");
     insightsUrl.searchParams.set("since", since);
     insightsUrl.searchParams.set("until", until);
-    insightsUrl.searchParams.set("metric_type", "total_value");
+    // metric_type removed — "day" period returns daily values by default
     insightsUrl.searchParams.set("access_token", META_TOKEN);
 
     const insightsRes = await fetch(insightsUrl.toString());
