@@ -8,6 +8,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "1612",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-02 00:00:00",
@@ -16,6 +19,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "1054",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-03 00:00:00",
@@ -24,6 +30,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "420",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-04 00:00:00",
@@ -32,6 +41,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "798",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-05 00:00:00",
@@ -40,6 +52,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "213",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-06 00:00:00",
@@ -48,6 +63,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "132",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-07 00:00:00",
@@ -56,6 +74,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "778",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-08 00:00:00",
@@ -64,6 +85,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "330",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-09 00:00:00",
@@ -72,6 +96,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "47",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-10 00:00:00",
@@ -80,6 +107,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "49",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-11 00:00:00",
@@ -88,6 +118,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "74",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-12 00:00:00",
@@ -96,6 +129,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "51",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-13 00:00:00",
@@ -104,6 +140,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "32",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-14 00:00:00",
@@ -112,6 +151,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "26",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-15 00:00:00",
@@ -120,6 +162,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "19",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-16 00:00:00",
@@ -128,6 +173,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "28",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-17 00:00:00",
@@ -136,6 +184,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "24",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-18 00:00:00",
@@ -144,6 +195,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "18",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-19 00:00:00",
@@ -152,6 +206,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "17",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-20 00:00:00",
@@ -160,6 +217,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "14",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-21 00:00:00",
@@ -168,6 +228,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "16",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-22 00:00:00",
@@ -176,6 +239,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "13",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-23 00:00:00",
@@ -184,6 +250,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "23",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-24 00:00:00",
@@ -192,6 +261,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "6",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-25 00:00:00",
@@ -200,6 +272,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "10",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-26 00:00:00",
@@ -208,6 +283,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "15",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-27 00:00:00",
@@ -216,6 +294,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "797",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-28 00:00:00",
@@ -224,6 +305,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "887",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-29 00:00:00",
@@ -232,6 +316,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "2839",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-30 00:00:00",
@@ -240,6 +327,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "1200",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-01-31 00:00:00",
@@ -248,6 +338,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "292",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-01 00:00:00",
@@ -256,6 +349,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "317",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-02 00:00:00",
@@ -264,6 +360,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "459",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-03 00:00:00",
@@ -272,6 +371,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "128",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-04 00:00:00",
@@ -280,6 +382,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "464",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-05 00:00:00",
@@ -288,6 +393,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "256",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-06 00:00:00",
@@ -296,6 +404,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "193",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-07 00:00:00",
@@ -304,6 +415,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "778",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-08 00:00:00",
@@ -312,6 +426,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "697",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-09 00:00:00",
@@ -320,6 +437,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "398",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-10 00:00:00",
@@ -328,6 +448,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "132",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-11 00:00:00",
@@ -336,6 +459,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "344",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-12 00:00:00",
@@ -344,6 +470,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "654",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-13 00:00:00",
@@ -352,6 +481,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "767",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-14 00:00:00",
@@ -360,6 +492,9 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "1034",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
   {
     Data: "2025-02-15 00:00:00",
@@ -368,5 +503,8 @@ export const marketingData: MarketingData[] = [
     Interações: "0",
     "Clicks no Link": "0",
     Alcance: "658",
+    Engajamentos: "0",
+    Saves: "0",
+    Shares: "0",
   },
 ];
