@@ -1,4 +1,13 @@
-import { createContext, useContext, useState, useMemo, useEffect, useCallback, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  type Context,
+  type ReactNode,
+} from "react";
 import {
   MarketingData,
   FollowersData,
@@ -64,7 +73,27 @@ interface DashboardContextType {
   refreshFromDatabase: () => Promise<void>;
 }
 
-export const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
+type DashboardContextValue = DashboardContextType | undefined;
+type DashboardContextInstance = Context<DashboardContextValue>;
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __lovableDashboardContext__: DashboardContextInstance | undefined;
+}
+
+const getDashboardContext = (): DashboardContextInstance => {
+  if (!import.meta.env.DEV) {
+    return createContext<DashboardContextValue>(undefined);
+  }
+
+  if (!globalThis.__lovableDashboardContext__) {
+    globalThis.__lovableDashboardContext__ = createContext<DashboardContextValue>(undefined);
+  }
+
+  return globalThis.__lovableDashboardContext__;
+};
+
+export const DashboardContext = getDashboardContext();
 
 export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [marketingData, setMarketingDataState] = useState<MarketingData[]>([]);
