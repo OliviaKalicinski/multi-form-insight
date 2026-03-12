@@ -1,27 +1,41 @@
 import { useState, useMemo } from "react";
 import { AdsData } from "@/types/marketing";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { TrendingUp, TrendingDown, DollarSign, MousePointer, ShoppingCart, Package, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  MousePointer,
+  ShoppingCart,
+  Package,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Filter,
+  Info,
+  HelpCircle,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { classifyFunnelRole, classifyByObjective, calcMedian, getRoleMeta, CTR_REFERENCE, ROAS_REFERENCE, getEfficiencyAxisInfo, type FunnelRole, type AdObjectiveType } from "@/utils/adFormatClassifier";
-import { Info } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  classifyFunnelRole,
+  classifyByObjective,
+  calcMedian,
+  getRoleMeta,
+  CTR_REFERENCE,
+  ROAS_REFERENCE,
+  getEfficiencyAxisInfo,
+  type FunnelRole,
+  type AdObjectiveType,
+} from "@/utils/adFormatClassifier";
 
 interface AdsBreakdownProps {
   ads: AdsData[];
@@ -29,39 +43,43 @@ interface AdsBreakdownProps {
   objective?: AdObjectiveType;
 }
 
-const formatCurrency = (value: number) => 
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
-const formatNumber = (value: number) => 
-  new Intl.NumberFormat('pt-BR').format(value);
+const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(value);
 
 const parseValue = (value: string | number | undefined | null): number => {
   if (value === undefined || value === null) return 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-
   const s = String(value).trim();
   if (s === "" || s === "-" || s.toLowerCase() === "n/a") return 0;
-
   let cleaned = s.replace(/[^\d.,-]/g, "");
   const hasComma = cleaned.includes(",");
   const hasDot = cleaned.includes(".");
-
   if (hasComma && hasDot) {
     if (cleaned.lastIndexOf(".") > cleaned.lastIndexOf(",")) {
-      cleaned = cleaned.replace(/,/g, "");      // US: 1,234.56
+      cleaned = cleaned.replace(/,/g, "");
     } else {
-      cleaned = cleaned.replace(/\./g, "").replace(",", "."); // BR: 1.234,56
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
     }
   } else if (hasComma) {
     cleaned = cleaned.replace(",", ".");
   }
-
   const n = parseFloat(cleaned);
   return Number.isFinite(n) ? n : 0;
 };
 
-
-type SortColumn = 'investment' | 'impressions' | 'clicks' | 'ctr' | 'purchases' | 'roas' | 'classification' | null;
+type SortColumn =
+  | "investment"
+  | "impressions"
+  | "clicks"
+  | "ctr"
+  | "purchases"
+  | "roas"
+  | "cpc"
+  | "classification"
+  | null;
+type SortDirection = "asc" | "desc" | null;
 
 const CLASSIFICATION_WEIGHT: Record<FunnelRole, number> = {
   conversor: 0,
@@ -71,13 +89,20 @@ const CLASSIFICATION_WEIGHT: Record<FunnelRole, number> = {
 };
 
 const CLASSIFICATION_TOOLTIPS: Record<FunnelRole, string> = {
-  conversor: "Criativo atrai cliques e gera retorno financeiro. Bom candidato para escala.",
-  isca_atencao: "CTR alto indica criativo atrativo, mas o baixo ROAS mostra que os cliques não estão se convertendo em receita. Investigar oferta, público ou página.",
-  conversor_silencioso: "Poucos cliques, mas altamente qualificados. CTR baixo não é problema aqui.",
-  ineficiente: "Baixa atenção e baixo retorno financeiro. Avaliar pausa ou reformulação.",
+  conversor: "Criativo atrai cliques e gera retorno. Bom candidato para escala.",
+  isca_atencao: "CTR alto mas ROAS baixo. Cliques não convertem — investigar oferta ou página.",
+  conversor_silencioso: "Poucos cliques mas altamente qualificados. CTR baixo não é problema aqui.",
+  ineficiente: "Baixa atenção e baixo retorno. Avaliar pausa ou reformulação.",
 };
 
-const CLASSIFICATION_FILTER_OPTIONS: { value: string; label: string }[] = [
+const CLASSIFICATION_COLORS: Record<FunnelRole, string> = {
+  conversor: "bg-emerald-100 text-emerald-800",
+  isca_atencao: "bg-amber-100 text-amber-800",
+  conversor_silencioso: "bg-blue-100 text-blue-800",
+  ineficiente: "bg-red-100 text-red-800",
+};
+
+const CLASSIFICATION_FILTER_OPTIONS = [
   { value: "all", label: "Todas classificações" },
   { value: "conversor", label: "Conversor" },
   { value: "isca_atencao", label: "Isca de Atenção" },
@@ -85,11 +110,46 @@ const CLASSIFICATION_FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: "ineficiente", label: "Ineficiente" },
 ];
 
-const CLASSIFICATION_COLORS: Record<FunnelRole, string> = {
-  conversor: "bg-green-100 text-green-800",
-  isca_atencao: "bg-yellow-100 text-yellow-800",
-  conversor_silencioso: "bg-blue-100 text-blue-800",
-  ineficiente: "bg-red-100 text-red-800",
+const getEffectiveStatus = (ad: AdsData): string => {
+  // Prioridade: effective_status (da API) > status_veiculacao (do CSV)
+  const es = (ad as any).effective_status || ad["Veiculação da campanha"] || "";
+  return es.toUpperCase();
+};
+
+const isActiveAd = (ad: AdsData): boolean => {
+  const status = getEffectiveStatus(ad);
+  return status === "ACTIVE" || status === "WITH_ISSUES" || status === "";
+  // status vazio = dados históricos sem status — mostra por padrão
+};
+
+const getStatusBadge = (ad: AdsData) => {
+  const status = getEffectiveStatus(ad);
+  if (status === "ACTIVE") return <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px]">Ativo</Badge>;
+  if (status === "WITH_ISSUES")
+    return <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px]">Com problemas</Badge>;
+  if (status === "PAUSED")
+    return (
+      <Badge variant="secondary" className="text-[10px]">
+        Pausado
+      </Badge>
+    );
+  if (status === "ARCHIVED")
+    return (
+      <Badge variant="secondary" className="text-[10px] opacity-60">
+        Arquivado
+      </Badge>
+    );
+  if (status === "DELETED")
+    return (
+      <Badge variant="secondary" className="text-[10px] opacity-40">
+        Excluído
+      </Badge>
+    );
+  return (
+    <Badge variant="secondary" className="text-[10px]">
+      —
+    </Badge>
+  );
 };
 
 const getAdMetrics = (ad: AdsData) => {
@@ -98,386 +158,431 @@ const getAdMetrics = (ad: AdsData) => {
   const revenue = parseValue(ad["Valor de conversão da compra"]);
   const clicks = parseValue(ad["Cliques (todos)"]);
   const results = parseValue(ad["Resultados"]);
-
   const ctrFromCsv = parseValue(ad["CTR (todos)"]);
   const roasFromCsv = parseValue(ad["ROAS de resultados"]);
-
-  const ctr = ctrFromCsv > 0 ? ctrFromCsv : (impressions > 0 ? (clicks / impressions) * 100 : 0);
-  const roas = roasFromCsv > 0 ? roasFromCsv : (investment > 0 ? revenue / investment : 0);
+  const cpcFromCsv = parseValue(ad["CPC (custo por clique no link)"]);
+  const ctr = ctrFromCsv > 0 ? ctrFromCsv : impressions > 0 ? (clicks / impressions) * 100 : 0;
+  const roas = roasFromCsv > 0 ? roasFromCsv : investment > 0 ? revenue / investment : 0;
   const cpr = results > 0 && investment > 0 ? investment / results : 0;
-  const cpc = clicks > 0 && investment > 0 ? investment / clicks : 0;
-
-  // Classification deferred to component (needs median context)
+  const cpc = cpcFromCsv > 0 ? cpcFromCsv : clicks > 0 && investment > 0 ? investment / clicks : 0;
   return { ctr, roas, clicks, cpr, cpc, results };
 };
-type SortDirection = 'asc' | 'desc' | null;
 
-export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }: AdsBreakdownProps) => {
-  const [sortColumn, setSortColumn] = useState<SortColumn>('investment');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [filterResultType, setFilterResultType] = useState<string>("all");
+export const AdsBreakdown = ({ ads, selectedMonth, objective = "OUTCOME_SALES" }: AdsBreakdownProps) => {
+  const [sortColumn, setSortColumn] = useState<SortColumn>("investment");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [filterClassification, setFilterClassification] = useState<string>("all");
+  const [onlyActive, setOnlyActive] = useState<boolean>(true);
 
-  // Extrair tipos únicos de resultado
-  const uniqueResultTypes = useMemo(() => {
-    const types = new Set(ads.map(ad => ad["Tipo de resultado"]).filter(Boolean));
-    return Array.from(types).sort();
-  }, [ads]);
-
-  // Função de ordenação
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
-      // Ciclar: desc -> asc -> null (padrão)
-      if (sortDirection === 'desc') {
-        setSortDirection('asc');
-      } else if (sortDirection === 'asc') {
+      if (sortDirection === "desc") setSortDirection("asc");
+      else {
         setSortDirection(null);
         setSortColumn(null);
       }
     } else {
       setSortColumn(column);
-      setSortDirection('desc');
+      setSortDirection("desc");
     }
   };
 
-  // Axis info based on objective
   const axisInfo = useMemo(() => getEfficiencyAxisInfo(objective), [objective]);
-  const isSales = objective === 'OUTCOME_SALES' || !objective;
+  const isSales = objective === "OUTCOME_SALES" || !objective;
 
-  // Compute medians for classification
   const { medianCpr, medianCpc } = useMemo(() => {
-    const allMetrics = ads.filter(a => parseValue(a["Valor usado (BRL)"]) >= 10).map(getAdMetrics);
+    const all = ads.filter((a) => parseValue(a["Valor usado (BRL)"]) >= 10).map(getAdMetrics);
     return {
-      medianCpr: calcMedian(allMetrics.map(m => m.cpr).filter(v => v > 0)),
-      medianCpc: calcMedian(allMetrics.map(m => m.cpc).filter(v => v > 0)),
+      medianCpr: calcMedian(all.map((m) => m.cpr).filter((v) => v > 0)),
+      medianCpc: calcMedian(all.map((m) => m.cpc).filter((v) => v > 0)),
     };
   }, [ads]);
 
   const classifyAd = (m: ReturnType<typeof getAdMetrics>, investment: number): FunnelRole | null => {
     if (investment < 10) return null;
-    return classifyByObjective(objective, m.ctr, {
-      roas: m.roas, cpr: m.cpr, cpc: m.cpc, medianCpr, medianCpc,
-    });
+    return classifyByObjective(objective, m.ctr, { roas: m.roas, cpr: m.cpr, cpc: m.cpc, medianCpr, medianCpc });
   };
 
-  // Filtrar e ordenar anúncios
+  // Contagem para o toggle
+  const activeCount = useMemo(() => ads.filter(isActiveAd).length, [ads]);
+  const hasStatusData = useMemo(() => ads.some((a) => (a as any).effective_status), [ads]);
+
+  // Agrupar por campanha (para separadores visuais)
   const processedAds = useMemo(() => {
     let filtered = [...ads];
 
-    if (filterResultType !== "all") {
-      filtered = filtered.filter(ad => ad["Tipo de resultado"] === filterResultType);
-    }
-
+    if (onlyActive) filtered = filtered.filter(isActiveAd);
     if (filterClassification !== "all") {
-      filtered = filtered.filter(ad => {
+      filtered = filtered.filter((ad) => {
         const m = getAdMetrics(ad);
         const inv = parseValue(ad["Valor usado (BRL)"]);
         return classifyAd(m, inv) === filterClassification;
       });
     }
 
-    // Aplicar ordenação
     if (sortColumn && sortDirection) {
       filtered.sort((a, b) => {
-        let valueA = 0;
-        let valueB = 0;
-
+        let vA = 0,
+          vB = 0;
         switch (sortColumn) {
-          case 'investment':
-            valueA = parseValue(a["Valor usado (BRL)"]);
-            valueB = parseValue(b["Valor usado (BRL)"]);
+          case "investment":
+            vA = parseValue(a["Valor usado (BRL)"]);
+            vB = parseValue(b["Valor usado (BRL)"]);
             break;
-          case 'impressions':
-            valueA = parseValue(a["Impressões"]);
-            valueB = parseValue(b["Impressões"]);
+          case "impressions":
+            vA = parseValue(a["Impressões"]);
+            vB = parseValue(b["Impressões"]);
             break;
-          case 'clicks':
-            valueA = getAdMetrics(a).clicks;
-            valueB = getAdMetrics(b).clicks;
+          case "clicks":
+            vA = getAdMetrics(a).clicks;
+            vB = getAdMetrics(b).clicks;
             break;
-          case 'ctr':
-            valueA = getAdMetrics(a).ctr;
-            valueB = getAdMetrics(b).ctr;
+          case "ctr":
+            vA = getAdMetrics(a).ctr;
+            vB = getAdMetrics(b).ctr;
             break;
-          case 'purchases':
-            valueA = parseValue(a["Compras"]);
-            valueB = parseValue(b["Compras"]);
+          case "purchases":
+            vA = parseValue(a["Compras"]);
+            vB = parseValue(b["Compras"]);
             break;
-          case 'roas': {
-            const mA = getAdMetrics(a);
-            const mB = getAdMetrics(b);
-            valueA = isSales ? mA.roas : (objective === 'OUTCOME_ENGAGEMENT' ? mA.cpr : mA.cpc);
-            valueB = isSales ? mB.roas : (objective === 'OUTCOME_ENGAGEMENT' ? mB.cpr : mB.cpc);
-            // For CPR/CPC lower is better, invert sort
-            if (!isSales) { const tmp = valueA; valueA = valueB; valueB = tmp; }
+          case "cpc":
+            vA = getAdMetrics(a).cpc;
+            vB = getAdMetrics(b).cpc;
+            break;
+          case "roas": {
+            const mA = getAdMetrics(a),
+              mB = getAdMetrics(b);
+            vA = isSales ? mA.roas : objective === "OUTCOME_ENGAGEMENT" ? mA.cpr : mA.cpc;
+            vB = isSales ? mB.roas : objective === "OUTCOME_ENGAGEMENT" ? mB.cpr : mB.cpc;
+            if (!isSales) {
+              const tmp = vA;
+              vA = vB;
+              vB = tmp;
+            }
             break;
           }
-          case 'classification': {
-            const invA2 = parseValue(a["Valor usado (BRL)"]);
-            const invB2 = parseValue(b["Valor usado (BRL)"]);
-            const classA = classifyAd(getAdMetrics(a), invA2);
-            const classB = classifyAd(getAdMetrics(b), invB2);
-            valueA = classA ? CLASSIFICATION_WEIGHT[classA] : 99;
-            valueB = classB ? CLASSIFICATION_WEIGHT[classB] : 99;
+          case "classification": {
+            const cA = classifyAd(getAdMetrics(a), parseValue(a["Valor usado (BRL)"]));
+            const cB = classifyAd(getAdMetrics(b), parseValue(b["Valor usado (BRL)"]));
+            vA = cA ? CLASSIFICATION_WEIGHT[cA] : 99;
+            vB = cB ? CLASSIFICATION_WEIGHT[cB] : 99;
             break;
           }
         }
-
-        return sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
+        return sortDirection === "asc" ? vA - vB : vB - vA;
       });
     } else {
-      // Ordenação padrão por investimento
-      filtered.sort((a, b) => {
-        const investA = parseValue(a["Valor usado (BRL)"]);
-        const investB = parseValue(b["Valor usado (BRL)"]);
-        return investB - investA;
-      });
+      filtered.sort((a, b) => parseValue(b["Valor usado (BRL)"]) - parseValue(a["Valor usado (BRL)"]));
     }
 
     return filtered;
-  }, [ads, sortColumn, sortDirection, filterResultType, filterClassification]);
+  }, [ads, sortColumn, sortDirection, filterClassification, onlyActive]);
+
+  // Agrupar por campanha para cabeçalhos de grupo
+  const groupedRows = useMemo(() => {
+    const result: Array<{ type: "group"; campanha: string } | { type: "ad"; ad: AdsData; index: number }> = [];
+    let lastCampanha = "";
+    processedAds.forEach((ad, i) => {
+      const campanha = ad.campanha || ad["Nome do conjunto de anúncios"] || "";
+      if (campanha && campanha !== lastCampanha) {
+        result.push({ type: "group", campanha });
+        lastCampanha = campanha;
+      }
+      result.push({ type: "ad", ad, index: i });
+    });
+    return result;
+  }, [processedAds]);
 
   const getSortIcon = (column: SortColumn) => {
-    if (sortColumn !== column) {
-      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
-    }
-    return sortDirection === 'asc' 
-      ? <ArrowUp className="h-3 w-3 ml-1" />
-      : <ArrowDown className="h-3 w-3 ml-1" />;
+    if (sortColumn !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDirection === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
-  if (ads.length === 0) {
-    return null;
-  }
+  if (ads.length === 0) return null;
 
   return (
     <Card className="mt-6">
       <CardHeader>
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
               Detalhamento por Anúncio
             </CardTitle>
-            <CardDescription className="flex items-center gap-2 mt-2">
-              <span>
-                {processedAds.length} {processedAds.length !== ads.length && `de ${ads.length}`} anúncios
-              </span>
-              {(filterResultType !== "all" || filterClassification !== "all") && (
-                <Badge variant="secondary" className="ml-2">
-                  Filtrado
-                </Badge>
-              )}
+            <CardDescription className="mt-1">
+              {processedAds.length}
+              {processedAds.length !== ads.length && ` de ${ads.length}`} anúncios
+              {onlyActive && activeCount < ads.length && ` · ${ads.length - activeCount} pausados/arquivados ocultos`}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select value={filterClassification} onValueChange={setFilterClassification}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Classificação" />
-              </SelectTrigger>
-              <SelectContent>
-                {CLASSIFICATION_FILTER_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterResultType} onValueChange={setFilterResultType}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Tipo de resultado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os tipos</SelectItem>
-                {uniqueResultTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Toggle só ativos */}
+            <div className="flex items-center gap-2">
+              <Switch id="only-active" checked={onlyActive} onCheckedChange={setOnlyActive} />
+              <Label htmlFor="only-active" className="text-sm text-muted-foreground cursor-pointer">
+                Só ativos
+              </Label>
+              {!hasStatusData && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs">
+                        Status ainda não sincronizado via API. Execute "Sincronizar Meta Ads" para atualizar.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+
+            {/* Filtro classificação */}
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={filterClassification} onValueChange={setFilterClassification}>
+                <SelectTrigger className="w-[190px]">
+                  <SelectValue placeholder="Classificação" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLASSIFICATION_FILTER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Legenda — popover */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+                  <HelpCircle className="h-4 w-4" />
+                  Classificações
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80" align="end">
+                <p className="text-xs font-semibold mb-3 text-foreground">Regra de classificação</p>
+                <div className="space-y-2.5">
+                  {isSales ? (
+                    <>
+                      {[
+                        { cls: "conversor", rule: `CTR ≥ ${CTR_REFERENCE}% + ROAS ≥ ${ROAS_REFERENCE}x` },
+                        { cls: "isca_atencao", rule: `CTR ≥ ${CTR_REFERENCE}% + ROAS < ${ROAS_REFERENCE}x` },
+                        { cls: "conversor_silencioso", rule: `CTR < ${CTR_REFERENCE}% + ROAS ≥ ${ROAS_REFERENCE}x` },
+                        { cls: "ineficiente", rule: `CTR < ${CTR_REFERENCE}% + ROAS < ${ROAS_REFERENCE}x` },
+                      ].map(({ cls, rule }) => (
+                        <div key={cls} className="flex items-start gap-2">
+                          <span
+                            className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${CLASSIFICATION_COLORS[cls as FunnelRole]}`}
+                          >
+                            {getRoleMeta(cls as FunnelRole).label}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{rule}</span>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      {[
+                        { cls: "conversor", rule: `CTR ≥ ${CTR_REFERENCE}% + ${axisInfo.key.toUpperCase()} ≤ mediana` },
+                        {
+                          cls: "isca_atencao",
+                          rule: `CTR ≥ ${CTR_REFERENCE}% + ${axisInfo.key.toUpperCase()} > mediana`,
+                        },
+                        {
+                          cls: "conversor_silencioso",
+                          rule: `CTR < ${CTR_REFERENCE}% + ${axisInfo.key.toUpperCase()} ≤ mediana`,
+                        },
+                        {
+                          cls: "ineficiente",
+                          rule: `CTR < ${CTR_REFERENCE}% + ${axisInfo.key.toUpperCase()} > mediana`,
+                        },
+                      ].map(({ cls, rule }) => (
+                        <div key={cls} className="flex items-start gap-2">
+                          <span
+                            className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${CLASSIFICATION_COLORS[cls as FunnelRole]}`}
+                          >
+                            {getRoleMeta(cls as FunnelRole).label}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{rule}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  <div className="space-y-1.5 pt-2 border-t">
+                    {(Object.keys(CLASSIFICATION_TOOLTIPS) as FunnelRole[]).map((cls) => (
+                      <p key={cls} className="text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">{getRoleMeta(cls).label}:</span>{" "}
+                        {CLASSIFICATION_TOOLTIPS[cls]}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 items-center rounded-md border border-border/50 bg-muted/30 px-3 py-2">
-          <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <span className="text-xs text-muted-foreground mr-1">Regra:</span>
-          {isSales ? (
-            <>
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-800">
-                Conversor: CTR≥{CTR_REFERENCE}% + ROAS≥{ROAS_REFERENCE}x
-              </span>
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-yellow-100 text-yellow-800">
-                Isca: CTR≥{CTR_REFERENCE}% + ROAS&lt;{ROAS_REFERENCE}x
-              </span>
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800">
-                Silencioso: CTR&lt;{CTR_REFERENCE}% + ROAS≥{ROAS_REFERENCE}x
-              </span>
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-800">
-                Ineficiente: CTR&lt;{CTR_REFERENCE}% + ROAS&lt;{ROAS_REFERENCE}x
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-800">
-                Conversor: CTR≥{CTR_REFERENCE}% + {axisInfo.key.toUpperCase()} ≤ mediana
-              </span>
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-yellow-100 text-yellow-800">
-                Isca: CTR≥{CTR_REFERENCE}% + {axisInfo.key.toUpperCase()} &gt; mediana
-              </span>
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800">
-                Silencioso: CTR&lt;{CTR_REFERENCE}% + {axisInfo.key.toUpperCase()} ≤ mediana
-              </span>
-              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-red-100 text-red-800">
-                Ineficiente: CTR&lt;{CTR_REFERENCE}% + {axisInfo.key.toUpperCase()} &gt; mediana
-              </span>
-            </>
-          )}
-        </div>
       </CardHeader>
+
       <CardContent>
         <div className="rounded-md border">
           <Table className="table-fixed w-full">
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-[30%]">Anúncio</TableHead>
-                <TableHead className="text-right w-[8%]">
+              <TableRow className="bg-muted/30">
+                <TableHead className="w-[28%]">Anúncio / Conjunto</TableHead>
+                <TableHead className="text-right w-[9%]">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort('investment')}
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    onClick={() => handleSort("investment")}
                   >
-                    <div className="flex items-center justify-end gap-1">
-                      <DollarSign className="h-4 w-4" />
-                      Investimento
-                      {getSortIcon('investment')}
-                    </div>
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Invest.{getSortIcon("investment")}
                   </Button>
                 </TableHead>
                 <TableHead className="text-right w-[8%]">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort('impressions')}
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    onClick={() => handleSort("impressions")}
                   >
-                    <div className="flex items-center justify-end gap-1">
-                      Impressões
-                      {getSortIcon('impressions')}
-                    </div>
+                    Impressões{getSortIcon("impressions")}
                   </Button>
                 </TableHead>
-                <TableHead className="text-right w-[8%]">
+                <TableHead className="text-right w-[7%]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    onClick={() => handleSort("clicks")}
+                  >
+                    <MousePointer className="h-3.5 w-3.5" />
+                    Cliques{getSortIcon("clicks")}
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right w-[7%]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    onClick={() => handleSort("ctr")}
+                  >
+                    CTR{getSortIcon("ctr")}
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right w-[7%]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    onClick={() => handleSort("cpc")}
+                  >
+                    CPC{getSortIcon("cpc")}
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right w-[7%]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    onClick={() => handleSort("purchases")}
+                  >
+                    <ShoppingCart className="h-3.5 w-3.5" />
+                    {isSales ? "Compras" : "Result."}
+                    {getSortIcon("purchases")}
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right w-[7%]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    onClick={() => handleSort("roas")}
+                  >
+                    {isSales ? "ROAS" : axisInfo.key.toUpperCase()}
+                    {getSortIcon("roas")}
+                  </Button>
+                </TableHead>
+                <TableHead className="text-center w-[12%]">
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort('clicks')}
+                    onClick={() => handleSort("classification")}
                   >
-                    <div className="flex items-center justify-end gap-1">
-                      <MousePointer className="h-4 w-4" />
-                      Cliques
-                      {getSortIcon('clicks')}
-                    </div>
+                    Classificação{getSortIcon("classification")}
                   </Button>
                 </TableHead>
-                <TableHead className="text-right w-[8%]">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort('purchases')}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <ShoppingCart className="h-4 w-4" />
-                      {isSales ? 'Compras' : 'Resultados'}
-                      {getSortIcon('purchases')}
-                    </div>
-                  </Button>
-                </TableHead>
-                <TableHead className="text-right w-[8%]">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort('ctr')}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      CTR
-                      {getSortIcon('ctr')}
-                    </div>
-                  </Button>
-                </TableHead>
-                <TableHead className="text-right w-[8%]">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort('roas')}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      {isSales ? 'ROAS' : axisInfo.key.toUpperCase()}
-                      {getSortIcon('roas')}
-                    </div>
-                  </Button>
-                </TableHead>
-                <TableHead className="text-center w-[10%]">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort('classification')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Classificação
-                      {getSortIcon('classification')}
-                    </div>
-                  </Button>
-                </TableHead>
-                <TableHead className="w-[10%]">Tipo de Resultado</TableHead>
-                <TableHead className="w-[6%]">Status</TableHead>
+                <TableHead className="w-[8%] text-center">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {processedAds.map((ad, index) => {
+              {groupedRows.map((row, i) => {
+                if (row.type === "group") {
+                  return (
+                    <TableRow key={`group-${i}`} className="bg-muted/20 hover:bg-muted/20">
+                      <TableCell colSpan={10} className="py-1.5 px-4">
+                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                          {row.campanha}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
+
+                const { ad, index } = row;
                 const investment = parseValue(ad["Valor usado (BRL)"]);
                 const impressions = parseValue(ad["Impressões"]);
                 const purchases = parseValue(ad["Compras"]);
                 const results = parseValue(ad["Resultados"]);
-                const status = ad["Veiculação da campanha"];
                 const adMetrics = getAdMetrics(ad);
                 const { ctr, roas, clicks, cpr, cpc } = adMetrics;
                 const classification = classifyAd(adMetrics, investment);
-
-                // Dynamic efficiency metric
-                const effValue = isSales ? roas : (objective === 'OUTCOME_ENGAGEMENT' ? cpr : cpc);
+                const effValue = isSales ? roas : objective === "OUTCOME_ENGAGEMENT" ? cpr : cpc;
                 const effDisplay = isSales
-                  ? (roas > 0 ? `${roas.toFixed(2)}x` : '-')
-                  : (effValue > 0 ? formatCurrency(effValue) : '-');
+                  ? roas > 0
+                    ? `${roas.toFixed(2)}x`
+                    : "-"
+                  : effValue > 0
+                    ? formatCurrency(effValue)
+                    : "-";
                 const effGood = isSales
                   ? roas >= ROAS_REFERENCE
-                  : (objective === 'OUTCOME_ENGAGEMENT' ? (medianCpr > 0 && cpr <= medianCpr && cpr > 0) : (medianCpc > 0 && cpc <= medianCpc && cpc > 0));
-
+                  : objective === "OUTCOME_ENGAGEMENT"
+                    ? medianCpr > 0 && cpr <= medianCpr && cpr > 0
+                    : medianCpc > 0 && cpc <= medianCpc && cpc > 0;
                 const countValue = isSales ? purchases : results;
+                const conjunto = ad.conjunto || ad["Nome do conjunto de anúncios"] || "";
+                const isActive = isActiveAd(ad);
 
                 return (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium whitespace-normal break-words min-w-[200px]">
-                      {ad["Nome do anúncio"]}
+                  <TableRow key={index} className={!isActive && !onlyActive ? "opacity-50" : ""}>
+                    <TableCell className="font-medium">
+                      <div className="space-y-0.5">
+                        <p className="text-sm leading-snug whitespace-normal break-words">{ad["Nome do anúncio"]}</p>
+                        {conjunto && <p className="text-[11px] text-muted-foreground truncate">{conjunto}</p>}
+                      </div>
                     </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatCurrency(investment)}
+                    <TableCell className="text-right font-semibold text-sm">{formatCurrency(investment)}</TableCell>
+                    <TableCell className="text-right text-sm">{formatNumber(impressions)}</TableCell>
+                    <TableCell className="text-right text-sm">{formatNumber(clicks)}</TableCell>
+                    <TableCell className="text-right text-sm">
+                      <span className={ctr >= CTR_REFERENCE ? "text-emerald-600 font-medium" : "text-red-500"}>
+                        {ctr.toFixed(2)}%
+                      </span>
                     </TableCell>
-                    <TableCell className="text-right">
-                      {formatNumber(impressions)}
+                    <TableCell className="text-right text-sm">
+                      {cpc > 0 ? formatCurrency(cpc) : <span className="text-muted-foreground">—</span>}
                     </TableCell>
-                    <TableCell className="text-right">
-                      {formatNumber(clicks)}
-                    </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right text-sm">
                       {countValue > 0 ? (
-                        <span className="flex items-center justify-end gap-1 text-green-600 font-medium">
+                        <span className="flex items-center justify-end gap-1 text-emerald-600 font-medium">
                           <TrendingUp className="h-3 w-3" />
                           {formatNumber(countValue)}
                         </span>
@@ -485,18 +590,13 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                         <span className="text-muted-foreground">0</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <span className={ctr >= CTR_REFERENCE ? "text-green-600 font-medium" : "text-red-500"}>
-                        {ctr.toFixed(2)}%
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {effDisplay !== '-' ? (
-                        <span className={effGood ? "text-green-600 font-semibold" : "text-red-500"}>
+                    <TableCell className="text-right text-sm">
+                      {effDisplay !== "-" ? (
+                        <span className={effGood ? "text-emerald-600 font-semibold" : "text-red-500"}>
                           {effDisplay}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
@@ -504,7 +604,9 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold cursor-default ${CLASSIFICATION_COLORS[classification]}`}>
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold cursor-default ${CLASSIFICATION_COLORS[classification]}`}
+                              >
                                 {getRoleMeta(classification).label}
                               </span>
                             </TooltipTrigger>
@@ -514,21 +616,12 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = 'OUTCOME_SALES' }
                           </Tooltip>
                         </TooltipProvider>
                       ) : (
-                        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gray-100 text-gray-500">
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-gray-100 text-gray-400">
                           Sem dados
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <span className="text-sm">
-                        {ad["Tipo de resultado"] || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={status === "active" ? "default" : "secondary"}>
-                        {status === "active" ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </TableCell>
+                    <TableCell className="text-center">{getStatusBadge(ad)}</TableCell>
                   </TableRow>
                 );
               })}
