@@ -47,6 +47,51 @@ function chunkDateRange(since: string, until: string, chunkDays: number) {
   return chunks;
 }
 
+// ─── Busca effective_status de todos os anúncios da conta ───────────────────
+async function syncEffectiveStatus(supabase: any, metaToken: string, metaAccount: string): Promise<number> {
+  // Meta API: /act_ACCOUNT/ads retorna effective_status por ad_id
+  // Inclui todos os status: ACTIVE, PAUSED, DELETED, ARCHIVED, WITH_ISSUES
+  const adStatuses: { ad_id: string; effective_status: string }[] = [];
+
+  let nextUrl: string | null =
+    `https://graph.facebook.com/v20.0/${metaAccount}/ads?` +
+    `fields=id,effective_status&limit=500&access_token=${metaToken}`;
+
+  let pages = 0;
+  while (nextUrl && pages < 20) {
+    const res = await fetch(nextUrl);
+    if (!res.ok) {
+      const err = await res.json();
+      console.error(`Erro ao buscar effective_status: ${JSON.stringify(err)}`);
+      return 0;
+    }
+    const json = await res.json();
+    for (const ad of json.data || []) {
+      if (ad.id && ad.effective_status) {
+        adStatuses.push({ ad_id: ad.id, effective_status: ad.effective_status });
+      }
+    }
+    nextUrl = json.paging?.next || null;
+    pages++;
+  }
+
+  if (adStatuses.length === 0) return 0;
+
+  // Upsert em lotes: atualiza effective_status por ad_id
+  const BATCH = 100;
+  let updated = 0;
+  for (let i = 0; i < adStatuses.length; i += BATCH) {
+    const batch = adStatuses.slice(i, i + BATCH);
+    for (const { ad_id, effective_status } of batch) {
+      const { error } = await supabase.from("ads_data").update({ effective_status }).eq("ad_id", ad_id);
+      if (!error) updated++;
+    }
+  }
+
+  console.log(`effective_status atualizado para ${updated} registros (${adStatuses.length} anúncios únicos)`);
+  return adStatuses.length;
+}
+
 async function syncChunk(
   supabase: any,
   metaToken: string,
@@ -147,7 +192,6 @@ async function syncChunk(
       conversion_rate_ranking: insight.conversion_rate_ranking ?? null,
       outbound_clicks:
         getActionValue(insight.outbound_clicks || [], "outbound_click") || parseInt(insight.outbound_clicks) || 0,
-      // Video retention
       video_p25_watched:
         getActionValue(insight.video_p25_watched_actions || [], "video_view") ||
         parseInt((insight.video_p25_watched_actions || [])[0]?.value) ||
@@ -240,13 +284,22 @@ serve(async (req) => {
       }
     }
 
+    // ── Após sincronizar insights, buscar effective_status atual de cada anúncio ──
+    let statusCount = 0;
+    try {
+      statusCount = await syncEffectiveStatus(supabase, META_TOKEN, META_ACCOUNT);
+    } catch (err: any) {
+      console.error(`Erro ao sincronizar effective_status: ${err.message}`);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         synced: totalSynced,
+        status_updated: statusCount,
         period: { since, until },
         chunks: chunkResults,
-        message: `${totalSynced} registros sincronizados em ${chunks.length} chunks`,
+        message: `${totalSynced} registros sincronizados · ${statusCount} anúncios com status atualizado`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
