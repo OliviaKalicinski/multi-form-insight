@@ -27,6 +27,7 @@ import Atendimentos from "./pages/Atendimentos";
 import ReclamacaoNova from "./pages/ReclamacaoNova";
 import RadarOperacional from "./pages/RadarOperacional";
 import KanbanOperacional from "./pages/KanbanOperacional";
+import KanbanConciliacao from "./pages/KanbanConciliacao";
 import Distribuidores from "./pages/Distribuidores";
 import LetsFly from "./pages/LetsFly";
 import NotFound from "./pages/NotFound";
@@ -275,6 +276,17 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <KanbanOperacional />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/kanban-conciliacao"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <KanbanConciliacao />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }
