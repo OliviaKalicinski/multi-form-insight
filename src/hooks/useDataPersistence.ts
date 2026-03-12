@@ -496,6 +496,9 @@ export const useDataPersistence = () => {
         Interações: String(m.interacoes),
         "Clicks no Link": String(m.clicks),
         Alcance: String(m.alcance),
+        Engajamentos: "0",
+        Saves: "0",
+        Shares: "0",
       }));
 
       setStats({
