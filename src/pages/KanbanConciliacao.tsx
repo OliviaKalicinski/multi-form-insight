@@ -219,7 +219,7 @@ export default function KanbanConciliacao() {
     );
   }
 
-  const { conciliados, cardsComSugestao, nfsSemCard, totalNfs } = data;
+  const { conciliados = [], cardsComSugestao = [], nfsSemCard = [], totalNfs = 0 } = data ?? {};
   const cardsComMatch = cardsComSugestao.filter((r) => r.sugestoes.length > 0);
   const cardsSemMatch = cardsComSugestao.filter((r) => r.sugestoes.length === 0);
 
