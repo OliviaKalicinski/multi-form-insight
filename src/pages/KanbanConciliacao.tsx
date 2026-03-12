@@ -6,14 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Search, CheckCircle2, AlertCircle, FileQuestion, FileText } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,6 +17,7 @@ interface KanbanCard {
   nf_pendente: boolean;
   status_operacional: string;
   apelido: string | null;
+  destinatario_nome: string | null;
   valor_total_informado: number;
   created_at: string;
   customer: { nome: string; cpf_cnpj: string } | null;
@@ -76,19 +70,21 @@ function useReconciliacao() {
   return useQuery({
     queryKey: ["kanban-conciliacao"],
     queryFn: async () => {
-      const [{ data: cards, error: cardsErr }, { data: nfs, error: nfsErr }] =
-        await Promise.all([
-          supabase
-            .from("operational_orders")
-            .select("id, numero_nf, nf_pendente, status_operacional, apelido, valor_total_informado, created_at, customer:customer_id(nome, cpf_cnpj)")
-            .neq("status_operacional", "cancelado")
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("sales_data")
-            .select("id, numero_nota, serie, cliente_nome, cpf_cnpj, valor_total, data_emissao_nf, data_venda")
-            .not("numero_nota", "is", null)
-            .order("data_venda", { ascending: false }),
-        ]);
+      const [{ data: cards, error: cardsErr }, { data: nfs, error: nfsErr }] = await Promise.all([
+        supabase
+          .from("operational_orders")
+          .select(
+            "id, numero_nf, nf_pendente, status_operacional, apelido, valor_total_informado, created_at, destinatario_nome, customer:customer_id(nome, cpf_cnpj)",
+          )
+          .neq("status_operacional", "cancelado")
+          .in("natureza_pedido", ["B2B", "B2B2C"])
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("sales_data")
+          .select("id, numero_nota, serie, cliente_nome, cpf_cnpj, valor_total, data_emissao_nf, data_venda")
+          .not("numero_nota", "is", null)
+          .order("data_venda", { ascending: false }),
+      ]);
 
       if (cardsErr) throw cardsErr;
       if (nfsErr) throw nfsErr;
@@ -109,7 +105,7 @@ function useReconciliacao() {
       }
 
       const cardLabel = (c: KanbanCard) =>
-        c.apelido || c.customer?.nome || `#${c.id.slice(0, 6)}`;
+        c.apelido || c.customer?.nome || c.destinatario_nome || `#${c.id.slice(0, 6)}`;
 
       // Conciliados: card tem numero_nf E existe NF correspondente
       const conciliados: ConciliadoRow[] = [];
@@ -167,11 +163,14 @@ function useReconciliacao() {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const fmtDate = (s: string) => {
-  try { return format(new Date(s), "dd/MM/yy"); } catch { return s; }
+  try {
+    return format(new Date(s), "dd/MM/yy");
+  } catch {
+    return s;
+  }
 };
 
-const fmtBRL = (v: number) =>
-  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -196,9 +195,7 @@ export default function KanbanConciliacao() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-        Carregando conciliação…
-      </div>
+      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">Carregando conciliação…</div>
     );
   }
 
@@ -219,16 +216,12 @@ export default function KanbanConciliacao() {
         (r) =>
           r.numero_nf.toLowerCase().includes(q) ||
           r.cliente.toLowerCase().includes(q) ||
-          r.card_label.toLowerCase().includes(q)
+          r.card_label.toLowerCase().includes(q),
       )
     : conciliados;
 
   const filteredCardsSemNf = q
-    ? cardsSemNf.filter(
-        (r) =>
-          r.card_label.toLowerCase().includes(q) ||
-          r.cliente.toLowerCase().includes(q)
-      )
+    ? cardsSemNf.filter((r) => r.card_label.toLowerCase().includes(q) || r.cliente.toLowerCase().includes(q))
     : cardsSemNf;
 
   const filteredNfsSemCard = q
@@ -236,7 +229,7 @@ export default function KanbanConciliacao() {
         (r) =>
           r.numero_nota.toLowerCase().includes(q) ||
           r.cliente.toLowerCase().includes(q) ||
-          r.cpf_cnpj.toLowerCase().includes(q)
+          r.cpf_cnpj.toLowerCase().includes(q),
       )
     : nfsSemCard;
 
@@ -311,15 +304,9 @@ export default function KanbanConciliacao() {
       {/* Tabs */}
       <Tabs defaultValue="conciliados">
         <TabsList>
-          <TabsTrigger value="conciliados">
-            Conciliados ({filteredConciliados.length})
-          </TabsTrigger>
-          <TabsTrigger value="sem-nf">
-            Cards sem NF ({filteredCardsSemNf.length})
-          </TabsTrigger>
-          <TabsTrigger value="sem-card">
-            NFs sem card ({filteredNfsSemCard.length})
-          </TabsTrigger>
+          <TabsTrigger value="conciliados">Conciliados ({filteredConciliados.length})</TabsTrigger>
+          <TabsTrigger value="sem-nf">Cards sem NF ({filteredCardsSemNf.length})</TabsTrigger>
+          <TabsTrigger value="sem-card">NFs sem card ({filteredNfsSemCard.length})</TabsTrigger>
         </TabsList>
 
         {/* ── Conciliados ── */}
@@ -346,8 +333,7 @@ export default function KanbanConciliacao() {
                   </TableRow>
                 ) : (
                   filteredConciliados.map((r) => {
-                    const divergencia =
-                      Math.abs(r.valor_nf - r.valor_card) > 0.5;
+                    const divergencia = Math.abs(r.valor_nf - r.valor_card) > 0.5;
                     return (
                       <TableRow key={r.card_id}>
                         <TableCell className="font-mono text-sm">{r.numero_nf}</TableCell>
@@ -357,12 +343,12 @@ export default function KanbanConciliacao() {
                         <TableCell className={`text-right ${divergencia ? "text-amber-600 font-semibold" : ""}`}>
                           {fmtBRL(r.valor_card)}
                           {divergencia && (
-                            <span className="ml-1 text-xs" title="Divergência de valor">⚠️</span>
+                            <span className="ml-1 text-xs" title="Divergência de valor">
+                              ⚠️
+                            </span>
                           )}
                         </TableCell>
-                        <TableCell className="max-w-[160px] truncate text-sm">
-                          {r.card_label}
-                        </TableCell>
+                        <TableCell className="max-w-[160px] truncate text-sm">{r.card_label}</TableCell>
                         <TableCell>{statusBadge(r.card_status)}</TableCell>
                       </TableRow>
                     );
@@ -396,9 +382,7 @@ export default function KanbanConciliacao() {
                 ) : (
                   filteredCardsSemNf.map((r) => (
                     <TableRow key={r.card_id}>
-                      <TableCell className="max-w-[180px] truncate text-sm font-medium">
-                        {r.card_label}
-                      </TableCell>
+                      <TableCell className="max-w-[180px] truncate text-sm font-medium">{r.card_label}</TableCell>
                       <TableCell className="max-w-[180px] truncate">{r.cliente}</TableCell>
                       <TableCell className="text-right">{fmtBRL(r.valor_card)}</TableCell>
                       <TableCell>{fmtDate(r.criado_em)}</TableCell>
