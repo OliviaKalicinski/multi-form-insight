@@ -100,7 +100,8 @@ export const extractDailyValues = (
 export interface FunnelStep {
   label: string;
   value: number;
-  rate: number | null; // % vs step anterior
+  conversionRate: number | null; // % de conversão desta etapa vs anterior
+  conversionLabel: string | null; // ex: "1 em cada 2 pessoas"
   color: string;
 }
 
@@ -115,7 +116,7 @@ export function buildInstagramFunnel(data: import("@/types/marketing").Marketing
 
   const steps = [
     { label: "Impressões", value: impressoes },
-    { label: "Alcance", value: alcance },
+    { label: "Alcance único", value: alcance },
     { label: "Visitas ao Perfil", value: visitas },
     { label: "Interações", value: interacoes },
     { label: "Cliques no Link", value: cliques },
@@ -129,22 +130,35 @@ export function buildInstagramFunnel(data: import("@/types/marketing").Marketing
     "hsl(var(--chart-5))",
   ];
 
-  return steps.map((step, i) => ({
-    ...step,
-    color: colors[i],
-    rate: i === 0 || steps[i - 1].value === 0 ? null : (step.value / steps[i - 1].value) * 100,
-  }));
+  const conversionLabel = (rate: number): string => {
+    if (rate >= 50) return `${rate.toFixed(0)}% chegam aqui`;
+    if (rate >= 10) return `${rate.toFixed(1)}% chegam aqui`;
+    return `${rate.toFixed(2)}% chegam aqui`;
+  };
+
+  return steps.map((step, i) => {
+    const prev = i > 0 ? steps[i - 1].value : null;
+    const rate = prev && prev > 0 ? (step.value / prev) * 100 : null;
+    return {
+      ...step,
+      color: colors[i],
+      conversionRate: rate,
+      conversionLabel: rate !== null ? conversionLabel(rate) : null,
+    };
+  });
 }
 
 // ── Historical Benchmarks ─────────────────────────────────────────────────────
 
 export interface HistoricalBenchmark {
   metric: string;
-  currentValue: number;
-  avg3months: number;
-  avg6months: number;
-  vsAvg3: number; // % difference
+  // Médias diárias (normalizado — permite comparação justa com meses incompletos)
+  currentDailyAvg: number;
+  avg3monthsDailyAvg: number;
+  avg6monthsDailyAvg: number;
+  vsAvg3: number;
   vsAvg6: number;
+  daysInCurrentPeriod: number;
 }
 
 export function calculateHistoricalBenchmarks(
@@ -160,6 +174,14 @@ export function calculateHistoricalBenchmarks(
     key: keyof import("@/types/marketing").MarketingData,
   ) => data.reduce((s, d) => s + safeInt(d[key]), 0);
 
+  const dailyAvg = (
+    data: import("@/types/marketing").MarketingData[],
+    key: keyof import("@/types/marketing").MarketingData,
+  ) => {
+    if (!data.length) return 0;
+    return sumMetric(data, key) / data.length;
+  };
+
   // Build last N months before currentMonth
   const getPastMonths = (n: number): string[] => {
     const [y, m] = currentMonth.split("-").map(Number);
@@ -172,32 +194,34 @@ export function calculateHistoricalBenchmarks(
   const months3 = getPastMonths(3);
   const months6 = getPastMonths(6);
 
-  const avg = (months: string[], key: keyof import("@/types/marketing").MarketingData) => {
-    const totals = months.map((mo) => sumMetric(getMonthData(mo), key)).filter((v) => v > 0);
-    return totals.length > 0 ? totals.reduce((s, v) => s + v, 0) / totals.length : 0;
+  const avgDailyOverMonths = (months: string[], key: keyof import("@/types/marketing").MarketingData) => {
+    const avgs = months.map((mo) => dailyAvg(getMonthData(mo), key)).filter((v) => v > 0);
+    return avgs.length > 0 ? avgs.reduce((s, v) => s + v, 0) / avgs.length : 0;
   };
 
   const currentData = getMonthData(currentMonth);
+  const daysInCurrentPeriod = currentData.length;
 
   const metrics: { label: string; key: keyof import("@/types/marketing").MarketingData }[] = [
     { label: "Visualizações", key: "Visualizações" },
     { label: "Alcance", key: "Alcance" },
-    { label: "Visitas", key: "Visitas" },
+    { label: "Visitas ao Perfil", key: "Visitas" },
     { label: "Interações", key: "Interações" },
     { label: "Cliques no Link", key: "Clicks no Link" },
   ];
 
   return metrics.map(({ label, key }) => {
-    const currentValue = sumMetric(currentData, key);
-    const avg3 = avg(months3, key);
-    const avg6 = avg(months6, key);
+    const currentDailyAvg = dailyAvg(currentData, key);
+    const avg3 = avgDailyOverMonths(months3, key);
+    const avg6 = avgDailyOverMonths(months6, key);
     return {
       metric: label,
-      currentValue,
-      avg3months: Math.round(avg3),
-      avg6months: Math.round(avg6),
-      vsAvg3: avg3 > 0 ? ((currentValue - avg3) / avg3) * 100 : 0,
-      vsAvg6: avg6 > 0 ? ((currentValue - avg6) / avg6) * 100 : 0,
+      currentDailyAvg: Math.round(currentDailyAvg),
+      avg3monthsDailyAvg: Math.round(avg3),
+      avg6monthsDailyAvg: Math.round(avg6),
+      vsAvg3: avg3 > 0 ? ((currentDailyAvg - avg3) / avg3) * 100 : 0,
+      vsAvg6: avg6 > 0 ? ((currentDailyAvg - avg6) / avg6) * 100 : 0,
+      daysInCurrentPeriod,
     };
   });
 }
