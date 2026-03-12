@@ -62,6 +62,7 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
   const [pagamento, setPagamento] = useState("");
   const [responsavel, setResponsavel] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [apelido, setApelido] = useState("");
   const [pesoTotal, setPesoTotal] = useState("");
   const [medidas, setMedidas] = useState("");
   const [codigoRastreio, setCodigoRastreio] = useState("");
@@ -92,17 +93,19 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
       setPagamento(order.forma_pagamento || "");
       setResponsavel(order.responsavel || "");
       setObservacoes(order.observacoes || "");
+      setApelido(order.apelido || "");
       setPesoTotal(order.peso_total ? String(order.peso_total) : "");
       setMedidas(order.medidas || "");
       setCodigoRastreio(order.codigo_rastreio || "");
       setNumeroNf(order.numero_nf || "");
-      setItems(order.items.length > 0
-        ? order.items.map(it => ({
-            ...it,
-            lote: it.lote || "",
-            valor_unitario: it.valor_unitario ?? undefined,
-          }))
-        : [defaultItem()]
+      setItems(
+        order.items.length > 0
+          ? order.items.map((it) => ({
+              ...it,
+              lote: it.lote || "",
+              valor_unitario: it.valor_unitario ?? undefined,
+            }))
+          : [defaultItem()],
       );
       setTipoNf(order.tipo_nf || "");
       setDestNome(order.destinatario_nome || "");
@@ -117,7 +120,10 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
   }, [order]);
 
   useEffect(() => {
-    if (customerSearch.length < 2) { setCustomers([]); return; }
+    if (customerSearch.length < 2) {
+      setCustomers([]);
+      return;
+    }
     const timeout = setTimeout(async () => {
       const { data } = await supabase
         .from("customer")
@@ -172,7 +178,7 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
 
   if (!order) return null;
 
-  const suggestedTotal = items.every(i => i.valor_unitario != null)
+  const suggestedTotal = items.every((i) => i.valor_unitario != null)
     ? items.reduce((s, i) => s + i.quantidade * (i.valor_unitario || 0), 0)
     : null;
 
@@ -192,6 +198,7 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
       forma_pagamento: pagamento || null,
       responsavel: responsavel || null,
       observacoes: observacoes || null,
+      apelido: apelido || null,
       peso_total: pesoTotal ? parseFloat(pesoTotal) : null,
       medidas: medidas || null,
       codigo_rastreio: codigoRastreio || null,
@@ -228,12 +235,24 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
               </div>
             ) : (
               <div className="relative">
-                <Input placeholder="Buscar cliente..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
+                <Input
+                  placeholder="Buscar cliente..."
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                />
                 {customerSearch.length >= 2 && (
                   <div className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-md max-h-40 overflow-y-auto">
                     {customers.map((c) => (
-                      <button key={c.id} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
-                        onClick={() => { setSelectedCustomer(c); setCustomerSearch(""); setCustomers([]); }}>
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          setCustomerSearch("");
+                          setCustomers([]);
+                        }}
+                      >
                         {c.nome || "—"} <span className="text-muted-foreground">({c.cpf_cnpj})</span>
                       </button>
                     ))}
@@ -253,7 +272,9 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
           <div className="space-y-2">
             <Label>Natureza</Label>
             <Select value={natureza} onValueChange={setNatureza}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="B2C">B2C</SelectItem>
                 <SelectItem value="B2B">B2B</SelectItem>
@@ -274,7 +295,11 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Documento</Label>
-                  <Input value={destDocumento} onChange={(e) => setDestDocumento(e.target.value)} placeholder="CPF/CNPJ" />
+                  <Input
+                    value={destDocumento}
+                    onChange={(e) => setDestDocumento(e.target.value)}
+                    placeholder="CPF/CNPJ"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Email</Label>
@@ -287,7 +312,11 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Endereço *</Label>
-                <Input value={destEndereco} onChange={(e) => setDestEndereco(e.target.value)} placeholder="Rua, número, complemento" />
+                <Input
+                  value={destEndereco}
+                  onChange={(e) => setDestEndereco(e.target.value)}
+                  placeholder="Rua, número, complemento"
+                />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
@@ -316,16 +345,22 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
                   <div className="flex gap-2 items-start">
                     <div className="flex-1">
                       <Select value={item.produto} onValueChange={(v) => handleProductChange(index, v)}>
-                        <SelectTrigger><SelectValue placeholder="Produto" /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Produto" />
+                        </SelectTrigger>
                         <SelectContent>
                           {Object.entries(productsByBrandAndCategory).map(([brand, categories]) => (
                             <div key={brand}>
                               <div className="px-2 py-1.5 text-xs font-bold text-foreground border-b">{brand}</div>
                               {Object.entries(categories).map(([catLabel, products]) => (
                                 <div key={catLabel}>
-                                  <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{catLabel}</div>
+                                  <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                    {catLabel}
+                                  </div>
                                   {products.map((p) => (
-                                    <SelectItem key={p.id} value={p.id}>{p.nome} ({p.unidade})</SelectItem>
+                                    <SelectItem key={p.id} value={p.id}>
+                                      {p.nome} ({p.unidade})
+                                    </SelectItem>
                                   ))}
                                 </div>
                               ))}
@@ -335,7 +370,13 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
                       </Select>
                     </div>
                     {items.length > 1 && (
-                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => removeItem(index)}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        onClick={() => removeItem(index)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
@@ -372,7 +413,9 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
                         step="0.01"
                         min="0"
                         value={item.valor_unitario ?? ""}
-                        onChange={(e) => updateItem(index, "valor_unitario", e.target.value ? parseFloat(e.target.value) : undefined)}
+                        onChange={(e) =>
+                          updateItem(index, "valor_unitario", e.target.value ? parseFloat(e.target.value) : undefined)
+                        }
                       />
                     </div>
                   </div>
@@ -388,9 +431,7 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
             <Label>Valor Total Informado (R$)</Label>
             <Input type="number" step="0.01" min="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
             {suggestedTotal !== null && (
-              <p className="text-xs text-muted-foreground">
-                Sugerido: R$ {suggestedTotal.toFixed(2)}
-              </p>
+              <p className="text-xs text-muted-foreground">Sugerido: R$ {suggestedTotal.toFixed(2)}</p>
             )}
           </div>
 
@@ -398,7 +439,9 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
           <div className="space-y-2">
             <Label>Tipo NF</Label>
             <Select value={tipoNf} onValueChange={setTipoNf}>
-              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Opcional" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="venda">Venda</SelectItem>
                 <SelectItem value="bonificacao">Bonificação</SelectItem>
@@ -411,7 +454,9 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
           <div className="space-y-2">
             <Label>Forma de Pagamento</Label>
             <Select value={pagamento} onValueChange={setPagamento}>
-              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Opcional" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="pix">PIX</SelectItem>
                 <SelectItem value="boleto">Boleto</SelectItem>
@@ -420,6 +465,15 @@ export function EditOrderForm({ order, open, onOpenChange, onSubmit, isLoading }
                 <SelectItem value="outro">Outro</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Apelido do pedido</Label>
+            <Input
+              value={apelido}
+              onChange={(e) => setApelido(e.target.value)}
+              placeholder="Ex: Fiotec Jan, Kit Natal #3..."
+            />
           </div>
 
           <div className="space-y-2">
