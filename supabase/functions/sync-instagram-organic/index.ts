@@ -94,7 +94,8 @@ serve(async (req) => {
 
     console.log(`Seguidores atuais: ${followersCount}`);
     console.log(`Insights recebidos: ${insightsJson.data?.length || 0} métricas`);
-    console.log(`Insights raw sample:`, JSON.stringify(insightsJson.data?.[0] || {}).substring(0, 500));
+    console.log(`Insights raw sample:`, JSON.stringify(insightsJson.data?.[0] || {}).substring(0, 1000));
+    if (insightsJson.data?.[1]) console.log(`Insights raw sample 2:`, JSON.stringify(insightsJson.data[1]).substring(0, 1000));
 
     // ── 3. Organiza por data ───────────────────────────────────────────
     const byDate: Record<string, Record<string, number>> = {};
