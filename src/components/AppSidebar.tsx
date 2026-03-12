@@ -62,6 +62,7 @@ const navSections: NavSection[] = [
       { title: "Fotografia Operacional", url: "/visao-executiva-v2", icon: LayoutDashboard },
       { title: "Visão Executiva", url: "/dashboard", icon: LayoutDashboard },
       { title: "Kanban", url: "/kanban-operacional", icon: ClipboardList },
+      { title: "Conciliação NF", url: "/kanban-conciliacao", icon: ClipboardList },
       { title: "Operações", url: "/operacoes", icon: Truck },
       { title: "Produtos", url: "/produtos", icon: Package },
     ],
