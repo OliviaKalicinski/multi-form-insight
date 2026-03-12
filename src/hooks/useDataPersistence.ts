@@ -475,11 +475,29 @@ export const useDataPersistence = () => {
       // Transform marketing data — pivot long→wide: agrupa por data antes de mapear
       const marketingByDate = new Map<
         string,
-        { visualizacoes: number; alcance: number; visitas: number; clicks: number; interacoes: number }
+        {
+          visualizacoes: number;
+          alcance: number;
+          visitas: number;
+          clicks: number;
+          interacoes: number;
+          engajamentos: number;
+          saves: number;
+          shares: number;
+        }
       >();
       for (const row of marketingRaw || []) {
         if (!marketingByDate.has(row.data)) {
-          marketingByDate.set(row.data, { visualizacoes: 0, alcance: 0, visitas: 0, clicks: 0, interacoes: 0 });
+          marketingByDate.set(row.data, {
+            visualizacoes: 0,
+            alcance: 0,
+            visitas: 0,
+            clicks: 0,
+            interacoes: 0,
+            engajamentos: 0,
+            saves: 0,
+            shares: 0,
+          });
         }
         const entry = marketingByDate.get(row.data)!;
         const val = Number(row.valor) || 0;
@@ -488,6 +506,9 @@ export const useDataPersistence = () => {
         else if (row.metrica === "visitas") entry.visitas = val;
         else if (row.metrica === "clicks") entry.clicks = val;
         else if (row.metrica === "interacoes") entry.interacoes = val;
+        else if (row.metrica === "engajamentos") entry.engajamentos = val;
+        else if (row.metrica === "saves") entry.saves = val;
+        else if (row.metrica === "shares") entry.shares = val;
       }
       const marketingData: MarketingData[] = Array.from(marketingByDate.entries()).map(([date, m]) => ({
         Data: date,
@@ -496,9 +517,9 @@ export const useDataPersistence = () => {
         Interações: String(m.interacoes),
         "Clicks no Link": String(m.clicks),
         Alcance: String(m.alcance),
-        Engajamentos: "0",
-        Saves: "0",
-        Shares: "0",
+        Engajamentos: String(m.engajamentos),
+        Saves: String(m.saves),
+        Shares: String(m.shares),
       }));
 
       setStats({
