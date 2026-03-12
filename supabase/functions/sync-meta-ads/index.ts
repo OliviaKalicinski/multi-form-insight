@@ -3,8 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 function getActionValue(actions: any[], actionType: string): number {
@@ -53,13 +52,35 @@ async function syncChunk(
   metaToken: string,
   metaAccount: string,
   since: string,
-  until: string
+  until: string,
 ): Promise<number> {
   const fields = [
-    "ad_id","ad_name","adset_id","adset_name",
-    "campaign_id","campaign_name","date_start",
-    "impressions","reach","clicks","spend",
-    "cpc","cpm","ctr","cpp","actions","action_values",
+    "ad_id",
+    "ad_name",
+    "adset_id",
+    "adset_name",
+    "campaign_id",
+    "campaign_name",
+    "date_start",
+    "impressions",
+    "reach",
+    "clicks",
+    "spend",
+    "cpc",
+    "cpm",
+    "ctr",
+    "cpp",
+    "actions",
+    "action_values",
+    "quality_ranking",
+    "engagement_rate_ranking",
+    "conversion_rate_ranking",
+    "outbound_clicks",
+    "video_p25_watched_actions",
+    "video_p50_watched_actions",
+    "video_p75_watched_actions",
+    "video_p100_watched_actions",
+    "video_play_actions",
   ].join(",");
 
   const metaUrl = new URL(`https://graph.facebook.com/v20.0/${metaAccount}/insights`);
@@ -121,6 +142,36 @@ async function syncChunk(
       leads: getActionValue(actions, "lead"),
       roas,
       source: "api",
+      quality_ranking: insight.quality_ranking ?? null,
+      engagement_rate_ranking: insight.engagement_rate_ranking ?? null,
+      conversion_rate_ranking: insight.conversion_rate_ranking ?? null,
+      outbound_clicks:
+        getActionValue(insight.outbound_clicks || [], "outbound_click") || parseInt(insight.outbound_clicks) || 0,
+      // Video retention
+      video_p25_watched:
+        getActionValue(insight.video_p25_watched_actions || [], "video_view") ||
+        parseInt((insight.video_p25_watched_actions || [])[0]?.value) ||
+        0,
+      video_p50_watched:
+        getActionValue(insight.video_p50_watched_actions || [], "video_view") ||
+        parseInt((insight.video_p50_watched_actions || [])[0]?.value) ||
+        0,
+      video_p75_watched:
+        getActionValue(insight.video_p75_watched_actions || [], "video_view") ||
+        parseInt((insight.video_p75_watched_actions || [])[0]?.value) ||
+        0,
+      video_p100_watched:
+        getActionValue(insight.video_p100_watched_actions || [], "video_view") ||
+        parseInt((insight.video_p100_watched_actions || [])[0]?.value) ||
+        0,
+      hook_rate: (() => {
+        const plays =
+          getActionValue(insight.video_play_actions || [], "video_view") ||
+          parseInt((insight.video_play_actions || [])[0]?.value) ||
+          0;
+        const impr = parseInt(insight.impressions) || 0;
+        return impr > 0 && plays > 0 ? (plays / impr) * 100 : null;
+      })(),
     };
   });
 
@@ -147,10 +198,10 @@ serve(async (req) => {
     const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     if (!META_TOKEN || !META_ACCOUNT) {
-      return new Response(
-        JSON.stringify({ error: "META_ACCESS_TOKEN ou META_AD_ACCOUNT_ID não configurados" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "META_ACCESS_TOKEN ou META_AD_ACCOUNT_ID não configurados" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     let since: string;
@@ -197,12 +248,12 @@ serve(async (req) => {
         chunks: chunkResults,
         message: `${totalSynced} registros sincronizados em ${chunks.length} chunks`,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
