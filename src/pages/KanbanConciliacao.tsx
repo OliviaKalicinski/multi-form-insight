@@ -93,7 +93,7 @@ function useReconciliacao() {
       if (cardsErr) throw cardsErr;
       if (nfsErr) throw nfsErr;
 
-      const allCards = (cards ?? []) as KanbanCard[];
+      const allCards = (cards ?? []) as unknown as KanbanCard[];
       const allNfs = (nfs ?? []) as SalesRow[];
 
       // Index: numero_nf → card
