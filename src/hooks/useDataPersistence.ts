@@ -461,6 +461,7 @@ export const useDataPersistence = () => {
         "Tipo de valor de resultado": "",
         "Veiculação da campanha": row.status_veiculacao || "",
         _ad_id: row.ad_id || "",
+        effective_status: row.effective_status || "",
         _campaign_id: row.campaign_id || "",
         _adset_id: row.adset_id || "",
         _source: row.source || "csv",
@@ -470,6 +471,7 @@ export const useDataPersistence = () => {
       const followersData: FollowersData[] = (followersRaw || []).map((row: any) => ({
         Data: row.data,
         Seguidores: String(Number(row.novos_seguidores) || 0),
+        TotalSeguidores: row.total_seguidores != null ? String(Number(row.total_seguidores)) : undefined,
       }));
 
       // Transform marketing data — pivot long→wide: agrupa por data antes de mapear
