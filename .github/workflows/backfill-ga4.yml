@@ -1,0 +1,17 @@
+name: Backfill GA4 pages_per_session
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invocar sync-ga4 modo full
+        run: |
+          curl -s -X POST \
+            "https://hqpupwtddwcvakhhjvcq.supabase.co/functions/v1/sync-ga4" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"mode":"full"}' \
+            --max-time 600
