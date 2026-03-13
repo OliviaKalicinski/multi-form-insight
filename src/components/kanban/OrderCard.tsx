@@ -81,7 +81,7 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
   const nfPendenteVisual = !isEnviado && order.nf_pendente && !order.nf_file_path;
 
   return (
-    <Card ref={setNodeRef} style={style} className="hover:shadow-md transition-shadow">
+    <Card ref={setNodeRef} style={style} className="hover:shadow-md transition-shadow overflow-hidden w-full">
       <CardContent className="p-3 space-y-2">
         {/* Top row: Nature + Customer */}
         <div className="flex items-start justify-between gap-2">
@@ -141,10 +141,14 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="text-[10px] text-muted-foreground/70">{format(new Date(order.created_at), "dd/MM/yy")}</span>
-          <span>R$ {order.valor_total_informado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between text-xs text-muted-foreground gap-1 min-w-0">
+          <span className="text-[10px] text-muted-foreground/70 shrink-0">
+            {format(new Date(order.created_at), "dd/MM/yy")}
+          </span>
+          <span className="shrink-0">
+            R$ {order.valor_total_informado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          </span>
+          <div className="flex items-center gap-2 min-w-0">
             {order.nf_file_path && (
               <button
                 type="button"
@@ -152,7 +156,7 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
                   e.stopPropagation();
                   handleDocClick(order.nf_file_path!);
                 }}
-                className="hover:text-foreground transition-colors"
+                className="hover:text-foreground transition-colors shrink-0"
                 title="Ver NF"
               >
                 <FileText className="h-3.5 w-3.5" />
@@ -165,13 +169,13 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
                   e.stopPropagation();
                   handleDocClick(order.boleto_file_path!);
                 }}
-                className="hover:text-foreground transition-colors"
+                className="hover:text-foreground transition-colors shrink-0"
                 title="Ver Boleto"
               >
                 <Receipt className="h-3.5 w-3.5" />
               </button>
             )}
-            {order.responsavel && <span>{order.responsavel}</span>}
+            {order.responsavel && <span className="truncate max-w-[60px]">{order.responsavel}</span>}
           </div>
         </div>
       </CardContent>
