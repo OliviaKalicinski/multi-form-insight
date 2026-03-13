@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "npm:pdfjs-dist@4.0.379/": "npm:pdfjs-dist@4.0.379/"
+  }
+}

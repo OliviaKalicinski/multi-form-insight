@@ -76,7 +76,7 @@ function dateChunks(startDate: string, endDate: string): { start: string; end: s
   const end = new Date(endDate);
   while (cur <= end) {
     const chunkEnd = new Date(cur);
-    chunkEnd.setDate(chunkEnd.getDate() + 29);
+    chunkEnd.setDate(chunkEnd.getDate() + 6);
     if (chunkEnd > end) chunkEnd.setTime(end.getTime());
     chunks.push({ start: cur.toISOString().slice(0, 10), end: chunkEnd.toISOString().slice(0, 10) });
     cur = new Date(chunkEnd);
