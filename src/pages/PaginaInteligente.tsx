@@ -365,7 +365,7 @@ export default function PaginaInteligente() {
     }
 
     return list;
-  }, [agingCreatives, roasBelowTargetDays, adsStats, funnelDrop, remarketingBase, bestSource, churnStats]);
+  }, [roasBelowTargetDays, adsStats, funnelDrop, remarketingBase, bestSource, churnStats]);
 
   const hasData = salesData.length > 0;
 
