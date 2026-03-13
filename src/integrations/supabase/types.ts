@@ -679,6 +679,123 @@ export type Database = {
           },
         ]
       }
+      ga4_behavior: {
+        Row: {
+          avg_session_duration: number | null
+          bounce_rate: number | null
+          created_at: string | null
+          date: string
+          dimension_type: string
+          dimension_value: string
+          id: number
+          new_users: number | null
+          sessions: number | null
+          transactions: number | null
+          users: number | null
+        }
+        Insert: {
+          avg_session_duration?: number | null
+          bounce_rate?: number | null
+          created_at?: string | null
+          date: string
+          dimension_type: string
+          dimension_value: string
+          id?: number
+          new_users?: number | null
+          sessions?: number | null
+          transactions?: number | null
+          users?: number | null
+        }
+        Update: {
+          avg_session_duration?: number | null
+          bounce_rate?: number | null
+          created_at?: string | null
+          date?: string
+          dimension_type?: string
+          dimension_value?: string
+          id?: number
+          new_users?: number | null
+          sessions?: number | null
+          transactions?: number | null
+          users?: number | null
+        }
+        Relationships: []
+      }
+      ga4_products: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: number
+          item_name: string
+          item_revenue: number | null
+          items_added_to_cart: number | null
+          items_purchased: number | null
+          items_viewed: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: number
+          item_name: string
+          item_revenue?: number | null
+          items_added_to_cart?: number | null
+          items_purchased?: number | null
+          items_viewed?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: number
+          item_name?: string
+          item_revenue?: number | null
+          items_added_to_cart?: number | null
+          items_purchased?: number | null
+          items_viewed?: number | null
+        }
+        Relationships: []
+      }
+      ga4_sessions: {
+        Row: {
+          add_to_carts: number | null
+          checkouts: number | null
+          created_at: string | null
+          date: string
+          id: number
+          new_users: number | null
+          purchase_revenue: number | null
+          sessions: number | null
+          source_medium: string
+          transactions: number | null
+          users: number | null
+        }
+        Insert: {
+          add_to_carts?: number | null
+          checkouts?: number | null
+          created_at?: string | null
+          date: string
+          id?: number
+          new_users?: number | null
+          purchase_revenue?: number | null
+          sessions?: number | null
+          source_medium: string
+          transactions?: number | null
+          users?: number | null
+        }
+        Update: {
+          add_to_carts?: number | null
+          checkouts?: number | null
+          created_at?: string | null
+          date?: string
+          id?: number
+          new_users?: number | null
+          purchase_revenue?: number | null
+          sessions?: number | null
+          source_medium?: string
+          transactions?: number | null
+          users?: number | null
+        }
+        Relationships: []
+      }
       instagram_demographics: {
         Row: {
           breakdown_type: string
@@ -885,6 +1002,7 @@ export type Database = {
       }
       operational_orders: {
         Row: {
+          apelido: string | null
           boleto_file_path: string | null
           codigo_rastreio: string | null
           created_at: string
@@ -922,6 +1040,7 @@ export type Database = {
           valor_total_informado: number
         }
         Insert: {
+          apelido?: string | null
           boleto_file_path?: string | null
           codigo_rastreio?: string | null
           created_at?: string
@@ -959,6 +1078,7 @@ export type Database = {
           valor_total_informado?: number
         }
         Update: {
+          apelido?: string | null
           boleto_file_path?: string | null
           codigo_rastreio?: string | null
           created_at?: string
