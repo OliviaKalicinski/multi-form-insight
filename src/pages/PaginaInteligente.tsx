@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 
 const ORIGINAL_KEYWORDS = ["original", "comida de dragão", "comida de dragao"];
 const ROAS_TARGET = 2;
-const CREATIVE_MAX_DAYS = 4;
 const CHURN_MULTIPLIER = 2; // 2x o ciclo médio = churn
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -224,32 +223,6 @@ export default function PaginaInteligente() {
     return { spend, revenue, roas };
   }, [filteredAds]);
 
-  // Creative aging: find unique active ads and days since first appearance
-  const agingCreatives = useMemo(() => {
-    const map = new Map<string, { firstDate: Date; lastDate: Date; spend: number }>();
-    filteredAds.forEach(a => {
-      const name = a["Nome do anúncio"];
-      if (!name) return;
-      const d = new Date(a["Início dos relatórios"] || "");
-      if (isNaN(d.getTime())) return;
-      const cur = map.get(name) ?? { firstDate: d, lastDate: d, spend: 0 };
-      if (d < cur.firstDate) cur.firstDate = d;
-      if (d > cur.lastDate)  cur.lastDate  = d;
-      cur.spend += parseFloat(a["Valor usado (BRL)"] || "0");
-      map.set(name, cur);
-    });
-    const refDate = dateRange ? dateRange.end : new Date();
-    return Array.from(map.entries())
-      .map(([name, d]) => ({
-        name,
-        daysRunning: differenceInDays(d.lastDate, d.firstDate) + 1,
-        daysOld: differenceInDays(refDate, d.firstDate),
-        spend: d.spend,
-      }))
-      .filter(c => c.daysOld >= CREATIVE_MAX_DAYS)
-      .sort((a, b) => b.daysOld - a.daysOld)
-      .slice(0, 3);
-  }, [filteredAds, dateRange]);
 
   // ROAS daily trend: consecutive days below target
   const roasBelowTargetDays = useMemo(() => {
@@ -341,15 +314,6 @@ export default function PaginaInteligente() {
   // ─── Alerts list ───────────────────────────────────────────────────────────
   const alerts = useMemo(() => {
     const list: { severity: "danger" | "warn" | "good" | "info"; title: string; desc: string; action?: string }[] = [];
-
-    if (agingCreatives.length > 0) {
-      list.push({
-        severity: "danger",
-        title: `Criativo "${agingCreatives[0].name.slice(0, 40)}..." precisa ser trocado`,
-        desc: `Ativo há ${agingCreatives[0].daysOld} dias — limite recomendado é ${CREATIVE_MAX_DAYS} dias. Performance tende a cair após esse ponto.`,
-        action: "Ver Anúncios Meta",
-      });
-    }
 
     if (roasBelowTargetDays >= 2) {
       list.push({
