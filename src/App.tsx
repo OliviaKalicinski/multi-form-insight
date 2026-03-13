@@ -30,7 +30,9 @@ import KanbanOperacional from "./pages/KanbanOperacional";
 import KanbanConciliacao from "./pages/KanbanConciliacao";
 import Distribuidores from "./pages/Distribuidores";
 import LetsFly from "./pages/LetsFly";
+import SiteConversao from "./pages/SiteConversao";
 import NotFound from "./pages/NotFound";
+
 const queryClient = new QueryClient();
 
 // Layout component for authenticated pages
@@ -309,6 +311,17 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <LetsFly />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/site-conversao"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <SiteConversao />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }
