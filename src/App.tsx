@@ -31,8 +31,8 @@ import KanbanConciliacao from "./pages/KanbanConciliacao";
 import Distribuidores from "./pages/Distribuidores";
 import LetsFly from "./pages/LetsFly";
 import SiteConversao from "./pages/SiteConversao";
+import PaginaInteligente from "./pages/PaginaInteligente";
 import NotFound from "./pages/NotFound";
-
 const queryClient = new QueryClient();
 
 // Layout component for authenticated pages
@@ -322,6 +322,17 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <SiteConversao />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/inteligencia"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <PaginaInteligente />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }
