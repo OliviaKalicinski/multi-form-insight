@@ -181,7 +181,7 @@ export default function PaginaInteligente() {
       o.produtos.forEach((p) => {
         if (isOriginal(p.descricaoAjustada || p.descricao)) {
           units += p.quantidade;
-          revenue += p.preco * p.quantidade;
+          revenue += p.preco;
         }
       });
     });
