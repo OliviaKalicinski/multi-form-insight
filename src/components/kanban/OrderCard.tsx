@@ -81,10 +81,14 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
   const nfPendenteVisual = !isEnviado && order.nf_pendente && !order.nf_file_path;
 
   return (
-    <Card ref={setNodeRef} style={style} className="hover:shadow-md transition-shadow overflow-hidden w-full">
-      <CardContent className="p-3 space-y-2">
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className="hover:shadow-md transition-shadow overflow-hidden w-full max-w-full"
+    >
+      <CardContent className="p-3 space-y-2 w-full min-w-0">
         {/* Top row: Nature + Customer */}
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-2 min-w-0 w-full">
           <div
             {...listeners}
             {...attributes}
