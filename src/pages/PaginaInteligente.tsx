@@ -9,10 +9,9 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const BREAKEVEN_UNITS = 4000;
+
 const ORIGINAL_KEYWORDS = ["original", "comida de dragão", "comida de dragao"];
 const ROAS_TARGET = 2;
 const CREATIVE_MAX_DAYS = 4;
@@ -432,13 +431,7 @@ export default function PaginaInteligente() {
             </CardHeader>
             <CardContent className="px-4 pb-4">
               <p className="text-2xl font-bold">{fmtN(originalStats.units)} <span className="text-sm font-normal text-muted-foreground">un.</span></p>
-              <div className="mt-2 space-y-1">
-                <Progress value={Math.min((originalStats.units / BREAKEVEN_UNITS) * 100, 100)} className="h-2" />
-                <p className="text-xs text-muted-foreground">
-                  {fmtPct((originalStats.units / BREAKEVEN_UNITS) * 100)} do breakeven ({fmtN(BREAKEVEN_UNITS)} un.)
-                  {originalStats.units < BREAKEVEN_UNITS && ` · faltam ${fmtN(BREAKEVEN_UNITS - originalStats.units)}`}
-                </p>
-              </div>
+              <p className="text-xs text-muted-foreground mt-2">{fmtR(originalStats.revenue)} no período</p>
             </CardContent>
           </Card>
 
@@ -560,7 +553,7 @@ export default function PaginaInteligente() {
                 ))}
               </div>
               <div className="text-xs text-muted-foreground border-t pt-3">
-                Meta de breakeven: <span className="font-semibold">{fmtN(BREAKEVEN_UNITS)} un./mês</span> · atual: <span className={`font-semibold ${originalStats.units < BREAKEVEN_UNITS ? "text-red-600" : "text-green-700"}`}>{fmtN(originalStats.units)}</span>
+                Receita do Original: <span className="font-semibold">{fmtR(originalStats.revenue)}</span> · ticket médio <span className="font-semibold">{originalStats.units > 0 ? fmtR(originalStats.revenue / originalStats.units) : "—"}</span>
               </div>
             </CardContent>
           </Card>
