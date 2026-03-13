@@ -33,7 +33,7 @@ export function KanbanColumn({ title, count, color, columnKey, indicators, child
       ref={setNodeRef}
       className={cn(
         "flex flex-col min-w-[280px] w-full max-w-[340px] bg-muted/30 rounded-lg border transition-all",
-        isOver && "ring-2 ring-primary"
+        isOver && "ring-2 ring-primary",
       )}
     >
       <div className="p-3 border-b space-y-1.5">
@@ -57,9 +57,7 @@ export function KanbanColumn({ title, count, color, columnKey, indicators, child
         )}
       </div>
       <ScrollArea className="flex-1 p-2 max-h-[calc(100vh-240px)]">
-        <div className="space-y-2">
-          {children}
-        </div>
+        <div className="space-y-2 w-full">{children}</div>
       </ScrollArea>
     </div>
   );
