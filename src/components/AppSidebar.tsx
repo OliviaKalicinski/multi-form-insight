@@ -21,6 +21,7 @@ import {
   UserCheck,
   Package,
   BarChart3,
+  BarChart2,
   Target,
   Instagram,
   Megaphone,
@@ -95,6 +96,7 @@ const navSections: NavSection[] = [
       { title: "Anúncios Meta", url: "/ads", icon: Megaphone },
       { title: "Seguidores", url: "/seguidores", icon: Instagram },
       { title: "Público", url: "/publico", icon: Users },
+      { title: "Site e Conversão", url: "/site-conversao", icon: BarChart2 },
     ],
   },
 ];
@@ -110,7 +112,6 @@ export function AppSidebar() {
 
   const isActive = (url: string) => location.pathname === url;
 
-  // Check if any item in section is active
   const isSectionActive = (section: NavSection) => section.items.some((item) => isActive(item.url));
 
   const handleLogout = async () => {
@@ -169,7 +170,6 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t">
         <SidebarMenu>
-          {/* Upload - Admin only */}
           {isAdmin && (
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -183,7 +183,6 @@ export function AppSidebar() {
             </SidebarMenuItem>
           )}
 
-          {/* Metas Financeiras - Admin only */}
           {isAdmin && (
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -197,7 +196,6 @@ export function AppSidebar() {
             </SidebarMenuItem>
           )}
 
-          {/* Settings */}
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={isActive("/settings")}
@@ -209,7 +207,6 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
 
-          {/* User info and logout */}
           {!isCollapsed && user && (
             <>
               <Separator className="my-2" />
