@@ -689,6 +689,7 @@ export type Database = {
           dimension_value: string
           id: number
           new_users: number | null
+          pages_per_session: number | null
           sessions: number | null
           transactions: number | null
           users: number | null
@@ -702,6 +703,7 @@ export type Database = {
           dimension_value: string
           id?: number
           new_users?: number | null
+          pages_per_session?: number | null
           sessions?: number | null
           transactions?: number | null
           users?: number | null
@@ -715,6 +717,7 @@ export type Database = {
           dimension_value?: string
           id?: number
           new_users?: number | null
+          pages_per_session?: number | null
           sessions?: number | null
           transactions?: number | null
           users?: number | null
@@ -793,6 +796,69 @@ export type Database = {
           source_medium?: string
           transactions?: number | null
           users?: number | null
+        }
+        Relationships: []
+      }
+      instagram_comments: {
+        Row: {
+          categoria: string | null
+          created_at: string | null
+          id: string
+          media_caption: string | null
+          media_id: string
+          media_timestamp: string | null
+          media_url: string | null
+          oculto: boolean | null
+          respondido: boolean | null
+          resposta_texto: string | null
+          resposta_timestamp: string | null
+          risco: string | null
+          risco_motivo: string | null
+          sentimento: string | null
+          text: string
+          timestamp: string
+          updated_at: string | null
+          username: string | null
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string | null
+          id: string
+          media_caption?: string | null
+          media_id: string
+          media_timestamp?: string | null
+          media_url?: string | null
+          oculto?: boolean | null
+          respondido?: boolean | null
+          resposta_texto?: string | null
+          resposta_timestamp?: string | null
+          risco?: string | null
+          risco_motivo?: string | null
+          sentimento?: string | null
+          text: string
+          timestamp: string
+          updated_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string | null
+          id?: string
+          media_caption?: string | null
+          media_id?: string
+          media_timestamp?: string | null
+          media_url?: string | null
+          oculto?: boolean | null
+          respondido?: boolean | null
+          resposta_texto?: string | null
+          resposta_timestamp?: string | null
+          risco?: string | null
+          risco_motivo?: string | null
+          sentimento?: string | null
+          text?: string
+          timestamp?: string
+          updated_at?: string | null
+          username?: string | null
         }
         Relationships: []
       }
