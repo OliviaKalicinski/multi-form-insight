@@ -61,6 +61,7 @@ const navSections: NavSection[] = [
     title: "Visão Geral",
     icon: LayoutDashboard,
     items: [
+      { title: "Inteligência", url: "/inteligencia", icon: Brain },
       { title: "Fotografia Operacional", url: "/visao-executiva-v2", icon: LayoutDashboard },
       { title: "Visão Executiva", url: "/dashboard", icon: LayoutDashboard },
       { title: "Kanban", url: "/kanban-operacional", icon: ClipboardList },
@@ -86,7 +87,6 @@ const navSections: NavSection[] = [
       { title: "Distribuidores", url: "/distribuidores", icon: Package },
       { title: "Let's Fly", url: "/lets-fly", icon: Truck },
       { title: "Site e Conversão", url: "/site-conversao", icon: BarChart2 },
-      { title: "Inteligência", url: "/inteligencia", icon: Brain },
     ],
   },
   {
