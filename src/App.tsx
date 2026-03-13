@@ -32,6 +32,7 @@ import Distribuidores from "./pages/Distribuidores";
 import LetsFly from "./pages/LetsFly";
 import SiteConversao from "./pages/SiteConversao";
 import PaginaInteligente from "./pages/PaginaInteligente";
+import ComentariosInstagram from "./pages/ComentariosInstagram";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -333,6 +334,17 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <PaginaInteligente />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/comentarios-instagram"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ComentariosInstagram />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }
