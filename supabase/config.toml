@@ -8,3 +8,5 @@ verify_jwt = false
 
 [functions.process-nf-pdf]
 verify_jwt = false
+[functions.sync-ga4]
+verify_jwt = false
