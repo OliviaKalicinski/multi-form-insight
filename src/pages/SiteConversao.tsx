@@ -2,14 +2,22 @@ import { useEffect, useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, eachDayOfInterval } from "date-fns";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
-} from "recharts";
-import {
-  Monitor, Smartphone, Users, ShoppingCart, TrendingUp,
-  AlertTriangle, Lightbulb, Eye, Target, MapPin, Globe,
-  ArrowDown, MousePointerClick, CreditCard,
+  Monitor,
+  Smartphone,
+  Users,
+  ShoppingCart,
+  TrendingUp,
+  AlertTriangle,
+  Lightbulb,
+  Eye,
+  Target,
+  MapPin,
+  Globe,
+  ArrowDown,
+  MousePointerClick,
+  CreditCard,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,30 +25,59 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 interface SessionRow {
-  date: string; source_medium: string; sessions: number; users: number;
-  new_users: number; transactions: number; purchase_revenue: number;
-  add_to_carts: number; checkouts: number;
+  date: string;
+  source_medium: string;
+  sessions: number;
+  users: number;
+  new_users: number;
+  transactions: number;
+  purchase_revenue: number;
+  add_to_carts: number;
+  checkouts: number;
 }
 interface ProductRow {
-  date: string; item_name: string; items_viewed: number;
-  items_added_to_cart: number; items_purchased: number; item_revenue: number;
+  date: string;
+  item_name: string;
+  items_viewed: number;
+  items_added_to_cart: number;
+  items_purchased: number;
+  item_revenue: number;
 }
 interface BehaviorRow {
-  date: string; dimension_type: string; dimension_value: string;
-  sessions: number; users: number; new_users: number;
-  bounce_rate: number; avg_session_duration: number; transactions: number;
+  date: string;
+  dimension_type: string;
+  dimension_value: string;
+  sessions: number;
+  users: number;
+  new_users: number;
+  bounce_rate: number;
+  avg_session_duration: number;
+  transactions: number;
 }
 
 // ─── Formatters ──────────────────────────────────────────────────────────
-const fmtN = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
+const fmtN = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n)));
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtR = (n: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
-const fmtMin = (secs: number) => { const m = Math.floor(secs / 60); const s = Math.round(secs % 60); return `${m}m ${s}s`; };
+const fmtMin = (secs: number) => {
+  const m = Math.floor(secs / 60);
+  const s = Math.round(secs % 60);
+  return `${m}m ${s}s`;
+};
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────
-function KPICard({ label, value, sub, icon, color = "default" }: {
-  label: string; value: string; sub?: string;
-  icon: React.ReactNode; color?: "default" | "primary" | "green" | "amber" | "red";
+function KPICard({
+  label,
+  value,
+  sub,
+  icon,
+  color = "default",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  icon: React.ReactNode;
+  color?: "default" | "primary" | "green" | "amber" | "red";
 }) {
   const colors = {
     default: "border-border",
@@ -49,7 +86,13 @@ function KPICard({ label, value, sub, icon, color = "default" }: {
     amber: "border-amber-300 bg-amber-50",
     red: "border-red-300 bg-red-50",
   };
-  const textColors = { default: "", primary: "text-primary", green: "text-green-700", amber: "text-amber-700", red: "text-red-700" };
+  const textColors = {
+    default: "",
+    primary: "text-primary",
+    green: "text-green-700",
+    amber: "text-amber-700",
+    red: "text-red-700",
+  };
   return (
     <Card className={`border-2 ${colors[color]}`}>
       <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-4">
@@ -85,16 +128,31 @@ function InsightBox({ type, children }: { type: "warn" | "info" | "good"; childr
 }
 
 // ─── Funil Row ────────────────────────────────────────────────────────────
-function FunnelStep({ step, label, sublabel, value, pct, dropPct, isWorst }: {
-  step: number; label: string; sublabel: string; value: number;
-  pct: number; dropPct?: number; isWorst?: boolean;
+function FunnelStep({
+  step,
+  label,
+  sublabel,
+  value,
+  pct,
+  dropPct,
+  isWorst,
+}: {
+  step: number;
+  label: string;
+  sublabel: string;
+  value: number;
+  pct: number;
+  dropPct?: number;
+  isWorst?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-            ${isWorst ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}>
+          <span
+            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+            ${isWorst ? "bg-red-100 text-red-700" : "bg-muted text-muted-foreground"}`}
+          >
             {step}
           </span>
           <div>
@@ -115,8 +173,10 @@ function FunnelStep({ step, label, sublabel, value, pct, dropPct, isWorst }: {
           />
         </div>
         {dropPct !== undefined && (
-          <div className={`flex items-center gap-0.5 text-xs font-medium w-24 justify-end
-            ${isWorst ? "text-red-600" : "text-muted-foreground"}`}>
+          <div
+            className={`flex items-center gap-0.5 text-xs font-medium w-24 justify-end
+            ${isWorst ? "text-red-600" : "text-muted-foreground"}`}
+          >
             <ArrowDown className="h-3 w-3" />
             <span>{fmtPct(dropPct)} saem aqui</span>
           </div>
@@ -152,20 +212,25 @@ export default function SiteConversao() {
       setBehavior((b.data as BehaviorRow[]) ?? []);
       setLoading(false);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [startStr, endStr]);
 
   // ─── Totals ──────────────────────────────────────────────────────────
   const t = useMemo(() => {
-    const s = sessions.reduce((acc, r) => ({
-      sessions: acc.sessions + r.sessions,
-      users: acc.users + r.users,
-      newUsers: acc.newUsers + r.new_users,
-      carts: acc.carts + r.add_to_carts,
-      checkouts: acc.checkouts + r.checkouts,
-      tx: acc.tx + r.transactions,
-      rev: acc.rev + r.purchase_revenue,
-    }), { sessions: 0, users: 0, newUsers: 0, carts: 0, checkouts: 0, tx: 0, rev: 0 });
+    const s = sessions.reduce(
+      (acc, r) => ({
+        sessions: acc.sessions + r.sessions,
+        users: acc.users + r.users,
+        newUsers: acc.newUsers + r.new_users,
+        carts: acc.carts + r.add_to_carts,
+        checkouts: acc.checkouts + r.checkouts,
+        tx: acc.tx + r.transactions,
+        rev: acc.rev + r.purchase_revenue,
+      }),
+      { sessions: 0, users: 0, newUsers: 0, carts: 0, checkouts: 0, tx: 0, rev: 0 },
+    );
     const viewed = products.reduce((acc, r) => acc + r.items_viewed, 0);
     const convRate = s.sessions > 0 ? (s.tx / s.sessions) * 100 : 0;
     const returningPct = s.users > 0 ? ((s.users - s.newUsers) / s.users) * 100 : 0;
@@ -178,9 +243,24 @@ export default function SiteConversao() {
     const base = t.sessions || 1;
     const steps = [
       { label: "Sessões no site", sublabel: "Visitantes que chegaram", value: t.sessions, pct: 100 },
-      { label: "Viram um produto", sublabel: "Abriram a página de algum produto", value: t.viewed, pct: (t.viewed / base) * 100 },
-      { label: "Adicionaram ao carrinho", sublabel: "Clicaram em 'Comprar'", value: t.carts, pct: (t.carts / base) * 100 },
-      { label: "Iniciaram o checkout", sublabel: "Foram para o pagamento", value: t.checkouts, pct: (t.checkouts / base) * 100 },
+      {
+        label: "Viram um produto",
+        sublabel: "Abriram a página de algum produto",
+        value: t.viewed,
+        pct: (t.viewed / base) * 100,
+      },
+      {
+        label: "Adicionaram ao carrinho",
+        sublabel: "Clicaram em 'Comprar'",
+        value: t.carts,
+        pct: (t.carts / base) * 100,
+      },
+      {
+        label: "Iniciaram o checkout",
+        sublabel: "Foram para o pagamento",
+        value: t.checkouts,
+        pct: (t.checkouts / base) * 100,
+      },
       { label: "Compraram", sublabel: "Finalizaram o pedido", value: t.tx, pct: (t.tx / base) * 100 },
     ];
     const withDrop = steps.map((s, i) => {
@@ -188,18 +268,20 @@ export default function SiteConversao() {
       const prev = steps[i - 1].value || 1;
       return { ...s, dropPct: ((prev - s.value) / prev) * 100 };
     });
-    const maxDropIdx = withDrop.slice(1).reduce((maxI, s, i) => (s.dropPct! > withDrop.slice(1)[maxI].dropPct! ? i : maxI), 0) + 1;
+    const maxDropIdx =
+      withDrop.slice(1).reduce((maxI, s, i) => (s.dropPct! > withDrop.slice(1)[maxI].dropPct! ? i : maxI), 0) + 1;
     return withDrop.map((s, i) => ({ ...s, isWorst: i === maxDropIdx }));
   }, [t]);
 
-  const worstStep = funnelSteps.find(s => s.isWorst);
+  const worstStep = funnelSteps.find((s) => s.isWorst);
 
   // Original
   const original = useMemo(() => {
-    const rows = products.filter(p =>
-      p.item_name.toLowerCase().includes("original") ||
-      p.item_name.toLowerCase().includes("dragã") ||
-      p.item_name.toLowerCase().includes("draga")
+    const rows = products.filter(
+      (p) =>
+        p.item_name.toLowerCase().includes("original") ||
+        p.item_name.toLowerCase().includes("dragã") ||
+        p.item_name.toLowerCase().includes("draga"),
     );
     return {
       viewed: rows.reduce((s, r) => s + r.items_viewed, 0),
@@ -213,50 +295,65 @@ export default function SiteConversao() {
   // All products
   const allProducts = useMemo(() => {
     const map = new Map<string, { viewed: number; cart: number; purchased: number; revenue: number }>();
-    products.forEach(r => {
+    products.forEach((r) => {
       const cur = map.get(r.item_name) ?? { viewed: 0, cart: 0, purchased: 0, revenue: 0 };
-      cur.viewed += r.items_viewed; cur.cart += r.items_added_to_cart;
-      cur.purchased += r.items_purchased; cur.revenue += r.item_revenue;
+      cur.viewed += r.items_viewed;
+      cur.cart += r.items_added_to_cart;
+      cur.purchased += r.items_purchased;
+      cur.revenue += r.item_revenue;
       map.set(r.item_name, cur);
     });
     return Array.from(map.entries())
       .map(([name, d]) => ({ name, ...d, convPct: d.viewed > 0 ? (d.purchased / d.viewed) * 100 : 0 }))
-      .sort((a, b) => b.purchased - a.purchased).slice(0, 10);
+      .sort((a, b) => b.purchased - a.purchased)
+      .slice(0, 10);
   }, [products]);
 
   // Sources
   const sources = useMemo(() => {
     const map = new Map<string, { sessions: number; tx: number; rev: number }>();
-    sessions.forEach(r => {
+    sessions.forEach((r) => {
       const cur = map.get(r.source_medium) ?? { sessions: 0, tx: 0, rev: 0 };
-      cur.sessions += r.sessions; cur.tx += r.transactions; cur.rev += r.purchase_revenue;
+      cur.sessions += r.sessions;
+      cur.tx += r.transactions;
+      cur.rev += r.purchase_revenue;
       map.set(r.source_medium, cur);
     });
     return Array.from(map.entries())
       .map(([sm, d]) => ({
-        sm, ...d,
+        sm,
+        ...d,
         conv: d.sessions > 0 ? (d.tx / d.sessions) * 100 : 0,
         revPerSession: d.sessions > 0 ? d.rev / d.sessions : 0,
       }))
-      .sort((a, b) => b.rev - a.rev).slice(0, 8);
+      .sort((a, b) => b.rev - a.rev)
+      .slice(0, 8);
   }, [sessions]);
   const bestSource = [...sources].sort((a, b) => b.revPerSession - a.revPerSession)[0];
-  const whatsappSource = sources.find(s => s.sm.toLowerCase().includes("whatsapp"));
+  const whatsappSource = sources.find((s) => s.sm.toLowerCase().includes("whatsapp"));
 
   // Devices
   const devices = useMemo(() => {
     const map = new Map<string, { sessions: number; tx: number; bounce: number; dur: number; count: number }>();
-    behavior.filter(b => b.dimension_type === "device").forEach(r => {
-      const cur = map.get(r.dimension_value) ?? { sessions: 0, tx: 0, bounce: 0, dur: 0, count: 0 };
-      cur.sessions += r.sessions; cur.tx += r.transactions;
-      cur.bounce += r.bounce_rate; cur.dur += r.avg_session_duration; cur.count++;
-      map.set(r.dimension_value, cur);
-    });
+    behavior
+      .filter((b) => b.dimension_type === "device")
+      .forEach((r) => {
+        const cur = map.get(r.dimension_value) ?? { sessions: 0, tx: 0, bounce: 0, dur: 0, count: 0 };
+        cur.sessions += r.sessions;
+        cur.tx += r.transactions;
+        cur.bounce += r.bounce_rate;
+        cur.dur += r.avg_session_duration;
+        cur.count++;
+        map.set(r.dimension_value, cur);
+      });
     const total = Array.from(map.values()).reduce((s, d) => s + d.sessions, 0) || 1;
     return Array.from(map.entries())
       .map(([dev, d]) => ({
-        dev, sessions: d.sessions, pct: (d.sessions / total) * 100,
-        tx: d.tx, bounce: d.count > 0 ? d.bounce / d.count : 0,
+        dev,
+        sessions: d.sessions,
+        pct: (d.sessions / total) * 100,
+        tx: d.tx,
+        bounce: d.count > 0 ? d.bounce / d.count : 0,
         dur: d.count > 0 ? d.dur / d.count : 0,
       }))
       .sort((a, b) => b.sessions - a.sessions);
@@ -265,28 +362,36 @@ export default function SiteConversao() {
   // Pages
   const topPages = useMemo(() => {
     const map = new Map<string, { sessions: number; tx: number }>();
-    behavior.filter(b => b.dimension_type === "landing_page").forEach(r => {
-      const cur = map.get(r.dimension_value) ?? { sessions: 0, tx: 0 };
-      cur.sessions += r.sessions; cur.tx += r.transactions;
-      map.set(r.dimension_value, cur);
-    });
+    behavior
+      .filter((b) => b.dimension_type === "landing_page")
+      .forEach((r) => {
+        const cur = map.get(r.dimension_value) ?? { sessions: 0, tx: 0 };
+        cur.sessions += r.sessions;
+        cur.tx += r.transactions;
+        map.set(r.dimension_value, cur);
+      });
     return Array.from(map.entries())
       .map(([page, d]) => ({ page, ...d }))
-      .sort((a, b) => b.sessions - a.sessions).slice(0, 5);
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 5);
   }, [behavior]);
 
   // Cities
   const topCities = useMemo(() => {
     const map = new Map<string, { sessions: number; tx: number }>();
-    behavior.filter(b => b.dimension_type === "city").forEach(r => {
-      const cur = map.get(r.dimension_value) ?? { sessions: 0, tx: 0 };
-      cur.sessions += r.sessions; cur.tx += r.transactions;
-      map.set(r.dimension_value, cur);
-    });
+    behavior
+      .filter((b) => b.dimension_type === "city")
+      .forEach((r) => {
+        const cur = map.get(r.dimension_value) ?? { sessions: 0, tx: 0 };
+        cur.sessions += r.sessions;
+        cur.tx += r.transactions;
+        map.set(r.dimension_value, cur);
+      });
     return Array.from(map.entries())
       .map(([city, d]) => ({ city, ...d }))
-      .filter(c => c.city !== "(not set)")
-      .sort((a, b) => b.sessions - a.sessions).slice(0, 5);
+      .filter((c) => c.city !== "(not set)")
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 5);
   }, [behavior]);
 
   // Trend
@@ -294,12 +399,14 @@ export default function SiteConversao() {
     if (!dateRange) return [];
     const days = eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
     const map = new Map<string, { sessions: number; tx: number; rev: number }>();
-    sessions.forEach(r => {
+    sessions.forEach((r) => {
       const cur = map.get(r.date) ?? { sessions: 0, tx: 0, rev: 0 };
-      cur.sessions += r.sessions; cur.tx += r.transactions; cur.rev += r.purchase_revenue;
+      cur.sessions += r.sessions;
+      cur.tx += r.transactions;
+      cur.rev += r.purchase_revenue;
       map.set(r.date, cur);
     });
-    return days.map(d => {
+    return days.map((d) => {
       const key = format(d, "yyyy-MM-dd");
       const row = map.get(key) ?? { sessions: 0, tx: 0, rev: 0 };
       return { day: format(d, "dd/MM"), ...row };
@@ -311,7 +418,11 @@ export default function SiteConversao() {
       <div className="container mx-auto px-6 py-8 space-y-6">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-          {Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-24" />)}
+          {Array(6)
+            .fill(0)
+            .map((_, i) => (
+              <Skeleton key={i} className="h-24" />
+            ))}
         </div>
         <Skeleton className="h-72" />
         <Skeleton className="h-64" />
@@ -323,7 +434,6 @@ export default function SiteConversao() {
 
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
-
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">📈 Site e Conversão</h1>
@@ -390,7 +500,9 @@ export default function SiteConversao() {
           <CardTitle className="flex items-center gap-2">
             <MousePointerClick className="h-5 w-5 text-primary" />
             Funil de conversão
-            <span className="text-sm font-normal text-muted-foreground ml-1">— onde os visitantes chegam e onde saem</span>
+            <span className="text-sm font-normal text-muted-foreground ml-1">
+              — onde os visitantes chegam e onde saem
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -423,10 +535,17 @@ export default function SiteConversao() {
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: "👁 Viram o produto", value: fmtN(original.viewed), sub: "visitantes que abriram a página" },
-                { label: "🛒 Adicionaram ao carrinho", value: original.viewed > 0 ? `${fmtN(original.cart)} (${fmtPct((original.cart / original.viewed) * 100)})` : `${fmtN(original.cart)}`, sub: "dos que viram" },
+                {
+                  label: "🛒 Adicionaram ao carrinho",
+                  value:
+                    original.viewed > 0
+                      ? `${fmtN(original.cart)} (${fmtPct((original.cart / original.viewed) * 100)})`
+                      : `${fmtN(original.cart)}`,
+                  sub: "dos que viram",
+                },
                 { label: "✅ Compraram", value: fmtN(original.purchased), sub: "pedidos do Original" },
                 { label: "💰 Receita gerada", value: fmtR(original.revenue), sub: "pelo produto Original" },
-              ].map(k => (
+              ].map((k) => (
                 <div key={k.label} className="bg-muted/40 rounded-lg p-3 space-y-0.5">
                   <p className="text-xs text-muted-foreground">{k.label}</p>
                   <p className="text-lg font-bold">{k.value}</p>
@@ -441,15 +560,19 @@ export default function SiteConversao() {
                 <Target className="h-4 w-4 text-primary" />
                 <p className="text-sm font-semibold text-primary">Base de remarketing</p>
               </div>
-              <p className="text-3xl font-bold">{fmtN(remarketing)} <span className="text-sm font-normal text-muted-foreground">pessoas</span></p>
+              <p className="text-3xl font-bold">
+                {fmtN(remarketing)} <span className="text-sm font-normal text-muted-foreground">pessoas</span>
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Visitaram a página do Original mas <strong>não compraram</strong> no período. Esse é o público mais quente para campanhas de remarketing no Meta Ads.
+                Visitaram a página do Original mas <strong>não compraram</strong> no período. Esse é o público mais
+                quente para campanhas de remarketing no Meta Ads.
               </p>
             </div>
 
             {original.viewed === 0 && (
               <InsightBox type="info">
-                Dados de "visualização de produto" ainda não chegam do Shopify. Ative o Enhanced Ecommerce no Google Analytics dentro do Shopify para ver esse dado.
+                Dados de "visualização de produto" ainda não chegam do Shopify. Ative o Enhanced Ecommerce no Google
+                Analytics dentro do Shopify para ver esse dado.
               </InsightBox>
             )}
           </CardContent>
@@ -469,14 +592,20 @@ export default function SiteConversao() {
               <thead>
                 <tr className="border-b text-xs text-muted-foreground">
                   <th className="text-left py-2 pr-2">Produto</th>
-                  <th className="text-right py-2 pr-2" title="Pessoas que viram a página do produto">👁 Viu</th>
-                  <th className="text-right py-2 pr-2" title="Adicionou ao carrinho">🛒 Carrinho</th>
-                  <th className="text-right py-2 pr-2" title="Finalizou a compra">✅ Comprou</th>
+                  <th className="text-right py-2 pr-2" title="Pessoas que viram a página do produto">
+                    👁 Viu
+                  </th>
+                  <th className="text-right py-2 pr-2" title="Adicionou ao carrinho">
+                    🛒 Carrinho
+                  </th>
+                  <th className="text-right py-2 pr-2" title="Finalizou a compra">
+                    ✅ Comprou
+                  </th>
                   <th className="text-right py-2">Conv.</th>
                 </tr>
               </thead>
               <tbody>
-                {allProducts.map(p => (
+                {allProducts.map((p) => (
                   <tr key={p.name} className="border-b border-muted/40 hover:bg-muted/20">
                     <td className="py-2 pr-2 max-w-[140px] truncate font-medium">{p.name}</td>
                     <td className="py-2 pr-2 text-right text-muted-foreground">{fmtN(p.viewed)}</td>
@@ -495,7 +624,8 @@ export default function SiteConversao() {
               </tbody>
             </table>
             <p className="text-xs text-muted-foreground mt-3">
-              Conv. = % de quem viu e comprou. Colunas com 0 indicam que o GA4 ainda não recebe esses eventos do Shopify.
+              Conv. = % de quem viu e comprou. Colunas com 0 indicam que o GA4 ainda não recebe esses eventos do
+              Shopify.
             </p>
           </CardContent>
         </Card>
@@ -514,12 +644,14 @@ export default function SiteConversao() {
           <div className="flex flex-wrap gap-2">
             {bestSource && (
               <InsightBox type="good">
-                <strong>{bestSource.sm}</strong> é o canal mais eficiente: {fmtR(bestSource.revPerSession)} de receita por visitante.
+                <strong>{bestSource.sm}</strong> é o canal mais eficiente: {fmtR(bestSource.revPerSession)} de receita
+                por visitante.
               </InsightBox>
             )}
             {whatsappSource && (
               <InsightBox type="good">
-                <strong>WhatsApp</strong> converte {fmtPct(whatsappSource.conv)} — acima da média. Vale investir nesse canal.
+                <strong>WhatsApp</strong> converte {fmtPct(whatsappSource.conv)} — acima da média. Vale investir nesse
+                canal.
               </InsightBox>
             )}
           </div>
@@ -546,14 +678,17 @@ export default function SiteConversao() {
                 </tr>
               </thead>
               <tbody>
-                {sources.map(s => (
+                {sources.map((s) => (
                   <tr key={s.sm} className="border-b border-muted/40 hover:bg-muted/20">
                     <td className="py-2 pr-3 font-medium max-w-[200px] truncate">{s.sm}</td>
                     <td className="py-2 pr-3 text-right">{fmtN(s.sessions)}</td>
                     <td className="py-2 pr-3 text-right">{fmtN(s.tx)}</td>
                     <td className="py-2 pr-3 text-right">{fmtR(s.rev)}</td>
                     <td className="py-2 pr-3 text-right">
-                      <Badge variant="outline" className={`text-xs ${s.conv > 3 ? "border-green-400 text-green-700" : s.conv > 1 ? "border-amber-400 text-amber-700" : "border-red-300 text-red-600"}`}>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${s.conv > 3 ? "border-green-400 text-green-700" : s.conv > 1 ? "border-amber-400 text-amber-700" : "border-red-300 text-red-600"}`}
+                      >
                         {fmtPct(s.conv)}
                       </Badge>
                     </td>
@@ -565,7 +700,10 @@ export default function SiteConversao() {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-muted-foreground">⭐ R$/visita = receita ÷ visitas. Melhor métrica de eficiência real do canal — ignora volume e foca em qualidade.</p>
+          <p className="text-xs text-muted-foreground">
+            ⭐ R$/visita = receita ÷ visitas. Melhor métrica de eficiência real do canal — ignora volume e foca em
+            qualidade.
+          </p>
         </CardContent>
       </Card>
 
@@ -582,7 +720,9 @@ export default function SiteConversao() {
           <CardContent className="space-y-5">
             {/* Novos vs recorrentes */}
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Novos vs. que já visitaram antes</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Novos vs. que já visitaram antes
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
                   <p className="text-xs text-blue-600 font-medium">🆕 Novos visitantes</p>
@@ -599,14 +739,22 @@ export default function SiteConversao() {
 
             {/* Dispositivo */}
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Dispositivo usado</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Dispositivo usado
+              </p>
               <div className="space-y-2.5">
-                {devices.map(d => (
+                {devices.map((d) => (
                   <div key={d.dev} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
-                        {d.dev === "mobile" ? <Smartphone className="h-4 w-4 text-muted-foreground" /> : <Monitor className="h-4 w-4 text-muted-foreground" />}
-                        <span className="capitalize font-medium">{d.dev === "mobile" ? "📱 Celular" : d.dev === "desktop" ? "💻 Computador" : `📟 ${d.dev}`}</span>
+                        {d.dev === "mobile" ? (
+                          <Smartphone className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Monitor className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className="capitalize font-medium">
+                          {d.dev === "mobile" ? "📱 Celular" : d.dev === "desktop" ? "💻 Computador" : `📟 ${d.dev}`}
+                        </span>
                       </div>
                       <div className="text-right">
                         <span className="font-bold">{fmtPct(d.pct)}</span>
@@ -634,9 +782,11 @@ export default function SiteConversao() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Páginas de entrada — por onde chegam no site</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Páginas de entrada — por onde chegam no site
+              </p>
               <div className="space-y-2">
-                {topPages.map(p => (
+                {topPages.map((p) => (
                   <div key={p.page} className="flex items-center justify-between text-sm py-1 border-b border-muted/40">
                     <span className="font-mono text-xs text-muted-foreground truncate max-w-[180px]">{p.page}</span>
                     <div className="flex gap-3 text-right shrink-0">
@@ -648,7 +798,9 @@ export default function SiteConversao() {
               </div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Cidades com mais visitas</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Cidades com mais visitas
+              </p>
               <div className="space-y-1.5">
                 {topCities.map((c, i) => {
                   const maxS = topCities[0]?.sessions || 1;
@@ -657,7 +809,10 @@ export default function SiteConversao() {
                       <span className="text-muted-foreground w-4 text-xs">{i + 1}.</span>
                       <span className="w-28 font-medium">{c.city}</span>
                       <div className="flex-1 h-2 bg-muted rounded-full">
-                        <div className="h-2 rounded-full bg-primary/60" style={{ width: `${(c.sessions / maxS) * 100}%` }} />
+                        <div
+                          className="h-2 rounded-full bg-primary/60"
+                          style={{ width: `${(c.sessions / maxS) * 100}%` }}
+                        />
                       </div>
                       <span className="text-muted-foreground text-xs w-16 text-right">{fmtN(c.sessions)} visitas</span>
                     </div>
@@ -677,11 +832,13 @@ export default function SiteConversao() {
             Evolução diária
           </CardTitle>
           <div className="flex gap-1">
-            {([
-              { key: "sessions", label: "👁 Visitas" },
-              { key: "tx", label: "✅ Compras" },
-              { key: "rev", label: "💰 Receita" },
-            ] as const).map(m => (
+            {(
+              [
+                { key: "sessions", label: "👁 Visitas" },
+                { key: "tx", label: "✅ Compras" },
+                { key: "rev", label: "💰 Receita" },
+              ] as const
+            ).map((m) => (
               <button
                 key={m.key}
                 onClick={() => setTrendMetric(m.key)}
@@ -708,8 +865,14 @@ export default function SiteConversao() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="day" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} width={45} />
-              <Tooltip formatter={(v: number) => trendMetric === "rev" ? fmtR(v) : fmtN(v)} />
-              <Area type="monotone" dataKey={trendMetric} stroke="hsl(var(--primary))" fill="url(#grad)" strokeWidth={2} />
+              <Tooltip formatter={(v: number) => (trendMetric === "rev" ? fmtR(v) : fmtN(v))} />
+              <Area
+                type="monotone"
+                dataKey={trendMetric}
+                stroke="hsl(var(--primary))"
+                fill="url(#grad)"
+                strokeWidth={2}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>
