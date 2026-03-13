@@ -29,7 +29,8 @@ export interface GrowthMetrics {
 
 export interface FollowersData {
   Data: string;
-  Seguidores: string;
+  Seguidores: string; // novos_seguidores (delta diário)
+  TotalSeguidores?: string; // total_seguidores (acumulado real da API)
 }
 
 export interface FollowersMetrics {
