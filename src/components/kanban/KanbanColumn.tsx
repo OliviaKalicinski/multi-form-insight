@@ -32,7 +32,7 @@ export function KanbanColumn({ title, count, color, columnKey, indicators, child
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col min-w-[280px] w-full max-w-[340px] bg-muted/30 rounded-lg border transition-all",
+        "flex flex-col min-w-[280px] w-full max-w-[340px] shrink-0 bg-muted/30 rounded-lg border transition-all",
         isOver && "ring-2 ring-primary",
       )}
     >
