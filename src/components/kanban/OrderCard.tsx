@@ -88,11 +88,11 @@ export function OrderCard({ order, onEdit, onMove, onCancel }: OrderCardProps) {
     >
       <CardContent className="p-3 space-y-2 w-full min-w-0">
         {/* Top row: Nature + Customer */}
-        <div className="flex items-start justify-between gap-2 min-w-0 w-full">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 w-full">
           <div
             {...listeners}
             {...attributes}
-            className="flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none select-none"
+            className="min-w-0 overflow-hidden cursor-grab active:cursor-grabbing touch-none select-none"
           >
             <div className="flex items-center gap-1.5 flex-wrap">
               <Badge className={naturezaColors[order.natureza_pedido] || ""} variant="outline">
