@@ -1,11 +1,10 @@
-import { useState, useMemo, useRef } from "react";
+import { Fragment, useState, useMemo, useRef } from "react";
 import Papa from "papaparse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, TrendingUp, ShoppingCart, DollarSign, Users, Search, ChevronDown, ChevronUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -396,10 +395,10 @@ export default function PerformanceInfluenciadores() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {/* Bug fix: Fragment com key para reconciliação correta no map */}
                     {displayed.map((s, i) => (
-                      <>
+                      <Fragment key={s.coupon}>
                         <TableRow
-                          key={s.coupon}
                           className="cursor-pointer hover:bg-muted/40"
                           onClick={() => setExpandedCoupon(expandedCoupon === s.coupon ? null : s.coupon)}
                         >
@@ -443,7 +442,7 @@ export default function PerformanceInfluenciadores() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     ))}
 
                     {displayed.length === 0 && (
