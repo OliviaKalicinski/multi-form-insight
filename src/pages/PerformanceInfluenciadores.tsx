@@ -268,7 +268,8 @@ export default function PerformanceInfluenciadores() {
   });
 
   const [search, setSearch] = useState("");
-  const [sortField, setSortField] = useState<keyof InfluencerStats>("gmv");
+  type SortField = keyof InfluencerStats | "bonificado" | "roi";
+  const [sortField, setSortField] = useState<SortField>("gmv");
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedCoupon, setExpandedCoupon] = useState<string | null>(null);
 
@@ -314,24 +315,42 @@ export default function PerformanceInfluenciadores() {
         return false;
       });
     }
+    const getBonif = (coupon: string) =>
+      (bonifByCoupon.get(coupon) ?? []).reduce((s, r) => s + (r.valor_total || 0), 0);
+    const getRoi = (coupon: string, gmv: number) => {
+      const b = getBonif(coupon);
+      return b > 0 ? gmv / b : -1; // -1 = sem bonificação (fica por último)
+    };
+
     list.sort((a, b) => {
-      const av = a[sortField];
-      const bv = b[sortField];
-      if (av instanceof Date && bv instanceof Date)
-        return sortAsc ? av.getTime() - bv.getTime() : bv.getTime() - av.getTime();
-      if (typeof av === "number" && typeof bv === "number")
-        return sortAsc ? av - bv : bv - av;
-      return 0;
+      let an: number, bn: number;
+
+      if (sortField === "bonificado") {
+        an = getBonif(a.coupon);
+        bn = getBonif(b.coupon);
+      } else if (sortField === "roi") {
+        an = getRoi(a.coupon, a.gmv);
+        bn = getRoi(b.coupon, b.gmv);
+      } else {
+        const av = a[sortField];
+        const bv = b[sortField];
+        if (av instanceof Date && bv instanceof Date)
+          return sortAsc ? av.getTime() - bv.getTime() : bv.getTime() - av.getTime();
+        if (typeof av === "number" && typeof bv === "number")
+          return sortAsc ? av - bv : bv - av;
+        return 0;
+      }
+      return sortAsc ? an - bn : bn - an;
     });
     return list;
-  }, [stats, search, sortField, sortAsc]);
+  }, [stats, search, sortField, sortAsc, bonifByCoupon]);
 
-  const handleSort = (field: keyof InfluencerStats) => {
+  const handleSort = (field: SortField) => {
     if (sortField === field) setSortAsc(!sortAsc);
     else { setSortField(field); setSortAsc(false); }
   };
 
-  const SortIcon = ({ field }: { field: keyof InfluencerStats }) =>
+  const SortIcon = ({ field }: { field: SortField }) =>
     sortField === field
       ? sortAsc
         ? <ChevronUp className="h-3 w-3" />
@@ -533,8 +552,22 @@ export default function PerformanceInfluenciadores() {
                           Ticket Médio <SortIcon field="avg_ticket" />
                         </div>
                       </TableHead>
-                      <TableHead>Bonificado</TableHead>
-                      <TableHead>ROI</TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => handleSort("bonificado")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Bonificado <SortIcon field="bonificado" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => handleSort("roi")}
+                      >
+                        <div className="flex items-center gap-1">
+                          ROI <SortIcon field="roi" />
+                        </div>
+                      </TableHead>
                       <TableHead
                         className="cursor-pointer select-none"
                         onClick={() => handleSort("last_sale")}
