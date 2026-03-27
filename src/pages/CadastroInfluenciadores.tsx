@@ -4,16 +4,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   Upload, Search, X, Instagram, Phone, Mail, MapPin, Building2,
-  TrendingUp, Link2, Users, LinkIcon,
+  TrendingUp, Link2, Users, LinkIcon, Zap, CheckCircle2, AlertCircle,
+  ChevronDown, ChevronUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -37,7 +42,7 @@ interface InfluencerRaw {
 }
 
 interface Influencer {
-  email: string; // stable ID
+  email: string;
   name: string;
   instagram: string;
   tiktok: string;
@@ -72,6 +77,14 @@ interface InfluencerStats {
   avg_ticket: number;
   products: Record<string, number>;
   last_sale: Date;
+}
+
+interface AutoSuggestion {
+  email: string;
+  name: string;
+  instagram: string;
+  coupon: string;
+  checked: boolean;
 }
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
@@ -133,7 +146,7 @@ function buildStatsFromPerf(rows: SaleRow[]): Map<string, InfluencerStats> {
   return map;
 }
 
-/** Divide handle em partes: "@arya.fiapa" → ["arya", "fiapa"] */
+/** "@arya.fiapa" → ["arya", "fiapa"] */
 function handleParts(instagram: string): string[] {
   return instagram
     .replace(/^@/, "")
@@ -142,7 +155,7 @@ function handleParts(instagram: string): string[] {
     .filter(Boolean);
 }
 
-/** Tenta sugerir o coupon mais provável com base no Instagram */
+/** Retorna o coupon sugerido com base no Instagram, ou null */
 function suggestCoupon(influencer: Influencer, availableCoupons: string[]): string | null {
   if (!availableCoupons.length || !influencer.instagram) return null;
   const parts = handleParts(influencer.instagram);
@@ -163,13 +176,8 @@ function fmt(n: number) {
 
 function fmtWhatsapp(raw: string): string {
   const d = raw.replace(/\D/g, "");
-  // "5521981861134" → "+55 21 98186-1134"
-  if (d.length === 13) {
-    return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 9)}-${d.slice(9)}`;
-  }
-  if (d.length === 12) {
-    return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 8)}-${d.slice(8)}`;
-  }
+  if (d.length === 13) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 9)}-${d.slice(9)}`;
+  if (d.length === 12) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 8)}-${d.slice(8)}`;
   return raw;
 }
 
@@ -180,14 +188,27 @@ export default function CadastroInfluenciadores() {
   const [selected, setSelected] = useState<Influencer | null>(null);
   const [editingCoupon, setEditingCoupon] = useState<string>("none");
 
+  // Sorting
+  type SortField = "name" | "instagram" | "cidade" | "coupon" | "gmv";
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) setSortAsc(!sortAsc);
+    else { setSortField(field); setSortAsc(true); }
+  };
+
+  // Auto-link dialog state
+  const [autoLinkOpen, setAutoLinkOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<AutoSuggestion[]>([]);
+  const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
+
   // Influencer registry
   const [influencers, setInfluencers] = useState<Influencer[]>(() => {
     try {
       const s = localStorage.getItem(REGISTRY_KEY);
       return s ? JSON.parse(s) : [];
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   });
 
   // Coupon links: email → coupon
@@ -195,29 +216,20 @@ export default function CadastroInfluenciadores() {
     try {
       const s = localStorage.getItem(LINKS_KEY);
       return s ? JSON.parse(s) : {};
-    } catch {
-      return {};
-    }
+    } catch { return {}; }
   });
 
-  // Performance data from the other page's localStorage
+  // Performance data from PerformanceInfluenciadores localStorage
   const perfStats = useMemo<Map<string, InfluencerStats>>(() => {
     try {
       const s = localStorage.getItem(PERF_KEY);
       if (!s) return new Map();
-      const rows: SaleRow[] = JSON.parse(s, (k, v) =>
-        k === "date_sale" ? new Date(v) : v
-      );
+      const rows: SaleRow[] = JSON.parse(s, (k, v) => k === "date_sale" ? new Date(v) : v);
       return buildStatsFromPerf(rows);
-    } catch {
-      return new Map();
-    }
+    } catch { return new Map(); }
   }, []);
 
-  const availableCoupons = useMemo(
-    () => Array.from(perfStats.keys()).sort(),
-    [perfStats]
-  );
+  const availableCoupons = useMemo(() => Array.from(perfStats.keys()).sort(), [perfStats]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -239,10 +251,61 @@ export default function CadastroInfluenciadores() {
     localStorage.removeItem(REGISTRY_KEY);
   };
 
+  // Abre o dialog de auto-link e roda o algoritmo em todas
+  const openAutoLink = () => {
+    const alreadyLinked = new Set(Object.values(couponLinks));
+    const matched: AutoSuggestion[] = [];
+    const unmatched: AutoSuggestion[] = [];
+
+    for (const inf of influencers) {
+      // Coupons que ainda não estão atribuídos a outra influenciadora
+      const free = availableCoupons.filter(
+        (c) => !alreadyLinked.has(c) || couponLinks[inf.email] === c
+      );
+      const suggestion = suggestCoupon(inf, free);
+
+      const entry: AutoSuggestion = {
+        email: inf.email,
+        name: inf.name,
+        instagram: inf.instagram,
+        coupon: suggestion ?? "",
+        checked: !!suggestion,
+      };
+
+      if (suggestion) {
+        matched.push(entry);
+        alreadyLinked.add(suggestion); // reserva o coupon para não sugerir para outra
+      } else {
+        unmatched.push(entry);
+      }
+    }
+
+    setSuggestions([...matched, ...unmatched]);
+    setManualLinks({});
+    setAutoLinkOpen(true);
+  };
+
+  // Confirma e salva todas as vinculações do dialog
+  const confirmAutoLink = () => {
+    const updated = { ...couponLinks };
+
+    for (const s of suggestions) {
+      if (s.checked && s.coupon) {
+        updated[s.email] = s.coupon;
+      }
+    }
+    for (const [email, coupon] of Object.entries(manualLinks)) {
+      if (coupon && coupon !== "none") updated[email] = coupon;
+    }
+
+    setCouponLinks(updated);
+    localStorage.setItem(LINKS_KEY, JSON.stringify(updated));
+    setAutoLinkOpen(false);
+  };
+
   const openProfile = (inf: Influencer) => {
     setSelected(inf);
-    const linked = couponLinks[inf.email] ?? "";
-    setEditingCoupon(linked || "none");
+    setEditingCoupon(couponLinks[inf.email] ?? "none");
   };
 
   const saveLink = () => {
@@ -265,16 +328,37 @@ export default function CadastroInfluenciadores() {
 
   // ── Derived ─────────────────────────────────────────────────────────────────
   const displayed = useMemo(() => {
-    if (!search) return influencers;
-    const q = search.toLowerCase();
-    return influencers.filter(
-      (i) =>
-        i.name.toLowerCase().includes(q) ||
-        i.instagram.toLowerCase().includes(q) ||
-        i.email.toLowerCase().includes(q) ||
-        i.address.cidade.toLowerCase().includes(q)
-    );
-  }, [influencers, search]);
+    let list = influencers;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (i) =>
+          i.name.toLowerCase().includes(q) ||
+          i.instagram.toLowerCase().includes(q) ||
+          i.email.toLowerCase().includes(q) ||
+          i.address.cidade.toLowerCase().includes(q)
+      );
+    }
+
+    list = [...list].sort((a, b) => {
+      let av = "";
+      let bv = "";
+      if (sortField === "name") { av = a.name; bv = b.name; }
+      else if (sortField === "instagram") { av = a.instagram; bv = b.instagram; }
+      else if (sortField === "cidade") { av = a.address.cidade; bv = b.address.cidade; }
+      else if (sortField === "coupon") {
+        av = getLinkedCoupon(a.email) ?? "";
+        bv = getLinkedCoupon(b.email) ?? "";
+      } else if (sortField === "gmv") {
+        const ag = getStats(a.email)?.gmv ?? -1;
+        const bg = getStats(b.email)?.gmv ?? -1;
+        return sortAsc ? ag - bg : bg - ag;
+      }
+      return sortAsc ? av.localeCompare(bv, "pt-BR") : bv.localeCompare(av, "pt-BR");
+    });
+
+    return list;
+  }, [influencers, search, sortField, sortAsc, couponLinks, perfStats]);
 
   const linkedCount = Object.keys(couponLinks).filter(
     (e) => influencers.some((i) => i.email === e)
@@ -289,11 +373,11 @@ export default function CadastroInfluenciadores() {
   const selectedLinkedCoupon = selected ? getLinkedCoupon(selected.email) : null;
   const selectedStats = selected ? getStats(selected.email) : null;
   const selectedSuggestion = selected
-    ? suggestCoupon(
-        selected,
-        availableCoupons.filter((c) => c !== selectedLinkedCoupon)
-      )
+    ? suggestCoupon(selected, availableCoupons.filter((c) => c !== selectedLinkedCoupon))
     : null;
+
+  const matchedSuggestions = suggestions.filter((s) => !!s.coupon);
+  const unmatchedSuggestions = suggestions.filter((s) => !s.coupon);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -308,7 +392,12 @@ export default function CadastroInfluenciadores() {
               : "Importe o CSV de cadastro"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {influencers.length > 0 && availableCoupons.length > 0 && (
+            <Button variant="outline" size="sm" onClick={openAutoLink}>
+              <Zap className="h-4 w-4 mr-1" /> Vincular automaticamente
+            </Button>
+          )}
           {influencers.length > 0 && (
             <Button variant="outline" size="sm" onClick={clearRegistry}>
               <X className="h-4 w-4 mr-1" /> Limpar
@@ -317,24 +406,26 @@ export default function CadastroInfluenciadores() {
           <Button size="sm" onClick={() => fileRef.current?.click()}>
             <Upload className="h-4 w-4 mr-1" /> Importar CSV
           </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={handleFile}
-          />
+          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
         </div>
       </div>
+
+      {/* Aviso sem performance carregada */}
+      {influencers.length > 0 && availableCoupons.length === 0 && (
+        <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>
+            Importe a planilha de vendas na página <strong>Performance</strong> para habilitar a vinculação automática de coupons.
+          </span>
+        </div>
+      )}
 
       {/* Empty state */}
       {influencers.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 border-2 border-dashed rounded-xl">
           <Users className="h-10 w-10 text-muted-foreground/40" />
           <div>
-            <p className="font-medium text-muted-foreground">
-              Nenhuma influenciadora cadastrada
-            </p>
+            <p className="font-medium text-muted-foreground">Nenhuma influenciadora cadastrada</p>
             <p className="text-sm text-muted-foreground/60 mt-1">
               Importe o CSV de cadastro no formato padrão da planilha
             </p>
@@ -416,12 +507,39 @@ export default function CadastroInfluenciadores() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Instagram</TableHead>
-                      <TableHead>WhatsApp</TableHead>
-                      <TableHead>Cidade / UF</TableHead>
-                      <TableHead>Coupon</TableHead>
-                      <TableHead>GMV Gerado</TableHead>
+                      {(
+                        [
+                          { label: "Nome", field: "name" },
+                          { label: "Instagram", field: "instagram" },
+                          { label: "WhatsApp", field: null },
+                          { label: "Cidade / UF", field: "cidade" },
+                          { label: "Coupon", field: "coupon" },
+                          { label: "GMV Gerado", field: "gmv" },
+                        ] as const
+                      ).map(({ label, field }) =>
+                        field ? (
+                          <TableHead
+                            key={label}
+                            className="cursor-pointer select-none"
+                            onClick={() => handleSort(field as SortField)}
+                          >
+                            <div className="flex items-center gap-1">
+                              {label}
+                              {sortField === field ? (
+                                sortAsc ? (
+                                  <ChevronUp className="h-3 w-3" />
+                                ) : (
+                                  <ChevronDown className="h-3 w-3" />
+                                )
+                              ) : (
+                                <ChevronDown className="h-3 w-3 opacity-30" />
+                              )}
+                            </div>
+                          </TableHead>
+                        ) : (
+                          <TableHead key={label}>{label}</TableHead>
+                        )
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -447,15 +565,11 @@ export default function CadastroInfluenciadores() {
                             {inf.whatsapp ? fmtWhatsapp(inf.whatsapp) : "—"}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {inf.address.cidade
-                              ? `${inf.address.cidade} / ${inf.address.estado}`
-                              : "—"}
+                            {inf.address.cidade ? `${inf.address.cidade} / ${inf.address.estado}` : "—"}
                           </TableCell>
                           <TableCell>
                             {coupon ? (
-                              <Badge variant="secondary" className="font-mono text-xs">
-                                {coupon}
-                              </Badge>
+                              <Badge variant="secondary" className="font-mono text-xs">{coupon}</Badge>
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
@@ -468,10 +582,7 @@ export default function CadastroInfluenciadores() {
                     })}
                     {displayed.length === 0 && (
                       <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="text-center py-8 text-muted-foreground"
-                        >
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Nenhum resultado encontrado
                         </TableCell>
                       </TableRow>
@@ -483,6 +594,117 @@ export default function CadastroInfluenciadores() {
           </Card>
         </>
       )}
+
+      {/* ── Auto-link Dialog ─────────────────────────────────────────────────── */}
+      <Dialog open={autoLinkOpen} onOpenChange={setAutoLinkOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Vinculação automática de coupons</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              O sistema comparou os handles do Instagram com os coupons disponíveis.
+              Confirme as correspondências e atribua manualmente as que não foram encontradas.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Encontradas */}
+            {matchedSuggestions.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <p className="text-sm font-semibold">
+                    Correspondências encontradas ({matchedSuggestions.length})
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {matchedSuggestions.map((s) => (
+                    <div
+                      key={s.email}
+                      className="flex items-center gap-3 p-2.5 rounded-lg border bg-green-50/50"
+                    >
+                      <Checkbox
+                        checked={s.checked}
+                        onCheckedChange={(v) =>
+                          setSuggestions((prev) =>
+                            prev.map((x) =>
+                              x.email === s.email ? { ...x, checked: !!v } : x
+                            )
+                          )
+                        }
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium">{s.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{s.instagram}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">→</span>
+                      <Badge variant="secondary" className="font-mono shrink-0">
+                        {s.coupon}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sem correspondência */}
+            {unmatchedSuggestions.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <p className="text-sm font-semibold">
+                    Sem correspondência automática ({unmatchedSuggestions.length})
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {unmatchedSuggestions.map((s) => (
+                    <div
+                      key={s.email}
+                      className="flex items-center gap-3 p-2.5 rounded-lg border bg-amber-50/30"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium">{s.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{s.instagram}</span>
+                      </div>
+                      <Select
+                        value={manualLinks[s.email] ?? "none"}
+                        onValueChange={(v) =>
+                          setManualLinks((prev) => ({ ...prev, [s.email]: v }))
+                        }
+                      >
+                        <SelectTrigger className="w-36 h-7 text-xs">
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sem vínculo</SelectItem>
+                          {availableCoupons.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {suggestions.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma influenciadora para processar.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAutoLinkOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmAutoLink}>
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Confirmar e salvar vínculos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Profile Sheet ───────────────────────────────────────────────────── */}
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
@@ -548,10 +770,7 @@ export default function CadastroInfluenciadores() {
                   {selected.email && (
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <a
-                        href={`mailto:${selected.email}`}
-                        className="text-blue-600 hover:underline"
-                      >
+                      <a href={`mailto:${selected.email}`} className="text-blue-600 hover:underline">
                         {selected.email}
                       </a>
                     </div>
@@ -570,9 +789,7 @@ export default function CadastroInfluenciadores() {
                     <div className="space-y-0.5">
                       <div>
                         {selected.address.logradouro}, {selected.address.numero}
-                        {selected.address.complemento
-                          ? ` – ${selected.address.complemento}`
-                          : ""}
+                        {selected.address.complemento ? ` – ${selected.address.complemento}` : ""}
                       </div>
                       <div className="text-muted-foreground">
                         {selected.address.bairro} · {selected.address.cidade} /{" "}
@@ -604,8 +821,7 @@ export default function CadastroInfluenciadores() {
                       <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                         <LinkIcon className="h-3.5 w-3.5 shrink-0" />
                         <span>
-                          Sugestão automática:{" "}
-                          <strong>{selectedSuggestion}</strong>
+                          Sugestão automática: <strong>{selectedSuggestion}</strong>
                         </span>
                         <Button
                           size="sm"
@@ -618,19 +834,14 @@ export default function CadastroInfluenciadores() {
                       </div>
                     )}
                     <div className="flex gap-2 items-center">
-                      <Select
-                        value={editingCoupon}
-                        onValueChange={setEditingCoupon}
-                      >
+                      <Select value={editingCoupon} onValueChange={setEditingCoupon}>
                         <SelectTrigger className="flex-1 h-9 text-sm">
                           <SelectValue placeholder="Selecionar coupon..." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Sem vínculo</SelectItem>
                           {availableCoupons.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -693,9 +904,8 @@ export default function CadastroInfluenciadores() {
 
               {!selectedStats && selectedLinkedCoupon && (
                 <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
-                  Coupon <strong>{selectedLinkedCoupon}</strong> vinculado, mas sem dados
-                  de vendas. Importe a planilha na página{" "}
-                  <strong>Performance</strong>.
+                  Coupon <strong>{selectedLinkedCoupon}</strong> vinculado, mas sem dados de
+                  vendas. Importe a planilha na página <strong>Performance</strong>.
                 </div>
               )}
             </div>
