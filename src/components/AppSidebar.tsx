@@ -109,6 +109,7 @@ const navSections: NavSection[] = [
     title: "Influenciadores",
     icon: Sparkles,
     items: [
+      { title: "Cadastro", url: "/influenciadores/cadastro", icon: Users },
       { title: "Kanban de Prospecção", url: "/influenciadores/kanban", icon: ClipboardList },
       { title: "Performance", url: "/influenciadores/performance", icon: BarChart },
     ],
