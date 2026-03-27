@@ -1,33 +1,63 @@
-import { Fragment, useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import Papa from "papaparse";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
-  Upload, TrendingUp, ShoppingCart, DollarSign, Package,
-  Search, ChevronDown, ChevronUp, X, AlertCircle, User,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Upload, Search, X, Instagram, Phone, Mail, MapPin, Building2,
+  TrendingUp, Link2, Users, LinkIcon, Zap, CheckCircle2, AlertCircle,
+  ChevronDown, ChevronUp,
 } from "lucide-react";
-import { useDashboard } from "@/contexts/DashboardContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface RawRow {
-  campaign: string;
-  coupons: string;
-  date_sale: string;
-  date_validation: string;
-  date_payment_schedule: string;
-  order_id: string;
-  order_value: string;
-  payment_value: string;
-  products: string;
+interface InfluencerRaw {
+  address_bairro_text: string;
+  address_cep_text: string;
+  address_cidade_text: string;
+  address_complemento_text: string;
+  address_estado_text: string;
+  address_logradouro_text: string;
+  address_numero_text: string;
+  contact_instagram_text: string;
+  contact_tiktok_text: string;
+  contact_whatsapp_text: string;
+  name_full_text: string;
+  paym_pj_cnpj_text: string;
+  paym_pj_razao_social_text: string;
+  email: string;
+}
+
+interface Influencer {
+  email: string;
+  name: string;
+  instagram: string;
+  tiktok: string;
+  whatsapp: string;
+  cnpj: string;
+  razao_social: string;
+  address: {
+    logradouro: string;
+    numero: string;
+    complemento: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+    cep: string;
+  };
 }
 
 interface SaleRow {
@@ -47,76 +77,47 @@ interface InfluencerStats {
   avg_ticket: number;
   products: Record<string, number>;
   last_sale: Date;
-  first_sale: Date;
 }
 
-interface BonifRow {
-  id: string;
-  data_venda: string;
-  valor_total: number;
-  cliente_nome: string | null;
-  cliente_email: string | null;
-  cpf_cnpj: string | null;
-  produtos: string[] | null;
-}
-
-interface Influencer {
+interface AutoSuggestion {
   email: string;
   name: string;
   instagram: string;
+  coupon: string;
+  checked: boolean;
 }
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
-const STORAGE_KEY = "influencer_performance_csv";
 const REGISTRY_KEY = "influencer_registry";
 const LINKS_KEY = "influencer_coupon_links";
+const PERF_KEY = "influencer_performance_csv";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function parseBRNumber(raw: string): number {
-  if (!raw) return 0;
-  return parseFloat(raw.replace(/["\s]/g, "").replace(",", ".")) || 0;
-}
-
-function parseFlexDate(raw: string): Date | null {
-  if (!raw) return null;
-  const ptToEn: Record<string, string> = {
-    "jan.": "Jan", "fev.": "Feb", "mar.": "Mar", "abr.": "Apr",
-    "mai.": "May", "jun.": "Jun", "jul.": "Jul", "ago.": "Aug",
-    "set.": "Sep", "out.": "Oct", "nov.": "Nov", "dez.": "Dec",
-  };
-  let s = raw.trim();
-  for (const [pt, en] of Object.entries(ptToEn)) {
-    s = s.replace(new RegExp(pt, "gi"), en);
-  }
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function firstCoupon(raw: string): string {
-  return raw.split(",")[0].trim().toUpperCase();
-}
-
-function parseCSV(raw: string): SaleRow[] {
-  const result = Papa.parse<RawRow>(raw, { header: true, skipEmptyLines: true });
+function parseInfluencerCSV(raw: string): Influencer[] {
+  const result = Papa.parse<InfluencerRaw>(raw, { header: true, skipEmptyLines: true });
   return result.data
-    .map((row): SaleRow | null => {
-      const coupon = firstCoupon(row.coupons || "");
-      if (!coupon) return null;
-      const date_sale = parseFlexDate(row.date_sale);
-      if (!date_sale) return null;
-      return {
-        coupon,
-        date_sale,
-        order_id: row.order_id || "",
-        order_value: parseBRNumber(row.order_value),
-        payment_value: parseBRNumber(row.payment_value),
-        products: (row.products || "").split(",").map((p) => p.trim()).filter(Boolean),
-      };
-    })
-    .filter((r): r is SaleRow => r !== null);
+    .filter((r) => r.email || r.name_full_text)
+    .map((r) => ({
+      email: r.email?.trim() || r.name_full_text?.trim(),
+      name: r.name_full_text?.trim() || "",
+      instagram: r.contact_instagram_text?.trim() || "",
+      tiktok: r.contact_tiktok_text?.trim() || "",
+      whatsapp: r.contact_whatsapp_text?.trim() || "",
+      cnpj: r.paym_pj_cnpj_text?.trim() || "",
+      razao_social: r.paym_pj_razao_social_text?.trim() || "",
+      address: {
+        logradouro: r.address_logradouro_text?.trim() || "",
+        numero: r.address_numero_text?.trim() || "",
+        complemento: r.address_complemento_text?.trim() || "",
+        bairro: r.address_bairro_text?.trim() || "",
+        cidade: r.address_cidade_text?.trim() || "",
+        estado: r.address_estado_text?.trim() || "",
+        cep: r.address_cep_text?.trim() || "",
+      },
+    }));
 }
 
-function buildStats(rows: SaleRow[]): InfluencerStats[] {
+function buildStatsFromPerf(rows: SaleRow[]): Map<string, InfluencerStats> {
   const map = new Map<string, InfluencerStats>();
   for (const row of rows) {
     if (!map.has(row.coupon)) {
@@ -128,7 +129,6 @@ function buildStats(rows: SaleRow[]): InfluencerStats[] {
         avg_ticket: 0,
         products: {},
         last_sale: row.date_sale,
-        first_sale: row.date_sale,
       });
     }
     const s = map.get(row.coupon)!;
@@ -136,7 +136,6 @@ function buildStats(rows: SaleRow[]): InfluencerStats[] {
     s.gmv += row.order_value;
     s.commission += row.payment_value;
     if (row.date_sale > s.last_sale) s.last_sale = row.date_sale;
-    if (row.date_sale < s.first_sale) s.first_sale = row.date_sale;
     for (const p of row.products) {
       s.products[p] = (s.products[p] || 0) + 1;
     }
@@ -144,208 +143,264 @@ function buildStats(rows: SaleRow[]): InfluencerStats[] {
   for (const s of map.values()) {
     s.avg_ticket = s.total_orders > 0 ? s.gmv / s.total_orders : 0;
   }
-  return Array.from(map.values()).sort((a, b) => b.gmv - a.gmv);
+  return map;
 }
 
-/** Normaliza nome para comparação tolerante */
-function normalizeName(s: string | null | undefined): string {
-  if (!s) return "";
-  return s.trim().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ");
+/** "@arya.fiapa" → ["arya", "fiapa"] */
+function handleParts(instagram: string): string[] {
+  return instagram
+    .replace(/^@/, "")
+    .toLowerCase()
+    .split(/[._\-\s]+/)
+    .filter(Boolean);
+}
+
+/** Retorna o coupon sugerido com base no Instagram, ou null */
+function suggestCoupon(influencer: Influencer, availableCoupons: string[]): string | null {
+  if (!availableCoupons.length || !influencer.instagram) return null;
+  const parts = handleParts(influencer.instagram);
+  for (const part of parts) {
+    for (const coupon of availableCoupons) {
+      const c = coupon.toLowerCase();
+      if (c === part || part.startsWith(c) || c.startsWith(part)) {
+        return coupon;
+      }
+    }
+  }
+  return null;
 }
 
 function fmt(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function fmtDate(d: Date) {
-  return format(d, "dd MMM yyyy", { locale: ptBR });
+function fmtWhatsapp(raw: string): string {
+  const d = raw.replace(/\D/g, "");
+  if (d.length === 13) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 9)}-${d.slice(9)}`;
+  if (d.length === 12) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 8)}-${d.slice(8)}`;
+  return raw;
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function PerformanceInfluenciadores() {
+export default function CadastroInfluenciadores() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Influencer | null>(null);
+  const [editingCoupon, setEditingCoupon] = useState<string>("none");
 
-  // Filtro global do dashboard
-  const { dateRange } = useDashboard();
+  // Sorting
+  type SortField = "name" | "instagram" | "cidade" | "coupon" | "gmv";
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortAsc, setSortAsc] = useState(true);
 
-  // ── Influencer registry + coupon links (localStorage) ───────────────────
-  const influencers = useMemo<Influencer[]>(() => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) setSortAsc(!sortAsc);
+    else { setSortField(field); setSortAsc(true); }
+  };
+
+  // Auto-link dialog state
+  const [autoLinkOpen, setAutoLinkOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<AutoSuggestion[]>([]);
+  const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
+
+  // Influencer registry
+  const [influencers, setInfluencers] = useState<Influencer[]>(() => {
     try {
       const s = localStorage.getItem(REGISTRY_KEY);
       return s ? JSON.parse(s) : [];
     } catch { return []; }
-  }, []);
+  });
 
-  const couponLinks = useMemo<Record<string, string>>(() => {
+  // Coupon links: email → coupon
+  const [couponLinks, setCouponLinks] = useState<Record<string, string>>(() => {
     try {
       const s = localStorage.getItem(LINKS_KEY);
       return s ? JSON.parse(s) : {};
     } catch { return {}; }
+  });
+
+  // Performance data from PerformanceInfluenciadores localStorage
+  const perfStats = useMemo<Map<string, InfluencerStats>>(() => {
+    try {
+      const s = localStorage.getItem(PERF_KEY);
+      if (!s) return new Map();
+      const rows: SaleRow[] = JSON.parse(s, (k, v) => k === "date_sale" ? new Date(v) : v);
+      return buildStatsFromPerf(rows);
+    } catch { return new Map(); }
   }, []);
 
-  // Reverse map: coupon → influencer
-  const influencerByCoupon = useMemo(() => {
-    const map = new Map<string, Influencer>();
-    for (const [email, coupon] of Object.entries(couponLinks)) {
-      const inf = influencers.find((i) => i.email === email);
-      if (inf) map.set(coupon, inf);
-    }
-    return map;
-  }, [influencers, couponLinks]);
+  const availableCoupons = useMemo(() => Array.from(perfStats.keys()).sort(), [perfStats]);
 
-  // Reverse map: influencer email → coupon
-  const couponByEmail = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const [email, coupon] of Object.entries(couponLinks)) {
-      map.set(email.toLowerCase(), coupon);
-    }
-    return map;
-  }, [couponLinks]);
-
-  // ── NFs de bonificação (sales_data com tipo_movimento = 'bonificacao') ──
-  const { data: bonifRaw = [], isLoading: loadingBonif } = useQuery({
-    queryKey: ["bonificacao-influenciadores"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales_data")
-        .select("id, data_venda, valor_total, cliente_nome, cliente_email, cpf_cnpj, produtos")
-        .eq("tipo_movimento", "bonificacao")
-        .order("data_venda", { ascending: false });
-      if (error) throw error;
-      return (data || []) as BonifRow[];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // Map: coupon → list of bonification rows
-  const bonifByCoupon = useMemo(() => {
-    const map = new Map<string, BonifRow[]>();
-
-    for (const row of bonifRaw) {
-      // 1. Match by email
-      let coupon: string | undefined;
-      if (row.cliente_email) {
-        coupon = couponByEmail.get(row.cliente_email.toLowerCase());
-      }
-      // 2. Fallback: match by name
-      if (!coupon && row.cliente_nome) {
-        const normRow = normalizeName(row.cliente_nome);
-        for (const inf of influencers) {
-          if (normalizeName(inf.name) === normRow) {
-            coupon = couponByEmail.get(inf.email.toLowerCase());
-            break;
-          }
-        }
-      }
-      if (!coupon) continue;
-      if (!map.has(coupon)) map.set(coupon, []);
-      map.get(coupon)!.push(row);
-    }
-    return map;
-  }, [bonifRaw, couponByEmail, influencers]);
-
-  // ── CSV local ────────────────────────────────────────────────────────────
-  const [rows, setRows] = useState<SaleRow[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved
-        ? JSON.parse(saved, (k, v) => (k === "date_sale" ? new Date(v) : v))
-        : [];
-    } catch { return []; }
-  });
-
-  const [search, setSearch] = useState("");
-  const [sortField, setSortField] = useState<keyof InfluencerStats>("gmv");
-  const [sortAsc, setSortAsc] = useState(false);
-  const [expandedCoupon, setExpandedCoupon] = useState<string | null>(null);
-
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const parsed = parseCSV(ev.target?.result as string);
-      setRows(parsed);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      const parsed = parseInfluencerCSV(ev.target?.result as string);
+      setInfluencers(parsed);
+      localStorage.setItem(REGISTRY_KEY, JSON.stringify(parsed));
     };
     reader.readAsText(file, "UTF-8");
     e.target.value = "";
   };
 
-  // Filtra pelo dateRange global
-  const filteredRows = useMemo(() => {
-    if (!dateRange) return rows;
-    return rows.filter(
-      (row) => row.date_sale >= dateRange.start && row.date_sale <= dateRange.end
-    );
-  }, [rows, dateRange]);
+  const clearRegistry = () => {
+    if (!confirm("Limpar cadastro de influenciadoras?")) return;
+    setInfluencers([]);
+    localStorage.removeItem(REGISTRY_KEY);
+  };
 
-  const stats = useMemo(() => buildStats(filteredRows), [filteredRows]);
+  // Abre o dialog de auto-link e roda o algoritmo em todas
+  const openAutoLink = () => {
+    const alreadyLinked = new Set(Object.values(couponLinks));
+    const matched: AutoSuggestion[] = [];
+    const unmatched: AutoSuggestion[] = [];
 
-  const totalGMV = useMemo(() => stats.reduce((s, r) => s + r.gmv, 0), [stats]);
-  const totalCommission = useMemo(() => stats.reduce((s, r) => s + r.commission, 0), [stats]);
-  const totalOrders = useMemo(() => stats.reduce((s, r) => s + r.total_orders, 0), [stats]);
-  const totalBonificado = useMemo(
-    () => bonifRaw.reduce((s, r) => s + (r.valor_total || 0), 0),
-    [bonifRaw]
-  );
+    for (const inf of influencers) {
+      // Coupons que ainda não estão atribuídos a outra influenciadora
+      const free = availableCoupons.filter(
+        (c) => !alreadyLinked.has(c) || couponLinks[inf.email] === c
+      );
+      const suggestion = suggestCoupon(inf, free);
 
+      const entry: AutoSuggestion = {
+        email: inf.email,
+        name: inf.name,
+        instagram: inf.instagram,
+        coupon: suggestion ?? "",
+        checked: !!suggestion,
+      };
+
+      if (suggestion) {
+        matched.push(entry);
+        alreadyLinked.add(suggestion); // reserva o coupon para não sugerir para outra
+      } else {
+        unmatched.push(entry);
+      }
+    }
+
+    setSuggestions([...matched, ...unmatched]);
+    setManualLinks({});
+    setAutoLinkOpen(true);
+  };
+
+  // Confirma e salva todas as vinculações do dialog
+  const confirmAutoLink = () => {
+    const updated = { ...couponLinks };
+
+    for (const s of suggestions) {
+      if (s.checked && s.coupon) {
+        updated[s.email] = s.coupon;
+      }
+    }
+    for (const [email, coupon] of Object.entries(manualLinks)) {
+      if (coupon && coupon !== "none") updated[email] = coupon;
+    }
+
+    setCouponLinks(updated);
+    localStorage.setItem(LINKS_KEY, JSON.stringify(updated));
+    setAutoLinkOpen(false);
+  };
+
+  const openProfile = (inf: Influencer) => {
+    setSelected(inf);
+    setEditingCoupon(couponLinks[inf.email] ?? "none");
+  };
+
+  const saveLink = () => {
+    if (!selected) return;
+    const updated = { ...couponLinks };
+    if (editingCoupon && editingCoupon !== "none") {
+      updated[selected.email] = editingCoupon;
+    } else {
+      delete updated[selected.email];
+    }
+    setCouponLinks(updated);
+    localStorage.setItem(LINKS_KEY, JSON.stringify(updated));
+  };
+
+  const getLinkedCoupon = (email: string) => couponLinks[email] ?? null;
+  const getStats = (email: string) => {
+    const c = getLinkedCoupon(email);
+    return c ? (perfStats.get(c) ?? null) : null;
+  };
+
+  // ── Derived ─────────────────────────────────────────────────────────────────
   const displayed = useMemo(() => {
-    let list = [...stats];
-    if (search) list = list.filter((s) => s.coupon.toLowerCase().includes(search.toLowerCase()));
-    list.sort((a, b) => {
-      const av = a[sortField];
-      const bv = b[sortField];
-      if (av instanceof Date && bv instanceof Date)
-        return sortAsc ? av.getTime() - bv.getTime() : bv.getTime() - av.getTime();
-      if (typeof av === "number" && typeof bv === "number")
-        return sortAsc ? av - bv : bv - av;
-      return 0;
+    let list = influencers;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (i) =>
+          i.name.toLowerCase().includes(q) ||
+          i.instagram.toLowerCase().includes(q) ||
+          i.email.toLowerCase().includes(q) ||
+          i.address.cidade.toLowerCase().includes(q)
+      );
+    }
+
+    list = [...list].sort((a, b) => {
+      let av = "";
+      let bv = "";
+      if (sortField === "name") { av = a.name; bv = b.name; }
+      else if (sortField === "instagram") { av = a.instagram; bv = b.instagram; }
+      else if (sortField === "cidade") { av = a.address.cidade; bv = b.address.cidade; }
+      else if (sortField === "coupon") {
+        av = getLinkedCoupon(a.email) ?? "";
+        bv = getLinkedCoupon(b.email) ?? "";
+      } else if (sortField === "gmv") {
+        const ag = getStats(a.email)?.gmv ?? -1;
+        const bg = getStats(b.email)?.gmv ?? -1;
+        return sortAsc ? ag - bg : bg - ag;
+      }
+      return sortAsc ? av.localeCompare(bv, "pt-BR") : bv.localeCompare(av, "pt-BR");
     });
+
     return list;
-  }, [stats, search, sortField, sortAsc]);
+  }, [influencers, search, sortField, sortAsc, couponLinks, perfStats]);
 
-  const handleSort = (field: keyof InfluencerStats) => {
-    if (sortField === field) setSortAsc(!sortAsc);
-    else { setSortField(field); setSortAsc(false); }
-  };
+  const linkedCount = Object.keys(couponLinks).filter(
+    (e) => influencers.some((i) => i.email === e)
+  ).length;
 
-  const SortIcon = ({ field }: { field: keyof InfluencerStats }) =>
-    sortField === field
-      ? sortAsc
-        ? <ChevronUp className="h-3 w-3" />
-        : <ChevronDown className="h-3 w-3" />
-      : <ChevronDown className="h-3 w-3 opacity-30" />;
+  const withPerfCount = Object.keys(couponLinks).filter(
+    (e) => perfStats.has(couponLinks[e])
+  ).length;
 
-  const clearData = () => {
-    if (!confirm("Limpar todos os dados carregados?")) return;
-    setRows([]);
-    localStorage.removeItem(STORAGE_KEY);
-  };
+  const pjCount = influencers.filter((i) => !!i.cnpj).length;
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  const selectedLinkedCoupon = selected ? getLinkedCoupon(selected.email) : null;
+  const selectedStats = selected ? getStats(selected.email) : null;
+  const selectedSuggestion = selected
+    ? suggestCoupon(selected, availableCoupons.filter((c) => c !== selectedLinkedCoupon))
+    : null;
+
+  const matchedSuggestions = suggestions.filter((s) => !!s.coupon);
+  const unmatchedSuggestions = suggestions.filter((s) => !s.coupon);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Performance de Influenciadoras</h1>
+          <h1 className="text-2xl font-bold">Cadastro de Influenciadoras</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Vendas por coupon
-            {dateRange && (
-              <span className="ml-1 text-xs text-blue-600">
-                · filtrando {format(dateRange.start, "dd/MM/yy")} –{" "}
-                {format(dateRange.end, "dd/MM/yy")}
-              </span>
-            )}
+            {influencers.length > 0
+              ? `${influencers.length} influenciadoras · clique para abrir perfil`
+              : "Importe o CSV de cadastro"}
           </p>
         </div>
-        <div className="flex gap-2">
-          {rows.length > 0 && (
-            <Button variant="outline" size="sm" onClick={clearData}>
-              <X className="h-4 w-4 mr-1" /> Limpar CSV
+        <div className="flex flex-wrap gap-2">
+          {influencers.length > 0 && availableCoupons.length > 0 && (
+            <Button variant="outline" size="sm" onClick={openAutoLink}>
+              <Zap className="h-4 w-4 mr-1" /> Vincular automaticamente
+            </Button>
+          )}
+          {influencers.length > 0 && (
+            <Button variant="outline" size="sm" onClick={clearRegistry}>
+              <X className="h-4 w-4 mr-1" /> Limpar
             </Button>
           )}
           <Button size="sm" onClick={() => fileRef.current?.click()}>
@@ -355,36 +410,24 @@ export default function PerformanceInfluenciadores() {
         </div>
       </div>
 
-      {/* Aviso filtro global ativo */}
-      {dateRange && rows.length > 0 && filteredRows.length < rows.length && (
+      {/* Aviso sem performance carregada */}
+      {influencers.length > 0 && availableCoupons.length === 0 && (
         <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>
-            Exibindo <strong>{filteredRows.length}</strong> de{" "}
-            <strong>{rows.length}</strong> linhas do CSV conforme o filtro de período do dashboard.
-          </span>
-        </div>
-      )}
-
-      {/* Aviso: sem registro de influenciadoras */}
-      {rows.length > 0 && influencers.length === 0 && (
-        <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>
-            Importe o cadastro de influenciadoras na página <strong>Cadastro</strong> e
-            vincule os coupons para ver nomes e bonificações por influenciadora.
+            Importe a planilha de vendas na página <strong>Performance</strong> para habilitar a vinculação automática de coupons.
           </span>
         </div>
       )}
 
       {/* Empty state */}
-      {rows.length === 0 && (
+      {influencers.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 border-2 border-dashed rounded-xl">
-          <Upload className="h-10 w-10 text-muted-foreground/40" />
+          <Users className="h-10 w-10 text-muted-foreground/40" />
           <div>
-            <p className="font-medium text-muted-foreground">Nenhum dado de vendas carregado</p>
+            <p className="font-medium text-muted-foreground">Nenhuma influenciadora cadastrada</p>
             <p className="text-sm text-muted-foreground/60 mt-1">
-              Importe a planilha de vendas por coupon (formato padrão)
+              Importe o CSV de cadastro no formato padrão da planilha
             </p>
           </div>
           <Button onClick={() => fileRef.current?.click()}>
@@ -393,376 +436,153 @@ export default function PerformanceInfluenciadores() {
         </div>
       )}
 
-      {rows.length > 0 && (
+      {influencers.length > 0 && (
         <>
-          {/* KPI cards */}
+          {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <TrendingUp className="h-3.5 w-3.5" /> GMV Total
+                  <Users className="h-3.5 w-3.5" /> Total
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{fmt(totalGMV)}</div>
-                <p className="text-xs text-muted-foreground mt-0.5">gerado pelos coupons</p>
+                <div className="text-2xl font-bold">{influencers.length}</div>
+                <p className="text-xs text-muted-foreground mt-0.5">influenciadoras</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <DollarSign className="h-3.5 w-3.5" /> Comissões
+                  <Link2 className="h-3.5 w-3.5" /> Vinculadas
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{fmt(totalCommission)}</div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {totalGMV > 0
-                    ? `${((totalCommission / totalGMV) * 100).toFixed(1)}% do GMV`
-                    : "—"}
-                </p>
+                <div className="text-2xl font-bold">{linkedCount}</div>
+                <p className="text-xs text-muted-foreground mt-0.5">com coupon linkado</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <Package className="h-3.5 w-3.5" /> Total Bonificado
+                  <TrendingUp className="h-3.5 w-3.5" /> Com vendas
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{fmt(totalBonificado)}</div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {loadingBonif
-                    ? "carregando..."
-                    : `${bonifRaw.length} NF(s) de bonificação`}
-                </p>
+                <div className="text-2xl font-bold">{withPerfCount}</div>
+                <p className="text-xs text-muted-foreground mt-0.5">com dados de performance</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <ShoppingCart className="h-3.5 w-3.5" /> Pedidos
+                  <Building2 className="h-3.5 w-3.5" /> Pessoa Jurídica
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalOrders}</div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {stats.length} coupons · ticket médio{" "}
-                  {totalOrders > 0 ? fmt(totalGMV / totalOrders) : "—"}
-                </p>
+                <div className="text-2xl font-bold">{pjCount}</div>
+                <p className="text-xs text-muted-foreground mt-0.5">com CNPJ cadastrado</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Busca */}
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
-              <Input
-                className="pl-8 w-56"
-                placeholder="Buscar coupon ou nome..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Clique em uma linha para ver detalhes de produtos e bonificações
-            </p>
+          {/* Search */}
+          <div className="relative w-72">
+            <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Buscar por nome, @, cidade..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
 
-          {/* Tabela */}
+          {/* Table */}
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-8">#</TableHead>
-                      <TableHead>Influenciadora</TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("total_orders")}
-                      >
-                        <div className="flex items-center gap-1">
-                          Pedidos <SortIcon field="total_orders" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("gmv")}
-                      >
-                        <div className="flex items-center gap-1">
-                          GMV <SortIcon field="gmv" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("commission")}
-                      >
-                        <div className="flex items-center gap-1">
-                          Comissão <SortIcon field="commission" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("avg_ticket")}
-                      >
-                        <div className="flex items-center gap-1">
-                          Ticket Médio <SortIcon field="avg_ticket" />
-                        </div>
-                      </TableHead>
-                      <TableHead>Bonificado</TableHead>
-                      <TableHead>ROI</TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("last_sale")}
-                      >
-                        <div className="flex items-center gap-1">
-                          Última Venda <SortIcon field="last_sale" />
-                        </div>
-                      </TableHead>
+                      {(
+                        [
+                          { label: "Nome", field: "name" },
+                          { label: "Instagram", field: "instagram" },
+                          { label: "WhatsApp", field: null },
+                          { label: "Cidade / UF", field: "cidade" },
+                          { label: "Coupon", field: "coupon" },
+                          { label: "GMV Gerado", field: "gmv" },
+                        ] as const
+                      ).map(({ label, field }) =>
+                        field ? (
+                          <TableHead
+                            key={label}
+                            className="cursor-pointer select-none"
+                            onClick={() => handleSort(field as SortField)}
+                          >
+                            <div className="flex items-center gap-1">
+                              {label}
+                              {sortField === field ? (
+                                sortAsc ? (
+                                  <ChevronUp className="h-3 w-3" />
+                                ) : (
+                                  <ChevronDown className="h-3 w-3" />
+                                )
+                              ) : (
+                                <ChevronDown className="h-3 w-3 opacity-30" />
+                              )}
+                            </div>
+                          </TableHead>
+                        ) : (
+                          <TableHead key={label}>{label}</TableHead>
+                        )
+                      )}
                     </TableRow>
                   </TableHeader>
-
                   <TableBody>
-                    {displayed.map((s, i) => {
-                      const inf = influencerByCoupon.get(s.coupon);
-                      const bonifs = bonifByCoupon.get(s.coupon) ?? [];
-                      const totalBonifInflu = bonifs.reduce(
-                        (acc, r) => acc + (r.valor_total || 0),
-                        0
-                      );
-                      const roi =
-                        totalBonifInflu > 0 ? s.gmv / totalBonifInflu : null;
-
+                    {displayed.map((inf) => {
+                      const coupon = getLinkedCoupon(inf.email);
+                      const stats = getStats(inf.email);
                       return (
-                        <Fragment key={s.coupon}>
-                          <TableRow
-                            className="cursor-pointer hover:bg-muted/40"
-                            onClick={() =>
-                              setExpandedCoupon(
-                                expandedCoupon === s.coupon ? null : s.coupon
-                              )
-                            }
-                          >
-                            <TableCell className="text-muted-foreground text-xs">
-                              {i + 1}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div>
-                                  {inf ? (
-                                    <>
-                                      <div className="font-semibold">{inf.name}</div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {inf.instagram || s.coupon}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-semibold font-mono">
-                                        {s.coupon}
-                                      </span>
-                                      {i === 0 && (
-                                        <Badge className="text-[10px] px-1.5 py-0">
-                                          🏆 Top
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  )}
-                                  {inf && i === 0 && (
-                                    <Badge className="text-[10px] px-1.5 py-0 mt-0.5">
-                                      🏆 Top
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>{s.total_orders}</TableCell>
-                            <TableCell className="font-medium">{fmt(s.gmv)}</TableCell>
-                            <TableCell className="text-amber-700">
-                              {fmt(s.commission)}
-                            </TableCell>
-                            <TableCell>{fmt(s.avg_ticket)}</TableCell>
-                            <TableCell>
-                              {bonifs.length > 0 ? (
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="text-sm font-medium text-rose-700">
-                                    {fmt(totalBonifInflu)}
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {bonifs.length} NF(s)
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {roi !== null ? (
-                                <Badge
-                                  variant={
-                                    roi >= 3
-                                      ? "default"
-                                      : roi >= 1
-                                      ? "secondary"
-                                      : "destructive"
-                                  }
-                                  className="text-xs font-mono"
-                                >
-                                  {roi.toFixed(1)}x
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {fmtDate(s.last_sale)}
-                            </TableCell>
-                          </TableRow>
-
-                          {/* Linha expandida */}
-                          {expandedCoupon === s.coupon && (
-                            <TableRow className="bg-muted/20 hover:bg-muted/20">
-                              <TableCell colSpan={9} className="py-4 px-6">
-                                <div className="grid md:grid-cols-2 gap-6">
-                                  {/* Produtos vendidos */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                                      Produtos vendidos
-                                      <span className="normal-case ml-1 font-normal">
-                                        ({s.total_orders} pedidos ·{" "}
-                                        {fmtDate(s.first_sale)} → {fmtDate(s.last_sale)})
-                                      </span>
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                      {Object.entries(s.products)
-                                        .sort((a, b) => b[1] - a[1])
-                                        .map(([product, qty]) => (
-                                          <div
-                                            key={product}
-                                            className="bg-white border rounded-md px-2.5 py-1 text-xs flex items-center gap-1.5"
-                                          >
-                                            <span>{product}</span>
-                                            <Badge
-                                              variant="secondary"
-                                              className="text-[10px] px-1 py-0"
-                                            >
-                                              {qty}x
-                                            </Badge>
-                                          </div>
-                                        ))}
-                                    </div>
-                                  </div>
-
-                                  {/* Bonificações */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                                      Bonificações enviadas
-                                    </p>
-                                    {bonifs.length === 0 ? (
-                                      <div className="text-xs text-muted-foreground">
-                                        {inf ? (
-                                          <span>
-                                            Nenhuma NF de bonificação encontrada para{" "}
-                                            <strong>{inf.name}</strong>. Verifique se o
-                                            e-mail da influenciadora no cadastro corresponde
-                                            ao destinatário nas NFs fiscais.
-                                          </span>
-                                        ) : (
-                                          <span>
-                                            Vincule esta influenciadora no{" "}
-                                            <strong>Cadastro</strong> para ver as
-                                            bonificações.
-                                          </span>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <div className="space-y-2">
-                                        {bonifs.map((b) => (
-                                          <div
-                                            key={b.id}
-                                            className="bg-white border rounded-md p-2.5 text-xs space-y-1"
-                                          >
-                                            <div className="flex items-center justify-between">
-                                              <span className="font-medium">
-                                                {format(
-                                                  new Date(b.data_venda),
-                                                  "dd/MM/yyyy"
-                                                )}
-                                              </span>
-                                              <span className="font-semibold text-rose-700">
-                                                {fmt(b.valor_total)}
-                                              </span>
-                                            </div>
-                                            {b.cliente_nome && (
-                                              <div className="flex items-center gap-1 text-muted-foreground">
-                                                <User className="h-3 w-3" />
-                                                {b.cliente_nome}
-                                              </div>
-                                            )}
-                                            {b.produtos && b.produtos.length > 0 && (
-                                              <div className="flex flex-wrap gap-1">
-                                                {b.produtos.map((p, idx) => (
-                                                  <span
-                                                    key={idx}
-                                                    className="bg-gray-50 border rounded px-1.5 py-0.5 text-[10px]"
-                                                  >
-                                                    {p}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-
-                                        <div className="flex items-center justify-between pt-1 border-t text-xs">
-                                          <span className="text-muted-foreground">
-                                            Total bonificado
-                                          </span>
-                                          <span className="font-semibold text-rose-700">
-                                            {fmt(totalBonifInflu)}
-                                          </span>
-                                        </div>
-                                        {roi !== null && (
-                                          <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">
-                                              ROI (GMV ÷ bonificado)
-                                            </span>
-                                            <Badge
-                                              variant={
-                                                roi >= 3
-                                                  ? "default"
-                                                  : roi >= 1
-                                                  ? "secondary"
-                                                  : "destructive"
-                                              }
-                                              className="font-mono"
-                                            >
-                                              {roi.toFixed(2)}x
-                                            </Badge>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </Fragment>
+                        <TableRow
+                          key={inf.email}
+                          className="cursor-pointer hover:bg-muted/40"
+                          onClick={() => openProfile(inf)}
+                        >
+                          <TableCell>
+                            <div className="font-medium">{inf.name}</div>
+                            {inf.cnpj && (
+                              <div className="text-[10px] text-muted-foreground">PJ</div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {inf.instagram || "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {inf.whatsapp ? fmtWhatsapp(inf.whatsapp) : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {inf.address.cidade ? `${inf.address.cidade} / ${inf.address.estado}` : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {coupon ? (
+                              <Badge variant="secondary" className="font-mono text-xs">{coupon}</Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {stats ? fmt(stats.gmv) : "—"}
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-
                     {displayed.length === 0 && (
                       <TableRow>
-                        <TableCell
-                          colSpan={9}
-                          className="text-center py-8 text-muted-foreground"
-                        >
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Nenhum resultado encontrado
                         </TableCell>
                       </TableRow>
@@ -774,6 +594,324 @@ export default function PerformanceInfluenciadores() {
           </Card>
         </>
       )}
+
+      {/* ── Auto-link Dialog ─────────────────────────────────────────────────── */}
+      <Dialog open={autoLinkOpen} onOpenChange={setAutoLinkOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Vinculação automática de coupons</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              O sistema comparou os handles do Instagram com os coupons disponíveis.
+              Confirme as correspondências e atribua manualmente as que não foram encontradas.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Encontradas */}
+            {matchedSuggestions.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <p className="text-sm font-semibold">
+                    Correspondências encontradas ({matchedSuggestions.length})
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {matchedSuggestions.map((s) => (
+                    <div
+                      key={s.email}
+                      className="flex items-center gap-3 p-2.5 rounded-lg border bg-green-50/50"
+                    >
+                      <Checkbox
+                        checked={s.checked}
+                        onCheckedChange={(v) =>
+                          setSuggestions((prev) =>
+                            prev.map((x) =>
+                              x.email === s.email ? { ...x, checked: !!v } : x
+                            )
+                          )
+                        }
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium">{s.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{s.instagram}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">→</span>
+                      <Badge variant="secondary" className="font-mono shrink-0">
+                        {s.coupon}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sem correspondência */}
+            {unmatchedSuggestions.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <p className="text-sm font-semibold">
+                    Sem correspondência automática ({unmatchedSuggestions.length})
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {unmatchedSuggestions.map((s) => (
+                    <div
+                      key={s.email}
+                      className="flex items-center gap-3 p-2.5 rounded-lg border bg-amber-50/30"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium">{s.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{s.instagram}</span>
+                      </div>
+                      <Select
+                        value={manualLinks[s.email] ?? "none"}
+                        onValueChange={(v) =>
+                          setManualLinks((prev) => ({ ...prev, [s.email]: v }))
+                        }
+                      >
+                        <SelectTrigger className="w-36 h-7 text-xs">
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sem vínculo</SelectItem>
+                          {availableCoupons.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {suggestions.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma influenciadora para processar.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAutoLinkOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmAutoLink}>
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Confirmar e salvar vínculos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Profile Sheet ───────────────────────────────────────────────────── */}
+      <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          {selected && (
+            <div className="space-y-6 pb-8">
+              <SheetHeader>
+                <SheetTitle className="text-xl">{selected.name}</SheetTitle>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {selected.cnpj && (
+                    <Badge variant="outline" className="text-xs">
+                      PJ · {selected.cnpj}
+                    </Badge>
+                  )}
+                  {selectedLinkedCoupon && (
+                    <Badge variant="secondary" className="font-mono text-xs">
+                      Coupon: {selectedLinkedCoupon}
+                    </Badge>
+                  )}
+                </div>
+              </SheetHeader>
+
+              {/* Contato */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Contato
+                </p>
+                <div className="space-y-2.5 text-sm">
+                  {selected.instagram && (
+                    <div className="flex items-center gap-2">
+                      <Instagram className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <a
+                        href={`https://instagram.com/${selected.instagram.replace(/^@/, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {selected.instagram}
+                      </a>
+                    </div>
+                  )}
+                  {selected.tiktok && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-muted-foreground w-4 shrink-0 text-center">
+                        TK
+                      </span>
+                      <span>{selected.tiktok}</span>
+                    </div>
+                  )}
+                  {selected.whatsapp && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <a
+                        href={`https://wa.me/${selected.whatsapp.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {fmtWhatsapp(selected.whatsapp)}
+                      </a>
+                    </div>
+                  )}
+                  {selected.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <a href={`mailto:${selected.email}`} className="text-blue-600 hover:underline">
+                        {selected.email}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Endereço */}
+              {selected.address.logradouro && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                    Endereço para Seeding
+                  </p>
+                  <div className="flex items-start gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <div>
+                        {selected.address.logradouro}, {selected.address.numero}
+                        {selected.address.complemento ? ` – ${selected.address.complemento}` : ""}
+                      </div>
+                      <div className="text-muted-foreground">
+                        {selected.address.bairro} · {selected.address.cidade} /{" "}
+                        {selected.address.estado} · CEP {selected.address.cep}
+                      </div>
+                      {selected.razao_social && (
+                        <div className="text-muted-foreground">
+                          Destinatário: {selected.razao_social}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Vincular coupon */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Coupon de Vendas
+                </p>
+                {availableCoupons.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Importe a planilha de vendas na página{" "}
+                    <strong>Performance</strong> para ver os coupons disponíveis.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedSuggestion && !selectedLinkedCoupon && (
+                      <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        <LinkIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Sugestão automática: <strong>{selectedSuggestion}</strong>
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 text-xs ml-auto px-2"
+                          onClick={() => setEditingCoupon(selectedSuggestion)}
+                        >
+                          Usar
+                        </Button>
+                      </div>
+                    )}
+                    <div className="flex gap-2 items-center">
+                      <Select value={editingCoupon} onValueChange={setEditingCoupon}>
+                        <SelectTrigger className="flex-1 h-9 text-sm">
+                          <SelectValue placeholder="Selecionar coupon..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sem vínculo</SelectItem>
+                          {availableCoupons.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button size="sm" onClick={saveLink}>
+                        Salvar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Performance */}
+              {selectedStats && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                    Performance · coupon {selectedStats.coupon}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground">GMV Total</p>
+                      <p className="text-xl font-bold">{fmt(selectedStats.gmv)}</p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground">Pedidos</p>
+                      <p className="text-xl font-bold">{selectedStats.total_orders}</p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground">Comissão</p>
+                      <p className="text-xl font-bold">{fmt(selectedStats.commission)}</p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground">Ticket Médio</p>
+                      <p className="text-xl font-bold">{fmt(selectedStats.avg_ticket)}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Última venda:{" "}
+                    {format(selectedStats.last_sale, "dd MMM yyyy", { locale: ptBR })}
+                  </p>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Produtos vendidos:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(selectedStats.products)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([p, qty]) => (
+                          <div
+                            key={p}
+                            className="bg-white border rounded px-2 py-0.5 text-xs flex items-center gap-1.5"
+                          >
+                            <span>{p}</span>
+                            <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                              {qty}x
+                            </Badge>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!selectedStats && selectedLinkedCoupon && (
+                <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
+                  Coupon <strong>{selectedLinkedCoupon}</strong> vinculado, mas sem dados de
+                  vendas. Importe a planilha na página <strong>Performance</strong>.
+                </div>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
