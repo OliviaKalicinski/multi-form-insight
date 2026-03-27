@@ -37,6 +37,8 @@ import {
   ClipboardList,
   Brain,
   BarChart2,
+  Sparkles,
+  BarChart,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
@@ -101,6 +103,14 @@ const navSections: NavSection[] = [
       { title: "Seguidores", url: "/seguidores", icon: Instagram },
       { title: "Comentários", url: "/comentarios-instagram", icon: MessageCircle },
       { title: "Público", url: "/publico", icon: Users },
+    ],
+  },
+  {
+    title: "Influenciadores",
+    icon: Sparkles,
+    items: [
+      { title: "Kanban de Prospecção", url: "/influenciadores/kanban", icon: ClipboardList },
+      { title: "Performance", url: "/influenciadores/performance", icon: BarChart },
     ],
   },
 ];
