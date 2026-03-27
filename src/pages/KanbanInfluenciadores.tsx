@@ -61,20 +61,17 @@ function InfluencerCard({
   influencer,
   onEdit,
   onDelete,
-  isDragging = false,
 }: {
   influencer: Influencer;
   onEdit: (i: Influencer) => void;
   onDelete: (id: string) => void;
-  isDragging?: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: influencer.id });
+  // Bug fix: usar isDragging do próprio hook, não de prop externa
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: influencer.id });
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
     : undefined;
-
-  const col = COLUMNS.find((c) => c.key === influencer.status);
 
   return (
     <div
@@ -84,7 +81,7 @@ function InfluencerCard({
       {...attributes}
       className={cn(
         "bg-white border rounded-lg p-3 shadow-sm cursor-grab select-none space-y-2 group",
-        isDragging && "opacity-50",
+        isDragging && "opacity-40",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -378,7 +375,9 @@ export default function KanbanInfluenciadores() {
         onClose={() => setDialogOpen(false)}
         onSave={handleAdd}
       />
+      {/* Bug fix: key força remount ao trocar de influenciador, resetando o form */}
       <InfluencerDialog
+        key={editing?.id ?? "novo"}
         open={!!editing}
         onClose={() => setEditing(null)}
         onSave={handleEdit}
