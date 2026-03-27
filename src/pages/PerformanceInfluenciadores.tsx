@@ -159,7 +159,8 @@ function fmt(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function fmtDate(d: Date) {
+function fmtDate(d: Date | null | undefined): string {
+  if (!d || !(d instanceof Date) || isNaN(d.getTime())) return "—";
   return format(d, "dd MMM yyyy", { locale: ptBR });
 }
 
@@ -219,11 +220,21 @@ export default function PerformanceInfluenciadores() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Filtra bonificações pelo dateRange global
+  const bonifFiltered = useMemo(() => {
+    if (!dateRange) return bonifRaw;
+    return bonifRaw.filter((r) => {
+      if (!r.data_venda) return false;
+      const d = new Date(r.data_venda);
+      return !isNaN(d.getTime()) && d >= dateRange.start && d <= dateRange.end;
+    });
+  }, [bonifRaw, dateRange]);
+
   // Map: coupon → list of bonification rows
   const bonifByCoupon = useMemo(() => {
     const map = new Map<string, BonifRow[]>();
 
-    for (const row of bonifRaw) {
+    for (const row of bonifFiltered) {
       // 1. Match by email
       let coupon: string | undefined;
       if (row.cliente_email) {
@@ -244,7 +255,7 @@ export default function PerformanceInfluenciadores() {
       map.get(coupon)!.push(row);
     }
     return map;
-  }, [bonifRaw, couponByEmail, influencers]);
+  }, [bonifFiltered, couponByEmail, influencers]);
 
   // ── CSV local ────────────────────────────────────────────────────────────
   const [rows, setRows] = useState<SaleRow[]>(() => {
@@ -288,13 +299,21 @@ export default function PerformanceInfluenciadores() {
   const totalCommission = useMemo(() => stats.reduce((s, r) => s + r.commission, 0), [stats]);
   const totalOrders = useMemo(() => stats.reduce((s, r) => s + r.total_orders, 0), [stats]);
   const totalBonificado = useMemo(
-    () => bonifRaw.reduce((s, r) => s + (r.valor_total || 0), 0),
-    [bonifRaw]
+    () => bonifFiltered.reduce((s, r) => s + (r.valor_total || 0), 0),
+    [bonifFiltered]
   );
 
   const displayed = useMemo(() => {
     let list = [...stats];
-    if (search) list = list.filter((s) => s.coupon.toLowerCase().includes(search.toLowerCase()));
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((s) => {
+        if (s.coupon.toLowerCase().includes(q)) return true;
+        const inf = influencerByCoupon.get(s.coupon);
+        if (inf && (inf.name.toLowerCase().includes(q) || inf.instagram.toLowerCase().includes(q))) return true;
+        return false;
+      });
+    }
     list.sort((a, b) => {
       const av = a[sortField];
       const bv = b[sortField];
@@ -436,7 +455,7 @@ export default function PerformanceInfluenciadores() {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {loadingBonif
                     ? "carregando..."
-                    : `${bonifRaw.length} NF(s) de bonificação`}
+                    : `${bonifFiltered.length} NF(s) de bonificação`}
                 </p>
               </CardContent>
             </Card>
