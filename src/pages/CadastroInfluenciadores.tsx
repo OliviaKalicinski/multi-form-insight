@@ -12,9 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+// Select substituído por CouponInput inline
 import {
   Upload, Search, X, Instagram, Phone, Mail, MapPin, Building2,
   TrendingUp, Link2, Users, LinkIcon, Zap, CheckCircle2, AlertCircle,
@@ -179,6 +177,109 @@ function fmtWhatsapp(raw: string): string {
   if (d.length === 13) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 9)}-${d.slice(9)}`;
   if (d.length === 12) return `+${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 8)}-${d.slice(8)}`;
   return raw;
+}
+
+// ─── CouponInput ─────────────────────────────────────────────────────────────
+/** Input com busca e sugestões. Permite digitar qualquer coupon ou selecionar da lista. */
+function CouponInput({
+  value,
+  onChange,
+  availableCoupons,
+  placeholder = "Digitar ou buscar coupon...",
+  className = "",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  availableCoupons: string[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!query) return availableCoupons;
+    const q = query.toLowerCase();
+    return availableCoupons.filter((c) => c.toLowerCase().includes(q));
+  }, [availableCoupons, query]);
+
+  const displayValue = value && value !== "none" ? value : "";
+
+  return (
+    <div className={`relative ${className}`} ref={ref}>
+      <Input
+        className="h-9 text-sm pr-8"
+        placeholder={placeholder}
+        value={open ? query : displayValue}
+        onFocus={() => {
+          setOpen(true);
+          setQuery(displayValue);
+        }}
+        onBlur={() => {
+          // Delay para permitir clique no dropdown
+          setTimeout(() => {
+            setOpen(false);
+            // Se digitou algo que não selecionou, salva como está
+            if (query && query !== displayValue) {
+              onChange(query.toUpperCase());
+            }
+          }, 200);
+        }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          if (!open) setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && query) {
+            onChange(query.toUpperCase());
+            setOpen(false);
+          }
+          if (e.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+      />
+      {displayValue && !open && (
+        <button
+          type="button"
+          className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            onChange("none");
+            setQuery("");
+          }}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+          {filtered.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted/50 ${
+                c === value ? "bg-muted font-medium" : ""
+              }`}
+              onMouseDown={(e) => {
+                e.preventDefault(); // Impede o onBlur
+                onChange(c);
+                setQuery("");
+                setOpen(false);
+              }}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+      {open && query && filtered.length === 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border rounded-md shadow-lg px-3 py-2 text-xs text-muted-foreground">
+          Enter para salvar "<strong>{query.toUpperCase()}</strong>" como novo coupon
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -665,22 +766,15 @@ export default function CadastroInfluenciadores() {
                         <span className="text-sm font-medium">{s.name}</span>
                         <span className="text-xs text-muted-foreground ml-2">{s.instagram}</span>
                       </div>
-                      <Select
+                      <CouponInput
                         value={manualLinks[s.email] ?? "none"}
-                        onValueChange={(v) =>
+                        onChange={(v) =>
                           setManualLinks((prev) => ({ ...prev, [s.email]: v }))
                         }
-                      >
-                        <SelectTrigger className="w-36 h-7 text-xs">
-                          <SelectValue placeholder="Selecionar..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Sem vínculo</SelectItem>
-                          {availableCoupons.map((c) => (
-                            <SelectItem key={c} value={c}>{c}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        availableCoupons={availableCoupons}
+                        className="w-40"
+                        placeholder="Digitar coupon..."
+                      />
                     </div>
                   ))}
                 </div>
@@ -834,17 +928,13 @@ export default function CadastroInfluenciadores() {
                       </div>
                     )}
                     <div className="flex gap-2 items-center">
-                      <Select value={editingCoupon} onValueChange={setEditingCoupon}>
-                        <SelectTrigger className="flex-1 h-9 text-sm">
-                          <SelectValue placeholder="Selecionar coupon..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Sem vínculo</SelectItem>
-                          {availableCoupons.map((c) => (
-                            <SelectItem key={c} value={c}>{c}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <CouponInput
+                        value={editingCoupon}
+                        onChange={setEditingCoupon}
+                        availableCoupons={availableCoupons}
+                        className="flex-1"
+                        placeholder="Digitar ou buscar coupon..."
+                      />
                       <Button size="sm" onClick={saveLink}>
                         Salvar
                       </Button>
@@ -879,7 +969,9 @@ export default function CadastroInfluenciadores() {
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
                     Última venda:{" "}
-                    {format(selectedStats.last_sale, "dd MMM yyyy", { locale: ptBR })}
+                    {selectedStats.last_sale instanceof Date && !isNaN(selectedStats.last_sale.getTime())
+                      ? format(selectedStats.last_sale, "dd MMM yyyy", { locale: ptBR })
+                      : "—"}
                   </p>
                   <div>
                     <p className="text-xs text-muted-foreground mb-2">Produtos vendidos:</p>
