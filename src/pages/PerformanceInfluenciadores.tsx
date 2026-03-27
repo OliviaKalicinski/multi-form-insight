@@ -5,8 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, TrendingUp, ShoppingCart, DollarSign, Users, Search, ChevronDown, ChevronUp, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  Upload, TrendingUp, ShoppingCart, DollarSign, Users,
+  Search, ChevronDown, ChevronUp, X, Package, AlertCircle,
+} from "lucide-react";
+import { useDashboard } from "@/contexts/DashboardContext";
+import { useOperationalOrders } from "@/hooks/useOperationalOrders";
+import { getProductDisplayName } from "@/data/operationalProducts";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface RawRow {
@@ -22,7 +29,7 @@ interface RawRow {
 }
 
 interface SaleRow {
-  coupon: string; // primeiro coupon
+  coupon: string;
   date_sale: Date;
   order_id: string;
   order_value: number;
@@ -36,7 +43,7 @@ interface InfluencerStats {
   gmv: number;
   commission: number;
   avg_ticket: number;
-  products: Record<string, number>; // product name → qty
+  products: Record<string, number>;
   last_sale: Date;
   first_sale: Date;
 }
@@ -44,13 +51,11 @@ interface InfluencerStats {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function parseBRNumber(raw: string): number {
   if (!raw) return 0;
-  // Remove aspas, espaços; troca vírgula por ponto
   return parseFloat(raw.replace(/["\s]/g, "").replace(",", ".")) || 0;
 }
 
 function parseFlexDate(raw: string): Date | null {
   if (!raw) return null;
-  // Normalise Portuguese month abbreviations → English
   const ptToEn: Record<string, string> = {
     "jan.": "Jan", "fev.": "Feb", "mar.": "Mar", "abr.": "Apr",
     "mai.": "May", "jun.": "Jun", "jul.": "Jul", "ago.": "Aug",
@@ -65,7 +70,6 @@ function parseFlexDate(raw: string): Date | null {
 }
 
 function firstCoupon(raw: string): string {
-  // "ZEDALMEIDA , ARYA , JOCA" → "ZEDALMEIDA"
   return raw.split(",")[0].trim().toUpperCase();
 }
 
@@ -91,7 +95,6 @@ function parseCSV(raw: string): SaleRow[] {
 
 function buildStats(rows: SaleRow[]): InfluencerStats[] {
   const map = new Map<string, InfluencerStats>();
-
   for (const row of rows) {
     if (!map.has(row.coupon)) {
       map.set(row.coupon, {
@@ -115,12 +118,20 @@ function buildStats(rows: SaleRow[]): InfluencerStats[] {
       s.products[p] = (s.products[p] || 0) + 1;
     }
   }
-
   for (const s of map.values()) {
     s.avg_ticket = s.total_orders > 0 ? s.gmv / s.total_orders : 0;
   }
-
   return Array.from(map.values()).sort((a, b) => b.gmv - a.gmv);
+}
+
+/** Normaliza string para comparação: remove acentos, uppercase, trim */
+function normalizeKey(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function fmt(n: number) {
@@ -128,7 +139,7 @@ function fmt(n: number) {
 }
 
 function fmtDate(d: Date) {
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+  return format(d, "dd MMM yyyy", { locale: ptBR });
 }
 
 function topProducts(products: Record<string, number>, n = 3): string {
@@ -144,12 +155,36 @@ const STORAGE_KEY = "influencer_performance_csv";
 // ─── Main Page ───────────────────────────────────────────────────────────────
 export default function PerformanceInfluenciadores() {
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // ── Filtro global do dashboard ──────────────────────────────────────────
+  const { dateRange } = useDashboard();
+
+  // ── NFs de bonificação (natureza Seeding) ───────────────────────────────
+  const { orders: seedingOrders, isLoading: loadingOrders } = useOperationalOrders(undefined, "Seeding");
+
+  // Lookup: coupon normalizado → lista de pedidos de bonificação
+  const bonificationsByCoupon = useMemo(() => {
+    const map = new Map<string, typeof seedingOrders>();
+    for (const order of seedingOrders) {
+      // Tenta match pelo campo apelido (coupon code cadastrado no pedido)
+      const key = normalizeKey(order.apelido) || normalizeKey(order.destinatario_nome);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(order);
+    }
+    return map;
+  }, [seedingOrders]);
+
+  const getBonifications = (coupon: string) =>
+    bonificationsByCoupon.get(normalizeKey(coupon)) || [];
+
+  // ── CSV local ───────────────────────────────────────────────────────────
   const [rows, setRows] = useState<SaleRow[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved, (k, v) =>
-        k === "date_sale" ? new Date(v) : v
-      ) : [];
+      return saved
+        ? JSON.parse(saved, (k, v) => (k === "date_sale" ? new Date(v) : v))
+        : [];
     } catch { return []; }
   });
 
@@ -158,17 +193,12 @@ export default function PerformanceInfluenciadores() {
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedCoupon, setExpandedCoupon] = useState<string | null>(null);
 
-  // Date filter
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const parsed = parseCSV(text);
+      const parsed = parseCSV(ev.target?.result as string);
       setRows(parsed);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     };
@@ -176,33 +206,34 @@ export default function PerformanceInfluenciadores() {
     e.target.value = "";
   };
 
+  // ── Filtra pelo dateRange global ────────────────────────────────────────
   const filteredRows = useMemo(() => {
-    let r = rows;
-    if (dateFrom) r = r.filter((row) => row.date_sale >= new Date(dateFrom));
-    if (dateTo)   r = r.filter((row) => row.date_sale <= new Date(dateTo + "T23:59:59"));
-    return r;
-  }, [rows, dateFrom, dateTo]);
+    if (!dateRange) return rows;
+    return rows.filter(
+      (row) => row.date_sale >= dateRange.start && row.date_sale <= dateRange.end,
+    );
+  }, [rows, dateRange]);
 
   const stats = useMemo(() => buildStats(filteredRows), [filteredRows]);
 
   const totalGMV = useMemo(() => stats.reduce((s, r) => s + r.gmv, 0), [stats]);
   const totalCommission = useMemo(() => stats.reduce((s, r) => s + r.commission, 0), [stats]);
   const totalOrders = useMemo(() => stats.reduce((s, r) => s + r.total_orders, 0), [stats]);
+  const totalBonificado = useMemo(
+    () => seedingOrders.reduce((s, o) => s + (o.valor_total_informado || 0), 0),
+    [seedingOrders],
+  );
 
   const displayed = useMemo(() => {
     let list = [...stats];
-    if (search) {
-      list = list.filter((s) => s.coupon.toLowerCase().includes(search.toLowerCase()));
-    }
+    if (search) list = list.filter((s) => s.coupon.toLowerCase().includes(search.toLowerCase()));
     list.sort((a, b) => {
       const av = a[sortField];
       const bv = b[sortField];
-      if (av instanceof Date && bv instanceof Date) {
+      if (av instanceof Date && bv instanceof Date)
         return sortAsc ? av.getTime() - bv.getTime() : bv.getTime() - av.getTime();
-      }
-      if (typeof av === "number" && typeof bv === "number") {
+      if (typeof av === "number" && typeof bv === "number")
         return sortAsc ? av - bv : bv - av;
-      }
       return 0;
     });
     return list;
@@ -224,18 +255,27 @@ export default function PerformanceInfluenciadores() {
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="p-4 md:p-6 space-y-6">
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Performance de Influenciadores</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Análise de vendas por coupon</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Vendas por coupon
+            {dateRange && (
+              <span className="ml-1 text-xs text-blue-600">
+                · filtrando {format(dateRange.start, "dd/MM/yy")} – {format(dateRange.end, "dd/MM/yy")}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
           {rows.length > 0 && (
             <Button variant="outline" size="sm" onClick={clearData}>
-              <X className="h-4 w-4 mr-1" /> Limpar dados
+              <X className="h-4 w-4 mr-1" /> Limpar CSV
             </Button>
           )}
           <Button size="sm" onClick={() => fileRef.current?.click()}>
@@ -245,14 +285,25 @@ export default function PerformanceInfluenciadores() {
         </div>
       </div>
 
+      {/* Aviso filtro global ativo */}
+      {dateRange && rows.length > 0 && filteredRows.length < rows.length && (
+        <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>
+            Exibindo <strong>{filteredRows.length}</strong> de <strong>{rows.length}</strong> linhas do CSV
+            conforme o filtro de período do dashboard.
+          </span>
+        </div>
+      )}
+
       {/* Empty state */}
       {rows.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 border-2 border-dashed rounded-xl">
           <Upload className="h-10 w-10 text-muted-foreground/40" />
           <div>
-            <p className="font-medium text-muted-foreground">Nenhum dado carregado</p>
+            <p className="font-medium text-muted-foreground">Nenhum dado de vendas carregado</p>
             <p className="text-sm text-muted-foreground/60 mt-1">
-              Importe a planilha de vendas por influenciador (formato padrão do sistema)
+              Importe a planilha de vendas por coupon (formato padrão do sistema)
             </p>
           </div>
           <Button onClick={() => fileRef.current?.click()}>
@@ -294,13 +345,13 @@ export default function PerformanceInfluenciadores() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <ShoppingCart className="h-3.5 w-3.5" /> Pedidos
+                  <Package className="h-3.5 w-3.5" /> Total Bonificado
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalOrders}</div>
+                <div className="text-2xl font-bold">{fmt(totalBonificado)}</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  ticket médio {totalOrders > 0 ? fmt(totalGMV / totalOrders) : "—"}
+                  {loadingOrders ? "carregando..." : `${seedingOrders.length} NF(s) de seeding`}
                 </p>
               </CardContent>
             </Card>
@@ -308,51 +359,36 @@ export default function PerformanceInfluenciadores() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <Users className="h-3.5 w-3.5" /> Influenciadores
+                  <ShoppingCart className="h-3.5 w-3.5" /> Pedidos
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.length}</div>
-                <p className="text-xs text-muted-foreground mt-0.5">coupons ativos no período</p>
+                <div className="text-2xl font-bold">{totalOrders}</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {stats.length} influenciadores · ticket médio{" "}
+                  {totalOrders > 0 ? fmt(totalGMV / totalOrders) : "—"}
+                </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap gap-3 items-center">
+          {/* Busca */}
+          <div className="flex items-center gap-3">
             <div className="relative">
               <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
               <Input
-                className="pl-8 w-48"
+                className="pl-8 w-52"
                 placeholder="Buscar coupon..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>De</span>
-              <Input
-                type="date"
-                className="w-36"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-              <span>Até</span>
-              <Input
-                type="date"
-                className="w-36"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-              {(dateFrom || dateTo) && (
-                <Button variant="ghost" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); }}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Clique em uma linha para ver detalhes de produtos e bonificações
+            </p>
           </div>
 
-          {/* Table */}
+          {/* Tabela */}
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -361,93 +397,175 @@ export default function PerformanceInfluenciadores() {
                     <TableRow>
                       <TableHead className="w-8">#</TableHead>
                       <TableHead>Coupon</TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("total_orders")}
-                      >
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("total_orders")}>
                         <div className="flex items-center gap-1">Pedidos <SortIcon field="total_orders" /></div>
                       </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("gmv")}
-                      >
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("gmv")}>
                         <div className="flex items-center gap-1">GMV <SortIcon field="gmv" /></div>
                       </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("commission")}
-                      >
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("commission")}>
                         <div className="flex items-center gap-1">Comissão <SortIcon field="commission" /></div>
                       </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("avg_ticket")}
-                      >
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("avg_ticket")}>
                         <div className="flex items-center gap-1">Ticket Médio <SortIcon field="avg_ticket" /></div>
                       </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
-                        onClick={() => handleSort("last_sale")}
-                      >
+                      <TableHead>Bonificações</TableHead>
+                      <TableHead>ROI</TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("last_sale")}>
                         <div className="flex items-center gap-1">Última Venda <SortIcon field="last_sale" /></div>
                       </TableHead>
-                      <TableHead>Tops Produtos</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {/* Bug fix: Fragment com key para reconciliação correta no map */}
-                    {displayed.map((s, i) => (
-                      <Fragment key={s.coupon}>
-                        <TableRow
-                          className="cursor-pointer hover:bg-muted/40"
-                          onClick={() => setExpandedCoupon(expandedCoupon === s.coupon ? null : s.coupon)}
-                        >
-                          <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{s.coupon}</span>
-                              {i === 0 && <Badge className="text-[10px] px-1.5 py-0">🏆 Top</Badge>}
-                            </div>
-                          </TableCell>
-                          <TableCell>{s.total_orders}</TableCell>
-                          <TableCell className="font-medium">{fmt(s.gmv)}</TableCell>
-                          <TableCell className="text-amber-700">{fmt(s.commission)}</TableCell>
-                          <TableCell>{fmt(s.avg_ticket)}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{fmtDate(s.last_sale)}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate">
-                            {topProducts(s.products)}
-                          </TableCell>
-                        </TableRow>
+                    {displayed.map((s, i) => {
+                      const bonifs = getBonifications(s.coupon);
+                      const totalBonifInflu = bonifs.reduce((acc, o) => acc + (o.valor_total_informado || 0), 0);
+                      const roi = totalBonifInflu > 0 ? s.gmv / totalBonifInflu : null;
 
-                        {/* Expanded row: product breakdown */}
-                        {expandedCoupon === s.coupon && (
-                          <TableRow key={`${s.coupon}-expanded`} className="bg-muted/20">
-                            <TableCell colSpan={8} className="py-3 px-6">
-                              <div className="text-xs font-medium mb-2 text-muted-foreground">
-                                Todos os produtos — {s.coupon} ({s.total_orders} pedidos, ativo de {fmtDate(s.first_sale)} a {fmtDate(s.last_sale)})
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {Object.entries(s.products)
-                                  .sort((a, b) => b[1] - a[1])
-                                  .map(([product, qty]) => (
-                                    <div
-                                      key={product}
-                                      className="bg-white border rounded-md px-2.5 py-1 text-xs flex items-center gap-1.5"
-                                    >
-                                      <span>{product}</span>
-                                      <Badge variant="secondary" className="text-[10px] px-1 py-0">{qty}x</Badge>
-                                    </div>
-                                  ))}
+                      return (
+                        <Fragment key={s.coupon}>
+                          {/* Linha principal */}
+                          <TableRow
+                            className="cursor-pointer hover:bg-muted/40"
+                            onClick={() => setExpandedCoupon(expandedCoupon === s.coupon ? null : s.coupon)}
+                          >
+                            <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{s.coupon}</span>
+                                {i === 0 && <Badge className="text-[10px] px-1.5 py-0">🏆 Top</Badge>}
                               </div>
                             </TableCell>
+                            <TableCell>{s.total_orders}</TableCell>
+                            <TableCell className="font-medium">{fmt(s.gmv)}</TableCell>
+                            <TableCell className="text-amber-700">{fmt(s.commission)}</TableCell>
+                            <TableCell>{fmt(s.avg_ticket)}</TableCell>
+                            <TableCell>
+                              {bonifs.length > 0 ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-sm font-medium text-rose-700">{fmt(totalBonifInflu)}</span>
+                                  <span className="text-[10px] text-muted-foreground">{bonifs.length} NF(s)</span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {roi !== null ? (
+                                <Badge
+                                  variant={roi >= 3 ? "default" : roi >= 1 ? "secondary" : "destructive"}
+                                  className="text-xs font-mono"
+                                >
+                                  {roi.toFixed(1)}x
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{fmtDate(s.last_sale)}</TableCell>
                           </TableRow>
-                        )}
-                      </Fragment>
-                    ))}
+
+                          {/* Linha expandida */}
+                          {expandedCoupon === s.coupon && (
+                            <TableRow className="bg-muted/20 hover:bg-muted/20">
+                              <TableCell colSpan={9} className="py-4 px-6">
+                                <div className="grid md:grid-cols-2 gap-6">
+
+                                  {/* Produtos mais vendidos */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                                      Produtos vendidos · {s.coupon}
+                                      <span className="normal-case ml-1 text-muted-foreground/60">
+                                        ({s.total_orders} pedidos · {fmtDate(s.first_sale)} → {fmtDate(s.last_sale)})
+                                      </span>
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {Object.entries(s.products)
+                                        .sort((a, b) => b[1] - a[1])
+                                        .map(([product, qty]) => (
+                                          <div
+                                            key={product}
+                                            className="bg-white border rounded-md px-2.5 py-1 text-xs flex items-center gap-1.5"
+                                          >
+                                            <span>{product}</span>
+                                            <Badge variant="secondary" className="text-[10px] px-1 py-0">{qty}x</Badge>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Bonificações enviadas */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                                      Bonificações enviadas
+                                      {bonifs.length === 0 && (
+                                        <span className="normal-case ml-1 text-muted-foreground/60">
+                                          · nenhuma NF encontrada para este coupon
+                                        </span>
+                                      )}
+                                    </p>
+                                    {bonifs.length === 0 ? (
+                                      <p className="text-xs text-muted-foreground">
+                                        Cadastre o coupon <strong>{s.coupon}</strong> no campo "Apelido" do pedido de seeding no Kanban Operacional.
+                                      </p>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {bonifs.map((order) => (
+                                          <div key={order.id} className="bg-white border rounded-md p-2.5 text-xs space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                              <span className="font-medium">
+                                                {format(new Date(order.created_at), "dd/MM/yyyy")}
+                                                {order.numero_nf && (
+                                                  <span className="ml-2 text-muted-foreground">NF {order.numero_nf}</span>
+                                                )}
+                                              </span>
+                                              <span className="font-semibold text-rose-700">
+                                                {fmt(order.valor_total_informado)}
+                                              </span>
+                                            </div>
+                                            {order.items.length > 0 && (
+                                              <div className="flex flex-wrap gap-1.5">
+                                                {order.items.map((item, idx) => (
+                                                  <span
+                                                    key={idx}
+                                                    className="bg-gray-50 border rounded px-1.5 py-0.5 text-[10px]"
+                                                  >
+                                                    {getProductDisplayName(item.produto)} · {item.quantidade}{item.unidade}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                        <div className="flex items-center justify-between pt-1 border-t text-xs">
+                                          <span className="text-muted-foreground">Total bonificado</span>
+                                          <span className="font-semibold text-rose-700">{fmt(totalBonifInflu)}</span>
+                                        </div>
+                                        {roi !== null && (
+                                          <div className="flex items-center justify-between text-xs">
+                                            <span className="text-muted-foreground">ROI (GMV ÷ Bonificado)</span>
+                                            <Badge
+                                              variant={roi >= 3 ? "default" : roi >= 1 ? "secondary" : "destructive"}
+                                              className="font-mono"
+                                            >
+                                              {roi.toFixed(2)}x
+                                            </Badge>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </Fragment>
+                      );
+                    })}
 
                     {displayed.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           Nenhum resultado encontrado
                         </TableCell>
                       </TableRow>
