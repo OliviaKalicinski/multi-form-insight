@@ -35,6 +35,7 @@ import PaginaInteligente from "./pages/PaginaInteligente";
 import ComentariosInstagram from "./pages/ComentariosInstagram";
 import KanbanInfluenciadores from "./pages/KanbanInfluenciadores";
 import PerformanceInfluenciadores from "./pages/PerformanceInfluenciadores";
+import CadastroInfluenciadores from "./pages/CadastroInfluenciadores";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -353,6 +354,17 @@ const App = () => (
           />
 
           {/* Influenciadores */}
+          <Route
+            path="/influenciadores/cadastro"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <CadastroInfluenciadores />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/influenciadores/kanban"
             element={
