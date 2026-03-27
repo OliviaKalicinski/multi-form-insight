@@ -1,21 +1,23 @@
 import { Fragment, useState, useMemo, useRef } from "react";
 import Papa from "papaparse";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Upload, TrendingUp, ShoppingCart, DollarSign, Users,
-  Search, ChevronDown, ChevronUp, X, Package, AlertCircle,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+  Upload, TrendingUp, ShoppingCart, DollarSign, Package,
+  Search, ChevronDown, ChevronUp, X, AlertCircle, User,
 } from "lucide-react";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { useOperationalOrders } from "@/hooks/useOperationalOrders";
-import { getProductDisplayName } from "@/data/operationalProducts";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface RawRow {
   campaign: string;
   coupons: string;
@@ -48,7 +50,28 @@ interface InfluencerStats {
   first_sale: Date;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+interface BonifRow {
+  id: string;
+  data_venda: string;
+  valor_total: number;
+  cliente_nome: string | null;
+  cliente_email: string | null;
+  cpf_cnpj: string | null;
+  produtos: string[] | null;
+}
+
+interface Influencer {
+  email: string;
+  name: string;
+  instagram: string;
+}
+
+// ─── Storage keys ─────────────────────────────────────────────────────────────
+const STORAGE_KEY = "influencer_performance_csv";
+const REGISTRY_KEY = "influencer_registry";
+const LINKS_KEY = "influencer_coupon_links";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function parseBRNumber(raw: string): number {
   if (!raw) return 0;
   return parseFloat(raw.replace(/["\s]/g, "").replace(",", ".")) || 0;
@@ -124,14 +147,12 @@ function buildStats(rows: SaleRow[]): InfluencerStats[] {
   return Array.from(map.values()).sort((a, b) => b.gmv - a.gmv);
 }
 
-/** Normaliza string para comparação: remove acentos, uppercase, trim */
-function normalizeKey(s: string | null | undefined): string {
+/** Normaliza nome para comparação tolerante */
+function normalizeName(s: string | null | undefined): string {
   if (!s) return "";
-  return s
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  return s.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
 }
 
 function fmt(n: number) {
@@ -142,43 +163,90 @@ function fmtDate(d: Date) {
   return format(d, "dd MMM yyyy", { locale: ptBR });
 }
 
-function topProducts(products: Record<string, number>, n = 3): string {
-  return Object.entries(products)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, n)
-    .map(([name, qty]) => `${name} (${qty}x)`)
-    .join(", ");
-}
-
-const STORAGE_KEY = "influencer_performance_csv";
-
-// ─── Main Page ───────────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function PerformanceInfluenciadores() {
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // ── Filtro global do dashboard ──────────────────────────────────────────
+  // Filtro global do dashboard
   const { dateRange } = useDashboard();
 
-  // ── NFs de bonificação (natureza Seeding) ───────────────────────────────
-  const { orders: seedingOrders, isLoading: loadingOrders } = useOperationalOrders(undefined, "Seeding");
+  // ── Influencer registry + coupon links (localStorage) ───────────────────
+  const influencers = useMemo<Influencer[]>(() => {
+    try {
+      const s = localStorage.getItem(REGISTRY_KEY);
+      return s ? JSON.parse(s) : [];
+    } catch { return []; }
+  }, []);
 
-  // Lookup: coupon normalizado → lista de pedidos de bonificação
-  const bonificationsByCoupon = useMemo(() => {
-    const map = new Map<string, typeof seedingOrders>();
-    for (const order of seedingOrders) {
-      // Tenta match pelo campo apelido (coupon code cadastrado no pedido)
-      const key = normalizeKey(order.apelido) || normalizeKey(order.destinatario_nome);
-      if (!key) continue;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(order);
+  const couponLinks = useMemo<Record<string, string>>(() => {
+    try {
+      const s = localStorage.getItem(LINKS_KEY);
+      return s ? JSON.parse(s) : {};
+    } catch { return {}; }
+  }, []);
+
+  // Reverse map: coupon → influencer
+  const influencerByCoupon = useMemo(() => {
+    const map = new Map<string, Influencer>();
+    for (const [email, coupon] of Object.entries(couponLinks)) {
+      const inf = influencers.find((i) => i.email === email);
+      if (inf) map.set(coupon, inf);
     }
     return map;
-  }, [seedingOrders]);
+  }, [influencers, couponLinks]);
 
-  const getBonifications = (coupon: string) =>
-    bonificationsByCoupon.get(normalizeKey(coupon)) || [];
+  // Reverse map: influencer email → coupon
+  const couponByEmail = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [email, coupon] of Object.entries(couponLinks)) {
+      map.set(email.toLowerCase(), coupon);
+    }
+    return map;
+  }, [couponLinks]);
 
-  // ── CSV local ───────────────────────────────────────────────────────────
+  // ── NFs de bonificação (sales_data com tipo_movimento = 'bonificacao') ──
+  const { data: bonifRaw = [], isLoading: loadingBonif } = useQuery({
+    queryKey: ["bonificacao-influenciadores"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sales_data")
+        .select("id, data_venda, valor_total, cliente_nome, cliente_email, cpf_cnpj, produtos")
+        .eq("tipo_movimento", "bonificacao")
+        .order("data_venda", { ascending: false });
+      if (error) throw error;
+      return (data || []) as BonifRow[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Map: coupon → list of bonification rows
+  const bonifByCoupon = useMemo(() => {
+    const map = new Map<string, BonifRow[]>();
+
+    for (const row of bonifRaw) {
+      // 1. Match by email
+      let coupon: string | undefined;
+      if (row.cliente_email) {
+        coupon = couponByEmail.get(row.cliente_email.toLowerCase());
+      }
+      // 2. Fallback: match by name
+      if (!coupon && row.cliente_nome) {
+        const normRow = normalizeName(row.cliente_nome);
+        for (const inf of influencers) {
+          if (normalizeName(inf.name) === normRow) {
+            coupon = couponByEmail.get(inf.email.toLowerCase());
+            break;
+          }
+        }
+      }
+      if (!coupon) continue;
+      if (!map.has(coupon)) map.set(coupon, []);
+      map.get(coupon)!.push(row);
+    }
+    return map;
+  }, [bonifRaw, couponByEmail, influencers]);
+
+  // ── CSV local ────────────────────────────────────────────────────────────
   const [rows, setRows] = useState<SaleRow[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -206,11 +274,11 @@ export default function PerformanceInfluenciadores() {
     e.target.value = "";
   };
 
-  // ── Filtra pelo dateRange global ────────────────────────────────────────
+  // Filtra pelo dateRange global
   const filteredRows = useMemo(() => {
     if (!dateRange) return rows;
     return rows.filter(
-      (row) => row.date_sale >= dateRange.start && row.date_sale <= dateRange.end,
+      (row) => row.date_sale >= dateRange.start && row.date_sale <= dateRange.end
     );
   }, [rows, dateRange]);
 
@@ -220,8 +288,8 @@ export default function PerformanceInfluenciadores() {
   const totalCommission = useMemo(() => stats.reduce((s, r) => s + r.commission, 0), [stats]);
   const totalOrders = useMemo(() => stats.reduce((s, r) => s + r.total_orders, 0), [stats]);
   const totalBonificado = useMemo(
-    () => seedingOrders.reduce((s, o) => s + (o.valor_total_informado || 0), 0),
-    [seedingOrders],
+    () => bonifRaw.reduce((s, r) => s + (r.valor_total || 0), 0),
+    [bonifRaw]
   );
 
   const displayed = useMemo(() => {
@@ -246,7 +314,9 @@ export default function PerformanceInfluenciadores() {
 
   const SortIcon = ({ field }: { field: keyof InfluencerStats }) =>
     sortField === field
-      ? (sortAsc ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
+      ? sortAsc
+        ? <ChevronUp className="h-3 w-3" />
+        : <ChevronDown className="h-3 w-3" />
       : <ChevronDown className="h-3 w-3 opacity-30" />;
 
   const clearData = () => {
@@ -255,19 +325,19 @@ export default function PerformanceInfluenciadores() {
     localStorage.removeItem(STORAGE_KEY);
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="p-4 md:p-6 space-y-6">
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Performance de Influenciadores</h1>
+          <h1 className="text-2xl font-bold">Performance de Influenciadoras</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Vendas por coupon
             {dateRange && (
               <span className="ml-1 text-xs text-blue-600">
-                · filtrando {format(dateRange.start, "dd/MM/yy")} – {format(dateRange.end, "dd/MM/yy")}
+                · filtrando {format(dateRange.start, "dd/MM/yy")} –{" "}
+                {format(dateRange.end, "dd/MM/yy")}
               </span>
             )}
           </p>
@@ -290,8 +360,19 @@ export default function PerformanceInfluenciadores() {
         <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>
-            Exibindo <strong>{filteredRows.length}</strong> de <strong>{rows.length}</strong> linhas do CSV
-            conforme o filtro de período do dashboard.
+            Exibindo <strong>{filteredRows.length}</strong> de{" "}
+            <strong>{rows.length}</strong> linhas do CSV conforme o filtro de período do dashboard.
+          </span>
+        </div>
+      )}
+
+      {/* Aviso: sem registro de influenciadoras */}
+      {rows.length > 0 && influencers.length === 0 && (
+        <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>
+            Importe o cadastro de influenciadoras na página <strong>Cadastro</strong> e
+            vincule os coupons para ver nomes e bonificações por influenciadora.
           </span>
         </div>
       )}
@@ -303,7 +384,7 @@ export default function PerformanceInfluenciadores() {
           <div>
             <p className="font-medium text-muted-foreground">Nenhum dado de vendas carregado</p>
             <p className="text-sm text-muted-foreground/60 mt-1">
-              Importe a planilha de vendas por coupon (formato padrão do sistema)
+              Importe a planilha de vendas por coupon (formato padrão)
             </p>
           </div>
           <Button onClick={() => fileRef.current?.click()}>
@@ -337,7 +418,9 @@ export default function PerformanceInfluenciadores() {
               <CardContent>
                 <div className="text-2xl font-bold">{fmt(totalCommission)}</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {totalGMV > 0 ? ((totalCommission / totalGMV) * 100).toFixed(1) : "0"}% do GMV
+                  {totalGMV > 0
+                    ? `${((totalCommission / totalGMV) * 100).toFixed(1)}% do GMV`
+                    : "—"}
                 </p>
               </CardContent>
             </Card>
@@ -351,7 +434,9 @@ export default function PerformanceInfluenciadores() {
               <CardContent>
                 <div className="text-2xl font-bold">{fmt(totalBonificado)}</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {loadingOrders ? "carregando..." : `${seedingOrders.length} NF(s) de seeding`}
+                  {loadingBonif
+                    ? "carregando..."
+                    : `${bonifRaw.length} NF(s) de bonificação`}
                 </p>
               </CardContent>
             </Card>
@@ -365,7 +450,7 @@ export default function PerformanceInfluenciadores() {
               <CardContent>
                 <div className="text-2xl font-bold">{totalOrders}</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {stats.length} influenciadores · ticket médio{" "}
+                  {stats.length} coupons · ticket médio{" "}
                   {totalOrders > 0 ? fmt(totalGMV / totalOrders) : "—"}
                 </p>
               </CardContent>
@@ -377,8 +462,8 @@ export default function PerformanceInfluenciadores() {
             <div className="relative">
               <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
               <Input
-                className="pl-8 w-52"
-                placeholder="Buscar coupon..."
+                className="pl-8 w-56"
+                placeholder="Buscar coupon ou nome..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -396,55 +481,121 @@ export default function PerformanceInfluenciadores() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-8">#</TableHead>
-                      <TableHead>Coupon</TableHead>
-                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("total_orders")}>
-                        <div className="flex items-center gap-1">Pedidos <SortIcon field="total_orders" /></div>
+                      <TableHead>Influenciadora</TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => handleSort("total_orders")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Pedidos <SortIcon field="total_orders" />
+                        </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("gmv")}>
-                        <div className="flex items-center gap-1">GMV <SortIcon field="gmv" /></div>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => handleSort("gmv")}
+                      >
+                        <div className="flex items-center gap-1">
+                          GMV <SortIcon field="gmv" />
+                        </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("commission")}>
-                        <div className="flex items-center gap-1">Comissão <SortIcon field="commission" /></div>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => handleSort("commission")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Comissão <SortIcon field="commission" />
+                        </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("avg_ticket")}>
-                        <div className="flex items-center gap-1">Ticket Médio <SortIcon field="avg_ticket" /></div>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => handleSort("avg_ticket")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Ticket Médio <SortIcon field="avg_ticket" />
+                        </div>
                       </TableHead>
-                      <TableHead>Bonificações</TableHead>
+                      <TableHead>Bonificado</TableHead>
                       <TableHead>ROI</TableHead>
-                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("last_sale")}>
-                        <div className="flex items-center gap-1">Última Venda <SortIcon field="last_sale" /></div>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => handleSort("last_sale")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Última Venda <SortIcon field="last_sale" />
+                        </div>
                       </TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
                     {displayed.map((s, i) => {
-                      const bonifs = getBonifications(s.coupon);
-                      const totalBonifInflu = bonifs.reduce((acc, o) => acc + (o.valor_total_informado || 0), 0);
-                      const roi = totalBonifInflu > 0 ? s.gmv / totalBonifInflu : null;
+                      const inf = influencerByCoupon.get(s.coupon);
+                      const bonifs = bonifByCoupon.get(s.coupon) ?? [];
+                      const totalBonifInflu = bonifs.reduce(
+                        (acc, r) => acc + (r.valor_total || 0),
+                        0
+                      );
+                      const roi =
+                        totalBonifInflu > 0 ? s.gmv / totalBonifInflu : null;
 
                       return (
                         <Fragment key={s.coupon}>
-                          {/* Linha principal */}
                           <TableRow
                             className="cursor-pointer hover:bg-muted/40"
-                            onClick={() => setExpandedCoupon(expandedCoupon === s.coupon ? null : s.coupon)}
+                            onClick={() =>
+                              setExpandedCoupon(
+                                expandedCoupon === s.coupon ? null : s.coupon
+                              )
+                            }
                           >
-                            <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
+                            <TableCell className="text-muted-foreground text-xs">
+                              {i + 1}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold">{s.coupon}</span>
-                                {i === 0 && <Badge className="text-[10px] px-1.5 py-0">🏆 Top</Badge>}
+                                <div>
+                                  {inf ? (
+                                    <>
+                                      <div className="font-semibold">{inf.name}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {inf.instagram || s.coupon}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold font-mono">
+                                        {s.coupon}
+                                      </span>
+                                      {i === 0 && (
+                                        <Badge className="text-[10px] px-1.5 py-0">
+                                          🏆 Top
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  )}
+                                  {inf && i === 0 && (
+                                    <Badge className="text-[10px] px-1.5 py-0 mt-0.5">
+                                      🏆 Top
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell>{s.total_orders}</TableCell>
                             <TableCell className="font-medium">{fmt(s.gmv)}</TableCell>
-                            <TableCell className="text-amber-700">{fmt(s.commission)}</TableCell>
+                            <TableCell className="text-amber-700">
+                              {fmt(s.commission)}
+                            </TableCell>
                             <TableCell>{fmt(s.avg_ticket)}</TableCell>
                             <TableCell>
                               {bonifs.length > 0 ? (
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="text-sm font-medium text-rose-700">{fmt(totalBonifInflu)}</span>
-                                  <span className="text-[10px] text-muted-foreground">{bonifs.length} NF(s)</span>
+                                  <span className="text-sm font-medium text-rose-700">
+                                    {fmt(totalBonifInflu)}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {bonifs.length} NF(s)
+                                  </span>
                                 </div>
                               ) : (
                                 <span className="text-xs text-muted-foreground">—</span>
@@ -453,7 +604,13 @@ export default function PerformanceInfluenciadores() {
                             <TableCell>
                               {roi !== null ? (
                                 <Badge
-                                  variant={roi >= 3 ? "default" : roi >= 1 ? "secondary" : "destructive"}
+                                  variant={
+                                    roi >= 3
+                                      ? "default"
+                                      : roi >= 1
+                                      ? "secondary"
+                                      : "destructive"
+                                  }
                                   className="text-xs font-mono"
                                 >
                                   {roi.toFixed(1)}x
@@ -462,7 +619,9 @@ export default function PerformanceInfluenciadores() {
                                 <span className="text-xs text-muted-foreground">—</span>
                               )}
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{fmtDate(s.last_sale)}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {fmtDate(s.last_sale)}
+                            </TableCell>
                           </TableRow>
 
                           {/* Linha expandida */}
@@ -470,13 +629,13 @@ export default function PerformanceInfluenciadores() {
                             <TableRow className="bg-muted/20 hover:bg-muted/20">
                               <TableCell colSpan={9} className="py-4 px-6">
                                 <div className="grid md:grid-cols-2 gap-6">
-
-                                  {/* Produtos mais vendidos */}
+                                  {/* Produtos vendidos */}
                                   <div>
                                     <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                                      Produtos vendidos · {s.coupon}
-                                      <span className="normal-case ml-1 text-muted-foreground/60">
-                                        ({s.total_orders} pedidos · {fmtDate(s.first_sale)} → {fmtDate(s.last_sale)})
+                                      Produtos vendidos
+                                      <span className="normal-case ml-1 font-normal">
+                                        ({s.total_orders} pedidos ·{" "}
+                                        {fmtDate(s.first_sale)} → {fmtDate(s.last_sale)})
                                       </span>
                                     </p>
                                     <div className="flex flex-wrap gap-2">
@@ -488,64 +647,99 @@ export default function PerformanceInfluenciadores() {
                                             className="bg-white border rounded-md px-2.5 py-1 text-xs flex items-center gap-1.5"
                                           >
                                             <span>{product}</span>
-                                            <Badge variant="secondary" className="text-[10px] px-1 py-0">{qty}x</Badge>
+                                            <Badge
+                                              variant="secondary"
+                                              className="text-[10px] px-1 py-0"
+                                            >
+                                              {qty}x
+                                            </Badge>
                                           </div>
                                         ))}
                                     </div>
                                   </div>
 
-                                  {/* Bonificações enviadas */}
+                                  {/* Bonificações */}
                                   <div>
                                     <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
                                       Bonificações enviadas
-                                      {bonifs.length === 0 && (
-                                        <span className="normal-case ml-1 text-muted-foreground/60">
-                                          · nenhuma NF encontrada para este coupon
-                                        </span>
-                                      )}
                                     </p>
                                     {bonifs.length === 0 ? (
-                                      <p className="text-xs text-muted-foreground">
-                                        Cadastre o coupon <strong>{s.coupon}</strong> no campo "Apelido" do pedido de seeding no Kanban Operacional.
-                                      </p>
+                                      <div className="text-xs text-muted-foreground">
+                                        {inf ? (
+                                          <span>
+                                            Nenhuma NF de bonificação encontrada para{" "}
+                                            <strong>{inf.name}</strong>. Verifique se o
+                                            e-mail da influenciadora no cadastro corresponde
+                                            ao destinatário nas NFs fiscais.
+                                          </span>
+                                        ) : (
+                                          <span>
+                                            Vincule esta influenciadora no{" "}
+                                            <strong>Cadastro</strong> para ver as
+                                            bonificações.
+                                          </span>
+                                        )}
+                                      </div>
                                     ) : (
                                       <div className="space-y-2">
-                                        {bonifs.map((order) => (
-                                          <div key={order.id} className="bg-white border rounded-md p-2.5 text-xs space-y-1.5">
+                                        {bonifs.map((b) => (
+                                          <div
+                                            key={b.id}
+                                            className="bg-white border rounded-md p-2.5 text-xs space-y-1"
+                                          >
                                             <div className="flex items-center justify-between">
                                               <span className="font-medium">
-                                                {format(new Date(order.created_at), "dd/MM/yyyy")}
-                                                {order.numero_nf && (
-                                                  <span className="ml-2 text-muted-foreground">NF {order.numero_nf}</span>
+                                                {format(
+                                                  new Date(b.data_venda),
+                                                  "dd/MM/yyyy"
                                                 )}
                                               </span>
                                               <span className="font-semibold text-rose-700">
-                                                {fmt(order.valor_total_informado)}
+                                                {fmt(b.valor_total)}
                                               </span>
                                             </div>
-                                            {order.items.length > 0 && (
-                                              <div className="flex flex-wrap gap-1.5">
-                                                {order.items.map((item, idx) => (
+                                            {b.cliente_nome && (
+                                              <div className="flex items-center gap-1 text-muted-foreground">
+                                                <User className="h-3 w-3" />
+                                                {b.cliente_nome}
+                                              </div>
+                                            )}
+                                            {b.produtos && b.produtos.length > 0 && (
+                                              <div className="flex flex-wrap gap-1">
+                                                {b.produtos.map((p, idx) => (
                                                   <span
                                                     key={idx}
                                                     className="bg-gray-50 border rounded px-1.5 py-0.5 text-[10px]"
                                                   >
-                                                    {getProductDisplayName(item.produto)} · {item.quantidade}{item.unidade}
+                                                    {p}
                                                   </span>
                                                 ))}
                                               </div>
                                             )}
                                           </div>
                                         ))}
+
                                         <div className="flex items-center justify-between pt-1 border-t text-xs">
-                                          <span className="text-muted-foreground">Total bonificado</span>
-                                          <span className="font-semibold text-rose-700">{fmt(totalBonifInflu)}</span>
+                                          <span className="text-muted-foreground">
+                                            Total bonificado
+                                          </span>
+                                          <span className="font-semibold text-rose-700">
+                                            {fmt(totalBonifInflu)}
+                                          </span>
                                         </div>
                                         {roi !== null && (
                                           <div className="flex items-center justify-between text-xs">
-                                            <span className="text-muted-foreground">ROI (GMV ÷ Bonificado)</span>
+                                            <span className="text-muted-foreground">
+                                              ROI (GMV ÷ bonificado)
+                                            </span>
                                             <Badge
-                                              variant={roi >= 3 ? "default" : roi >= 1 ? "secondary" : "destructive"}
+                                              variant={
+                                                roi >= 3
+                                                  ? "default"
+                                                  : roi >= 1
+                                                  ? "secondary"
+                                                  : "destructive"
+                                              }
                                               className="font-mono"
                                             >
                                               {roi.toFixed(2)}x
@@ -565,7 +759,10 @@ export default function PerformanceInfluenciadores() {
 
                     {displayed.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        <TableCell
+                          colSpan={9}
+                          className="text-center py-8 text-muted-foreground"
+                        >
                           Nenhum resultado encontrado
                         </TableCell>
                       </TableRow>
