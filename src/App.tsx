@@ -33,6 +33,8 @@ import LetsFly from "./pages/LetsFly";
 import SiteConversao from "./pages/SiteConversao";
 import PaginaInteligente from "./pages/PaginaInteligente";
 import ComentariosInstagram from "./pages/ComentariosInstagram";
+import KanbanInfluenciadores from "./pages/KanbanInfluenciadores";
+import PerformanceInfluenciadores from "./pages/PerformanceInfluenciadores";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -345,6 +347,29 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <ComentariosInstagram />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Influenciadores */}
+          <Route
+            path="/influenciadores/kanban"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <KanbanInfluenciadores />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/influenciadores/performance"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <PerformanceInfluenciadores />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }
