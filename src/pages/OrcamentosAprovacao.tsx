@@ -266,13 +266,15 @@ function DeptApprovalSection({
 
 export default function OrcamentosAprovacao() {
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef     = useRef<HTMLInputElement>(null);
+  const formFileInputRef = useRef<HTMLInputElement>(null);
 
-  const [tab, setTab]             = useState<"all" | "pending" | "approved" | "rejected">("all");
-  const [formOpen, setFormOpen]   = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [detailId, setDetailId]   = useState<string | null>(null);
-  const [form, setForm]           = useState<BudgetForm>(EMPTY_FORM);
+  const [tab, setTab]               = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [formOpen, setFormOpen]     = useState(false);
+  const [editingId, setEditingId]   = useState<string | null>(null);
+  const [detailId, setDetailId]     = useState<string | null>(null);
+  const [form, setForm]             = useState<BudgetForm>(EMPTY_FORM);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [approvalNotes, setApprovalNotes] = useState<ApprovalNotes>(EMPTY_NOTES);
 
   useEffect(() => { setApprovalNotes(EMPTY_NOTES); }, [detailId]);
@@ -332,7 +334,7 @@ export default function OrcamentosAprovacao() {
   // ── Mutations ──────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: async (f: BudgetForm) => {
+    mutationFn: async ({ f, files }: { f: BudgetForm; files: File[] }) => {
       const value = parseFloat(f.value.replace(",", "."));
 
       // 1. Optionally create calendar event first
@@ -353,7 +355,7 @@ export default function OrcamentosAprovacao() {
       }
 
       // 2. Create budget linked to the new event
-      const { error } = await (supabase.from("budget_requests") as any).insert({
+      const { data: budgetData, error } = await (supabase.from("budget_requests") as any).insert({
         title:             f.title,
         description:       f.description  || null,
         value,
@@ -369,8 +371,21 @@ export default function OrcamentosAprovacao() {
         financial_status:  f.needs_financial  ? "pending" : "not_required",
         operations_status: f.needs_operations ? "pending" : "not_required",
         marketing_status:  f.needs_marketing  ? "pending" : "not_required",
-      });
+      }).select("id").single();
       if (error) throw error;
+
+      // 3. Upload any pending files
+      if (files.length > 0 && budgetData?.id) {
+        await Promise.all(files.map(async (file) => {
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const path     = `${budgetData.id}/${Date.now()}-${safeName}`;
+          const { error: storageErr } = await supabase.storage.from("budget-attachments").upload(path, file);
+          if (storageErr) throw storageErr;
+          await (supabase.from("budget_attachments") as any).insert({
+            budget_id: budgetData.id, file_name: file.name, file_path: path, file_size: file.size,
+          });
+        }));
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
@@ -381,7 +396,7 @@ export default function OrcamentosAprovacao() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, f }: { id: string; f: BudgetForm }) => {
+    mutationFn: async ({ id, f, files }: { id: string; f: BudgetForm; files: File[] }) => {
       const value   = parseFloat(f.value.replace(",", "."));
       const current = budgets.find((b) => b.id === id);
 
@@ -438,6 +453,19 @@ export default function OrcamentosAprovacao() {
         })
         .eq("id", id);
       if (error) throw error;
+
+      // Upload any pending files
+      if (files.length > 0) {
+        await Promise.all(files.map(async (file) => {
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const path     = `${id}/${Date.now()}-${safeName}`;
+          const { error: storageErr } = await supabase.storage.from("budget-attachments").upload(path, file);
+          if (storageErr) throw storageErr;
+          await (supabase.from("budget_attachments") as any).insert({
+            budget_id: id, file_name: file.name, file_path: path, file_size: file.size,
+          });
+        }));
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
@@ -536,14 +564,26 @@ export default function OrcamentosAprovacao() {
     setFormOpen(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setPendingFiles([]);
+  };
+
+  const handleFormFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setPendingFiles((prev) => [...prev, ...files]);
+    e.target.value = "";
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = () => {
     if (!form.title.trim() || !form.value || !form.deadline_date) return;
     if (editingId) {
-      updateMutation.mutate({ id: editingId, f: form });
+      updateMutation.mutate({ id: editingId, f: form, files: pendingFiles });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate({ f: form, files: pendingFiles });
     }
   };
 
@@ -919,6 +959,50 @@ export default function OrcamentosAprovacao() {
               <textarea className="mt-1 w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="Por que esse investimento é necessário?"
                 value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} />
+            </div>
+
+            <Separator />
+
+            {/* Attachments */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-muted-foreground">Anexos</label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => formFileInputRef.current?.click()}
+                >
+                  <Paperclip className="h-3.5 w-3.5 mr-1" /> Adicionar arquivo
+                </Button>
+              </div>
+              <input
+                ref={formFileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleFormFileChange}
+              />
+              {pendingFiles.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum arquivo selecionado.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {pendingFiles.map((file, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs bg-muted/20">
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate font-medium">{file.name}</span>
+                      <span className="text-muted-foreground shrink-0">{formatFileSize(file.size)}</span>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => removePendingFile(i)}
+                      >
+                        <IconX className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Separator />
