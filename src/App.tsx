@@ -37,6 +37,7 @@ import KanbanInfluenciadores from "./pages/KanbanInfluenciadores";
 import PerformanceInfluenciadores from "./pages/PerformanceInfluenciadores";
 import CadastroInfluenciadores from "./pages/CadastroInfluenciadores";
 import CalendarioMarketing from "./pages/CalendarioMarketing";
+import OrcamentosAprovacao from "./pages/OrcamentosAprovacao";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -383,6 +384,18 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <PerformanceInfluenciadores />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Orçamentos */}
+          <Route
+            path="/orcamentos"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <OrcamentosAprovacao />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }
