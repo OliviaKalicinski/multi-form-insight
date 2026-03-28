@@ -257,32 +257,53 @@ export default function PerformanceInfluenciadores() {
     const unmatched: BonifRow[] = [];
 
     for (const row of bonifFiltered) {
-      // 1. Match by email (com trim para evitar espaços invisíveis)
       let coupon: string | undefined;
-      if (row.cliente_email) {
-        coupon = couponByEmail.get(row.cliente_email.trim().toLowerCase());
+
+      // 1. Match por e-mail — só tenta se o campo realmente parece um e-mail (contém "@")
+      // Muitos sistemas gravam o CPF no campo cliente_email; ignoramos nesses casos.
+      const isRealEmail = row.cliente_email?.includes("@");
+      if (isRealEmail) {
+        coupon = couponByEmail.get(row.cliente_email!.trim().toLowerCase());
       }
-      // 2. Fallback: match by CPF (PF) ou CNPJ (PJ)
-      if (!coupon && row.cpf_cnpj) {
-        const normDoc = row.cpf_cnpj.replace(/\D/g, "");
-        if (normDoc) {
-          for (const inf of influencers) {
-            const cnpjMatch = inf.cnpj && inf.cnpj.replace(/\D/g, "") === normDoc;
-            const cpfMatch  = inf.cpf  && inf.cpf.replace(/\D/g, "")  === normDoc;
-            if (cnpjMatch || cpfMatch) {
-              coupon = couponByEmail.get(inf.email.toLowerCase());
-              break;
-            }
+
+      // 2. Match por documento (CPF / CNPJ)
+      // Verifica cpf_cnpj E cliente_email quando este último parecer um documento
+      const docCandidates = new Set<string>();
+      if (row.cpf_cnpj) docCandidates.add(row.cpf_cnpj.replace(/\D/g, ""));
+      if (!isRealEmail && row.cliente_email) docCandidates.add(row.cliente_email.replace(/\D/g, ""));
+
+      if (!coupon && docCandidates.size > 0) {
+        for (const inf of influencers) {
+          const cnpjNorm = inf.cnpj?.replace(/\D/g, "");
+          const cpfNorm  = inf.cpf?.replace(/\D/g, "");
+          if ((cnpjNorm && docCandidates.has(cnpjNorm)) ||
+              (cpfNorm  && docCandidates.has(cpfNorm))) {
+            coupon = couponByEmail.get(inf.email.toLowerCase());
+            break;
           }
         }
       }
-      // 3. Fallback: match by name
+
+      // 3. Match por nome — exato primeiro, depois parcial (≥2 partes significativas)
       if (!coupon && row.cliente_nome) {
-        const normRow = normalizeName(row.cliente_nome);
+        const normRow  = normalizeName(row.cliente_nome);
+        const rowParts = normRow.split(" ").filter((p) => p.length >= 3);
+
+        // 3a. exato
         for (const inf of influencers) {
           if (normalizeName(inf.name) === normRow) {
             coupon = couponByEmail.get(inf.email.toLowerCase());
-            break;
+            if (coupon) break;
+          }
+        }
+        // 3b. parcial — todas as partes significativas da NF aparecem no nome do cadastro
+        if (!coupon && rowParts.length >= 2) {
+          for (const inf of influencers) {
+            const normInf = normalizeName(inf.name);
+            if (rowParts.every((p) => normInf.includes(p))) {
+              coupon = couponByEmail.get(inf.email.toLowerCase());
+              if (coupon) break;
+            }
           }
         }
       }
@@ -535,8 +556,8 @@ export default function PerformanceInfluenciadores() {
                   {(b.valor_total ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                 </span>
                 {b.cliente_nome && <span className="text-muted-foreground">👤 {b.cliente_nome}</span>}
-                {b.cliente_email && <span className="text-muted-foreground">✉ {b.cliente_email}</span>}
-                {b.cpf_cnpj && <span className="text-muted-foreground font-mono">doc: {b.cpf_cnpj}</span>}
+                {b.cliente_email?.includes("@") && <span className="text-muted-foreground">✉ {b.cliente_email}</span>}
+                {b.cpf_cnpj && <span className="text-muted-foreground font-mono">CPF/CNPJ: {b.cpf_cnpj}</span>}
               </div>
             ))}
           </div>
