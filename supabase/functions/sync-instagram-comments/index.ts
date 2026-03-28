@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
       comments: totalComments,
       classified,
       errors,
-    }), { headers: { "Content-Type": "application/json" } });
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err: any) {
     console.error(err);
