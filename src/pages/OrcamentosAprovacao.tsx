@@ -42,7 +42,8 @@ interface BudgetRequest {
   description: string | null;
   value: number;
   request_date: string;
-  event_date: string | null;
+  event_start_date: string | null;
+  event_end_date: string | null;
   deadline_date: string;
   justification: string | null;
   calendar_event_id: string | null;
@@ -75,7 +76,8 @@ interface BudgetForm {
   description: string;
   value: string;
   request_date: string;
-  event_date: string;         // quando o evento acontece
+  event_start_date: string;   // início do evento
+  event_end_date: string;     // fim do evento (opcional — mesmo dia se vazio)
   deadline_date: string;      // prazo para aprovação do orçamento
   justification: string;
   // Calendar integration
@@ -102,7 +104,8 @@ const EMPTY_FORM: BudgetForm = {
   description: "",
   value: "",
   request_date: today,
-  event_date: "",
+  event_start_date: "",
+  event_end_date: "",
   deadline_date: "",
   justification: "",
   create_calendar_event: true,
@@ -339,8 +342,8 @@ export default function OrcamentosAprovacao() {
           .insert({
             title:       f.title,
             description: f.description || null,
-            start_date:  f.event_date || f.request_date,
-            end_date:    f.event_date || f.deadline_date,
+            start_date:  f.event_start_date || f.request_date,
+            end_date:    f.event_end_date   || f.event_start_date || f.deadline_date,
             category_id: f.calendar_category_id,
           })
           .select("id")
@@ -355,7 +358,8 @@ export default function OrcamentosAprovacao() {
         description:       f.description  || null,
         value,
         request_date:      f.request_date,
-        event_date:        f.event_date   || null,
+        event_start_date:  f.event_start_date || null,
+        event_end_date:    f.event_end_date   || null,
         deadline_date:     f.deadline_date,
         justification:     f.justification || null,
         calendar_event_id: calEventId,
@@ -394,8 +398,8 @@ export default function OrcamentosAprovacao() {
         await (supabase.from("marketing_calendar") as any)
           .update({
             title:      f.title,
-            start_date: f.event_date || f.request_date,
-            end_date:   f.event_date || f.deadline_date,
+            start_date: f.event_start_date || f.request_date,
+            end_date:   f.event_end_date   || f.event_start_date || f.deadline_date,
           })
           .eq("id", calEventId);
       } else if (f.create_calendar_event && f.calendar_category_id) {
@@ -404,8 +408,8 @@ export default function OrcamentosAprovacao() {
           .insert({
             title:       f.title,
             description: f.description || null,
-            start_date:  f.event_date || f.request_date,
-            end_date:    f.event_date || f.deadline_date,
+            start_date:  f.event_start_date || f.request_date,
+            end_date:    f.event_end_date   || f.event_start_date || f.deadline_date,
             category_id: f.calendar_category_id,
           })
           .select("id")
@@ -420,7 +424,8 @@ export default function OrcamentosAprovacao() {
           description:       f.description  || null,
           value,
           request_date:      f.request_date,
-          event_date:        f.event_date   || null,
+          event_start_date:  f.event_start_date || null,
+          event_end_date:    f.event_end_date   || null,
           deadline_date:     f.deadline_date,
           justification:     f.justification || null,
           calendar_event_id: calEventId,
@@ -514,7 +519,8 @@ export default function OrcamentosAprovacao() {
       description:           b.description  || "",
       value:                 b.value.toString(),
       request_date:          b.request_date,
-      event_date:            b.event_date   || "",
+      event_start_date:      b.event_start_date || "",
+      event_end_date:        b.event_end_date   || "",
       deadline_date:         b.deadline_date,
       justification:         b.justification || "",
       create_calendar_event: false,   // shown differently when already linked
@@ -642,9 +648,12 @@ export default function OrcamentosAprovacao() {
                 <p className="text-xl font-bold">{formatCurrency(b.value)}</p>
 
                 <div className="text-xs text-muted-foreground space-y-0.5">
-                  {b.event_date && (
+                  {b.event_start_date && (
                     <div className="font-medium text-foreground">
-                      Evento: {formatDate(b.event_date)}
+                      Evento: {formatDate(b.event_start_date)}
+                      {b.event_end_date && b.event_end_date !== b.event_start_date
+                        ? ` → ${formatDate(b.event_end_date)}`
+                        : ""}
                     </div>
                   )}
                   <div className={past && status !== "approved" ? "text-red-600 font-medium" : near && status !== "approved" ? "text-amber-600 font-medium" : ""}>
@@ -710,10 +719,19 @@ export default function OrcamentosAprovacao() {
                     <p className="text-xs text-muted-foreground">Data de entrada</p>
                     <p className="font-medium">{formatDateLong(detailBudget.request_date)}</p>
                   </div>
-                  {detailBudget.event_date && (
+                  {detailBudget.event_start_date && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Data do evento</p>
-                      <p className="font-medium">{formatDateLong(detailBudget.event_date)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {detailBudget.event_end_date && detailBudget.event_end_date !== detailBudget.event_start_date
+                          ? "Período do evento"
+                          : "Data do evento"}
+                      </p>
+                      <p className="font-medium">
+                        {formatDateLong(detailBudget.event_start_date)}
+                        {detailBudget.event_end_date && detailBudget.event_end_date !== detailBudget.event_start_date
+                          ? ` até ${formatDateLong(detailBudget.event_end_date)}`
+                          : ""}
+                      </p>
                     </div>
                   )}
                   <div>
@@ -878,17 +896,24 @@ export default function OrcamentosAprovacao() {
                   onChange={(e) => setForm({ ...form, request_date: e.target.value })} />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Data do evento</label>
-                <Input className="mt-1" type="date" value={form.event_date}
-                  onChange={(e) => setForm({ ...form, event_date: e.target.value })} />
+                <label className="text-xs font-medium text-muted-foreground">Prazo da aprovação *</label>
+                <Input className="mt-1" type="date" min={form.request_date} value={form.deadline_date}
+                  onChange={(e) => setForm({ ...form, deadline_date: e.target.value })} />
               </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Prazo da aprovação *</label>
-              <Input className="mt-1" type="date" min={form.request_date} value={form.deadline_date}
-                onChange={(e) => setForm({ ...form, deadline_date: e.target.value })} />
-            </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Início do evento</label>
+                <Input className="mt-1" type="date" value={form.event_start_date}
+                  onChange={(e) => setForm({ ...form, event_start_date: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Fim do evento <span className="text-muted-foreground/60">(opcional)</span></label>
+                <Input className="mt-1" type="date" min={form.event_start_date} value={form.event_end_date}
+                  onChange={(e) => setForm({ ...form, event_end_date: e.target.value })} />
+              </div>
+            </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Justificativa</label>
               <textarea className="mt-1 w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
