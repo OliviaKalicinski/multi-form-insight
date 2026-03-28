@@ -1,16 +1,25 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 const META_API = "https://graph.facebook.com/v19.0";
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     if (req.method !== "POST") {
-      return new Response(JSON.stringify({ ok: false, error: "Method not allowed" }), { status: 405 });
+      return new Response(JSON.stringify({ ok: false, error: "Method not allowed" }), { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const { comment_id, message } = await req.json();
     if (!comment_id || !message?.trim()) {
-      return new Response(JSON.stringify({ ok: false, error: "comment_id e message são obrigatórios" }), { status: 400 });
+      return new Response(JSON.stringify({ ok: false, error: "comment_id e message são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const META_TOKEN = Deno.env.get("META_ACCESS_TOKEN");
@@ -28,13 +37,13 @@ Deno.serve(async (req) => {
     if (data.error) throw new Error(`Meta API: ${data.error.message} (code ${data.error.code})`);
 
     return new Response(JSON.stringify({ ok: true, reply_id: data.id }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (err: any) {
     console.error(err);
     return new Response(JSON.stringify({ ok: false, error: err.message }), {
-      status: 500, headers: { "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
