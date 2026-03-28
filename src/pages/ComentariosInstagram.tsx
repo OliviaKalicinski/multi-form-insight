@@ -156,12 +156,13 @@ export default function ComentariosInstagram() {
     });
   }, [allComments, effectiveDateRange]);
 
-  const doSync = async (fetchAll: boolean) => {
+  const doSync = async (mode: "delta" | "full") => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-instagram-comments", {
-        body: fetchAll ? { fetch_all: true } : { limit: 50 },
-      });
+      const body = mode === "full"
+        ? { fetch_all: true, full_sync: true }
+        : { fetch_all: true }; // delta: fetch_all pagina posts, mas since filtra pelo banco
+      const { data, error } = await supabase.functions.invoke("sync-instagram-comments", { body });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error ?? "Erro desconhecido");
 
@@ -169,10 +170,12 @@ export default function ComentariosInstagram() {
       if (data.classified > 0) parts.push(`${data.classified} novos classificados`);
       if (data.skipped > 0) parts.push(`${data.skipped} já classificados`);
       if (data.errors > 0) parts.push(`${data.errors} erros`);
+      if (data.firstError) parts.push(`Erro: ${data.firstError}`);
 
       toast({
         title: `Sync concluído — ${data.posts} posts, ${data.comments} comentários`,
         description: parts.join(" · ") || "Nenhum comentário novo encontrado.",
+        variant: data.errors > 0 && data.classified === 0 ? "destructive" : "default",
       });
       await fetchComments();
     } catch (e: any) {
@@ -181,8 +184,8 @@ export default function ComentariosInstagram() {
     setSyncing(false);
   };
 
-  const handleSync = () => doSync(false);
-  const handleSyncAll = () => doSync(true);
+  const handleSync = () => doSync("delta");
+  const handleSyncAll = () => doSync("full");
 
   const handleReply = async (comment: Comment) => {
     if (!replyText.trim()) return;
@@ -273,11 +276,11 @@ export default function ComentariosInstagram() {
         <div className="flex gap-2">
           <Button onClick={handleSyncAll} disabled={syncing} variant="outline" size="sm" className="gap-1.5 text-xs">
             <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-            Buscar todos
+            Sync completo
           </Button>
           <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Sincronizando..." : "Sincronizar recentes"}
+            {syncing ? "Sincronizando..." : "Sincronizar"}
           </Button>
         </div>
       </div>
