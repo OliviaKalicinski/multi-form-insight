@@ -50,7 +50,12 @@ async function metaGetAll(
   return all;
 }
 
-async function classifyComment(text: string, anthropicKey: string): Promise<{
+const CLASSIFY_DELAY_MS = 350; // delay entre requests para evitar rate limit
+const CLASSIFY_MAX_RETRIES = 3;
+
+function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
+async function classifyComment(text: string, anthropicKey: string, attempt = 1): Promise<{
   sentimento: string; categoria: string; risco: string; risco_motivo: string;
 }> {
   const res = await fetch(ANTHROPIC_API, {
@@ -89,6 +94,15 @@ Risco "baixo": tudo mais.`,
       }],
     }),
   });
+
+  // Rate limit (429) → retry com backoff exponencial
+  if (res.status === 429 && attempt <= CLASSIFY_MAX_RETRIES) {
+    const backoff = CLASSIFY_DELAY_MS * Math.pow(2, attempt); // 700, 1400, 2800ms
+    console.log(`Rate limited, retry ${attempt}/${CLASSIFY_MAX_RETRIES} em ${backoff}ms...`);
+    await sleep(backoff);
+    return classifyComment(text, anthropicKey, attempt + 1);
+  }
+
   const data = await res.json();
   if (data.error) throw new Error(`Anthropic: ${data.error.message}`);
   const raw = data.content[0].text.trim();
@@ -117,25 +131,47 @@ Deno.serve(async (req) => {
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const fetchAll = body.fetch_all ?? false;
+    const fullSync = body.full_sync ?? false; // ignora delta, puxa tudo do zero
     const limit = body.limit ?? 50;
 
-    // 1. Busca posts — paginado se fetch_all=true
+    // Delta sync: busca timestamp do post mais recente já sincronizado
+    let sinceTsUnix: number | null = null;
+    if (!fullSync) {
+      const { data: latestRow } = await (supabase as any)
+        .from("instagram_comments")
+        .select("media_timestamp")
+        .order("media_timestamp", { ascending: false })
+        .limit(1)
+        .single();
+      if (latestRow?.media_timestamp) {
+        // Subtrai 1 dia de margem para não perder comentários novos em posts antigos recentes
+        const latestDate = new Date(latestRow.media_timestamp);
+        latestDate.setDate(latestDate.getDate() - 1);
+        sinceTsUnix = Math.floor(latestDate.getTime() / 1000);
+        console.log(`Delta sync: buscando posts desde ${latestDate.toISOString()}`);
+      }
+    }
+
+    // 1. Busca posts — paginado se fetch_all=true, com since para delta
+    const mediaParams: Record<string, string> = {
+      fields: "id,caption,media_url,permalink,timestamp,media_type",
+      limit: "50",
+    };
+    if (sinceTsUnix && !fullSync) {
+      mediaParams.since = String(sinceTsUnix);
+    }
+
     let posts: any[];
-    if (fetchAll) {
+    if (fetchAll || fullSync) {
       // Busca até 10 páginas de 50 posts = 500 posts max
-      posts = await metaGetAll(`${IG_ACCOUNT_ID}/media`, META_TOKEN, {
-        fields: "id,caption,media_url,permalink,timestamp,media_type",
-        limit: "50",
-      }, 10);
+      posts = await metaGetAll(`${IG_ACCOUNT_ID}/media`, META_TOKEN, mediaParams, 10);
     } else {
-      const mediasData = await metaGet(`${IG_ACCOUNT_ID}/media`, META_TOKEN, {
-        fields: "id,caption,media_url,permalink,timestamp,media_type",
-        limit: String(limit),
-      });
+      mediaParams.limit = String(limit);
+      const mediasData = await metaGet(`${IG_ACCOUNT_ID}/media`, META_TOKEN, mediaParams);
       posts = mediasData.data ?? [];
     }
 
-    console.log(`Encontrados ${posts.length} posts (fetch_all=${fetchAll})`);
+    console.log(`Encontrados ${posts.length} posts (fetch_all=${fetchAll}, full_sync=${fullSync}, since=${sinceTsUnix ?? "none"})`);
 
     let totalComments = 0, classified = 0, skipped = 0, errors = 0;
 
@@ -195,10 +231,11 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Classifica com Claude (só comentários novos)
+        // Classifica com Claude (só comentários novos) — com delay para evitar rate limit
         let classification = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
         let classifiedAt: string | null = null;
         try {
+          await sleep(CLASSIFY_DELAY_MS);
           classification = await classifyComment(comment.text, ANTHROPIC_KEY);
           classifiedAt = new Date().toISOString();
           classified++;
