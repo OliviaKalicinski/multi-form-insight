@@ -112,7 +112,7 @@ export const TopProductsChart = ({
                       <div>TM Pedido:</div>
                       <div className="font-semibold">{formatCurrency(item.ticketMedio)}</div>
                       <div>TM Produto:</div>
-                      <div className="font-semibold">{formatCurrency(item.ticketMedioProduto)}</div>
+                      <div className="font-semibold">{formatCurrency(item.ticketMedioProduto || 0)}</div>
                       <div>Participação:</div>
                       <div className="font-semibold">{item.percentage.toFixed(1)}%</div>
                     </div>
