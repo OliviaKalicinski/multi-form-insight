@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const IG_ACCOUNT_ID = "17841470017662704";
+const BRAND_USERNAME = "comidadedragao";
 const META_API = "https://graph.facebook.com/v19.0";
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 
@@ -185,6 +186,18 @@ Deno.serve(async (req) => {
           errors++;
         }
 
+        // Detecta se a marca já respondeu este comentário
+        let respondido = existing?.respondido ?? false;
+        let respostaTexto = "";
+        const replies = comment.replies?.data ?? [];
+        for (const reply of replies) {
+          if (reply.username === BRAND_USERNAME) {
+            respondido = true;
+            respostaTexto = reply.text ?? "";
+            break;
+          }
+        }
+
         // Salva no banco
         const row: any = {
           id: comment.id,
@@ -196,7 +209,8 @@ Deno.serve(async (req) => {
           username: comment.username,
           text: comment.text,
           timestamp: comment.timestamp,
-          respondido: existing?.respondido ?? false,
+          respondido,
+          resposta_texto: respostaTexto,
           ...classification,
         };
         if (classifiedAt) row.classified_at = classifiedAt;
