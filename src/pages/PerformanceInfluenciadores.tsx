@@ -57,7 +57,7 @@ interface BonifRow {
   cliente_nome: string | null;
   cliente_email: string | null;
   cpf_cnpj: string | null;
-  produtos: string[] | null;
+  produtos: any[] | null;
 }
 
 interface Influencer {
@@ -848,14 +848,20 @@ export default function PerformanceInfluenciadores() {
                                             )}
                                             {b.produtos && b.produtos.length > 0 && (
                                               <div className="flex flex-wrap gap-1">
-                                                {b.produtos.map((p, idx) => (
-                                                  <span
-                                                    key={idx}
-                                                    className="bg-gray-50 border rounded px-1.5 py-0.5 text-[10px]"
-                                                  >
-                                                    {p}
-                                                  </span>
-                                                ))}
+                                                {b.produtos.map((p: any, idx: number) => {
+                                                  const label = typeof p === "string"
+                                                    ? p
+                                                    : (p?.descricaoAjustada || p?.descricao || p?.sku || "");
+                                                  if (!label) return null;
+                                                  return (
+                                                    <span
+                                                      key={idx}
+                                                      className="bg-gray-50 border rounded px-1.5 py-0.5 text-[10px]"
+                                                    >
+                                                      {label}{p?.quantidade > 1 ? ` (${p.quantidade}x)` : ""}
+                                                    </span>
+                                                  );
+                                                })}
                                               </div>
                                             )}
                                           </div>
