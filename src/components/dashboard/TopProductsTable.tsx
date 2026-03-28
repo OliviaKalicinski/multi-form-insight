@@ -27,7 +27,8 @@ export const TopProductsTable = ({ products, sortBy }: TopProductsTableProps) =>
             <TableHead className="text-right">Quantidade</TableHead>
             <TableHead className="text-right">Faturamento</TableHead>
             <TableHead className="text-right">Pedidos</TableHead>
-            <TableHead className="text-right">Ticket Médio</TableHead>
+            <TableHead className="text-right">TM Pedido</TableHead>
+            <TableHead className="text-right">TM Produto</TableHead>
             <TableHead className="text-right">% {sortBy === 'quantity' ? 'Qtd' : 'Fat'}</TableHead>
           </TableRow>
         </TableHeader>
@@ -45,6 +46,7 @@ export const TopProductsTable = ({ products, sortBy }: TopProductsTableProps) =>
               <TableCell className="text-right font-mono">{formatCurrency(product.faturamentoTotal)}</TableCell>
               <TableCell className="text-right">{product.numeroPedidos}</TableCell>
               <TableCell className="text-right font-mono">{formatCurrency(product.ticketMedio)}</TableCell>
+              <TableCell className="text-right font-mono">{formatCurrency(product.ticketMedioProduto)}</TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
                   <span className="text-sm font-medium">
