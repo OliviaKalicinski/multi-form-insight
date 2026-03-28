@@ -39,6 +39,7 @@ import {
   BarChart2,
   Sparkles,
   BarChart,
+  Calendar,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
@@ -71,6 +72,7 @@ const navSections: NavSection[] = [
       { title: "Conciliação NF", url: "/kanban-conciliacao", icon: ClipboardList },
       { title: "Operações", url: "/operacoes", icon: Truck },
       { title: "Produtos", url: "/produtos", icon: Package },
+      { title: "Calendário", url: "/calendario-marketing", icon: Calendar },
     ],
   },
   {
