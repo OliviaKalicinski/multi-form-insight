@@ -36,6 +36,7 @@ import ComentariosInstagram from "./pages/ComentariosInstagram";
 import KanbanInfluenciadores from "./pages/KanbanInfluenciadores";
 import PerformanceInfluenciadores from "./pages/PerformanceInfluenciadores";
 import CadastroInfluenciadores from "./pages/CadastroInfluenciadores";
+import CalendarioMarketing from "./pages/CalendarioMarketing";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -382,6 +383,18 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <PerformanceInfluenciadores />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Calendário de Marketing */}
+          <Route
+            path="/calendario-marketing"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <CalendarioMarketing />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }
