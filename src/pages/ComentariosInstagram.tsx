@@ -10,11 +10,11 @@ import {
   Send,
   EyeOff,
   RefreshCw,
-  Filter,
   TrendingDown,
   Heart,
   HelpCircle,
   Shield,
+  ShoppingBag,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,15 +75,25 @@ const SENTIMENTO_ICON = {
   neutro: <MessageCircle className="h-3.5 w-3.5 text-gray-400" />,
 };
 
-const CATEGORIA_ICON = {
+const CATEGORIA_ICON: Record<string, JSX.Element> = {
   elogio: <Heart className="h-3.5 w-3.5" />,
   reclamação: <AlertTriangle className="h-3.5 w-3.5" />,
   dúvida: <HelpCircle className="h-3.5 w-3.5" />,
+  duvida_oportunidade: <ShoppingBag className="h-3.5 w-3.5" />,
   risco: <Shield className="h-3.5 w-3.5" />,
   outro: <MessageCircle className="h-3.5 w-3.5" />,
 };
 
-type FilterType = "todos" | "nao_respondidos" | "critico" | "alto" | "negativo";
+const CATEGORIA_LABEL: Record<string, string> = {
+  elogio: "elogio",
+  reclamação: "reclamação",
+  dúvida: "dúvida",
+  duvida_oportunidade: "oportunidade",
+  risco: "risco",
+  outro: "outro",
+};
+
+type FilterType = "todos" | "nao_respondidos" | "critico" | "alto" | "negativo" | "duvida_oportunidade";
 
 export default function ComentariosInstagram() {
   const { toast } = useToast();
@@ -175,6 +185,7 @@ export default function ComentariosInstagram() {
       naoRespondidos: comments.filter((c) => !c.respondido).length,
       negativos: comments.filter((c) => c.sentimento === "negativo").length,
       positivos: comments.filter((c) => c.sentimento === "positivo").length,
+      duvidaOportunidade: comments.filter((c) => c.categoria === "duvida_oportunidade").length,
       taxaResposta:
         comments.length > 0 ? Math.round((comments.filter((c) => c.respondido).length / comments.length) * 100) : 0,
     }),
@@ -189,6 +200,7 @@ export default function ComentariosInstagram() {
     else if (filter === "critico") list = list.filter((c) => c.risco === "critico");
     else if (filter === "alto") list = list.filter((c) => c.risco === "alto" || c.risco === "critico");
     else if (filter === "negativo") list = list.filter((c) => c.sentimento === "negativo");
+    else if (filter === "duvida_oportunidade") list = list.filter((c) => c.categoria === "duvida_oportunidade");
     return list.sort(
       (a, b) =>
         (ricoOrder[a.risco ?? "baixo"] ?? 3) - (ricoOrder[b.risco ?? "baixo"] ?? 3) ||
@@ -231,6 +243,11 @@ export default function ComentariosInstagram() {
             color: kpis.taxaResposta >= 80 ? "text-green-700" : "text-amber-600",
           },
           { label: "Negativos", value: kpis.negativos, color: kpis.negativos > 0 ? "text-red-600" : "" },
+          {
+            label: "Oportunidades",
+            value: kpis.duvidaOportunidade,
+            color: kpis.duvidaOportunidade > 0 ? "text-blue-600" : "",
+          },
         ].map((k) => (
           <div key={k.label} className="bg-muted/40 rounded-lg p-4">
             <p className="text-xs text-muted-foreground">{k.label}</p>
@@ -245,6 +262,7 @@ export default function ComentariosInstagram() {
           [
             { key: "todos", label: `Todos (${kpis.total})` },
             { key: "nao_respondidos", label: `Não respondidos (${kpis.naoRespondidos})` },
+            { key: "duvida_oportunidade", label: `Oportunidades (${kpis.duvidaOportunidade})` },
             { key: "critico", label: `Críticos (${kpis.criticos})` },
             { key: "alto", label: `Alto risco (${kpis.altos})` },
             { key: "negativo", label: `Negativos (${kpis.negativos})` },
@@ -299,8 +317,8 @@ export default function ComentariosInstagram() {
                       )}
                       {/* Categoria */}
                       {comment.categoria && (
-                        <Badge variant="outline" className="text-xs gap-1">
-                          {CATEGORIA_ICON[comment.categoria]} {comment.categoria}
+                        <Badge variant={comment.categoria === "duvida_oportunidade" ? "default" : "outline"} className={`text-xs gap-1 ${comment.categoria === "duvida_oportunidade" ? "bg-blue-100 text-blue-800 border-blue-300" : ""}`}>
+                          {CATEGORIA_ICON[comment.categoria]} {CATEGORIA_LABEL[comment.categoria] ?? comment.categoria}
                         </Badge>
                       )}
                       {comment.respondido && (
