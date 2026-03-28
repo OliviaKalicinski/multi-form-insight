@@ -1017,6 +1017,7 @@ export type Database = {
       instagram_comments: {
         Row: {
           categoria: string | null
+          classified_at: string | null
           created_at: string | null
           id: string
           media_caption: string | null
@@ -1037,6 +1038,7 @@ export type Database = {
         }
         Insert: {
           categoria?: string | null
+          classified_at?: string | null
           created_at?: string | null
           id: string
           media_caption?: string | null
@@ -1057,6 +1059,7 @@ export type Database = {
         }
         Update: {
           categoria?: string | null
+          classified_at?: string | null
           created_at?: string | null
           id?: string
           media_caption?: string | null

@@ -1,0 +1,1 @@
+ALTER TABLE instagram_comments ADD COLUMN classified_at timestamptz;
