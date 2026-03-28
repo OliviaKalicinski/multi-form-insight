@@ -111,6 +111,20 @@ interface AutoSuggestion {
   checked: boolean;
 }
 
+interface CpfMatch {
+  /** email da influenciadora no cadastro */
+  email: string;
+  /** nome no cadastro */
+  registryName: string;
+  /** nome como aparece na NF */
+  nfName: string;
+  /** CPF da NF */
+  cpf: string;
+  /** CPF já estava salvo no cadastro? */
+  alreadySaved: boolean;
+  checked: boolean;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function parseInfluencerCSV(raw: string): Influencer[] {
   const result = Papa.parse<InfluencerRaw>(raw, { header: true, skipEmptyLines: true });
@@ -209,6 +223,26 @@ function buildStatsFromPerf(rows: SaleRow[]): Map<string, InfluencerStats> {
     s.avg_ticket = s.total_orders > 0 ? s.gmv / s.total_orders : 0;
   }
   return map;
+}
+
+/** Normaliza string para comparação: minúsculas, sem acentos, sem espaços duplos */
+function normalizeName(s: string): string {
+  return s.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * Verifica se o nome da NF bate com o nome do cadastro.
+ * Usa match parcial: todas as partes significativas (≥3 chars) do nome da NF
+ * devem aparecer no nome do cadastro.
+ */
+function nameMatches(nfName: string, registryName: string): boolean {
+  const normNF  = normalizeName(nfName);
+  const normReg = normalizeName(registryName);
+  if (normNF === normReg) return true;
+  const parts = normNF.split(" ").filter((p) => p.length >= 3);
+  return parts.length >= 2 && parts.every((p) => normReg.includes(p));
 }
 
 /** "texto qualquer" → ["texto", "qualquer"] — sem acentos, sem símbolos */
@@ -427,6 +461,10 @@ export default function CadastroInfluenciadores() {
 
   // Auto-link dialog state
   const [autoLinkOpen, setAutoLinkOpen] = useState(false);
+
+  // CPF import dialog state
+  const [cpfImportOpen, setCpfImportOpen] = useState(false);
+  const [cpfMatches, setCpfMatches] = useState<CpfMatch[]>([]);
   const [suggestions, setSuggestions] = useState<AutoSuggestion[]>([]);
   const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
 
@@ -507,6 +545,21 @@ export default function CadastroInfluenciadores() {
     },
   });
 
+  // Mutation: Save CPFs from NF cross-reference
+  const saveCpfsMutation = useMutation({
+    mutationFn: async (updates: Array<{ email: string; cpf: string }>) => {
+      for (const { email, cpf } of updates) {
+        const { error } = await (supabase.from("influencer_registry") as any)
+          .update({ cpf })
+          .eq("email", email);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer-registry"] });
+    },
+  });
+
   // Mutation: Clear registry
   const clearMutation = useMutation({
     mutationFn: async () => {
@@ -568,6 +621,49 @@ export default function CadastroInfluenciadores() {
     setSuggestions([...matched, ...unmatched]);
     setManualLinks({});
     setAutoLinkOpen(true);
+  };
+
+  // Open CPF import dialog — cruza NFs de bonificação com o cadastro pelo nome
+  const openCpfImport = async () => {
+    // Busca NFs com CPF disponível
+    const { data: nfRows, error } = await supabase
+      .from("sales_data")
+      .select("cliente_nome, cliente_email, cpf_cnpj")
+      .eq("tipo_movimento", "bonificacao")
+      .not("cpf_cnpj", "is", null);
+
+    if (error || !nfRows) return;
+
+    // Constrói mapa cpfNorm → { nfName, cpf } — desduplicado
+    const cpfMap = new Map<string, { nfName: string; cpf: string }>();
+    for (const row of nfRows as any[]) {
+      const cpf = (row.cpf_cnpj as string | null)?.trim();
+      const nome = (row.cliente_nome as string | null)?.trim();
+      if (!cpf || !nome) continue;
+      const norm = cpf.replace(/\D/g, "");
+      if (norm && !cpfMap.has(norm)) cpfMap.set(norm, { nfName: nome, cpf });
+    }
+
+    // Cruza com o cadastro pelo nome
+    const matches: CpfMatch[] = [];
+    for (const [norm, { nfName, cpf }] of cpfMap.entries()) {
+      for (const inf of influencersData) {
+        if (!nameMatches(nfName, inf.name)) continue;
+        const alreadySaved = !!inf.cpf && inf.cpf.replace(/\D/g, "") === norm;
+        matches.push({
+          email: inf.email,
+          registryName: inf.name,
+          nfName,
+          cpf,
+          alreadySaved,
+          checked: !alreadySaved, // pré-seleciona só os novos
+        });
+        break; // uma influenciadora por CPF
+      }
+    }
+
+    setCpfMatches(matches);
+    setCpfImportOpen(true);
   };
 
   // Confirm and save auto-link
@@ -673,6 +769,11 @@ export default function CadastroInfluenciadores() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {influencersData.length > 0 && (
+            <Button variant="outline" size="sm" onClick={openCpfImport}>
+              <User className="h-4 w-4 mr-1" /> Importar CPFs das NFs
+            </Button>
+          )}
           {influencersData.length > 0 && availableCoupons.length > 0 && (
             <Button variant="outline" size="sm" onClick={openAutoLink}>
               <Zap className="h-4 w-4 mr-1" /> Vincular automaticamente
@@ -875,6 +976,85 @@ export default function CadastroInfluenciadores() {
           </Card>
         </>
       )}
+
+      {/* ── CPF Import Dialog ────────────────────────────────────────────────── */}
+      <Dialog open={cpfImportOpen} onOpenChange={setCpfImportOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Importar CPFs das NFs de bonificação</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              O sistema cruzou os nomes das NFs de bonificação com o cadastro.
+              Confirme os vínculos para salvar os CPFs — após isso, as NFs passam a casar automaticamente.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            {cpfMatches.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Nenhum CPF encontrado nas NFs que corresponda a uma influenciadora do cadastro.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-2 px-2 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide border-b">
+                  <span>Nome na NF</span>
+                  <span>Cadastro</span>
+                  <span>CPF</span>
+                </div>
+                {cpfMatches.map((m, idx) => (
+                  <div
+                    key={m.email}
+                    className={`grid grid-cols-3 gap-2 items-center p-2 rounded-lg border text-sm ${
+                      m.alreadySaved ? "bg-muted/30 opacity-60" : "bg-green-50/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {!m.alreadySaved && (
+                        <Checkbox
+                          checked={m.checked}
+                          onCheckedChange={(v) =>
+                            setCpfMatches((prev) =>
+                              prev.map((x, i) => i === idx ? { ...x, checked: !!v } : x)
+                            )
+                          }
+                        />
+                      )}
+                      <span className={m.alreadySaved ? "ml-6" : ""}>{m.nfName}</span>
+                    </div>
+                    <span className="text-muted-foreground truncate">{m.registryName}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs">{m.cpf}</span>
+                      {m.alreadySaved && (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-muted-foreground pt-1">
+                  {cpfMatches.filter((m) => m.alreadySaved).length} já salvos ·{" "}
+                  {cpfMatches.filter((m) => !m.alreadySaved && m.checked).length} novos selecionados
+                </p>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCpfImportOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                const updates = cpfMatches
+                  .filter((m) => m.checked && !m.alreadySaved)
+                  .map((m) => ({ email: m.email, cpf: m.cpf }));
+                if (updates.length > 0) saveCpfsMutation.mutate(updates);
+                setCpfImportOpen(false);
+              }}
+              disabled={saveCpfsMutation.isPending || cpfMatches.filter((m) => m.checked && !m.alreadySaved).length === 0}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Salvar {cpfMatches.filter((m) => m.checked && !m.alreadySaved).length} CPF(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Auto-link Dialog ─────────────────────────────────────────────────── */}
       <Dialog open={autoLinkOpen} onOpenChange={setAutoLinkOpen}>
