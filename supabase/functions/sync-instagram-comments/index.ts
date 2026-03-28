@@ -19,6 +19,36 @@ async function metaGet(path: string, token: string, params: Record<string, strin
   return data;
 }
 
+/** Busca paginada: segue cursores até acabar ou atingir maxPages */
+async function metaGetAll(
+  path: string,
+  token: string,
+  params: Record<string, string>,
+  maxPages: number,
+): Promise<any[]> {
+  const all: any[] = [];
+  let nextUrl: string | null = null;
+  let page = 0;
+
+  // Primeira página
+  const first = await metaGet(path, token, params);
+  all.push(...(first.data ?? []));
+  nextUrl = first.paging?.next ?? null;
+  page++;
+
+  // Páginas seguintes via cursor
+  while (nextUrl && page < maxPages) {
+    const res = await fetch(nextUrl);
+    const data = await res.json();
+    if (data.error) break;
+    all.push(...(data.data ?? []));
+    nextUrl = data.paging?.next ?? null;
+    page++;
+  }
+
+  return all;
+}
+
 async function classifyComment(text: string, anthropicKey: string): Promise<{
   sentimento: string; categoria: string; risco: string; risco_motivo: string;
 }> {
@@ -64,7 +94,6 @@ Risco "baixo": tudo mais.`,
   try {
     return JSON.parse(raw);
   } catch {
-    // fallback sem classified_at — será reclassificado na próxima sync
     return { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
   }
 }
@@ -86,59 +115,77 @@ Deno.serve(async (req) => {
     if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY não configurado");
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    const fetchAll = body.fetch_all ?? false;
     const limit = body.limit ?? 50;
 
-    // 1. Busca posts recentes
-    const mediasData = await metaGet(`${IG_ACCOUNT_ID}/media`, META_TOKEN, {
-      fields: "id,caption,media_url,permalink,timestamp,media_type",
-      limit: String(limit),
-    });
+    // 1. Busca posts — paginado se fetch_all=true
+    let posts: any[];
+    if (fetchAll) {
+      // Busca até 10 páginas de 50 posts = 500 posts max
+      posts = await metaGetAll(`${IG_ACCOUNT_ID}/media`, META_TOKEN, {
+        fields: "id,caption,media_url,permalink,timestamp,media_type",
+        limit: "50",
+      }, 10);
+    } else {
+      const mediasData = await metaGet(`${IG_ACCOUNT_ID}/media`, META_TOKEN, {
+        fields: "id,caption,media_url,permalink,timestamp,media_type",
+        limit: String(limit),
+      });
+      posts = mediasData.data ?? [];
+    }
 
-    const posts = mediasData.data ?? [];
-    console.log(`Encontrados ${posts.length} posts`);
+    console.log(`Encontrados ${posts.length} posts (fetch_all=${fetchAll})`);
 
     let totalComments = 0, classified = 0, skipped = 0, errors = 0;
 
     for (const post of posts) {
       // 2. Busca comentários de cada post
-      let commentsData;
+      let allComments: any[];
       try {
-        commentsData = await metaGet(`${post.id}/comments`, META_TOKEN, {
-          fields: "id,text,username,timestamp,replies{id,text,username,timestamp}",
-          limit: "100",
-        });
+        if (fetchAll) {
+          // Pagina comentários também
+          allComments = await metaGetAll(`${post.id}/comments`, META_TOKEN, {
+            fields: "id,text,username,timestamp,replies{id,text,username,timestamp}",
+            limit: "100",
+          }, 5);
+        } else {
+          const commentsData = await metaGet(`${post.id}/comments`, META_TOKEN, {
+            fields: "id,text,username,timestamp,replies{id,text,username,timestamp}",
+            limit: "100",
+          });
+          allComments = commentsData.data ?? [];
+        }
       } catch (e: any) {
         console.error(`Erro ao buscar comentários do post ${post.id}: ${e.message}`);
         errors++;
         continue;
       }
 
-      const comments = commentsData.data ?? [];
-
-      for (const comment of comments) {
+      for (const comment of allComments) {
         totalComments++;
 
-        // Verifica se já foi classificado de verdade (classified_at preenchido)
+        // Verifica se já foi classificado
         const { data: existing } = await (supabase as any)
           .from("instagram_comments")
           .select("id, respondido, classified_at")
           .eq("id", comment.id)
           .single();
 
-        if (existing?.classified_at) { skipped++; continue; } // já classificado pela IA — pula
+        if (existing?.classified_at) { skipped++; continue; }
 
         // Classifica com Claude
         let classification = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
         let classifiedAt: string | null = null;
         try {
           classification = await classifyComment(comment.text, ANTHROPIC_KEY);
-          classifiedAt = new Date().toISOString(); // só seta se Anthropic retornou com sucesso
+          classifiedAt = new Date().toISOString();
           classified++;
         } catch (e: any) {
           console.error(`Erro ao classificar: ${e.message}`);
+          errors++;
         }
 
-        // Salva no banco — preserva respondido existente, só seta classified_at se classificou
+        // Salva no banco
         const row: any = {
           id: comment.id,
           media_id: post.id,
