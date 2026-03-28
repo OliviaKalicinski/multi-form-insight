@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,15 +13,28 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  Plus, Pencil, Trash2, CheckCircle2, XCircle, Clock, MinusCircle, CalendarDays,
+  Plus, Pencil, Trash2, CheckCircle2, XCircle, Clock, MinusCircle,
+  CalendarDays, Paperclip, Download, FileText, X as IconX,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DeptStatus = "pending" | "approved" | "rejected" | "not_required";
+type DeptStatus    = "pending" | "approved" | "rejected" | "not_required";
 type OverallStatus = "pending" | "approved" | "rejected";
+
+interface Category {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start_date: string;
+}
 
 interface BudgetRequest {
   id: string;
@@ -29,6 +42,7 @@ interface BudgetRequest {
   description: string | null;
   value: number;
   request_date: string;
+  event_date: string | null;
   deadline_date: string;
   justification: string | null;
   calendar_event_id: string | null;
@@ -47,10 +61,13 @@ interface BudgetRequest {
   created_at: string;
 }
 
-interface CalendarEvent {
+interface Attachment {
   id: string;
-  title: string;
-  start_date: string;
+  budget_id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  created_at: string;
 }
 
 interface BudgetForm {
@@ -58,9 +75,13 @@ interface BudgetForm {
   description: string;
   value: string;
   request_date: string;
-  deadline_date: string;
+  event_date: string;         // quando o evento acontece
+  deadline_date: string;      // prazo para aprovação do orçamento
   justification: string;
-  calendar_event_id: string;
+  // Calendar integration
+  create_calendar_event: boolean;
+  calendar_category_id: string;
+  // Dept approvals
   needs_financial: boolean;
   needs_operations: boolean;
   needs_marketing: boolean;
@@ -81,27 +102,22 @@ const EMPTY_FORM: BudgetForm = {
   description: "",
   value: "",
   request_date: today,
+  event_date: "",
   deadline_date: "",
   justification: "",
-  calendar_event_id: "",
+  create_calendar_event: true,
+  calendar_category_id: "",
   needs_financial: true,
   needs_operations: false,
   needs_marketing: false,
 };
 
-const EMPTY_NOTES: ApprovalNotes = {
-  financial: "",
-  operations: "",
-  marketing: "",
-};
+const EMPTY_NOTES: ApprovalNotes = { financial: "", operations: "", marketing: "" };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
 function formatDate(dateStr: string): string {
@@ -109,11 +125,13 @@ function formatDate(dateStr: string): string {
 }
 
 function formatDateLong(dateStr: string): string {
-  return format(
-    new Date(dateStr.slice(0, 10) + "T12:00"),
-    "dd 'de' MMMM 'de' yyyy",
-    { locale: ptBR }
-  );
+  return format(new Date(dateStr.slice(0, 10) + "T12:00"), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024)              return `${bytes} B`;
+  if (bytes < 1024 * 1024)       return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function computeStatus(b: BudgetRequest): OverallStatus {
@@ -122,7 +140,6 @@ function computeStatus(b: BudgetRequest): OverallStatus {
     b.needs_operations ? b.operations_status : "not_required",
     b.needs_marketing  ? b.marketing_status  : "not_required",
   ].filter((s) => s !== "not_required");
-
   if (statuses.length === 0) return "pending";
   if (statuses.some((s) => s === "rejected")) return "rejected";
   if (statuses.every((s) => s === "approved")) return "approved";
@@ -142,22 +159,10 @@ function isDeadlinePast(dateStr: string): boolean {
 
 function OverallBadge({ status }: { status: OverallStatus }) {
   if (status === "approved")
-    return (
-      <Badge className="bg-green-100 text-green-800 border border-green-200 hover:bg-green-100">
-        Aprovado
-      </Badge>
-    );
+    return <Badge className="bg-green-100 text-green-800 border border-green-200 hover:bg-green-100">Aprovado</Badge>;
   if (status === "rejected")
-    return (
-      <Badge className="bg-red-100 text-red-800 border border-red-200 hover:bg-red-100">
-        Reprovado
-      </Badge>
-    );
-  return (
-    <Badge className="bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-100">
-      Pendente
-    </Badge>
-  );
+    return <Badge className="bg-red-100 text-red-800 border border-red-200 hover:bg-red-100">Reprovado</Badge>;
+  return <Badge className="bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-100">Pendente</Badge>;
 }
 
 function DeptIcon({ status }: { status: DeptStatus }) {
@@ -175,9 +180,7 @@ function DeptChip({ label, status }: { label: string; status: DeptStatus }) {
     not_required: "bg-muted/30 text-muted-foreground border-muted",
   };
   return (
-    <span
-      className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium ${cls[status]}`}
-    >
+    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium ${cls[status]}`}>
       <DeptIcon status={status} />
       {label}
     </span>
@@ -187,30 +190,22 @@ function DeptChip({ label, status }: { label: string; status: DeptStatus }) {
 // ─── Dept approval section ────────────────────────────────────────────────────
 
 interface DeptSectionProps {
-  budgetId: string;
-  needed: boolean;
-  status: DeptStatus;
-  notes: string | null;
-  approvedAt: string | null;
-  label: string;
-  dept: "financial" | "operations" | "marketing";
+  budgetId:     string;
+  needed:       boolean;
+  status:       DeptStatus;
+  notes:        string | null;
+  approvedAt:   string | null;
+  label:        string;
+  dept:         "financial" | "operations" | "marketing";
   approvalNote: string;
   onNoteChange: (v: string) => void;
-  onApprove: (dept: "financial" | "operations" | "marketing", action: "approved" | "rejected") => void;
-  isPending: boolean;
+  onApprove:    (dept: "financial" | "operations" | "marketing", action: "approved" | "rejected") => void;
+  isPending:    boolean;
 }
 
 function DeptApprovalSection({
-  needed,
-  status,
-  notes,
-  approvedAt,
-  label,
-  dept,
-  approvalNote,
-  onNoteChange,
-  onApprove,
-  isPending,
+  needed, status, notes, approvedAt, label, dept,
+  approvalNote, onNoteChange, onApprove, isPending,
 }: DeptSectionProps) {
   if (!needed) {
     return (
@@ -221,7 +216,6 @@ function DeptApprovalSection({
       </div>
     );
   }
-
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -229,18 +223,15 @@ function DeptApprovalSection({
         <span className="text-sm font-medium">{label}</span>
         {(status === "approved" || status === "rejected") && approvedAt && (
           <span className="text-xs text-muted-foreground ml-auto">
-            {status === "approved" ? "Aprovado" : "Reprovado"} em{" "}
-            {formatDate(approvedAt)}
+            {status === "approved" ? "Aprovado" : "Reprovado"} em {formatDate(approvedAt)}
           </span>
         )}
       </div>
-
       {notes && (
         <p className="text-xs text-muted-foreground bg-muted/30 rounded px-3 py-2 ml-6 whitespace-pre-wrap">
           {notes}
         </p>
       )}
-
       {status === "pending" && (
         <div className="ml-6 space-y-2">
           <textarea
@@ -258,12 +249,7 @@ function DeptApprovalSection({
             >
               <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Aprovar
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => onApprove(dept, "rejected")}
-              disabled={isPending}
-            >
+            <Button size="sm" variant="destructive" onClick={() => onApprove(dept, "rejected")} disabled={isPending}>
               <XCircle className="h-3.5 w-3.5 mr-1" /> Reprovar
             </Button>
           </div>
@@ -277,6 +263,7 @@ function DeptApprovalSection({
 
 export default function OrcamentosAprovacao() {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [tab, setTab]             = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [formOpen, setFormOpen]   = useState(false);
@@ -285,10 +272,7 @@ export default function OrcamentosAprovacao() {
   const [form, setForm]           = useState<BudgetForm>(EMPTY_FORM);
   const [approvalNotes, setApprovalNotes] = useState<ApprovalNotes>(EMPTY_NOTES);
 
-  // Reset approval notes when switching detail
-  useEffect(() => {
-    setApprovalNotes(EMPTY_NOTES);
-  }, [detailId]);
+  useEffect(() => { setApprovalNotes(EMPTY_NOTES); }, [detailId]);
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -296,8 +280,17 @@ export default function OrcamentosAprovacao() {
     queryKey: ["budget-requests"],
     queryFn: async () => {
       const { data, error } = await (supabase.from("budget_requests") as any)
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["marketing-categories"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("marketing_categories") as any)
+        .select("*").order("name", { ascending: true });
       if (error) throw error;
       return data || [];
     },
@@ -307,30 +300,65 @@ export default function OrcamentosAprovacao() {
     queryKey: ["marketing-calendar-all"],
     queryFn: async () => {
       const { data, error } = await (supabase.from("marketing_calendar") as any)
-        .select("id, title, start_date")
-        .order("start_date", { ascending: true });
+        .select("id, title, start_date").order("start_date", { ascending: true });
       if (error) throw error;
       return data || [];
     },
   });
 
-  const calEventMap = new Map<string, CalendarEvent>(
-    calEvents.map((e) => [e.id, e])
-  );
+  const { data: attachments = [] } = useQuery<Attachment[]>({
+    queryKey: ["budget-attachments", detailId],
+    enabled: !!detailId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("budget_attachments") as any)
+        .select("*").eq("budget_id", detailId).order("created_at", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Auto-select first category when form opens and no category is set
+  useEffect(() => {
+    if (formOpen && !editingId && categories.length > 0 && !form.calendar_category_id) {
+      setForm((f) => ({ ...f, calendar_category_id: categories[0].id }));
+    }
+  }, [formOpen, categories]);
+
+  const calEventMap = new Map<string, CalendarEvent>(calEvents.map((e) => [e.id, e]));
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
     mutationFn: async (f: BudgetForm) => {
       const value = parseFloat(f.value.replace(",", "."));
+
+      // 1. Optionally create calendar event first
+      let calEventId: string | null = null;
+      if (f.create_calendar_event && f.calendar_category_id) {
+        const { data: evtData, error: evtErr } = await (supabase.from("marketing_calendar") as any)
+          .insert({
+            title:       f.title,
+            description: f.description || null,
+            start_date:  f.event_date || f.request_date,
+            end_date:    f.event_date || f.deadline_date,
+            category_id: f.calendar_category_id,
+          })
+          .select("id")
+          .single();
+        if (evtErr) throw evtErr;
+        calEventId = evtData.id;
+      }
+
+      // 2. Create budget linked to the new event
       const { error } = await (supabase.from("budget_requests") as any).insert({
         title:             f.title,
         description:       f.description  || null,
         value,
         request_date:      f.request_date,
+        event_date:        f.event_date   || null,
         deadline_date:     f.deadline_date,
         justification:     f.justification || null,
-        calendar_event_id: f.calendar_event_id || null,
+        calendar_event_id: calEventId,
         needs_financial:   f.needs_financial,
         needs_operations:  f.needs_operations,
         needs_marketing:   f.needs_marketing,
@@ -342,6 +370,8 @@ export default function OrcamentosAprovacao() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["marketing-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
       closeForm();
     },
   });
@@ -351,14 +381,38 @@ export default function OrcamentosAprovacao() {
       const value   = parseFloat(f.value.replace(",", "."));
       const current = budgets.find((b) => b.id === id);
 
-      const resolveStatus = (
-        needed: boolean,
-        currentStatus: DeptStatus | undefined
-      ): DeptStatus => {
+      const resolveStatus = (needed: boolean, cur: DeptStatus | undefined): DeptStatus => {
         if (!needed) return "not_required";
-        if (currentStatus === "not_required") return "pending";
-        return currentStatus ?? "pending";
+        if (cur === "not_required") return "pending";
+        return cur ?? "pending";
       };
+
+      let calEventId = current?.calendar_event_id || null;
+
+      // Sync title + dates to existing calendar event
+      if (calEventId) {
+        await (supabase.from("marketing_calendar") as any)
+          .update({
+            title:      f.title,
+            start_date: f.event_date || f.request_date,
+            end_date:   f.event_date || f.deadline_date,
+          })
+          .eq("id", calEventId);
+      } else if (f.create_calendar_event && f.calendar_category_id) {
+        // Create new event if user opted in during edit
+        const { data: evtData, error: evtErr } = await (supabase.from("marketing_calendar") as any)
+          .insert({
+            title:       f.title,
+            description: f.description || null,
+            start_date:  f.event_date || f.request_date,
+            end_date:    f.event_date || f.deadline_date,
+            category_id: f.calendar_category_id,
+          })
+          .select("id")
+          .single();
+        if (evtErr) throw evtErr;
+        calEventId = evtData.id;
+      }
 
       const { error } = await (supabase.from("budget_requests") as any)
         .update({
@@ -366,9 +420,10 @@ export default function OrcamentosAprovacao() {
           description:       f.description  || null,
           value,
           request_date:      f.request_date,
+          event_date:        f.event_date   || null,
           deadline_date:     f.deadline_date,
           justification:     f.justification || null,
-          calendar_event_id: f.calendar_event_id || null,
+          calendar_event_id: calEventId,
           needs_financial:   f.needs_financial,
           needs_operations:  f.needs_operations,
           needs_marketing:   f.needs_marketing,
@@ -381,15 +436,15 @@ export default function OrcamentosAprovacao() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["marketing-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
       closeForm();
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("budget_requests") as any)
-        .delete()
-        .eq("id", id);
+      const { error } = await (supabase.from("budget_requests") as any).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -400,51 +455,73 @@ export default function OrcamentosAprovacao() {
 
   const approveMutation = useMutation({
     mutationFn: async ({
-      id,
-      dept,
-      action,
-      notes,
-    }: {
-      id: string;
-      dept: "financial" | "operations" | "marketing";
-      action: "approved" | "rejected";
-      notes: string;
-    }) => {
+      id, dept, action, notes,
+    }: { id: string; dept: "financial" | "operations" | "marketing"; action: "approved" | "rejected"; notes: string }) => {
       const { error } = await (supabase.from("budget_requests") as any)
         .update({
-          [`${dept}_status`]:      action,
-          [`${dept}_notes`]:       notes.trim() || null,
-          [`${dept}_approved_at`]: new Date().toISOString(),
+          [`${dept}_status`]:       action,
+          [`${dept}_notes`]:        notes.trim() || null,
+          [`${dept}_approved_at`]:  new Date().toISOString(),
         })
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["budget-requests"] }),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async ({ budgetId, file }: { budgetId: string; file: File }) => {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path     = `${budgetId}/${Date.now()}-${safeName}`;
+
+      const { error: storageErr } = await supabase.storage
+        .from("budget-attachments")
+        .upload(path, file);
+      if (storageErr) throw storageErr;
+
+      const { error: dbErr } = await (supabase.from("budget_attachments") as any).insert({
+        budget_id: budgetId,
+        file_name: file.name,
+        file_path: path,
+        file_size: file.size,
+      });
+      if (dbErr) throw dbErr;
     },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] }),
+  });
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: async ({ id, path }: { id: string; path: string }) => {
+      await supabase.storage.from("budget-attachments").remove([path]);
+      const { error } = await (supabase.from("budget_attachments") as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] }),
   });
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const openCreate = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, calendar_category_id: categories[0]?.id || "" });
     setFormOpen(true);
   };
 
   const openEdit = (b: BudgetRequest) => {
     setEditingId(b.id);
     setForm({
-      title:             b.title,
-      description:       b.description  || "",
-      value:             b.value.toString(),
-      request_date:      b.request_date,
-      deadline_date:     b.deadline_date,
-      justification:     b.justification || "",
-      calendar_event_id: b.calendar_event_id || "",
-      needs_financial:   b.needs_financial,
-      needs_operations:  b.needs_operations,
-      needs_marketing:   b.needs_marketing,
+      title:                 b.title,
+      description:           b.description  || "",
+      value:                 b.value.toString(),
+      request_date:          b.request_date,
+      event_date:            b.event_date   || "",
+      deadline_date:         b.deadline_date,
+      justification:         b.justification || "",
+      create_calendar_event: false,   // shown differently when already linked
+      calendar_category_id:  "",
+      needs_financial:       b.needs_financial,
+      needs_operations:      b.needs_operations,
+      needs_marketing:       b.needs_marketing,
     });
     setFormOpen(true);
   };
@@ -469,27 +546,38 @@ export default function OrcamentosAprovacao() {
     deleteMutation.mutate(id);
   };
 
-  const handleApprove = (
-    id: string,
-    dept: "financial" | "operations" | "marketing",
-    action: "approved" | "rejected"
-  ) => {
+  const handleApprove = (id: string, dept: "financial" | "operations" | "marketing", action: "approved" | "rejected") => {
     approveMutation.mutate({ id, dept, action, notes: approvalNotes[dept] });
-    setApprovalNotes((prev) => ({ ...prev, [dept]: "" }));
+    setApprovalNotes((p) => ({ ...p, [dept]: "" }));
   };
 
-  // ── Filtered budgets ───────────────────────────────────────────────────────
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!detailId || files.length === 0) return;
+    files.forEach((file) => uploadMutation.mutate({ budgetId: detailId, file }));
+    e.target.value = "";
+  };
+
+  function getPublicUrl(path: string): string {
+    const { data } = supabase.storage.from("budget-attachments").getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  // ── Derived ────────────────────────────────────────────────────────────────
 
   const filtered = budgets.filter((b) => {
     if (tab === "all") return true;
     return computeStatus(b) === tab;
   });
 
-  const countByStatus = (s: OverallStatus) =>
-    budgets.filter((b) => computeStatus(b) === s).length;
+  const countByStatus = (s: OverallStatus) => budgets.filter((b) => computeStatus(b) === s).length;
 
   const detailBudget = budgets.find((b) => b.id === detailId) ?? null;
   const isPending    = createMutation.isPending || updateMutation.isPending;
+
+  // The budget being edited — used to check if already linked to calendar
+  const editingBudget = editingId ? budgets.find((b) => b.id === editingId) : null;
+  const editingHasEvent = !!editingBudget?.calendar_event_id;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -513,28 +601,16 @@ export default function OrcamentosAprovacao() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
         <TabsList>
           <TabsTrigger value="all">
-            Todos
-            <span className="ml-1.5 text-[10px] bg-muted rounded px-1.5 py-0.5">
-              {budgets.length}
-            </span>
+            Todos <span className="ml-1.5 text-[10px] bg-muted rounded px-1.5 py-0.5">{budgets.length}</span>
           </TabsTrigger>
           <TabsTrigger value="pending">
-            Pendentes
-            <span className="ml-1.5 text-[10px] bg-muted rounded px-1.5 py-0.5">
-              {countByStatus("pending")}
-            </span>
+            Pendentes <span className="ml-1.5 text-[10px] bg-muted rounded px-1.5 py-0.5">{countByStatus("pending")}</span>
           </TabsTrigger>
           <TabsTrigger value="approved">
-            Aprovados
-            <span className="ml-1.5 text-[10px] bg-muted rounded px-1.5 py-0.5">
-              {countByStatus("approved")}
-            </span>
+            Aprovados <span className="ml-1.5 text-[10px] bg-muted rounded px-1.5 py-0.5">{countByStatus("approved")}</span>
           </TabsTrigger>
           <TabsTrigger value="rejected">
-            Reprovados
-            <span className="ml-1.5 text-[10px] bg-muted rounded px-1.5 py-0.5">
-              {countByStatus("rejected")}
-            </span>
+            Reprovados <span className="ml-1.5 text-[10px] bg-muted rounded px-1.5 py-0.5">{countByStatus("rejected")}</span>
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -547,12 +623,10 @@ export default function OrcamentosAprovacao() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((b) => {
-            const status    = computeStatus(b);
-            const near      = isDeadlineNear(b.deadline_date);
-            const past      = isDeadlinePast(b.deadline_date);
-            const calEvent  = b.calendar_event_id
-              ? calEventMap.get(b.calendar_event_id)
-              : null;
+            const status   = computeStatus(b);
+            const near     = isDeadlineNear(b.deadline_date);
+            const past     = isDeadlinePast(b.deadline_date);
+            const calEvent = b.calendar_event_id ? calEventMap.get(b.calendar_event_id) : null;
 
             return (
               <div
@@ -560,39 +634,26 @@ export default function OrcamentosAprovacao() {
                 className="border rounded-xl p-4 bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow space-y-3"
                 onClick={() => setDetailId(b.id)}
               >
-                {/* Title + status */}
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-sm leading-snug line-clamp-2 flex-1">
-                    {b.title}
-                  </h3>
+                  <h3 className="font-semibold text-sm leading-snug line-clamp-2 flex-1">{b.title}</h3>
                   <OverallBadge status={status} />
                 </div>
 
-                {/* Value */}
                 <p className="text-xl font-bold">{formatCurrency(b.value)}</p>
 
-                {/* Dates */}
                 <div className="text-xs text-muted-foreground space-y-0.5">
-                  <div>Entrada: {formatDate(b.request_date)}</div>
-                  <div
-                    className={
-                      past && status !== "approved"
-                        ? "text-red-600 font-medium"
-                        : near && status !== "approved"
-                        ? "text-amber-600 font-medium"
-                        : ""
-                    }
-                  >
-                    Prazo: {formatDate(b.deadline_date)}
-                    {past && status !== "approved"
-                      ? " ⚠ Vencido"
-                      : near && status !== "approved"
-                      ? " ⚠ Próximo"
-                      : ""}
+                  {b.event_date && (
+                    <div className="font-medium text-foreground">
+                      Evento: {formatDate(b.event_date)}
+                    </div>
+                  )}
+                  <div className={past && status !== "approved" ? "text-red-600 font-medium" : near && status !== "approved" ? "text-amber-600 font-medium" : ""}>
+                    Aprovação até: {formatDate(b.deadline_date)}
+                    {past && status !== "approved" ? " ⚠ Vencido" : near && status !== "approved" ? " ⚠ Próximo" : ""}
                   </div>
+                  <div>Entrada: {formatDate(b.request_date)}</div>
                 </div>
 
-                {/* Calendar event link */}
                 {calEvent && (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <CalendarDays className="h-3.5 w-3.5 shrink-0" />
@@ -600,7 +661,6 @@ export default function OrcamentosAprovacao() {
                   </div>
                 )}
 
-                {/* Dept chips */}
                 <div className="flex flex-wrap gap-1.5">
                   {b.needs_financial  && <DeptChip label="Financeiro" status={b.financial_status} />}
                   {b.needs_operations && <DeptChip label="Operações"  status={b.operations_status} />}
@@ -617,32 +677,23 @@ export default function OrcamentosAprovacao() {
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {detailBudget && (() => {
             const status   = computeStatus(detailBudget);
-            const calEvent = detailBudget.calendar_event_id
-              ? calEventMap.get(detailBudget.calendar_event_id)
-              : null;
-            const past = isDeadlinePast(detailBudget.deadline_date);
-            const near = isDeadlineNear(detailBudget.deadline_date);
+            const calEvent = detailBudget.calendar_event_id ? calEventMap.get(detailBudget.calendar_event_id) : null;
+            const past     = isDeadlinePast(detailBudget.deadline_date);
+            const near     = isDeadlineNear(detailBudget.deadline_date);
 
             return (
               <div className="space-y-6 pt-2">
                 <SheetHeader>
                   <div className="flex items-start gap-2 pr-8">
-                    <SheetTitle className="leading-snug flex-1">
-                      {detailBudget.title}
-                    </SheetTitle>
+                    <SheetTitle className="leading-snug flex-1">{detailBudget.title}</SheetTitle>
                     <OverallBadge status={status} />
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEdit(detailBudget)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => openEdit(detailBudget)}>
                       <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
+                      variant="outline" size="sm"
                       className="text-destructive hover:text-destructive"
                       onClick={() => handleDelete(detailBudget.id)}
                       disabled={deleteMutation.isPending}
@@ -652,65 +703,48 @@ export default function OrcamentosAprovacao() {
                   </div>
                 </SheetHeader>
 
-                {/* Value */}
-                <p className="text-3xl font-bold">
-                  {formatCurrency(detailBudget.value)}
-                </p>
+                <p className="text-3xl font-bold">{formatCurrency(detailBudget.value)}</p>
 
-                {/* Dates */}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <div>
                     <p className="text-xs text-muted-foreground">Data de entrada</p>
                     <p className="font-medium">{formatDateLong(detailBudget.request_date)}</p>
                   </div>
+                  {detailBudget.event_date && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Data do evento</p>
+                      <p className="font-medium">{formatDateLong(detailBudget.event_date)}</p>
+                    </div>
+                  )}
                   <div>
-                    <p className="text-xs text-muted-foreground">Data limite</p>
-                    <p
-                      className={`font-medium ${
-                        past && status !== "approved"
-                          ? "text-red-600"
-                          : near && status !== "approved"
-                          ? "text-amber-600"
-                          : ""
-                      }`}
-                    >
+                    <p className="text-xs text-muted-foreground">Prazo da aprovação</p>
+                    <p className={`font-medium ${past && status !== "approved" ? "text-red-600" : near && status !== "approved" ? "text-amber-600" : ""}`}>
                       {formatDateLong(detailBudget.deadline_date)}
-                      {past && status !== "approved"
-                        ? " ⚠"
-                        : near && status !== "approved"
-                        ? " ⚠"
-                        : ""}
+                      {(past || near) && status !== "approved" ? " ⚠" : ""}
                     </p>
                   </div>
                 </div>
 
-                {/* Calendar event */}
                 {calEvent && (
                   <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-2.5">
                     <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Evento vinculado</p>
+                      <p className="text-xs text-muted-foreground">Evento no calendário</p>
                       <p className="text-sm font-medium">{calEvent.title}</p>
                     </div>
                   </div>
                 )}
 
-                {/* Description */}
                 {detailBudget.description && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1 font-medium uppercase tracking-wide">
-                      Descrição
-                    </p>
+                    <p className="text-xs text-muted-foreground mb-1 font-medium uppercase tracking-wide">Descrição</p>
                     <p className="text-sm whitespace-pre-wrap">{detailBudget.description}</p>
                   </div>
                 )}
 
-                {/* Justification */}
                 {detailBudget.justification && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1 font-medium uppercase tracking-wide">
-                      Justificativa
-                    </p>
+                    <p className="text-xs text-muted-foreground mb-1 font-medium uppercase tracking-wide">Justificativa</p>
                     <p className="text-sm whitespace-pre-wrap">{detailBudget.justification}</p>
                   </div>
                 )}
@@ -719,55 +753,89 @@ export default function OrcamentosAprovacao() {
 
                 {/* Approvals */}
                 <div className="space-y-4">
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Aprovações
-                  </h4>
-
-                  <DeptApprovalSection
-                    budgetId={detailBudget.id}
-                    dept="financial"
-                    label="💰 Financeiro"
-                    needed={detailBudget.needs_financial}
-                    status={detailBudget.financial_status}
-                    notes={detailBudget.financial_notes}
-                    approvedAt={detailBudget.financial_approved_at}
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aprovações</h4>
+                  <DeptApprovalSection budgetId={detailBudget.id} dept="financial"  label="💰 Financeiro"
+                    needed={detailBudget.needs_financial}   status={detailBudget.financial_status}
+                    notes={detailBudget.financial_notes}    approvedAt={detailBudget.financial_approved_at}
                     approvalNote={approvalNotes.financial}
                     onNoteChange={(v) => setApprovalNotes((p) => ({ ...p, financial: v }))}
-                    onApprove={(dept, action) => handleApprove(detailBudget.id, dept, action)}
+                    onApprove={(d, a) => handleApprove(detailBudget.id, d, a)}
                     isPending={approveMutation.isPending}
                   />
-
                   <Separator className="my-1" />
-
-                  <DeptApprovalSection
-                    budgetId={detailBudget.id}
-                    dept="operations"
-                    label="🚚 Operações"
-                    needed={detailBudget.needs_operations}
-                    status={detailBudget.operations_status}
-                    notes={detailBudget.operations_notes}
-                    approvedAt={detailBudget.operations_approved_at}
+                  <DeptApprovalSection budgetId={detailBudget.id} dept="operations" label="🚚 Operações"
+                    needed={detailBudget.needs_operations}  status={detailBudget.operations_status}
+                    notes={detailBudget.operations_notes}   approvedAt={detailBudget.operations_approved_at}
                     approvalNote={approvalNotes.operations}
                     onNoteChange={(v) => setApprovalNotes((p) => ({ ...p, operations: v }))}
-                    onApprove={(dept, action) => handleApprove(detailBudget.id, dept, action)}
+                    onApprove={(d, a) => handleApprove(detailBudget.id, d, a)}
                     isPending={approveMutation.isPending}
                   />
-
                   <Separator className="my-1" />
-
-                  <DeptApprovalSection
-                    budgetId={detailBudget.id}
-                    dept="marketing"
-                    label="📢 Marketing"
-                    needed={detailBudget.needs_marketing}
-                    status={detailBudget.marketing_status}
-                    notes={detailBudget.marketing_notes}
-                    approvedAt={detailBudget.marketing_approved_at}
+                  <DeptApprovalSection budgetId={detailBudget.id} dept="marketing"  label="📢 Marketing"
+                    needed={detailBudget.needs_marketing}   status={detailBudget.marketing_status}
+                    notes={detailBudget.marketing_notes}    approvedAt={detailBudget.marketing_approved_at}
                     approvalNote={approvalNotes.marketing}
                     onNoteChange={(v) => setApprovalNotes((p) => ({ ...p, marketing: v }))}
-                    onApprove={(dept, action) => handleApprove(detailBudget.id, dept, action)}
+                    onApprove={(d, a) => handleApprove(detailBudget.id, d, a)}
                     isPending={approveMutation.isPending}
                   />
+                </div>
+
+                <Separator />
+
+                {/* Attachments */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anexos</h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadMutation.isPending}
+                    >
+                      <Paperclip className="h-3.5 w-3.5 mr-1" />
+                      {uploadMutation.isPending ? "Enviando…" : "Adicionar"}
+                    </Button>
+                  </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+
+                  {attachments.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum arquivo anexado.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {attachments.map((att) => (
+                        <div key={att.id} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted/20 transition-colors">
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="flex-1 truncate font-medium text-xs">{att.file_name}</span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">{formatFileSize(att.file_size)}</span>
+                          <a
+                            href={getPublicUrl(att.file_path)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </a>
+                          <button
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => deleteAttachmentMutation.mutate({ id: att.id, path: att.file_path })}
+                            disabled={deleteAttachmentMutation.isPending}
+                          >
+                            <IconX className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -779,112 +847,102 @@ export default function OrcamentosAprovacao() {
       <Dialog open={formOpen} onOpenChange={(o) => !o && closeForm()}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>
-              {editingId ? "Editar orçamento" : "Novo orçamento"}
-            </DialogTitle>
+            <DialogTitle>{editingId ? "Editar orçamento" : "Novo orçamento"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-1 max-h-[72vh] overflow-y-auto pr-1">
 
             <div>
               <label className="text-xs font-medium text-muted-foreground">Título *</label>
-              <Input
-                className="mt-1"
-                placeholder="Ex: Campanha Dia das Mães"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-              />
+              <Input className="mt-1" placeholder="Ex: Campanha Dia das Mães"
+                value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             </div>
 
             <div>
               <label className="text-xs font-medium text-muted-foreground">Descrição</label>
-              <textarea
-                className="mt-1 w-full min-h-[64px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              <textarea className="mt-1 w-full min-h-[64px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="Descreva o que está sendo orçado"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
+                value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </div>
 
             <div>
               <label className="text-xs font-medium text-muted-foreground">Valor (R$) *</label>
-              <Input
-                className="mt-1"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0,00"
-                value={form.value}
-                onChange={(e) => setForm({ ...form, value: e.target.value })}
-              />
+              <Input className="mt-1" type="number" min="0" step="0.01" placeholder="0,00"
+                value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  Data de entrada *
-                </label>
-                <Input
-                  className="mt-1"
-                  type="date"
-                  value={form.request_date}
-                  onChange={(e) => setForm({ ...form, request_date: e.target.value })}
-                />
+                <label className="text-xs font-medium text-muted-foreground">Data de entrada *</label>
+                <Input className="mt-1" type="date" value={form.request_date}
+                  onChange={(e) => setForm({ ...form, request_date: e.target.value })} />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  Data limite *
-                </label>
-                <Input
-                  className="mt-1"
-                  type="date"
-                  min={form.request_date}
-                  value={form.deadline_date}
-                  onChange={(e) => setForm({ ...form, deadline_date: e.target.value })}
-                />
+                <label className="text-xs font-medium text-muted-foreground">Data do evento</label>
+                <Input className="mt-1" type="date" value={form.event_date}
+                  onChange={(e) => setForm({ ...form, event_date: e.target.value })} />
               </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Prazo da aprovação *</label>
+              <Input className="mt-1" type="date" min={form.request_date} value={form.deadline_date}
+                onChange={(e) => setForm({ ...form, deadline_date: e.target.value })} />
             </div>
 
             <div>
               <label className="text-xs font-medium text-muted-foreground">Justificativa</label>
-              <textarea
-                className="mt-1 w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              <textarea className="mt-1 w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="Por que esse investimento é necessário?"
-                value={form.justification}
-                onChange={(e) => setForm({ ...form, justification: e.target.value })}
-              />
+                value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} />
             </div>
 
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">
-                Evento do calendário (opcional)
-              </label>
-              <select
-                className="mt-1 w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                value={form.calendar_event_id}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setForm((f) => ({
-                    ...f,
-                    calendar_event_id: val,
-                    // auto-check Marketing when a calendar event is selected
-                    needs_marketing: val ? true : f.needs_marketing,
-                  }));
-                }}
-              >
-                <option value="">— Nenhum —</option>
-                {calEvents.map((evt) => (
-                  <option key={evt.id} value={evt.id}>
-                    {evt.title} ({formatDate(evt.start_date)})
-                  </option>
-                ))}
-              </select>
+            <Separator />
+
+            {/* Calendar integration */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Calendário de Marketing</p>
+              {editingHasEvent ? (
+                <div className="flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-2 text-sm">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>Evento vinculado — título e datas serão atualizados automaticamente.</span>
+                </div>
+              ) : (
+                <>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={form.create_calendar_event}
+                      onChange={(e) => setForm({ ...form, create_calendar_event: e.target.checked })}
+                      className="w-4 h-4 rounded border-input accent-primary" />
+                    <span className="text-sm">Criar evento no calendário</span>
+                  </label>
+                  {form.create_calendar_event && (
+                    <div className="ml-7">
+                      <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+                      <select
+                        className="mt-1 w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        value={form.calendar_category_id}
+                        onChange={(e) => setForm({ ...form, calendar_category_id: e.target.value })}
+                      >
+                        <option value="" disabled>Selecione a categoria</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                      {categories.length === 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Nenhuma categoria criada. Crie categorias no Calendário de Marketing primeiro.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
+            <Separator />
+
+            {/* Dept approvals */}
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-2">
-                Aprovações necessárias
-              </label>
+              <label className="text-xs font-medium text-muted-foreground block mb-2">Aprovações necessárias</label>
               <div className="space-y-2.5">
                 {(
                   [
@@ -894,12 +952,9 @@ export default function OrcamentosAprovacao() {
                   ] as const
                 ).map(({ key, label, hint }) => (
                   <label key={key} className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form[key]}
+                    <input type="checkbox" checked={form[key]}
                       onChange={(e) => setForm({ ...form, [key]: e.target.checked })}
-                      className="w-4 h-4 rounded border-input accent-primary"
-                    />
+                      className="w-4 h-4 rounded border-input accent-primary" />
                     <span className="text-sm">{label}</span>
                     <span className="text-xs text-muted-foreground">{hint}</span>
                   </label>
@@ -910,13 +965,13 @@ export default function OrcamentosAprovacao() {
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={closeForm}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={closeForm}>Cancelar</Button>
             <Button
               onClick={handleSubmit}
               disabled={
-                !form.title.trim() || !form.value || !form.deadline_date || isPending
+                !form.title.trim() || !form.value || !form.deadline_date ||
+                (form.create_calendar_event && !form.calendar_category_id && !editingHasEvent) ||
+                isPending
               }
             >
               {editingId ? "Salvar alterações" : "Criar orçamento"}
