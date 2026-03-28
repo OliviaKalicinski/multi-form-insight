@@ -1,20 +1,10 @@
 
 
-## Fix: Add missing `User` import in CadastroInfluenciadores.tsx
+## Fix: Normalize query key in PerformanceInfluenciadores.tsx
 
-**Problem:** The `User` icon from lucide-react is used in the component but not imported, causing a build error.
+**Problem:** The query key `["influencer_registry"]` in `PerformanceInfluenciadores.tsx` differs from `["influencer-registry"]` used in `CadastroInfluenciadores.tsx`. This means invalidating the cache after saving a CPF in Cadastro doesn't refresh the Performance page data.
 
-**Change:** In `src/pages/CadastroInfluenciadores.tsx`, line 19, add `User` after `Users` in the lucide-react import.
-
-**Before (line 19):**
-```
-  TrendingUp, Link2, Users, LinkIcon, Zap, CheckCircle2, AlertCircle,
-```
-
-**After:**
-```
-  TrendingUp, Link2, Users, User, LinkIcon, Zap, CheckCircle2, AlertCircle,
-```
+**Change:** In `src/pages/PerformanceInfluenciadores.tsx`, update the `queryKey` from `["influencer_registry"]` to `["influencer-registry"]`.
 
 Single-line change, no other files affected.
 
