@@ -1,5 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import Papa from "papaparse";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +14,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-// Select substituído por CouponInput inline
 import {
   Upload, Search, X, Instagram, Phone, Mail, MapPin, Building2,
   TrendingUp, Link2, Users, LinkIcon, Zap, CheckCircle2, AlertCircle,
@@ -56,6 +57,28 @@ interface Influencer {
     estado: string;
     cep: string;
   };
+  coupon: string | null;
+}
+
+interface InfluencerDBRow {
+  id?: string;
+  email: string;
+  name: string;
+  instagram: string;
+  tiktok: string;
+  whatsapp: string;
+  cnpj: string;
+  razao_social: string;
+  address_logradouro: string;
+  address_numero: string;
+  address_complemento: string;
+  address_bairro: string;
+  address_cidade: string;
+  address_estado: string;
+  address_cep: string;
+  coupon: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface SaleRow {
@@ -85,11 +108,6 @@ interface AutoSuggestion {
   checked: boolean;
 }
 
-// ─── Storage keys ─────────────────────────────────────────────────────────────
-const REGISTRY_KEY = "influencer_registry";
-const LINKS_KEY = "influencer_coupon_links";
-const PERF_KEY = "influencer_performance_csv";
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function parseInfluencerCSV(raw: string): Influencer[] {
   const result = Papa.parse<InfluencerRaw>(raw, { header: true, skipEmptyLines: true });
@@ -112,7 +130,50 @@ function parseInfluencerCSV(raw: string): Influencer[] {
         estado: r.address_estado_text?.trim() || "",
         cep: r.address_cep_text?.trim() || "",
       },
+      coupon: null,
     }));
+}
+
+function influencerDBRowToInfluencer(row: InfluencerDBRow): Influencer {
+  return {
+    email: row.email,
+    name: row.name,
+    instagram: row.instagram,
+    tiktok: row.tiktok,
+    whatsapp: row.whatsapp,
+    cnpj: row.cnpj,
+    razao_social: row.razao_social,
+    address: {
+      logradouro: row.address_logradouro,
+      numero: row.address_numero,
+      complemento: row.address_complemento,
+      bairro: row.address_bairro,
+      cidade: row.address_cidade,
+      estado: row.address_estado,
+      cep: row.address_cep,
+    },
+    coupon: row.coupon || null,
+  };
+}
+
+function influencerToDBRow(inf: Influencer): InfluencerDBRow {
+  return {
+    email: inf.email,
+    name: inf.name,
+    instagram: inf.instagram,
+    tiktok: inf.tiktok,
+    whatsapp: inf.whatsapp,
+    cnpj: inf.cnpj,
+    razao_social: inf.razao_social,
+    address_logradouro: inf.address.logradouro,
+    address_numero: inf.address.numero,
+    address_complemento: inf.address.complemento,
+    address_bairro: inf.address.bairro,
+    address_cidade: inf.address.cidade,
+    address_estado: inf.address.estado,
+    address_cep: inf.address.cep,
+    coupon: inf.coupon,
+  };
 }
 
 function buildStatsFromPerf(rows: SaleRow[]): Map<string, InfluencerStats> {
@@ -180,7 +241,6 @@ function fmtWhatsapp(raw: string): string {
 }
 
 // ─── CouponInput ─────────────────────────────────────────────────────────────
-/** Input com busca e sugestões. Permite digitar qualquer coupon ou selecionar da lista. */
 function CouponInput({
   value,
   onChange,
@@ -217,10 +277,8 @@ function CouponInput({
           setQuery(displayValue);
         }}
         onBlur={() => {
-          // Delay para permitir clique no dropdown
           setTimeout(() => {
             setOpen(false);
-            // Se digitou algo que não selecionou, salva como está
             if (query && query !== displayValue) {
               onChange(query.toUpperCase());
             }
@@ -262,7 +320,7 @@ function CouponInput({
                 c === value ? "bg-muted font-medium" : ""
               }`}
               onMouseDown={(e) => {
-                e.preventDefault(); // Impede o onBlur
+                e.preventDefault();
                 onChange(c);
                 setQuery("");
                 setOpen(false);
@@ -288,6 +346,7 @@ export default function CadastroInfluenciadores() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Influencer | null>(null);
   const [editingCoupon, setEditingCoupon] = useState<string>("none");
+  const queryClient = useQueryClient();
 
   // Sorting
   type SortField = "name" | "instagram" | "cidade" | "coupon" | "gmv";
@@ -304,33 +363,88 @@ export default function CadastroInfluenciadores() {
   const [suggestions, setSuggestions] = useState<AutoSuggestion[]>([]);
   const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
 
-  // Influencer registry
-  const [influencers, setInfluencers] = useState<Influencer[]>(() => {
-    try {
-      const s = localStorage.getItem(REGISTRY_KEY);
-      return s ? JSON.parse(s) : [];
-    } catch { return []; }
+  // Fetch influencers from Supabase
+  const { data: influencersData = [], isLoading: influencersLoading } = useQuery({
+    queryKey: ["influencer-registry"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("influencer_registry") as any).select("*");
+      if (error) throw error;
+      return (data || []).map(influencerDBRowToInfluencer);
+    },
   });
 
-  // Coupon links: email → coupon
-  const [couponLinks, setCouponLinks] = useState<Record<string, string>>(() => {
-    try {
-      const s = localStorage.getItem(LINKS_KEY);
-      return s ? JSON.parse(s) : {};
-    } catch { return {}; }
+  // Fetch performance data from Supabase
+  const { data: salesData = [] } = useQuery({
+    queryKey: ["influencer-sales-stats"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("influencer_sales") as any).select("*");
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
+        coupon: row.coupon,
+        date_sale: new Date(row.date_sale),
+        order_id: row.order_id,
+        order_value: row.order_value,
+        payment_value: row.payment_value,
+        products: row.products || [],
+      }));
+    },
   });
 
-  // Performance data from PerformanceInfluenciadores localStorage
-  const perfStats = useMemo<Map<string, InfluencerStats>>(() => {
-    try {
-      const s = localStorage.getItem(PERF_KEY);
-      if (!s) return new Map();
-      const rows: SaleRow[] = JSON.parse(s, (k, v) => k === "date_sale" ? new Date(v) : v);
-      return buildStatsFromPerf(rows);
-    } catch { return new Map(); }
-  }, []);
-
+  const perfStats = useMemo(() => buildStatsFromPerf(salesData), [salesData]);
   const availableCoupons = useMemo(() => Array.from(perfStats.keys()).sort(), [perfStats]);
+
+  // Mutation: Import CSV
+  const importMutation = useMutation({
+    mutationFn: async (influencers: Influencer[]) => {
+      const rows = influencers.map(influencerToDBRow);
+      const { error } = await (supabase.from("influencer_registry") as any).upsert(rows, {
+        onConflict: "email",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer-registry"] });
+    },
+  });
+
+  // Mutation: Save coupon link
+  const saveLinkMutation = useMutation({
+    mutationFn: async ({ email, coupon }: { email: string; coupon: string | null }) => {
+      const { error } = await (supabase.from("influencer_registry") as any)
+        .update({ coupon })
+        .eq("email", email);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer-registry"] });
+    },
+  });
+
+  // Mutation: Batch update coupons
+  const batchUpdateMutation = useMutation({
+    mutationFn: async (updates: Array<{ email: string; coupon: string | null }>) => {
+      for (const { email, coupon } of updates) {
+        const { error } = await (supabase.from("influencer_registry") as any)
+          .update({ coupon })
+          .eq("email", email);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer-registry"] });
+    },
+  });
+
+  // Mutation: Clear registry
+  const clearMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase.from("influencer_registry") as any).delete().gt("id", "");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer-registry"] });
+    },
+  });
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -339,8 +453,7 @@ export default function CadastroInfluenciadores() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const parsed = parseInfluencerCSV(ev.target?.result as string);
-      setInfluencers(parsed);
-      localStorage.setItem(REGISTRY_KEY, JSON.stringify(parsed));
+      importMutation.mutate(parsed);
     };
     reader.readAsText(file, "UTF-8");
     e.target.value = "";
@@ -348,20 +461,18 @@ export default function CadastroInfluenciadores() {
 
   const clearRegistry = () => {
     if (!confirm("Limpar cadastro de influenciadoras?")) return;
-    setInfluencers([]);
-    localStorage.removeItem(REGISTRY_KEY);
+    clearMutation.mutate();
   };
 
-  // Abre o dialog de auto-link e roda o algoritmo em todas
+  // Open auto-link dialog
   const openAutoLink = () => {
-    const alreadyLinked = new Set(Object.values(couponLinks));
+    const alreadyLinked = new Set(influencersData.map(i => i.coupon).filter(Boolean));
     const matched: AutoSuggestion[] = [];
     const unmatched: AutoSuggestion[] = [];
 
-    for (const inf of influencers) {
-      // Coupons que ainda não estão atribuídos a outra influenciadora
+    for (const inf of influencersData) {
       const free = availableCoupons.filter(
-        (c) => !alreadyLinked.has(c) || couponLinks[inf.email] === c
+        (c) => !alreadyLinked.has(c) || inf.coupon === c
       );
       const suggestion = suggestCoupon(inf, free);
 
@@ -375,7 +486,7 @@ export default function CadastroInfluenciadores() {
 
       if (suggestion) {
         matched.push(entry);
-        alreadyLinked.add(suggestion); // reserva o coupon para não sugerir para outra
+        alreadyLinked.add(suggestion);
       } else {
         unmatched.push(entry);
       }
@@ -386,50 +497,46 @@ export default function CadastroInfluenciadores() {
     setAutoLinkOpen(true);
   };
 
-  // Confirma e salva todas as vinculações do dialog
+  // Confirm and save auto-link
   const confirmAutoLink = () => {
-    const updated = { ...couponLinks };
+    const updates: Array<{ email: string; coupon: string | null }> = [];
 
     for (const s of suggestions) {
       if (s.checked && s.coupon) {
-        updated[s.email] = s.coupon;
+        updates.push({ email: s.email, coupon: s.coupon });
       }
     }
     for (const [email, coupon] of Object.entries(manualLinks)) {
-      if (coupon && coupon !== "none") updated[email] = coupon;
+      if (coupon && coupon !== "none") {
+        updates.push({ email, coupon });
+      }
     }
 
-    setCouponLinks(updated);
-    localStorage.setItem(LINKS_KEY, JSON.stringify(updated));
+    batchUpdateMutation.mutate(updates);
     setAutoLinkOpen(false);
   };
 
   const openProfile = (inf: Influencer) => {
     setSelected(inf);
-    setEditingCoupon(couponLinks[inf.email] ?? "none");
+    setEditingCoupon(inf.coupon ?? "none");
   };
 
   const saveLink = () => {
     if (!selected) return;
-    const updated = { ...couponLinks };
-    if (editingCoupon && editingCoupon !== "none") {
-      updated[selected.email] = editingCoupon;
-    } else {
-      delete updated[selected.email];
-    }
-    setCouponLinks(updated);
-    localStorage.setItem(LINKS_KEY, JSON.stringify(updated));
+    const coupon = editingCoupon && editingCoupon !== "none" ? editingCoupon : null;
+    saveLinkMutation.mutate({ email: selected.email, coupon });
+    setSelected(null);
   };
 
-  const getLinkedCoupon = (email: string) => couponLinks[email] ?? null;
   const getStats = (email: string) => {
-    const c = getLinkedCoupon(email);
+    const inf = influencersData.find(i => i.email === email);
+    const c = inf?.coupon;
     return c ? (perfStats.get(c) ?? null) : null;
   };
 
   // ── Derived ─────────────────────────────────────────────────────────────────
   const displayed = useMemo(() => {
-    let list = influencers;
+    let list = influencersData;
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -448,8 +555,8 @@ export default function CadastroInfluenciadores() {
       else if (sortField === "instagram") { av = a.instagram; bv = b.instagram; }
       else if (sortField === "cidade") { av = a.address.cidade; bv = b.address.cidade; }
       else if (sortField === "coupon") {
-        av = getLinkedCoupon(a.email) ?? "";
-        bv = getLinkedCoupon(b.email) ?? "";
+        av = a.coupon ?? "";
+        bv = b.coupon ?? "";
       } else if (sortField === "gmv") {
         const ag = getStats(a.email)?.gmv ?? -1;
         const bg = getStats(b.email)?.gmv ?? -1;
@@ -459,19 +566,17 @@ export default function CadastroInfluenciadores() {
     });
 
     return list;
-  }, [influencers, search, sortField, sortAsc, couponLinks, perfStats]);
+  }, [influencersData, search, sortField, sortAsc]);
 
-  const linkedCount = Object.keys(couponLinks).filter(
-    (e) => influencers.some((i) => i.email === e)
+  const linkedCount = influencersData.filter((i) => !!i.coupon).length;
+
+  const withPerfCount = influencersData.filter(
+    (i) => i.coupon && perfStats.has(i.coupon)
   ).length;
 
-  const withPerfCount = Object.keys(couponLinks).filter(
-    (e) => perfStats.has(couponLinks[e])
-  ).length;
+  const pjCount = influencersData.filter((i) => !!i.cnpj).length;
 
-  const pjCount = influencers.filter((i) => !!i.cnpj).length;
-
-  const selectedLinkedCoupon = selected ? getLinkedCoupon(selected.email) : null;
+  const selectedLinkedCoupon = selected?.coupon ?? null;
   const selectedStats = selected ? getStats(selected.email) : null;
   const selectedSuggestion = selected
     ? suggestCoupon(selected, availableCoupons.filter((c) => c !== selectedLinkedCoupon))
@@ -488,31 +593,31 @@ export default function CadastroInfluenciadores() {
         <div>
           <h1 className="text-2xl font-bold">Cadastro de Influenciadoras</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {influencers.length > 0
-              ? `${influencers.length} influenciadoras · clique para abrir perfil`
+            {influencersData.length > 0
+              ? `${influencersData.length} influenciadoras · clique para abrir perfil`
               : "Importe o CSV de cadastro"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {influencers.length > 0 && availableCoupons.length > 0 && (
+          {influencersData.length > 0 && availableCoupons.length > 0 && (
             <Button variant="outline" size="sm" onClick={openAutoLink}>
               <Zap className="h-4 w-4 mr-1" /> Vincular automaticamente
             </Button>
           )}
-          {influencers.length > 0 && (
-            <Button variant="outline" size="sm" onClick={clearRegistry}>
+          {influencersData.length > 0 && (
+            <Button variant="outline" size="sm" onClick={clearRegistry} disabled={clearMutation.isPending}>
               <X className="h-4 w-4 mr-1" /> Limpar
             </Button>
           )}
-          <Button size="sm" onClick={() => fileRef.current?.click()}>
+          <Button size="sm" onClick={() => fileRef.current?.click()} disabled={importMutation.isPending}>
             <Upload className="h-4 w-4 mr-1" /> Importar CSV
           </Button>
           <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
         </div>
       </div>
 
-      {/* Aviso sem performance carregada */}
-      {influencers.length > 0 && availableCoupons.length === 0 && (
+      {/* Warning without performance loaded */}
+      {influencersData.length > 0 && availableCoupons.length === 0 && (
         <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>
@@ -522,7 +627,7 @@ export default function CadastroInfluenciadores() {
       )}
 
       {/* Empty state */}
-      {influencers.length === 0 && (
+      {influencersData.length === 0 && !influencersLoading && (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 border-2 border-dashed rounded-xl">
           <Users className="h-10 w-10 text-muted-foreground/40" />
           <div>
@@ -537,7 +642,7 @@ export default function CadastroInfluenciadores() {
         </div>
       )}
 
-      {influencers.length > 0 && (
+      {influencersData.length > 0 && (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -548,7 +653,7 @@ export default function CadastroInfluenciadores() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{influencers.length}</div>
+                <div className="text-2xl font-bold">{influencersData.length}</div>
                 <p className="text-xs text-muted-foreground mt-0.5">influenciadoras</p>
               </CardContent>
             </Card>
@@ -645,7 +750,6 @@ export default function CadastroInfluenciadores() {
                   </TableHeader>
                   <TableBody>
                     {displayed.map((inf) => {
-                      const coupon = getLinkedCoupon(inf.email);
                       const stats = getStats(inf.email);
                       return (
                         <TableRow
@@ -669,8 +773,8 @@ export default function CadastroInfluenciadores() {
                             {inf.address.cidade ? `${inf.address.cidade} / ${inf.address.estado}` : "—"}
                           </TableCell>
                           <TableCell>
-                            {coupon ? (
-                              <Badge variant="secondary" className="font-mono text-xs">{coupon}</Badge>
+                            {inf.coupon ? (
+                              <Badge variant="secondary" className="font-mono text-xs">{inf.coupon}</Badge>
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
@@ -708,7 +812,7 @@ export default function CadastroInfluenciadores() {
           </DialogHeader>
 
           <div className="space-y-5 py-2">
-            {/* Encontradas */}
+            {/* Found matches */}
             {matchedSuggestions.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -747,7 +851,7 @@ export default function CadastroInfluenciadores() {
               </div>
             )}
 
-            {/* Sem correspondência */}
+            {/* No match */}
             {unmatchedSuggestions.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -792,7 +896,7 @@ export default function CadastroInfluenciadores() {
             <Button variant="outline" onClick={() => setAutoLinkOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={confirmAutoLink}>
+            <Button onClick={confirmAutoLink} disabled={batchUpdateMutation.isPending}>
               <CheckCircle2 className="h-4 w-4 mr-1" />
               Confirmar e salvar vínculos
             </Button>
@@ -821,7 +925,7 @@ export default function CadastroInfluenciadores() {
                 </div>
               </SheetHeader>
 
-              {/* Contato */}
+              {/* Contact */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                   Contato
@@ -872,7 +976,7 @@ export default function CadastroInfluenciadores() {
                 </div>
               </div>
 
-              {/* Endereço */}
+              {/* Address */}
               {selected.address.logradouro && (
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
@@ -899,7 +1003,7 @@ export default function CadastroInfluenciadores() {
                 </div>
               )}
 
-              {/* Vincular coupon */}
+              {/* Link coupon */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                   Coupon de Vendas
@@ -935,7 +1039,7 @@ export default function CadastroInfluenciadores() {
                         className="flex-1"
                         placeholder="Digitar ou buscar coupon..."
                       />
-                      <Button size="sm" onClick={saveLink}>
+                      <Button size="sm" onClick={saveLink} disabled={saveLinkMutation.isPending}>
                         Salvar
                       </Button>
                     </div>
