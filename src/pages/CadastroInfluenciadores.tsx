@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Upload, Search, X, Instagram, Phone, Mail, MapPin, Building2,
-  TrendingUp, Link2, Users, LinkIcon, Zap, CheckCircle2, AlertCircle,
+  TrendingUp, Link2, Users, User, LinkIcon, Zap, CheckCircle2, AlertCircle,
   ChevronDown, ChevronUp,
 } from "lucide-react";
 import { format } from "date-fns";
