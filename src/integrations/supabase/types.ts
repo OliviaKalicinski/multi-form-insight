@@ -262,6 +262,122 @@ export type Database = {
         }
         Relationships: []
       }
+      budget_attachments: {
+        Row: {
+          budget_id: string
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number
+          id: string
+        }
+        Insert: {
+          budget_id: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size: number
+          id?: string
+        }
+        Update: {
+          budget_id?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+        }
+        Relationships: []
+      }
+      budget_requests: {
+        Row: {
+          calendar_event_id: string | null
+          created_at: string
+          deadline_date: string
+          description: string | null
+          event_end_date: string | null
+          event_start_date: string | null
+          financial_approved_at: string | null
+          financial_notes: string | null
+          financial_status: string
+          id: string
+          justification: string | null
+          marketing_approved_at: string | null
+          marketing_notes: string | null
+          marketing_status: string
+          needs_financial: boolean
+          needs_marketing: boolean
+          needs_operations: boolean
+          operations_approved_at: string | null
+          operations_notes: string | null
+          operations_status: string
+          request_date: string
+          title: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          calendar_event_id?: string | null
+          created_at?: string
+          deadline_date: string
+          description?: string | null
+          event_end_date?: string | null
+          event_start_date?: string | null
+          financial_approved_at?: string | null
+          financial_notes?: string | null
+          financial_status?: string
+          id?: string
+          justification?: string | null
+          marketing_approved_at?: string | null
+          marketing_notes?: string | null
+          marketing_status?: string
+          needs_financial?: boolean
+          needs_marketing?: boolean
+          needs_operations?: boolean
+          operations_approved_at?: string | null
+          operations_notes?: string | null
+          operations_status?: string
+          request_date?: string
+          title: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          calendar_event_id?: string | null
+          created_at?: string
+          deadline_date?: string
+          description?: string | null
+          event_end_date?: string | null
+          event_start_date?: string | null
+          financial_approved_at?: string | null
+          financial_notes?: string | null
+          financial_status?: string
+          id?: string
+          justification?: string | null
+          marketing_approved_at?: string | null
+          marketing_notes?: string | null
+          marketing_status?: string
+          needs_financial?: boolean
+          needs_marketing?: boolean
+          needs_operations?: boolean
+          operations_approved_at?: string | null
+          operations_notes?: string | null
+          operations_status?: string
+          request_date?: string
+          title?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_requests_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_calendar"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer: {
         Row: {
           average_days_between_purchases: number | null
@@ -1036,6 +1152,68 @@ export type Database = {
         }
         Relationships: []
       }
+      marketing_calendar: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          start_date: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          start_date: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_calendar_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_categories: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       marketing_data: {
         Row: {
           created_at: string | null
@@ -1674,6 +1852,19 @@ export type Database = {
       }
     }
     Functions: {
+      bulk_update_effective_status:
+        | {
+            Args: { updates: Json }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.bulk_update_effective_status(updates => jsonb), public.bulk_update_effective_status(updates => _jsonb). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { updates: Json[] }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.bulk_update_effective_status(updates => jsonb), public.bulk_update_effective_status(updates => _jsonb). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
       expire_old_decisions: { Args: never; Returns: number }
       find_customer_by_identifier: {
         Args: { p_value: string }
