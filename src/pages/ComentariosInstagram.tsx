@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, startOfDay, endOfDay, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -99,11 +99,11 @@ const CATEGORIA_LABEL: Record<string, string> = {
 
 type FilterType = "todos" | "nao_respondidos" | "critico" | "alto" | "negativo" | "duvida_oportunidade";
 
-/** Tenta construir o link do post no Instagram */
+/** Tenta construir o link do post no Instagram — nunca retorna URLs de imagem/CDN */
 function getPostLink(comment: Comment): string | null {
   if (comment.media_permalink) return comment.media_permalink;
-  // media_url pode ser permalink se for uma URL do instagram.com
-  if (comment.media_url?.includes("instagram.com")) return comment.media_url;
+  // Só usa media_url se for realmente um link do instagram.com (não CDN de imagem)
+  if (comment.media_url?.includes("instagram.com/p/")) return comment.media_url;
   return null;
 }
 
@@ -134,14 +134,27 @@ export default function ComentariosInstagram() {
     fetchComments();
   }, []);
 
-  // ─── Filtro por período global ──────────────────────────────────────────
+  // ─── Filtro por período ─────────────────────────────────────────────────
+  // O dateRange do dashboard é baseado no lastDataDate (NFs/vendas), não em "hoje".
+  // Para comentários do Instagram, recalculamos com base em hoje quando o label é relativo.
+  const effectiveDateRange = useMemo(() => {
+    if (!dateRange) return null;
+    const label = dateRange.label;
+    if (label === "7d" || label === "30d" || label === "90d") {
+      const days = label === "7d" ? 7 : label === "30d" ? 30 : 90;
+      return { start: startOfDay(subDays(new Date(), days)), end: endOfDay(new Date()), label };
+    }
+    // Para períodos customizados, usa o range como está
+    return dateRange;
+  }, [dateRange]);
+
   const comments = useMemo(() => {
-    if (!dateRange) return allComments;
+    if (!effectiveDateRange) return allComments;
     return allComments.filter((c) => {
       const d = new Date(c.timestamp);
-      return !isNaN(d.getTime()) && d >= dateRange.start && d <= dateRange.end;
+      return !isNaN(d.getTime()) && d >= effectiveDateRange.start && d <= effectiveDateRange.end;
     });
-  }, [allComments, dateRange]);
+  }, [allComments, effectiveDateRange]);
 
   const doSync = async (fetchAll: boolean) => {
     setSyncing(true);
@@ -250,9 +263,9 @@ export default function ComentariosInstagram() {
           <h1 className="text-2xl font-bold">Comentários Instagram</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Classificação automática por IA
-            {dateRange && (
+            {effectiveDateRange && (
               <span className="ml-1 text-xs text-blue-600">
-                · {format(dateRange.start, "dd/MM/yy")} – {format(dateRange.end, "dd/MM/yy")}
+                · {format(effectiveDateRange.start, "dd/MM/yy")} – {format(effectiveDateRange.end, "dd/MM/yy")}
               </span>
             )}
           </p>
@@ -270,7 +283,7 @@ export default function ComentariosInstagram() {
       </div>
 
       {/* Aviso filtro global */}
-      {dateRange && allComments.length > 0 && comments.length < allComments.length && (
+      {effectiveDateRange && allComments.length > 0 && comments.length < allComments.length && (
         <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>
