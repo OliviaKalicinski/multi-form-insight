@@ -147,10 +147,22 @@ Deno.serve(async (req) => {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const mode = body.mode ?? "daily";
 
-    const endD = new Date(); endD.setDate(endD.getDate() - 1);
-    const startD = new Date(); startD.setDate(startD.getDate() - (mode === "full" ? 365 : 5));
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    const [startDate, endDate] = [fmt(startD), fmt(endD)];
+
+    // Suporta datas customizadas via body: { startDate, endDate }
+    // Caso contrário, usa janela padrão: "daily" = últimos 5 dias, "full" = últimos 365 dias
+    let startDate: string;
+    let endDate: string;
+
+    if (body.startDate && body.endDate) {
+      startDate = body.startDate;
+      endDate = body.endDate;
+    } else {
+      const endD = new Date(); endD.setDate(endD.getDate() - 1);
+      const startD = new Date(); startD.setDate(startD.getDate() - (mode === "full" ? 365 : 5));
+      startDate = fmt(startD);
+      endDate = fmt(endD);
+    }
 
     console.log(`Sync GA4 [${mode}]: ${startDate} → ${endDate}`);
     const token = await getGoogleToken(saJson);
