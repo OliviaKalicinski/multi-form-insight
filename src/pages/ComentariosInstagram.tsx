@@ -15,12 +15,15 @@ import {
   HelpCircle,
   Shield,
   ShoppingBag,
+  ExternalLink,
+  AlertCircle,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useDashboard } from "@/contexts/DashboardContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Comment {
@@ -28,12 +31,13 @@ interface Comment {
   media_id: string;
   media_caption: string;
   media_url: string;
+  media_permalink?: string;
   media_timestamp: string;
   username: string;
   text: string;
   timestamp: string;
   sentimento: "positivo" | "negativo" | "neutro" | null;
-  categoria: "elogio" | "reclamação" | "dúvida" | "risco" | "outro" | null;
+  categoria: string | null;
   risco: "baixo" | "medio" | "alto" | "critico" | null;
   risco_motivo: string | null;
   respondido: boolean;
@@ -78,7 +82,7 @@ const SENTIMENTO_ICON = {
 const CATEGORIA_ICON: Record<string, JSX.Element> = {
   elogio: <Heart className="h-3.5 w-3.5" />,
   reclamação: <AlertTriangle className="h-3.5 w-3.5" />,
-  dúvida: <HelpCircle className="h-3.5 w-3.5" />,
+  "dúvida": <HelpCircle className="h-3.5 w-3.5" />,
   duvida_oportunidade: <ShoppingBag className="h-3.5 w-3.5" />,
   risco: <Shield className="h-3.5 w-3.5" />,
   outro: <MessageCircle className="h-3.5 w-3.5" />,
@@ -86,8 +90,8 @@ const CATEGORIA_ICON: Record<string, JSX.Element> = {
 
 const CATEGORIA_LABEL: Record<string, string> = {
   elogio: "elogio",
-  reclamação: "reclamação",
-  dúvida: "dúvida",
+  "reclamação": "reclamação",
+  "dúvida": "dúvida",
   duvida_oportunidade: "oportunidade",
   risco: "risco",
   outro: "outro",
@@ -95,9 +99,19 @@ const CATEGORIA_LABEL: Record<string, string> = {
 
 type FilterType = "todos" | "nao_respondidos" | "critico" | "alto" | "negativo" | "duvida_oportunidade";
 
+/** Tenta construir o link do post no Instagram */
+function getPostLink(comment: Comment): string | null {
+  if (comment.media_permalink) return comment.media_permalink;
+  // media_url pode ser permalink se for uma URL do instagram.com
+  if (comment.media_url?.includes("instagram.com")) return comment.media_url;
+  return null;
+}
+
 export default function ComentariosInstagram() {
   const { toast } = useToast();
-  const [comments, setComments] = useState<Comment[]>([]);
+  const { dateRange } = useDashboard();
+
+  const [allComments, setAllComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("nao_respondidos");
@@ -111,9 +125,8 @@ export default function ComentariosInstagram() {
       .from("instagram_comments")
       .select("*")
       .eq("oculto", false)
-      .order("timestamp", { ascending: false })
-      .limit(200);
-    if (!error && data) setComments(data as Comment[]);
+      .order("timestamp", { ascending: false });
+    if (!error && data) setAllComments(data as Comment[]);
     setLoading(false);
   };
 
@@ -121,17 +134,32 @@ export default function ComentariosInstagram() {
     fetchComments();
   }, []);
 
+  // ─── Filtro por período global ──────────────────────────────────────────
+  const comments = useMemo(() => {
+    if (!dateRange) return allComments;
+    return allComments.filter((c) => {
+      const d = new Date(c.timestamp);
+      return !isNaN(d.getTime()) && d >= dateRange.start && d <= dateRange.end;
+    });
+  }, [allComments, dateRange]);
+
   const handleSync = async () => {
     setSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke("sync-instagram-comments", {
-        body: { limit: 20 },
+        body: { limit: 50 },
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error ?? "Erro desconhecido");
+
+      const parts: string[] = [];
+      if (data.classified > 0) parts.push(`${data.classified} novos classificados`);
+      if (data.skipped > 0) parts.push(`${data.skipped} já classificados`);
+      if (data.errors > 0) parts.push(`${data.errors} erros`);
+
       toast({
-        title: `Sync concluído`,
-        description: `${data.comments} comentários encontrados, ${data.classified} classificados.`,
+        title: `Sync concluído — ${data.posts} posts, ${data.comments} comentários`,
+        description: parts.join(" · ") || "Nenhum comentário novo encontrado.",
       });
       await fetchComments();
     } catch (e: any) {
@@ -144,14 +172,12 @@ export default function ComentariosInstagram() {
     if (!replyText.trim()) return;
     setSendingReply(true);
     try {
-      // Chama Meta API via edge function para responder
       const { data, error } = await supabase.functions.invoke("reply-instagram-comment", {
         body: { comment_id: comment.id, message: replyText },
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error ?? "Erro ao enviar resposta");
 
-      // Marca como respondido no banco
       await (supabase as any)
         .from("instagram_comments")
         .update({
@@ -173,10 +199,10 @@ export default function ComentariosInstagram() {
 
   const handleHide = async (id: string) => {
     await (supabase as any).from("instagram_comments").update({ oculto: true }).eq("id", id);
-    setComments((prev) => prev.filter((c) => c.id !== id));
+    setAllComments((prev) => prev.filter((c) => c.id !== id));
   };
 
-  // ─── KPIs ────────────────────────────────────────────────────────────────
+  // ─── KPIs (usam comments filtrados por período) ────────────────────────
   const kpis = useMemo(
     () => ({
       total: comments.length,
@@ -187,14 +213,16 @@ export default function ComentariosInstagram() {
       positivos: comments.filter((c) => c.sentimento === "positivo").length,
       duvidaOportunidade: comments.filter((c) => c.categoria === "duvida_oportunidade").length,
       taxaResposta:
-        comments.length > 0 ? Math.round((comments.filter((c) => c.respondido).length / comments.length) * 100) : 0,
+        comments.length > 0
+          ? Math.round((comments.filter((c) => c.respondido).length / comments.length) * 100)
+          : 0,
     }),
     [comments],
   );
 
-  // ─── Filtered comments ──────────────────────────────────────────────────
+  // ─── Filtered comments ────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    const ricoOrder = { critico: 0, alto: 1, medio: 2, baixo: 3 };
+    const riscoOrder: Record<string, number> = { critico: 0, alto: 1, medio: 2, baixo: 3 };
     let list = [...comments];
     if (filter === "nao_respondidos") list = list.filter((c) => !c.respondido);
     else if (filter === "critico") list = list.filter((c) => c.risco === "critico");
@@ -203,20 +231,28 @@ export default function ComentariosInstagram() {
     else if (filter === "duvida_oportunidade") list = list.filter((c) => c.categoria === "duvida_oportunidade");
     return list.sort(
       (a, b) =>
-        (ricoOrder[a.risco ?? "baixo"] ?? 3) - (ricoOrder[b.risco ?? "baixo"] ?? 3) ||
+        (riscoOrder[a.risco ?? "baixo"] ?? 3) - (riscoOrder[b.risco ?? "baixo"] ?? 3) ||
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
   }, [comments, filter]);
 
-  const riscoConfig = (r: string | null) => RISCO_CONFIG[r as keyof typeof RISCO_CONFIG] ?? RISCO_CONFIG.baixo;
+  const riscoConfig = (r: string | null) =>
+    RISCO_CONFIG[r as keyof typeof RISCO_CONFIG] ?? RISCO_CONFIG.baixo;
 
   return (
-    <div className="container mx-auto px-6 py-8 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Comentários Instagram</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gerenciamento + classificação automática por IA</p>
+          <h1 className="text-2xl font-bold">Comentários Instagram</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Classificação automática por IA
+            {dateRange && (
+              <span className="ml-1 text-xs text-blue-600">
+                · {format(dateRange.start, "dd/MM/yy")} – {format(dateRange.end, "dd/MM/yy")}
+              </span>
+            )}
+          </p>
         </div>
         <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
           <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
@@ -224,8 +260,19 @@ export default function ComentariosInstagram() {
         </Button>
       </div>
 
+      {/* Aviso filtro global */}
+      {dateRange && allComments.length > 0 && comments.length < allComments.length && (
+        <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>
+            Exibindo <strong>{comments.length}</strong> de <strong>{allComments.length}</strong>{" "}
+            comentários conforme o período selecionado no dashboard.
+          </span>
+        </div>
+      )}
+
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           {
             label: "Não respondidos",
@@ -272,7 +319,9 @@ export default function ComentariosInstagram() {
             key={f.key}
             onClick={() => setFilter(f.key)}
             className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
-              filter === f.key ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"
+              filter === f.key
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border hover:bg-muted"
             }`}
           >
             {f.label}
@@ -285,7 +334,7 @@ export default function ComentariosInstagram() {
         <div className="text-center py-12 text-muted-foreground">Carregando comentários...</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          {comments.length === 0
+          {allComments.length === 0
             ? 'Nenhum comentário ainda. Clique em "Sincronizar agora" para buscar.'
             : "Nenhum comentário para este filtro."}
         </div>
@@ -294,10 +343,18 @@ export default function ComentariosInstagram() {
           {filtered.map((comment) => {
             const rc = riscoConfig(comment.risco);
             const isReplying = replyingTo === comment.id;
+            const postLink = getPostLink(comment);
+
             return (
               <Card
                 key={comment.id}
-                className={`border ${comment.risco === "critico" ? "border-red-300 bg-red-50/30" : comment.risco === "alto" ? "border-orange-200" : ""}`}
+                className={`border ${
+                  comment.risco === "critico"
+                    ? "border-red-300 bg-red-50/30"
+                    : comment.risco === "alto"
+                    ? "border-orange-200"
+                    : ""
+                }`}
               >
                 <CardContent className="pt-4 pb-3 px-4">
                   {/* Header do comentário */}
@@ -317,8 +374,16 @@ export default function ComentariosInstagram() {
                       )}
                       {/* Categoria */}
                       {comment.categoria && (
-                        <Badge variant={comment.categoria === "duvida_oportunidade" ? "default" : "outline"} className={`text-xs gap-1 ${comment.categoria === "duvida_oportunidade" ? "bg-blue-100 text-blue-800 border-blue-300" : ""}`}>
-                          {CATEGORIA_ICON[comment.categoria]} {CATEGORIA_LABEL[comment.categoria] ?? comment.categoria}
+                        <Badge
+                          variant={comment.categoria === "duvida_oportunidade" ? "default" : "outline"}
+                          className={`text-xs gap-1 ${
+                            comment.categoria === "duvida_oportunidade"
+                              ? "bg-blue-100 text-blue-800 border-blue-300"
+                              : ""
+                          }`}
+                        >
+                          {CATEGORIA_ICON[comment.categoria] ?? <MessageCircle className="h-3.5 w-3.5" />}{" "}
+                          {CATEGORIA_LABEL[comment.categoria] ?? comment.categoria}
                         </Badge>
                       )}
                       {comment.respondido && (
@@ -342,14 +407,28 @@ export default function ComentariosInstagram() {
 
                   {/* Texto */}
                   <p className="text-sm text-foreground mb-2">
-                    <span className="font-semibold text-primary">@{comment.username}</span> {comment.text}
+                    <span className="font-semibold text-primary">@{comment.username}</span>{" "}
+                    {comment.text}
                   </p>
 
-                  {/* Post origem */}
+                  {/* Post origem + link */}
                   {comment.media_caption && (
-                    <p className="text-xs text-muted-foreground mb-3 truncate">
-                      Post: {comment.media_caption.slice(0, 80)}...
-                    </p>
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <p className="text-xs text-muted-foreground truncate flex-1">
+                        Post: {comment.media_caption.slice(0, 80)}
+                        {comment.media_caption.length > 80 ? "..." : ""}
+                      </p>
+                      {postLink && (
+                        <a
+                          href={postLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-0.5 shrink-0"
+                        >
+                          <ExternalLink className="h-3 w-3" /> Ver post
+                        </a>
+                      )}
+                    </div>
                   )}
 
                   {/* Resposta existente */}
