@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
 
     const { comment_id, message } = await req.json();
     if (!comment_id || !message?.trim()) {
-      return new Response(JSON.stringify({ ok: false, error: "comment_id e message são obrigatórios" }), { status: 400 });
+      return new Response(JSON.stringify({ ok: false, error: "comment_id e message são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const META_TOKEN = Deno.env.get("META_ACCESS_TOKEN");
