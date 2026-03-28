@@ -1022,6 +1022,7 @@ export type Database = {
           id: string
           media_caption: string | null
           media_id: string
+          media_permalink: string | null
           media_timestamp: string | null
           media_url: string | null
           oculto: boolean | null
@@ -1043,6 +1044,7 @@ export type Database = {
           id: string
           media_caption?: string | null
           media_id: string
+          media_permalink?: string | null
           media_timestamp?: string | null
           media_url?: string | null
           oculto?: boolean | null
@@ -1064,6 +1066,7 @@ export type Database = {
           id?: string
           media_caption?: string | null
           media_id?: string
+          media_permalink?: string | null
           media_timestamp?: string | null
           media_url?: string | null
           oculto?: boolean | null
