@@ -251,71 +251,94 @@ export default function PerformanceInfluenciadores() {
   }, [bonifRaw, dateRange]);
 
   // Map: coupon → list of bonification rows
+  // bonifByInfluencer: email → NFs para influenciadoras SEM coupon (mas identificadas)
   // Também rastreia NFs não casadas para diagnóstico
-  const { bonifByCoupon, bonifUnmatched } = useMemo(() => {
-    const map = new Map<string, BonifRow[]>();
+  const { bonifByCoupon, bonifByInfluencer, bonifUnmatched } = useMemo(() => {
+    const couponMap = new Map<string, BonifRow[]>();
+    const emailMap  = new Map<string, BonifRow[]>();
     const unmatched: BonifRow[] = [];
 
     for (const row of bonifFiltered) {
-      let coupon: string | undefined;
+      let matchedEmail: string | undefined;
+      let matchedCoupon: string | undefined;
 
       // 1. Match por e-mail — só tenta se o campo realmente parece um e-mail (contém "@")
       // Muitos sistemas gravam o CPF no campo cliente_email; ignoramos nesses casos.
       const isRealEmail = row.cliente_email?.includes("@");
       if (isRealEmail) {
-        coupon = couponByEmail.get(row.cliente_email!.trim().toLowerCase());
+        const inf = influencers.find(
+          (i) => i.email.toLowerCase() === row.cliente_email!.trim().toLowerCase()
+        );
+        if (inf) {
+          matchedEmail  = inf.email;
+          matchedCoupon = inf.coupon ?? undefined;
+        }
       }
 
       // 2. Match por documento (CPF / CNPJ)
       // Verifica cpf_cnpj E cliente_email quando este último parecer um documento
-      const docCandidates = new Set<string>();
-      if (row.cpf_cnpj) docCandidates.add(row.cpf_cnpj.replace(/\D/g, ""));
-      if (!isRealEmail && row.cliente_email) docCandidates.add(row.cliente_email.replace(/\D/g, ""));
+      if (!matchedEmail) {
+        const docCandidates = new Set<string>();
+        if (row.cpf_cnpj) docCandidates.add(row.cpf_cnpj.replace(/\D/g, ""));
+        if (!isRealEmail && row.cliente_email) docCandidates.add(row.cliente_email.replace(/\D/g, ""));
 
-      if (!coupon && docCandidates.size > 0) {
-        for (const inf of influencers) {
-          const cnpjNorm = inf.cnpj?.replace(/\D/g, "");
-          const cpfNorm  = inf.cpf?.replace(/\D/g, "");
-          if ((cnpjNorm && docCandidates.has(cnpjNorm)) ||
-              (cpfNorm  && docCandidates.has(cpfNorm))) {
-            coupon = couponByEmail.get(inf.email.toLowerCase());
-            break;
+        if (docCandidates.size > 0) {
+          for (const inf of influencers) {
+            const cnpjNorm = inf.cnpj?.replace(/\D/g, "");
+            const cpfNorm  = inf.cpf?.replace(/\D/g, "");
+            if ((cnpjNorm && docCandidates.has(cnpjNorm)) ||
+                (cpfNorm  && docCandidates.has(cpfNorm))) {
+              matchedEmail  = inf.email;
+              matchedCoupon = inf.coupon ?? undefined;
+              break;
+            }
           }
         }
       }
 
       // 3. Match por nome — exato primeiro, depois parcial (≥2 partes significativas)
-      if (!coupon && row.cliente_nome) {
+      if (!matchedEmail && row.cliente_nome) {
         const normRow  = normalizeName(row.cliente_nome);
         const rowParts = normRow.split(" ").filter((p) => p.length >= 3);
 
         // 3a. exato
         for (const inf of influencers) {
           if (normalizeName(inf.name) === normRow) {
-            coupon = couponByEmail.get(inf.email.toLowerCase());
-            if (coupon) break;
+            matchedEmail  = inf.email;
+            matchedCoupon = inf.coupon ?? undefined;
+            break;
           }
         }
         // 3b. parcial — todas as partes significativas da NF aparecem no nome do cadastro
-        if (!coupon && rowParts.length >= 2) {
+        if (!matchedEmail && rowParts.length >= 2) {
           for (const inf of influencers) {
             const normInf = normalizeName(inf.name);
             if (rowParts.every((p) => normInf.includes(p))) {
-              coupon = couponByEmail.get(inf.email.toLowerCase());
-              if (coupon) break;
+              matchedEmail  = inf.email;
+              matchedCoupon = inf.coupon ?? undefined;
+              break;
             }
           }
         }
       }
-      if (!coupon) {
+
+      if (!matchedEmail) {
         unmatched.push(row);
         continue;
       }
-      if (!map.has(coupon)) map.set(coupon, []);
-      map.get(coupon)!.push(row);
+
+      if (matchedCoupon) {
+        // Influenciadora com coupon → agrupa pelo coupon
+        if (!couponMap.has(matchedCoupon)) couponMap.set(matchedCoupon, []);
+        couponMap.get(matchedCoupon)!.push(row);
+      } else {
+        // Influenciadora identificada mas sem coupon → agrupa pelo e-mail
+        if (!emailMap.has(matchedEmail)) emailMap.set(matchedEmail, []);
+        emailMap.get(matchedEmail)!.push(row);
+      }
     }
-    return { bonifByCoupon: map, bonifUnmatched: unmatched };
-  }, [bonifFiltered, couponByEmail, influencers]);
+    return { bonifByCoupon: couponMap, bonifByInfluencer: emailMap, bonifUnmatched: unmatched };
+  }, [bonifFiltered, influencers]); // couponByEmail removido — não mais usado no matching
 
   // ── CSV data from Supabase ───────────────────────────────────────────────
   const { data: rows = [], isLoading: loadingRows, refetch: refetchRows } = useQuery({
@@ -979,6 +1002,67 @@ export default function PerformanceInfluenciadores() {
               </div>
             </CardContent>
           </Card>
+          {/* Bonificação sem coupon vinculado */}
+          {bonifByInfluencer.size > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Package className="h-4 w-4 text-rose-600" />
+                  Bonificação enviada · sem coupon vinculado
+                  <Badge variant="secondary" className="ml-1">{bonifByInfluencer.size}</Badge>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Influenciadoras identificadas pelo CPF/CNPJ ou nome, mas sem coupon de vendas.
+                  Vincule o coupon no <strong>Cadastro</strong> para que apareçam na tabela de performance.
+                </p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Influenciadora</TableHead>
+                      <TableHead>Total Bonificado</TableHead>
+                      <TableHead>NFs</TableHead>
+                      <TableHead>Última NF</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from(bonifByInfluencer.entries())
+                      .sort((a, b) =>
+                        b[1].reduce((s, r) => s + (r.valor_total || 0), 0) -
+                        a[1].reduce((s, r) => s + (r.valor_total || 0), 0)
+                      )
+                      .map(([email, bonifs]) => {
+                        const inf = influencers.find((i) => i.email === email);
+                        const total = bonifs.reduce((s, r) => s + (r.valor_total || 0), 0);
+                        const lastNF = bonifs.reduce((latest, r) =>
+                          !latest || r.data_venda > latest ? r.data_venda : latest, "" as string
+                        );
+                        return (
+                          <TableRow key={email}>
+                            <TableCell>
+                              <div className="font-medium">{inf?.name || email}</div>
+                              {inf?.instagram && (
+                                <div className="text-xs text-muted-foreground">{inf.instagram}</div>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-semibold text-rose-700">
+                              {fmt(total)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {bonifs.length} NF(s)
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {lastNF ? format(new Date(lastNF), "dd/MM/yyyy") : "—"}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>
