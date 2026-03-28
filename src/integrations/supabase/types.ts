@@ -799,6 +799,105 @@ export type Database = {
         }
         Relationships: []
       }
+      influencer_registry: {
+        Row: {
+          address_bairro: string | null
+          address_cep: string | null
+          address_cidade: string | null
+          address_complemento: string | null
+          address_estado: string | null
+          address_logradouro: string | null
+          address_numero: string | null
+          cnpj: string | null
+          coupon: string | null
+          cpf: string | null
+          created_at: string | null
+          email: string
+          id: string
+          instagram: string | null
+          name: string
+          razao_social: string | null
+          tiktok: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          address_bairro?: string | null
+          address_cep?: string | null
+          address_cidade?: string | null
+          address_complemento?: string | null
+          address_estado?: string | null
+          address_logradouro?: string | null
+          address_numero?: string | null
+          cnpj?: string | null
+          coupon?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          email: string
+          id?: string
+          instagram?: string | null
+          name?: string
+          razao_social?: string | null
+          tiktok?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          address_bairro?: string | null
+          address_cep?: string | null
+          address_cidade?: string | null
+          address_complemento?: string | null
+          address_estado?: string | null
+          address_logradouro?: string | null
+          address_numero?: string | null
+          cnpj?: string | null
+          coupon?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          instagram?: string | null
+          name?: string
+          razao_social?: string | null
+          tiktok?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
+      influencer_sales: {
+        Row: {
+          coupon: string
+          date_sale: string
+          id: string
+          imported_at: string | null
+          order_id: string | null
+          order_value: number | null
+          payment_value: number | null
+          products: string[] | null
+        }
+        Insert: {
+          coupon: string
+          date_sale: string
+          id?: string
+          imported_at?: string | null
+          order_id?: string | null
+          order_value?: number | null
+          payment_value?: number | null
+          products?: string[] | null
+        }
+        Update: {
+          coupon?: string
+          date_sale?: string
+          id?: string
+          imported_at?: string | null
+          order_id?: string | null
+          order_value?: number | null
+          payment_value?: number | null
+          products?: string[] | null
+        }
+        Relationships: []
+      }
       instagram_comments: {
         Row: {
           categoria: string | null
