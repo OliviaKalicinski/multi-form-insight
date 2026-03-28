@@ -167,7 +167,7 @@ export default function CalendarioMarketing() {
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["marketing-categories"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("marketing_categories") as any)
+      const { data, error } = await (supabase as any).from("marketing_categories")
         .select("*")
         .order("name", { ascending: true });
       if (error) throw error;
@@ -178,7 +178,7 @@ export default function CalendarioMarketing() {
   const { data: events = [] } = useQuery<CalendarEvent[]>({
     queryKey: ["marketing-calendar", rangeStart, rangeEnd],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("marketing_calendar") as any)
+      const { data, error } = await (supabase as any).from("marketing_calendar")
         .select("*")
         .lte("start_date", rangeEnd)
         .order("start_date", { ascending: true });
@@ -195,7 +195,7 @@ export default function CalendarioMarketing() {
 
   const createEventMutation = useMutation({
     mutationFn: async (f: EventForm) => {
-      const { error } = await (supabase.from("marketing_calendar") as any).insert({
+      const { error } = await (supabase as any).from("marketing_calendar").insert({
         title:       f.title,
         description: f.description || null,
         start_date:  f.start_date,
@@ -212,7 +212,7 @@ export default function CalendarioMarketing() {
 
   const updateEventMutation = useMutation({
     mutationFn: async ({ id, f }: { id: string; f: EventForm }) => {
-      const { error } = await (supabase.from("marketing_calendar") as any)
+      const { error } = await (supabase as any).from("marketing_calendar")
         .update({
           title:       f.title,
           description: f.description || null,
@@ -231,7 +231,7 @@ export default function CalendarioMarketing() {
 
   const deleteEventMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("marketing_calendar") as any)
+      const { error } = await (supabase as any).from("marketing_calendar")
         .delete().eq("id", id);
       if (error) throw error;
     },
@@ -245,7 +245,7 @@ export default function CalendarioMarketing() {
 
   const createCatMutation = useMutation({
     mutationFn: async (f: CategoryForm) => {
-      const { error } = await (supabase.from("marketing_categories") as any)
+      const { error } = await (supabase as any).from("marketing_categories")
         .insert({ name: f.name, color: f.color });
       if (error) throw error;
     },
@@ -258,7 +258,7 @@ export default function CalendarioMarketing() {
 
   const updateCatMutation = useMutation({
     mutationFn: async ({ id, f }: { id: string; f: CategoryForm }) => {
-      const { error } = await (supabase.from("marketing_categories") as any)
+      const { error } = await (supabase as any).from("marketing_categories")
         .update({ name: f.name, color: f.color }).eq("id", id);
       if (error) throw error;
     },
@@ -271,7 +271,7 @@ export default function CalendarioMarketing() {
 
   const deleteCatMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("marketing_categories") as any)
+      const { error } = await (supabase as any).from("marketing_categories")
         .delete().eq("id", id);
       if (error) throw error;
     },
