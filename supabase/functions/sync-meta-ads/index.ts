@@ -77,18 +77,17 @@ async function syncEffectiveStatus(supabase: any, metaToken: string, metaAccount
 
   if (adStatuses.length === 0) return 0;
 
-  // Upsert em lotes: atualiza effective_status por ad_id
-  const BATCH = 100;
-  let updated = 0;
-  for (let i = 0; i < adStatuses.length; i += BATCH) {
-    const batch = adStatuses.slice(i, i + BATCH);
-    for (const { ad_id, effective_status } of batch) {
-      const { error } = await supabase.from("ads_data").update({ effective_status }).eq("ad_id", ad_id);
-      if (!error) updated++;
-    }
+  // Batch update via RPC — uma única chamada ao banco em vez de N updates individuais
+  const { error } = await supabase.rpc("bulk_update_effective_status", {
+    updates: adStatuses,
+  });
+
+  if (error) {
+    console.error(`Erro ao atualizar effective_status em batch: ${error.message}`);
+    return 0;
   }
 
-  console.log(`effective_status atualizado para ${updated} registros (${adStatuses.length} anúncios únicos)`);
+  console.log(`effective_status atualizado em batch para ${adStatuses.length} anúncios`);
   return adStatuses.length;
 }
 
