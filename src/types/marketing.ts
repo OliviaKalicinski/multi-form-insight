@@ -427,7 +427,8 @@ export interface ProductRanking {
   quantidadeTotal: number;
   faturamentoTotal: number;
   numeroPedidos: number;
-  ticketMedio: number;
+  ticketMedio: number; // faturamento / nº pedidos (ticket médio de pedido)
+  ticketMedioProduto: number; // faturamento / quantidade (preço médio unitário)
   percentualQuantidade: number;
   percentualFaturamento: number;
 }
