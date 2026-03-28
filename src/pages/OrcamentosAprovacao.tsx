@@ -275,9 +275,11 @@ export default function OrcamentosAprovacao() {
   const [detailId, setDetailId]     = useState<string | null>(null);
   const [form, setForm]             = useState<BudgetForm>(EMPTY_FORM);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [formError, setFormError]   = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [approvalNotes, setApprovalNotes] = useState<ApprovalNotes>(EMPTY_NOTES);
 
-  useEffect(() => { setApprovalNotes(EMPTY_NOTES); }, [detailId]);
+  useEffect(() => { setApprovalNotes(EMPTY_NOTES); setUploadError(null); }, [detailId]);
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -374,24 +376,34 @@ export default function OrcamentosAprovacao() {
       }).select("id").single();
       if (error) throw error;
 
-      // 3. Upload any pending files
+      // 3. Upload any pending files — errors are non-fatal (budget already saved)
       if (files.length > 0 && budgetData?.id) {
-        await Promise.all(files.map(async (file) => {
+        const uploadResults = await Promise.allSettled(files.map(async (file) => {
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
           const path     = `${budgetData.id}/${Date.now()}-${safeName}`;
           const { error: storageErr } = await supabase.storage.from("budget-attachments").upload(path, file);
-          if (storageErr) throw storageErr;
+          if (storageErr) throw new Error(`${file.name}: ${storageErr.message}`);
           await (supabase.from("budget_attachments") as any).insert({
             budget_id: budgetData.id, file_name: file.name, file_path: path, file_size: file.size,
           });
         }));
+        const failed = uploadResults.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+        if (failed.length > 0) {
+          throw new Error(`Orçamento salvo, mas falha no upload: ${failed.map((f) => f.reason?.message).join("; ")}`);
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
+      setFormError(null);
       closeForm();
+    },
+    onError: (err: Error) => {
+      setFormError(err.message || "Erro ao salvar orçamento.");
+      queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
     },
   });
 
@@ -454,24 +466,34 @@ export default function OrcamentosAprovacao() {
         .eq("id", id);
       if (error) throw error;
 
-      // Upload any pending files
+      // Upload any pending files — errors are non-fatal (budget already saved)
       if (files.length > 0) {
-        await Promise.all(files.map(async (file) => {
+        const uploadResults = await Promise.allSettled(files.map(async (file) => {
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
           const path     = `${id}/${Date.now()}-${safeName}`;
           const { error: storageErr } = await supabase.storage.from("budget-attachments").upload(path, file);
-          if (storageErr) throw storageErr;
+          if (storageErr) throw new Error(`${file.name}: ${storageErr.message}`);
           await (supabase.from("budget_attachments") as any).insert({
             budget_id: id, file_name: file.name, file_path: path, file_size: file.size,
           });
         }));
+        const failed = uploadResults.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+        if (failed.length > 0) {
+          throw new Error(`Orçamento salvo, mas falha no upload: ${failed.map((f) => f.reason?.message).join("; ")}`);
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
+      setFormError(null);
       closeForm();
+    },
+    onError: (err: Error) => {
+      setFormError(err.message || "Erro ao salvar alterações.");
+      queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
     },
   });
 
@@ -520,7 +542,11 @@ export default function OrcamentosAprovacao() {
       });
       if (dbErr) throw dbErr;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] }),
+    onSuccess: () => {
+      setUploadError(null);
+      queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] });
+    },
+    onError: (err: Error) => setUploadError(err.message || "Erro ao enviar arquivo."),
   });
 
   const deleteAttachmentMutation = useMutation({
@@ -565,6 +591,7 @@ export default function OrcamentosAprovacao() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setPendingFiles([]);
+    setFormError(null);
   };
 
   const handleFormFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -849,7 +876,7 @@ export default function OrcamentosAprovacao() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => { setUploadError(null); fileInputRef.current?.click(); }}
                       disabled={uploadMutation.isPending}
                     >
                       <Paperclip className="h-3.5 w-3.5 mr-1" />
@@ -864,6 +891,12 @@ export default function OrcamentosAprovacao() {
                     className="hidden"
                     onChange={handleFileChange}
                   />
+
+                  {uploadError && (
+                    <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+                      ⚠ {uploadError}
+                    </div>
+                  )}
 
                   {attachments.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Nenhum arquivo anexado.</p>
@@ -1073,6 +1106,12 @@ export default function OrcamentosAprovacao() {
 
           </div>
 
+          {formError && (
+            <div className="mx-1 mb-1 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+              ⚠ {formError}
+            </div>
+          )}
+
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={closeForm}>Cancelar</Button>
             <Button
@@ -1083,7 +1122,7 @@ export default function OrcamentosAprovacao() {
                 isPending
               }
             >
-              {editingId ? "Salvar alterações" : "Criar orçamento"}
+              {isPending ? "Salvando…" : editingId ? "Salvar alterações" : "Criar orçamento"}
             </Button>
           </DialogFooter>
         </DialogContent>
