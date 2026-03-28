@@ -118,19 +118,21 @@ Deno.serve(async (req) => {
           .eq("id", comment.id)
           .single();
 
-        if (existing?.sentimento) continue; // já classificado
+        if (existing?.classified_at) continue; // só pula se foi realmente classificado
 
         // Classifica com Claude
-        let classification = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
+        let classification: Record<string, string> = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
+        let classifiedSuccessfully = false;
         try {
           classification = await classifyComment(comment.text, ANTHROPIC_KEY);
+          classifiedSuccessfully = true;
           classified++;
         } catch (e: any) {
           console.error(`Erro ao classificar: ${e.message}`);
         }
 
         // Salva no banco
-        await supabase.from("instagram_comments").upsert({
+        const row: Record<string, unknown> = {
           id: comment.id,
           media_id: post.id,
           media_caption: post.caption?.slice(0, 500) ?? "",
@@ -140,8 +142,12 @@ Deno.serve(async (req) => {
           text: comment.text,
           timestamp: comment.timestamp,
           ...classification,
-          respondido: existing?.sentimento ? existing.sentimento !== null : false,
-        }, { onConflict: "id" });
+          respondido: false,
+        };
+        if (classifiedSuccessfully) {
+          row.classified_at = new Date().toISOString();
+        }
+        await supabase.from("instagram_comments").upsert(row, { onConflict: "id" });
       }
     }
 
