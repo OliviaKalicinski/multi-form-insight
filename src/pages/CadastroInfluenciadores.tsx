@@ -37,6 +37,7 @@ interface InfluencerRaw {
   name_full_text: string;
   paym_pj_cnpj_text: string;
   paym_pj_razao_social_text: string;
+  paym_pf_cpf_text: string;
   email: string;
 }
 
@@ -47,6 +48,7 @@ interface Influencer {
   tiktok: string;
   whatsapp: string;
   cnpj: string;
+  cpf: string;
   razao_social: string;
   address: {
     logradouro: string;
@@ -68,6 +70,7 @@ interface InfluencerDBRow {
   tiktok: string;
   whatsapp: string;
   cnpj: string;
+  cpf: string;
   razao_social: string;
   address_logradouro: string;
   address_numero: string;
@@ -120,6 +123,7 @@ function parseInfluencerCSV(raw: string): Influencer[] {
       tiktok: r.contact_tiktok_text?.trim() || "",
       whatsapp: r.contact_whatsapp_text?.trim() || "",
       cnpj: r.paym_pj_cnpj_text?.trim() || "",
+      cpf: r.paym_pf_cpf_text?.trim() || "",
       razao_social: r.paym_pj_razao_social_text?.trim() || "",
       address: {
         logradouro: r.address_logradouro_text?.trim() || "",
@@ -142,6 +146,7 @@ function influencerDBRowToInfluencer(row: InfluencerDBRow): Influencer {
     tiktok: row.tiktok,
     whatsapp: row.whatsapp,
     cnpj: row.cnpj,
+    cpf: row.cpf || "",
     razao_social: row.razao_social,
     address: {
       logradouro: row.address_logradouro,
@@ -164,6 +169,7 @@ function influencerToDBRow(inf: Influencer): InfluencerDBRow {
     tiktok: inf.tiktok,
     whatsapp: inf.whatsapp,
     cnpj: inf.cnpj,
+    cpf: inf.cpf || "",
     razao_social: inf.razao_social,
     address_logradouro: inf.address.logradouro,
     address_numero: inf.address.numero,
@@ -575,6 +581,7 @@ export default function CadastroInfluenciadores() {
   ).length;
 
   const pjCount = influencersData.filter((i) => !!i.cnpj).length;
+  const pfCount = influencersData.filter((i) => !!i.cpf && !i.cnpj).length;
 
   const selectedLinkedCoupon = selected?.coupon ?? null;
   const selectedStats = selected ? getStats(selected.email) : null;
@@ -685,12 +692,14 @@ export default function CadastroInfluenciadores() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <Building2 className="h-3.5 w-3.5" /> Pessoa Jurídica
+                  <Building2 className="h-3.5 w-3.5" /> Documentos
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{pjCount}</div>
-                <p className="text-xs text-muted-foreground mt-0.5">com CNPJ cadastrado</p>
+                <div className="text-2xl font-bold">{pjCount + pfCount}</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {pjCount} CNPJ · {pfCount} CPF
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -915,6 +924,11 @@ export default function CadastroInfluenciadores() {
                   {selected.cnpj && (
                     <Badge variant="outline" className="text-xs">
                       PJ · {selected.cnpj}
+                    </Badge>
+                  )}
+                  {selected.cpf && !selected.cnpj && (
+                    <Badge variant="outline" className="text-xs">
+                      PF · {selected.cpf}
                     </Badge>
                   )}
                   {selectedLinkedCoupon && (
