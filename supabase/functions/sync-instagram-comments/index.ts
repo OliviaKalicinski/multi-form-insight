@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY não configurado");
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const limit = body.limit ?? 20;
+    const limit = body.limit ?? 50;
 
     // 1. Busca posts recentes
     const mediasData = await metaGet(`${IG_ACCOUNT_ID}/media`, META_TOKEN, {
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     const posts = mediasData.data ?? [];
     console.log(`Encontrados ${posts.length} posts`);
 
-    let totalComments = 0, classified = 0, errors = 0;
+    let totalComments = 0, classified = 0, skipped = 0, errors = 0;
 
     for (const post of posts) {
       // 2. Busca comentários de cada post
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
           .eq("id", comment.id)
           .single();
 
-        if (existing?.classified_at) continue; // já classificado pela IA — pula
+        if (existing?.classified_at) { skipped++; continue; } // já classificado pela IA — pula
 
         // Classifica com Claude
         let classification = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
@@ -143,7 +143,8 @@ Deno.serve(async (req) => {
           id: comment.id,
           media_id: post.id,
           media_caption: post.caption?.slice(0, 500) ?? "",
-          media_url: post.media_url ?? post.permalink ?? "",
+          media_url: post.media_url ?? "",
+          media_permalink: post.permalink ?? "",
           media_timestamp: post.timestamp,
           username: comment.username,
           text: comment.text,
@@ -162,6 +163,7 @@ Deno.serve(async (req) => {
       posts: posts.length,
       comments: totalComments,
       classified,
+      skipped,
       errors,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
