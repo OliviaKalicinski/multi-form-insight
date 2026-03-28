@@ -222,10 +222,32 @@ function textParts(raw: string): string[] {
 }
 
 /**
- * Tenta casar o coupon com a influenciadora por três critérios (em ordem):
- * 1. Handle do Instagram
- * 2. Primeiro nome / sobrenome
- * 3. Prefixo do e-mail (parte antes do @)
+ * Remove dígitos do final de um coupon para comparação de raiz.
+ * Ex: "BOLT10" → "bolt", "NALA10" → "nala"
+ */
+function couponRoot(coupon: string): string {
+  return coupon.toLowerCase().replace(/\d+$/, "");
+}
+
+/**
+ * Tenta casar o coupon com a influenciadora em quatro passagens (mais específica → mais tolerante):
+ *
+ * Passagem 1 — exato / prefixo direto
+ *   ex: coupon "ARYA"       bate com parte "arya"       (@arya.fiapa)
+ *   ex: coupon "ZEDALMEIDA" bate com parte "zed"        (@zed.almeida) via c.startsWith(part)
+ *
+ * Passagem 2 — coupon sem dígitos finais
+ *   ex: coupon "BOLT10"  → raiz "bolt"  bate com parte "bolthenriquee" via part.startsWith(root)
+ *   ex: coupon "NALA10"  → raiz "nala"  bate com parte "naladoguealemao"
+ *
+ * Passagem 3 — coupon contido dentro da parte (handle longo com prefixo)
+ *   ex: coupon "AZEITONA" está dentro de "itsazeitona"
+ *   ex: coupon "REALIXO"  está dentro de "eurealixo"
+ *
+ * Passagem 4 — raiz do coupon contida dentro da parte
+ *   ex: coupon "CEUZINHA" → raiz "ceuzinha" → handle "ceucadeirante" (começa com "ceu")
+ *
+ * Fontes tentadas em ordem: Instagram → nome completo → prefixo do e-mail
  */
 function suggestCoupon(influencer: Influencer, availableCoupons: string[]): string | null {
   if (!availableCoupons.length) return null;
@@ -235,17 +257,42 @@ function suggestCoupon(influencer: Influencer, availableCoupons: string[]): stri
   if (influencer.name)      sources.push(influencer.name);
   if (influencer.email)     sources.push(influencer.email.split("@")[0]);
 
-  for (const source of sources) {
-    const parts = textParts(source);
-    for (const part of parts) {
-      for (const coupon of availableCoupons) {
-        const c = coupon.toLowerCase();
-        if (c === part || part.startsWith(c) || c.startsWith(part)) {
-          return coupon;
-        }
-      }
+  // Junta todas as partes de todas as fontes num único array para comparação
+  const allParts = sources.flatMap(textParts);
+
+  // Passagem 1 — exato / prefixo direto
+  for (const part of allParts) {
+    for (const coupon of availableCoupons) {
+      const c = coupon.toLowerCase();
+      if (c === part || part.startsWith(c) || c.startsWith(part)) return coupon;
     }
   }
+
+  // Passagem 2 — raiz do coupon (sem dígitos finais) contra as partes
+  for (const part of allParts) {
+    for (const coupon of availableCoupons) {
+      const root = couponRoot(coupon);
+      if (root.length < 3) continue;
+      if (part === root || part.startsWith(root) || root.startsWith(part)) return coupon;
+    }
+  }
+
+  // Passagem 3 — coupon inteiro contido dentro de uma parte do handle
+  for (const part of allParts) {
+    for (const coupon of availableCoupons) {
+      const c = coupon.toLowerCase();
+      if (c.length >= 4 && part.includes(c)) return coupon;
+    }
+  }
+
+  // Passagem 4 — raiz do coupon contida dentro de uma parte do handle (ex: CEUZINHA → ceu)
+  for (const part of allParts) {
+    for (const coupon of availableCoupons) {
+      const root = couponRoot(coupon);
+      if (root.length >= 4 && part.includes(root)) return coupon;
+    }
+  }
+
   return null;
 }
 
