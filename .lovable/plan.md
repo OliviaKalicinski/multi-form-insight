@@ -2,9 +2,9 @@
 
 ## Deploy sync-instagram-comments
 
-Single action: deploy the `sync-instagram-comments` edge function to production using the Supabase deploy tool. No code changes needed.
+Deploy the `sync-instagram-comments` edge function to production. No code changes needed.
 
 ### Technical detail
 - Function: `supabase/functions/sync-instagram-comments/index.ts`
-- The build errors shown are in `ComentariosInstagram.tsx` (frontend), not in the edge function — they won't block the deploy.
+- The build error shown is in `process-nf-pdf/index.ts`, unrelated to this function and won't block the deploy.
 
