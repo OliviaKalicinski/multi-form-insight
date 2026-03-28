@@ -30,6 +30,7 @@ export const TopProductsChart = ({
     revenue: p.faturamentoTotal,
     orders: p.numeroPedidos,
     ticketMedio: p.ticketMedio,
+    ticketMedioProduto: p.ticketMedioProduto,
     isFreebie: p.ticketMedio <= 0.02, // Brindes
     originalIndex: index,
     sku: p.sku,
@@ -108,8 +109,10 @@ export const TopProductsChart = ({
                       <div className="font-semibold">{formatCurrency(item.revenue)}</div>
                       <div>Pedidos:</div>
                       <div className="font-semibold">{item.orders}</div>
-                      <div>Ticket Médio:</div>
+                      <div>TM Pedido:</div>
                       <div className="font-semibold">{formatCurrency(item.ticketMedio)}</div>
+                      <div>TM Produto:</div>
+                      <div className="font-semibold">{formatCurrency(item.ticketMedioProduto)}</div>
                       <div>Participação:</div>
                       <div className="font-semibold">{item.percentage.toFixed(1)}%</div>
                     </div>
