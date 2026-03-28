@@ -177,7 +177,7 @@ export default function PerformanceInfluenciadores() {
 
   // ── Influencer registry from Supabase ───────────────────────────────────
   const { data: influencers = [], isLoading: loadingInfluencers } = useQuery({
-    queryKey: ["influencer_registry"],
+    queryKey: ["influencer-registry"],
     queryFn: async () => {
       // Usa select("*") para não quebrar caso a coluna cpf ainda não exista no banco
       const { data, error } = await (supabase.from("influencer_registry") as any)
