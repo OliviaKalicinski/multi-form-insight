@@ -165,16 +165,37 @@ Deno.serve(async (req) => {
       for (const comment of allComments) {
         totalComments++;
 
-        // Verifica se já foi classificado
+        // Verifica se já existe no banco
         const { data: existing } = await (supabase as any)
           .from("instagram_comments")
-          .select("id, respondido, classified_at")
+          .select("id, respondido, resposta_texto, classified_at")
           .eq("id", comment.id)
           .single();
 
-        if (existing?.classified_at) { skipped++; continue; }
+        // Detecta se a marca já respondeu este comentário (roda SEMPRE, mesmo se já classificado)
+        let respondido = existing?.respondido ?? false;
+        let respostaTexto = existing?.resposta_texto ?? "";
+        const replies = comment.replies?.data ?? [];
+        for (const reply of replies) {
+          if (reply.username === BRAND_USERNAME) {
+            respondido = true;
+            respostaTexto = reply.text ?? "";
+            break;
+          }
+        }
 
-        // Classifica com Claude
+        // Se já classificado, só atualiza respondido/resposta_texto se mudou
+        if (existing?.classified_at) {
+          if (respondido !== (existing.respondido ?? false) || respostaTexto !== (existing.resposta_texto ?? "")) {
+            await (supabase as any).from("instagram_comments")
+              .update({ respondido, resposta_texto: respostaTexto })
+              .eq("id", comment.id);
+          }
+          skipped++;
+          continue;
+        }
+
+        // Classifica com Claude (só comentários novos)
         let classification = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
         let classifiedAt: string | null = null;
         try {
@@ -184,18 +205,6 @@ Deno.serve(async (req) => {
         } catch (e: any) {
           console.error(`Erro ao classificar: ${e.message}`);
           errors++;
-        }
-
-        // Detecta se a marca já respondeu este comentário
-        let respondido = existing?.respondido ?? false;
-        let respostaTexto = "";
-        const replies = comment.replies?.data ?? [];
-        for (const reply of replies) {
-          if (reply.username === BRAND_USERNAME) {
-            respondido = true;
-            respostaTexto = reply.text ?? "";
-            break;
-          }
         }
 
         // Salva no banco
