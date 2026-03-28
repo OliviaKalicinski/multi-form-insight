@@ -1,10 +1,10 @@
 
 
-## Fix: Normalize query key in PerformanceInfluenciadores.tsx
+## Deploy sync-instagram-comments
 
-**Problem:** The query key `["influencer_registry"]` in `PerformanceInfluenciadores.tsx` differs from `["influencer-registry"]` used in `CadastroInfluenciadores.tsx`. This means invalidating the cache after saving a CPF in Cadastro doesn't refresh the Performance page data.
+Single action: deploy the `sync-instagram-comments` edge function to production using the Supabase deploy tool. No code changes needed.
 
-**Change:** In `src/pages/PerformanceInfluenciadores.tsx`, update the `queryKey` from `["influencer_registry"]` to `["influencer-registry"]`.
-
-Single-line change, no other files affected.
+### Technical detail
+- Function: `supabase/functions/sync-instagram-comments/index.ts`
+- The build errors shown are in `ComentariosInstagram.tsx` (frontend), not in the edge function — they won't block the deploy.
 
