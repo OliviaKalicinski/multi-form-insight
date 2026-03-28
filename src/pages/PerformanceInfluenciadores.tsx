@@ -11,8 +11,12 @@ import {
 } from "@/components/ui/table";
 import {
   Upload, TrendingUp, ShoppingCart, DollarSign, Package,
-  Search, ChevronDown, ChevronUp, X, AlertCircle, User,
+  Search, ChevronDown, ChevronUp, X, AlertCircle, User, Wallet,
 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell, Legend,
+} from "recharts";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -434,6 +438,68 @@ export default function PerformanceInfluenciadores() {
     () => bonifFiltered.reduce((s, r) => s + (r.valor_total || 0), 0),
     [bonifFiltered]
   );
+  const totalInvestido  = totalCommission + totalBonificado;
+  const lucroLiquido    = totalGMV - totalInvestido;
+  const roiMedio        = totalInvestido > 0 ? totalGMV / totalInvestido : null;
+
+  // ── Chart data ────────────────────────────────────────────────────────────
+
+  // GMV mensal
+  const gmvByMonth = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of filteredRows) {
+      const key = format(row.date_sale, "MMM/yy", { locale: ptBR });
+      map.set(key, (map.get(key) || 0) + row.order_value);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => {
+        const aIdx = filteredRows.findIndex(r => format(r.date_sale, "MMM/yy", { locale: ptBR }) === a[0]);
+        const bIdx = filteredRows.findIndex(r => format(r.date_sale, "MMM/yy", { locale: ptBR }) === b[0]);
+        return aIdx - bIdx;
+      })
+      .map(([month, gmv]) => ({ month, gmv: parseFloat(gmv.toFixed(2)) }));
+  }, [filteredRows]);
+
+  // Top 10 por GMV
+  const top10gmv = useMemo(() =>
+    stats.slice(0, 10).map((s) => {
+      const inf = influencerByCoupon.get(s.coupon);
+      return {
+        name: inf?.name?.split(" ")[0] || s.coupon,
+        gmv: parseFloat(s.gmv.toFixed(2)),
+        comissao: parseFloat(s.commission.toFixed(2)),
+      };
+    }).reverse(),
+  [stats, influencerByCoupon]);
+
+  // Ticket médio top 10
+  const ticketData = useMemo(() =>
+    stats.slice(0, 10).map((s) => {
+      const inf = influencerByCoupon.get(s.coupon);
+      return {
+        name: inf?.name?.split(" ")[0] || s.coupon,
+        ticket: parseFloat(s.avg_ticket.toFixed(2)),
+        pedidos: s.total_orders,
+      };
+    }),
+  [stats, influencerByCoupon]);
+
+  // Produtos mais vendidos (donut)
+  const CHART_COLORS = ["#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6","#8b5cf6","#ec4899","#14b8a6"];
+  const productData = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of stats) {
+      for (const [p, qty] of Object.entries(s.products)) {
+        map.set(p, (map.get(p) || 0) + qty);
+      }
+    }
+    const sorted = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    const top7 = sorted.slice(0, 7);
+    const outros = sorted.slice(7).reduce((acc, [, q]) => acc + q, 0);
+    const result = top7.map(([name, value]) => ({ name, value }));
+    if (outros > 0) result.push({ name: "Outros", value: outros });
+    return result;
+  }, [stats]);
 
   // Coupon com melhor ROI (para badge 🏆)
   const topRoiCoupon = useMemo(() => {
@@ -442,8 +508,9 @@ export default function PerformanceInfluenciadores() {
     for (const s of stats) {
       const bonifs = bonifByCoupon.get(s.coupon) ?? [];
       const totalB = bonifs.reduce((acc, r) => acc + (r.valor_total || 0), 0);
-      if (totalB > 0) {
-        const roi = s.gmv / totalB;
+      const totalCost = s.commission + totalB;
+      if (totalCost > 0) {
+        const roi = s.gmv / totalCost;
         if (roi > bestRoi) { bestRoi = roi; best = s.coupon; }
       }
     }
@@ -463,9 +530,10 @@ export default function PerformanceInfluenciadores() {
     }
     const getBonif = (coupon: string) =>
       (bonifByCoupon.get(coupon) ?? []).reduce((s, r) => s + (r.valor_total || 0), 0);
-    const getRoi = (coupon: string, gmv: number) => {
+    const getRoi = (coupon: string, gmv: number, commission: number) => {
       const b = getBonif(coupon);
-      return b > 0 ? gmv / b : -1; // -1 = sem bonificação (fica por último)
+      const cost = commission + b;
+      return cost > 0 ? gmv / cost : -1; // -1 = sem custo registrado (fica por último)
     };
 
     list.sort((a, b) => {
@@ -475,8 +543,8 @@ export default function PerformanceInfluenciadores() {
         an = getBonif(a.coupon);
         bn = getBonif(b.coupon);
       } else if (sortField === "roi") {
-        an = getRoi(a.coupon, a.gmv);
-        bn = getRoi(b.coupon, b.gmv);
+        an = getRoi(a.coupon, a.gmv, a.commission);
+        bn = getRoi(b.coupon, b.gmv, b.commission);
       } else {
         const av = a[sortField];
         const bv = b[sortField];
@@ -606,7 +674,7 @@ export default function PerformanceInfluenciadores() {
       {rows.length > 0 && (
         <>
           {/* KPI cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
@@ -638,7 +706,7 @@ export default function PerformanceInfluenciadores() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <Package className="h-3.5 w-3.5" /> Total Bonificado
+                  <Package className="h-3.5 w-3.5" /> Bonificações
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -646,7 +714,7 @@ export default function PerformanceInfluenciadores() {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {loadingBonif
                     ? "carregando..."
-                    : `${bonifFiltered.length} NF(s) de bonificação`}
+                    : `${bonifFiltered.length} NF(s) · total investido ${fmt(totalInvestido)}`}
                 </p>
               </CardContent>
             </Card>
@@ -654,15 +722,112 @@ export default function PerformanceInfluenciadores() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <ShoppingCart className="h-3.5 w-3.5" /> Pedidos
+                  <Wallet className="h-3.5 w-3.5" /> Lucro Líquido
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${lucroLiquido >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {fmt(lucroLiquido)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">GMV − comissões − bonif.</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <ShoppingCart className="h-3.5 w-3.5" /> Pedidos · ROI Médio
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{totalOrders}</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {stats.length} coupons · ticket médio{" "}
-                  {totalOrders > 0 ? fmt(totalGMV / totalOrders) : "—"}
+                  {roiMedio !== null ? (
+                    <span className={roiMedio >= 3 ? "text-green-600 font-semibold" : roiMedio >= 1 ? "text-amber-600 font-semibold" : "text-red-600 font-semibold"}>
+                      ROI {roiMedio.toFixed(1)}x
+                    </span>
+                  ) : "ROI —"}{" "}
+                  · ticket {totalOrders > 0 ? fmt(totalGMV / totalOrders) : "—"}
                 </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* GMV mensal */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">GMV por mês</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={gmvByMonth} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(v: number) => fmt(v)} />
+                    <Line type="monotone" dataKey="gmv" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} name="GMV" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Top 10 por GMV */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Top 10 por GMV</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={top10gmv} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={68} />
+                    <Tooltip formatter={(v: number) => fmt(v)} />
+                    <Bar dataKey="gmv" fill="#6366f1" name="GMV" radius={[0, 3, 3, 0]} />
+                    <Bar dataKey="comissao" fill="#f59e0b" name="Comissão" radius={[0, 3, 3, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Ticket médio */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Ticket médio por influenciadora</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={ticketData} margin={{ top: 4, right: 16, left: 0, bottom: 32 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `R$${v}`} />
+                    <Tooltip formatter={(v: number, name: string) => name === "ticket" ? fmt(v) : `${v} pedidos`} />
+                    <Bar dataKey="ticket" fill="#10b981" name="ticket" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Produtos mais vendidos */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Produtos mais vendidos</CardTitle>
+              </CardHeader>
+              <CardContent className="flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={productData} cx="50%" cy="50%" innerRadius={55} outerRadius={85}
+                      dataKey="value" nameKey="name" paddingAngle={2}>
+                      {productData.map((_, idx) => (
+                        <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number, name: string) => [`${v} vendas`, name]} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
@@ -759,8 +924,8 @@ export default function PerformanceInfluenciadores() {
                         (acc, r) => acc + (r.valor_total || 0),
                         0
                       );
-                      const roi =
-                        totalBonifInflu > 0 ? s.gmv / totalBonifInflu : null;
+                      const totalCostInflu = s.commission + totalBonifInflu;
+                      const roi = totalCostInflu > 0 ? s.gmv / totalCostInflu : null;
 
                       return (
                         <Fragment key={s.coupon}>
@@ -960,7 +1125,7 @@ export default function PerformanceInfluenciadores() {
                                         {roi !== null && (
                                           <div className="flex items-center justify-between text-xs">
                                             <span className="text-muted-foreground">
-                                              ROI (GMV ÷ bonificado)
+                                              ROI (GMV ÷ comissão + bonif.)
                                             </span>
                                             <Badge
                                               variant={
