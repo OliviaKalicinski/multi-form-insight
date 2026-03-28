@@ -17,7 +17,7 @@ import {
 import {
   Upload, Search, X, Instagram, Phone, Mail, MapPin, Building2,
   TrendingUp, Link2, Users, User, LinkIcon, Zap, CheckCircle2, AlertCircle,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -459,6 +459,10 @@ export default function CadastroInfluenciadores() {
     else { setSortField(field); setSortAsc(true); }
   };
 
+  // Edit mode for profile sheet
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState<Influencer | null>(null);
+
   // Auto-link dialog state
   const [autoLinkOpen, setAutoLinkOpen] = useState(false);
 
@@ -554,6 +558,20 @@ export default function CadastroInfluenciadores() {
           .eq("email", email);
         if (error) throw error;
       }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer-registry"] });
+    },
+  });
+
+  // Mutation: Update influencer fields
+  const updateInfluencerMutation = useMutation({
+    mutationFn: async (inf: Influencer) => {
+      const { coupon, ...row } = influencerToDBRow(inf);
+      const { error } = await (supabase.from("influencer_registry") as any)
+        .update({ ...row, coupon: inf.coupon })
+        .eq("email", inf.email);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["influencer-registry"] });
@@ -688,6 +706,30 @@ export default function CadastroInfluenciadores() {
   const openProfile = (inf: Influencer) => {
     setSelected(inf);
     setEditingCoupon(inf.coupon ?? "none");
+    setEditMode(false);
+    setEditData(null);
+  };
+
+  const startEdit = () => {
+    if (!selected) return;
+    setEditData({ ...selected, address: { ...selected.address } });
+    setEditMode(true);
+  };
+
+  const cancelEdit = () => {
+    setEditMode(false);
+    setEditData(null);
+  };
+
+  const saveEdit = () => {
+    if (!editData) return;
+    updateInfluencerMutation.mutate(editData, {
+      onSuccess: () => {
+        setSelected(editData);
+        setEditMode(false);
+        setEditData(null);
+      },
+    });
   };
 
   const saveLink = () => {
@@ -1167,31 +1209,112 @@ export default function CadastroInfluenciadores() {
       </Dialog>
 
       {/* ── Profile Sheet ───────────────────────────────────────────────────── */}
-      <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
+      <Sheet open={!!selected} onOpenChange={(o) => { if (!o) { setSelected(null); setEditMode(false); setEditData(null); } }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {selected && (
             <div className="space-y-6 pb-8">
               <SheetHeader>
-                <SheetTitle className="text-xl">{selected.name}</SheetTitle>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {selected.cnpj && (
-                    <Badge variant="outline" className="text-xs">
-                      PJ · {selected.cnpj}
-                    </Badge>
-                  )}
-                  {selected.cpf && !selected.cnpj && (
-                    <Badge variant="outline" className="text-xs">
-                      PF · {selected.cpf}
-                    </Badge>
-                  )}
-                  {selectedLinkedCoupon && (
-                    <Badge variant="secondary" className="font-mono text-xs">
-                      Coupon: {selectedLinkedCoupon}
-                    </Badge>
+                <div className="flex items-start justify-between gap-2">
+                  <SheetTitle className="text-xl">{editMode ? "Editar cadastro" : selected.name}</SheetTitle>
+                  {!editMode && (
+                    <Button variant="outline" size="sm" onClick={startEdit} className="shrink-0 mt-0.5">
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                    </Button>
                   )}
                 </div>
+                {!editMode && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {selected.cnpj && (
+                      <Badge variant="outline" className="text-xs">PJ · {selected.cnpj}</Badge>
+                    )}
+                    {selected.cpf && !selected.cnpj && (
+                      <Badge variant="outline" className="text-xs">PF · {selected.cpf}</Badge>
+                    )}
+                    {selectedLinkedCoupon && (
+                      <Badge variant="secondary" className="font-mono text-xs">Coupon: {selectedLinkedCoupon}</Badge>
+                    )}
+                  </div>
+                )}
               </SheetHeader>
 
+              {/* ── Edit Mode ── */}
+              {editMode && editData && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <label className="text-xs font-medium text-muted-foreground">Nome completo</label>
+                      <Input className="mt-1" value={editData.name} onChange={(e) => setEditData({ ...editData, name: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Instagram</label>
+                      <Input className="mt-1" value={editData.instagram} onChange={(e) => setEditData({ ...editData, instagram: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">TikTok</label>
+                      <Input className="mt-1" value={editData.tiktok} onChange={(e) => setEditData({ ...editData, tiktok: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">WhatsApp</label>
+                      <Input className="mt-1" value={editData.whatsapp} onChange={(e) => setEditData({ ...editData, whatsapp: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">CPF</label>
+                      <Input className="mt-1" value={editData.cpf} onChange={(e) => setEditData({ ...editData, cpf: e.target.value })} placeholder="000.000.000-00" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">CNPJ</label>
+                      <Input className="mt-1" value={editData.cnpj} onChange={(e) => setEditData({ ...editData, cnpj: e.target.value })} placeholder="00.000.000/0001-00" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs font-medium text-muted-foreground">Razão Social</label>
+                      <Input className="mt-1" value={editData.razao_social} onChange={(e) => setEditData({ ...editData, razao_social: e.target.value })} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Endereço</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2">
+                        <label className="text-xs font-medium text-muted-foreground">Logradouro</label>
+                        <Input className="mt-1" value={editData.address.logradouro} onChange={(e) => setEditData({ ...editData, address: { ...editData.address, logradouro: e.target.value } })} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Número</label>
+                        <Input className="mt-1" value={editData.address.numero} onChange={(e) => setEditData({ ...editData, address: { ...editData.address, numero: e.target.value } })} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Complemento</label>
+                        <Input className="mt-1" value={editData.address.complemento} onChange={(e) => setEditData({ ...editData, address: { ...editData.address, complemento: e.target.value } })} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Bairro</label>
+                        <Input className="mt-1" value={editData.address.bairro} onChange={(e) => setEditData({ ...editData, address: { ...editData.address, bairro: e.target.value } })} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">CEP</label>
+                        <Input className="mt-1" value={editData.address.cep} onChange={(e) => setEditData({ ...editData, address: { ...editData.address, cep: e.target.value } })} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Cidade</label>
+                        <Input className="mt-1" value={editData.address.cidade} onChange={(e) => setEditData({ ...editData, address: { ...editData.address, cidade: e.target.value } })} />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Estado (UF)</label>
+                        <Input className="mt-1" value={editData.address.estado} maxLength={2} onChange={(e) => setEditData({ ...editData, address: { ...editData.address, estado: e.target.value.toUpperCase() } })} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button className="flex-1" onClick={saveEdit} disabled={updateInfluencerMutation.isPending}>
+                      <CheckCircle2 className="h-4 w-4 mr-1" /> Salvar alterações
+                    </Button>
+                    <Button variant="outline" onClick={cancelEdit}>Cancelar</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── View Mode ── */}
+              {!editMode && (
+                <>
               {/* Contact */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
@@ -1370,6 +1493,8 @@ export default function CadastroInfluenciadores() {
                   Coupon <strong>{selectedLinkedCoupon}</strong> vinculado, mas sem dados de
                   vendas. Importe a planilha na página <strong>Performance</strong>.
                 </div>
+              )}
+                </>
               )}
             </div>
           )}
