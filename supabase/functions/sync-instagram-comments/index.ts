@@ -1,13 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const IG_ACCOUNT_ID = "17841470017662704";
+const META_API = "https://graph.facebook.com/v19.0";
+const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const IG_ACCOUNT_ID = "17841470017662704";
-const META_API = "https://graph.facebook.com/v19.0";
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 
 async function metaGet(path: string, token: string, params: Record<string, string> = {}) {
   const url = new URL(`${META_API}/${path}`);
@@ -40,10 +40,16 @@ async function classifyComment(text: string, anthropicKey: string): Promise<{
 Responda APENAS com este JSON:
 {
   "sentimento": "positivo" | "negativo" | "neutro",
-  "categoria": "elogio" | "reclamação" | "dúvida" | "risco" | "outro",
+  "categoria": "elogio" | "reclamação" | "duvida_oportunidade" | "risco" | "outro",
   "risco": "baixo" | "medio" | "alto" | "critico",
   "risco_motivo": "breve explicação se risco for medio/alto/critico, caso contrário string vazia"
 }
+
+Categoria "duvida_oportunidade": perguntas sobre o produto, ingredientes, onde comprar, para qual pet serve, qual sabor, disponibilidade, preço — qualquer comentário que indique interesse ou curiosidade com potencial de virar venda. Ex: "onde compro?", "tem para gato?", "qual o melhor sabor?", "quero experimentar".
+Categoria "elogio": comentários positivos, aprovação, agradecimento.
+Categoria "reclamação": insatisfação com produto, entrega ou atendimento.
+Categoria "risco": ameaças à marca, processos, órgãos reguladores.
+Categoria "outro": tudo que não se encaixa acima.
 
 Risco "critico": menção a doença, intoxicação, morte de animal, anvisa, procon, processo.
 Risco "alto": reclamação grave de qualidade, produto estragado, alergia.
@@ -58,6 +64,7 @@ Risco "baixo": tudo mais.`,
   try {
     return JSON.parse(raw);
   } catch {
+    // fallback sem classified_at — será reclassificado na próxima sync
     return { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
   }
 }
@@ -79,7 +86,7 @@ Deno.serve(async (req) => {
     if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_API_KEY não configurado");
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const limit = body.limit ?? 20; // posts recentes a buscar
+    const limit = body.limit ?? 20;
 
     // 1. Busca posts recentes
     const mediasData = await metaGet(`${IG_ACCOUNT_ID}/media`, META_TOKEN, {
@@ -111,28 +118,28 @@ Deno.serve(async (req) => {
       for (const comment of comments) {
         totalComments++;
 
-        // Verifica se já existe
-        const { data: existing } = await supabase
+        // Verifica se já foi classificado de verdade (classified_at preenchido)
+        const { data: existing } = await (supabase as any)
           .from("instagram_comments")
-          .select("id, sentimento")
+          .select("id, respondido, classified_at")
           .eq("id", comment.id)
           .single();
 
-        if (existing?.classified_at) continue; // só pula se foi realmente classificado
+        if (existing?.classified_at) continue; // já classificado pela IA — pula
 
         // Classifica com Claude
-        let classification: Record<string, string> = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
-        let classifiedSuccessfully = false;
+        let classification = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
+        let classifiedAt: string | null = null;
         try {
           classification = await classifyComment(comment.text, ANTHROPIC_KEY);
-          classifiedSuccessfully = true;
+          classifiedAt = new Date().toISOString(); // só seta se Anthropic retornou com sucesso
           classified++;
         } catch (e: any) {
           console.error(`Erro ao classificar: ${e.message}`);
         }
 
-        // Salva no banco
-        const row: Record<string, unknown> = {
+        // Salva no banco — preserva respondido existente, só seta classified_at se classificou
+        const row: any = {
           id: comment.id,
           media_id: post.id,
           media_caption: post.caption?.slice(0, 500) ?? "",
@@ -141,13 +148,12 @@ Deno.serve(async (req) => {
           username: comment.username,
           text: comment.text,
           timestamp: comment.timestamp,
+          respondido: existing?.respondido ?? false,
           ...classification,
-          respondido: false,
         };
-        if (classifiedSuccessfully) {
-          row.classified_at = new Date().toISOString();
-        }
-        await supabase.from("instagram_comments").upsert(row, { onConflict: "id" });
+        if (classifiedAt) row.classified_at = classifiedAt;
+
+        await (supabase as any).from("instagram_comments").upsert(row, { onConflict: "id" });
       }
     }
 
