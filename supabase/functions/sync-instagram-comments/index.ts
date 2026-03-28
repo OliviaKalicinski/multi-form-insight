@@ -1,5 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 const IG_ACCOUNT_ID = "17841470017662704";
 const META_API = "https://graph.facebook.com/v19.0";
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
