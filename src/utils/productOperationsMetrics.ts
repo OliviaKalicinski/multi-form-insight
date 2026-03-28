@@ -63,6 +63,7 @@ export const analyzeTopProductsByQuantity = (orders: ProcessedOrder[], limit: nu
     faturamentoTotal: data.faturamento,
     numeroPedidos: data.pedidos.size,
     ticketMedio: data.faturamento / data.pedidos.size,
+    ticketMedioProduto: data.quantidade > 0 ? data.faturamento / data.quantidade : 0,
     percentualQuantidade: (data.quantidade / totalQuantidade) * 100,
     percentualFaturamento: (data.faturamento / totalFaturamento) * 100,
   }));
@@ -397,6 +398,7 @@ export const calculateProductOperationsMetrics = (
     faturamentoTotal: f.quantidadeTotal * 0.01, // R$ 0,01 fixo
     numeroPedidos: f.numeroPedidos,
     ticketMedio: 0.01,
+    ticketMedioProduto: 0.01,
     percentualQuantidade: 0, // Será recalculado
     percentualFaturamento: 0, // Será recalculado
   }));
