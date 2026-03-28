@@ -65,6 +65,7 @@ interface Influencer {
   name: string;
   instagram: string;
   cnpj?: string;
+  cpf?: string;
 }
 
 // ─── Storage keys (legacy, kept for reference) ────────────────────────────────────
@@ -179,7 +180,7 @@ export default function PerformanceInfluenciadores() {
     queryKey: ["influencer_registry"],
     queryFn: async () => {
       const { data, error } = await (supabase.from("influencer_registry") as any)
-        .select("email, name, instagram, tiktok, cnpj, coupon")
+        .select("email, name, instagram, tiktok, cnpj, cpf, coupon")
         .order("name", { ascending: true });
       if (error) throw error;
       return (data || []) as Array<{
@@ -188,6 +189,7 @@ export default function PerformanceInfluenciadores() {
         instagram: string;
         tiktok?: string;
         cnpj?: string;
+        cpf?: string;
         coupon: string | null;
       }>;
     },
@@ -215,6 +217,7 @@ export default function PerformanceInfluenciadores() {
           name: inf.name,
           instagram: inf.instagram || "",
           cnpj: inf.cnpj,
+          cpf: inf.cpf,
         });
       }
     }
@@ -256,12 +259,14 @@ export default function PerformanceInfluenciadores() {
       if (row.cliente_email) {
         coupon = couponByEmail.get(row.cliente_email.toLowerCase());
       }
-      // 2. Fallback: match by CPF/CNPJ
+      // 2. Fallback: match by CPF (PF) ou CNPJ (PJ)
       if (!coupon && row.cpf_cnpj) {
         const normDoc = row.cpf_cnpj.replace(/\D/g, "");
         if (normDoc) {
           for (const inf of influencers) {
-            if (inf.cnpj && inf.cnpj.replace(/\D/g, "") === normDoc) {
+            const cnpjMatch = inf.cnpj && inf.cnpj.replace(/\D/g, "") === normDoc;
+            const cpfMatch  = inf.cpf  && inf.cpf.replace(/\D/g, "")  === normDoc;
+            if (cnpjMatch || cpfMatch) {
               coupon = couponByEmail.get(inf.email.toLowerCase());
               break;
             }
