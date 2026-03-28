@@ -380,6 +380,21 @@ export default function PerformanceInfluenciadores() {
     [bonifFiltered]
   );
 
+  // Coupon com melhor ROI (para badge 🏆)
+  const topRoiCoupon = useMemo(() => {
+    let best: string | null = null;
+    let bestRoi = 0;
+    for (const s of stats) {
+      const bonifs = bonifByCoupon.get(s.coupon) ?? [];
+      const totalB = bonifs.reduce((acc, r) => acc + (r.valor_total || 0), 0);
+      if (totalB > 0) {
+        const roi = s.gmv / totalB;
+        if (roi > bestRoi) { bestRoi = roi; best = s.coupon; }
+      }
+    }
+    return best;
+  }, [stats, bonifByCoupon]);
+
   const displayed = useMemo(() => {
     let list = [...stats];
     if (search) {
@@ -693,16 +708,16 @@ export default function PerformanceInfluenciadores() {
                                       <span className="font-semibold font-mono">
                                         {s.coupon}
                                       </span>
-                                      {i === 0 && (
+                                      {s.coupon === topRoiCoupon && (
                                         <Badge className="text-[10px] px-1.5 py-0">
-                                          🏆 Top
+                                          🏆 Top ROI
                                         </Badge>
                                       )}
                                     </div>
                                   )}
-                                  {inf && i === 0 && (
+                                  {inf && s.coupon === topRoiCoupon && (
                                     <Badge className="text-[10px] px-1.5 py-0 mt-0.5">
-                                      🏆 Top
+                                      🏆 Top ROI
                                     </Badge>
                                   )}
                                 </div>
