@@ -1,6 +1,6 @@
-import { Fragment, useState, useMemo, useRef } from "react";
+import { Fragment, useState, useMemo, useRef, useCallback } from "react";
 import Papa from "papaparse";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,12 +64,14 @@ interface Influencer {
   email: string;
   name: string;
   instagram: string;
+  cnpj?: string;
 }
 
-// ─── Storage keys ─────────────────────────────────────────────────────────────
-const STORAGE_KEY = "influencer_performance_csv";
-const REGISTRY_KEY = "influencer_registry";
-const LINKS_KEY = "influencer_coupon_links";
+// ─── Storage keys (legacy, kept for reference) ────────────────────────────────────
+// Data now comes from Supabase tables instead of localStorage
+// const STORAGE_KEY = "influencer_performance_csv";
+// const REGISTRY_KEY = "influencer_registry";
+// const LINKS_KEY = "influencer_coupon_links";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function parseBRNumber(raw: string): number {
@@ -167,43 +169,57 @@ function fmtDate(d: Date | null | undefined): string {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function PerformanceInfluenciadores() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
 
   // Filtro global do dashboard
   const { dateRange } = useDashboard();
 
-  // ── Influencer registry + coupon links (localStorage) ───────────────────
-  const influencers = useMemo<Influencer[]>(() => {
-    try {
-      const s = localStorage.getItem(REGISTRY_KEY);
-      return s ? JSON.parse(s) : [];
-    } catch { return []; }
-  }, []);
+  // ── Influencer registry from Supabase ───────────────────────────────────
+  const { data: influencers = [], isLoading: loadingInfluencers } = useQuery({
+    queryKey: ["influencer_registry"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("influencer_registry") as any)
+        .select("email, name, instagram, tiktok, cnpj, coupon")
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data || []) as Array<{
+        email: string;
+        name: string;
+        instagram: string;
+        tiktok?: string;
+        cnpj?: string;
+        coupon: string | null;
+      }>;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const couponLinks = useMemo<Record<string, string>>(() => {
-    try {
-      const s = localStorage.getItem(LINKS_KEY);
-      return s ? JSON.parse(s) : {};
-    } catch { return {}; }
-  }, []);
+  // Derive coupon maps from influencer registry
+  const couponByEmail = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const inf of influencers) {
+      if (inf.coupon) {
+        map.set(inf.email.toLowerCase(), inf.coupon);
+      }
+    }
+    return map;
+  }, [influencers]);
 
   // Reverse map: coupon → influencer
   const influencerByCoupon = useMemo(() => {
     const map = new Map<string, Influencer>();
-    for (const [email, coupon] of Object.entries(couponLinks)) {
-      const inf = influencers.find((i) => i.email === email);
-      if (inf) map.set(coupon, inf);
+    for (const inf of influencers) {
+      if (inf.coupon) {
+        map.set(inf.coupon, {
+          email: inf.email,
+          name: inf.name,
+          instagram: inf.instagram || "",
+          cnpj: inf.cnpj,
+        });
+      }
     }
     return map;
-  }, [influencers, couponLinks]);
-
-  // Reverse map: influencer email → coupon
-  const couponByEmail = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const [email, coupon] of Object.entries(couponLinks)) {
-      map.set(email.toLowerCase(), coupon);
-    }
-    return map;
-  }, [couponLinks]);
+  }, [influencers]);
 
   // ── NFs de bonificação (sales_data com tipo_movimento = 'bonificacao') ──
   const { data: bonifRaw = [], isLoading: loadingBonif } = useQuery({
@@ -240,7 +256,19 @@ export default function PerformanceInfluenciadores() {
       if (row.cliente_email) {
         coupon = couponByEmail.get(row.cliente_email.toLowerCase());
       }
-      // 2. Fallback: match by name
+      // 2. Fallback: match by CPF/CNPJ
+      if (!coupon && row.cpf_cnpj) {
+        const normDoc = row.cpf_cnpj.replace(/\D/g, "");
+        if (normDoc) {
+          for (const inf of influencers) {
+            if (inf.cnpj && inf.cnpj.replace(/\D/g, "") === normDoc) {
+              coupon = couponByEmail.get(inf.email.toLowerCase());
+              break;
+            }
+          }
+        }
+      }
+      // 3. Fallback: match by name
       if (!coupon && row.cliente_nome) {
         const normRow = normalizeName(row.cliente_nome);
         for (const inf of influencers) {
@@ -257,14 +285,63 @@ export default function PerformanceInfluenciadores() {
     return map;
   }, [bonifFiltered, couponByEmail, influencers]);
 
-  // ── CSV local ────────────────────────────────────────────────────────────
-  const [rows, setRows] = useState<SaleRow[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved
-        ? JSON.parse(saved, (k, v) => (k === "date_sale" ? new Date(v) : v))
-        : [];
-    } catch { return []; }
+  // ── CSV data from Supabase ───────────────────────────────────────────────
+  const { data: rows = [], isLoading: loadingRows, refetch: refetchRows } = useQuery({
+    queryKey: ["influencer_sales"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("influencer_sales") as any)
+        .select("coupon, date_sale, order_id, order_value, payment_value, products")
+        .order("date_sale", { ascending: false });
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
+        coupon: row.coupon,
+        date_sale: new Date(row.date_sale),
+        order_id: row.order_id,
+        order_value: row.order_value || 0,
+        payment_value: row.payment_value || 0,
+        products: row.products || [],
+      })) as SaleRow[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Mutation for upserting sales data
+  const upsertSalesMutation = useMutation({
+    mutationFn: async (salesData: SaleRow[]) => {
+      // Transform date back to string for Supabase
+      const transformed = salesData.map((row) => ({
+        coupon: row.coupon,
+        date_sale: row.date_sale.toISOString().split("T")[0],
+        order_id: row.order_id,
+        order_value: row.order_value,
+        payment_value: row.payment_value,
+        products: row.products,
+        imported_at: new Date().toISOString(),
+      }));
+
+      // Upsert with conflict resolution on (order_id, coupon)
+      const { error } = await (supabase.from("influencer_sales") as any)
+        .upsert(transformed, {
+          onConflict: "order_id,coupon",
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer_sales"] });
+    },
+  });
+
+  // Mutation for deleting all sales data
+  const deleteAllSalesMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase.from("influencer_sales") as any)
+        .delete()
+        .neq("coupon", ""); // Delete all rows
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer_sales"] });
+    },
   });
 
   const [search, setSearch] = useState("");
@@ -279,8 +356,7 @@ export default function PerformanceInfluenciadores() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const parsed = parseCSV(ev.target?.result as string);
-      setRows(parsed);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      upsertSalesMutation.mutate(parsed);
     };
     reader.readAsText(file, "UTF-8");
     e.target.value = "";
@@ -359,8 +435,7 @@ export default function PerformanceInfluenciadores() {
 
   const clearData = () => {
     if (!confirm("Limpar todos os dados carregados?")) return;
-    setRows([]);
-    localStorage.removeItem(STORAGE_KEY);
+    deleteAllSalesMutation.mutate();
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
