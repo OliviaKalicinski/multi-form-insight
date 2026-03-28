@@ -211,24 +211,38 @@ function buildStatsFromPerf(rows: SaleRow[]): Map<string, InfluencerStats> {
   return map;
 }
 
-/** "@arya.fiapa" → ["arya", "fiapa"] */
-function handleParts(instagram: string): string[] {
-  return instagram
+/** "texto qualquer" → ["texto", "qualquer"] — sem acentos, sem símbolos */
+function textParts(raw: string): string[] {
+  return raw
     .replace(/^@/, "")
     .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .split(/[._\-\s]+/)
-    .filter(Boolean);
+    .filter((p) => p.length >= 3); // ignora partículas curtas
 }
 
-/** Retorna o coupon sugerido com base no Instagram, ou null */
+/**
+ * Tenta casar o coupon com a influenciadora por três critérios (em ordem):
+ * 1. Handle do Instagram
+ * 2. Primeiro nome / sobrenome
+ * 3. Prefixo do e-mail (parte antes do @)
+ */
 function suggestCoupon(influencer: Influencer, availableCoupons: string[]): string | null {
-  if (!availableCoupons.length || !influencer.instagram) return null;
-  const parts = handleParts(influencer.instagram);
-  for (const part of parts) {
-    for (const coupon of availableCoupons) {
-      const c = coupon.toLowerCase();
-      if (c === part || part.startsWith(c) || c.startsWith(part)) {
-        return coupon;
+  if (!availableCoupons.length) return null;
+
+  const sources: string[] = [];
+  if (influencer.instagram) sources.push(influencer.instagram);
+  if (influencer.name)      sources.push(influencer.name);
+  if (influencer.email)     sources.push(influencer.email.split("@")[0]);
+
+  for (const source of sources) {
+    const parts = textParts(source);
+    for (const part of parts) {
+      for (const coupon of availableCoupons) {
+        const c = coupon.toLowerCase();
+        if (c === part || part.startsWith(c) || c.startsWith(part)) {
+          return coupon;
+        }
       }
     }
   }
@@ -400,9 +414,14 @@ export default function CadastroInfluenciadores() {
   const availableCoupons = useMemo(() => Array.from(perfStats.keys()).sort(), [perfStats]);
 
   // Mutation: Import CSV
+  // IMPORTANTE: exclui o campo `coupon` do upsert para nunca sobrescrever
+  // vínculos que o usuário já salvou manualmente ou via auto-link.
   const importMutation = useMutation({
     mutationFn: async (influencers: Influencer[]) => {
-      const rows = influencers.map(influencerToDBRow);
+      const rows = influencers.map((inf) => {
+        const { coupon, ...rowWithoutCoupon } = influencerToDBRow(inf);
+        return rowWithoutCoupon;
+      });
       const { error } = await (supabase.from("influencer_registry") as any).upsert(rows, {
         onConflict: "email",
       });
@@ -470,16 +489,17 @@ export default function CadastroInfluenciadores() {
     clearMutation.mutate();
   };
 
-  // Open auto-link dialog
+  // Open auto-link dialog — processa apenas quem ainda NÃO tem coupon vinculado
   const openAutoLink = () => {
     const alreadyLinked = new Set(influencersData.map(i => i.coupon).filter(Boolean));
     const matched: AutoSuggestion[] = [];
     const unmatched: AutoSuggestion[] = [];
 
     for (const inf of influencersData) {
-      const free = availableCoupons.filter(
-        (c) => !alreadyLinked.has(c) || inf.coupon === c
-      );
+      // Pula influenciadoras que já têm coupon salvo
+      if (inf.coupon) continue;
+
+      const free = availableCoupons.filter((c) => !alreadyLinked.has(c));
       const suggestion = suggestCoupon(inf, free);
 
       const entry: AutoSuggestion = {
@@ -492,7 +512,7 @@ export default function CadastroInfluenciadores() {
 
       if (suggestion) {
         matched.push(entry);
-        alreadyLinked.add(suggestion);
+        alreadyLinked.add(suggestion); // reserva o coupon para não sugerir pra mais de uma
       } else {
         unmatched.push(entry);
       }
@@ -815,9 +835,15 @@ export default function CadastroInfluenciadores() {
           <DialogHeader>
             <DialogTitle>Vinculação automática de coupons</DialogTitle>
             <p className="text-sm text-muted-foreground">
-              O sistema comparou os handles do Instagram com os coupons disponíveis.
-              Confirme as correspondências e atribua manualmente as que não foram encontradas.
+              Exibe apenas influenciadoras <strong>sem coupon vinculado</strong>.
+              O sistema tenta casar pelo Instagram, nome e e-mail.
+              Quem já está vinculada é preservada e não aparece aqui.
             </p>
+            {linkedCount > 0 && (
+              <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1 mt-1">
+                ✓ {linkedCount} influenciadora(s) já vinculadas — não serão alteradas
+              </p>
+            )}
           </DialogHeader>
 
           <div className="space-y-5 py-2">
