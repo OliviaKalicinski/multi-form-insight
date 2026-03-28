@@ -286,7 +286,7 @@ export default function OrcamentosAprovacao() {
   const { data: budgets = [] } = useQuery<BudgetRequest[]>({
     queryKey: ["budget-requests"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("budget_requests") as any)
+      const { data, error } = await (supabase as any).from("budget_requests")
         .select("*").order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -296,7 +296,7 @@ export default function OrcamentosAprovacao() {
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["marketing-categories"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("marketing_categories") as any)
+      const { data, error } = await (supabase as any).from("marketing_categories")
         .select("*").order("name", { ascending: true });
       if (error) throw error;
       return data || [];
@@ -306,7 +306,7 @@ export default function OrcamentosAprovacao() {
   const { data: calEvents = [] } = useQuery<CalendarEvent[]>({
     queryKey: ["marketing-calendar-all"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("marketing_calendar") as any)
+      const { data, error } = await (supabase as any).from("marketing_calendar")
         .select("id, title, start_date").order("start_date", { ascending: true });
       if (error) throw error;
       return data || [];
@@ -317,7 +317,7 @@ export default function OrcamentosAprovacao() {
     queryKey: ["budget-attachments", detailId],
     enabled: !!detailId,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("budget_attachments") as any)
+      const { data, error } = await (supabase as any).from("budget_attachments")
         .select("*").eq("budget_id", detailId).order("created_at", { ascending: true });
       if (error) throw error;
       return data || [];
@@ -342,7 +342,7 @@ export default function OrcamentosAprovacao() {
       // 1. Optionally create calendar event first
       let calEventId: string | null = null;
       if (f.create_calendar_event && f.calendar_category_id) {
-        const { data: evtData, error: evtErr } = await (supabase.from("marketing_calendar") as any)
+        const { data: evtData, error: evtErr } = await (supabase as any).from("marketing_calendar")
           .insert({
             title:       f.title,
             description: f.description || null,
@@ -357,7 +357,7 @@ export default function OrcamentosAprovacao() {
       }
 
       // 2. Create budget linked to the new event
-      const { data: budgetData, error } = await (supabase.from("budget_requests") as any).insert({
+      const { data: budgetData, error } = await (supabase as any).from("budget_requests").insert({
         title:             f.title,
         description:       f.description  || null,
         value,
@@ -383,7 +383,7 @@ export default function OrcamentosAprovacao() {
           const path     = `${budgetData.id}/${Date.now()}-${safeName}`;
           const { error: storageErr } = await supabase.storage.from("budget-attachments").upload(path, file);
           if (storageErr) throw new Error(`${file.name}: ${storageErr.message}`);
-          await (supabase.from("budget_attachments") as any).insert({
+          await (supabase as any).from("budget_attachments").insert({
             budget_id: budgetData.id, file_name: file.name, file_path: path, file_size: file.size,
           });
         }));
@@ -422,7 +422,7 @@ export default function OrcamentosAprovacao() {
 
       // Sync title + dates to existing calendar event
       if (calEventId) {
-        await (supabase.from("marketing_calendar") as any)
+        await (supabase as any).from("marketing_calendar")
           .update({
             title:      f.title,
             start_date: f.event_start_date || f.request_date,
@@ -431,7 +431,7 @@ export default function OrcamentosAprovacao() {
           .eq("id", calEventId);
       } else if (f.create_calendar_event && f.calendar_category_id) {
         // Create new event if user opted in during edit
-        const { data: evtData, error: evtErr } = await (supabase.from("marketing_calendar") as any)
+        const { data: evtData, error: evtErr } = await (supabase as any).from("marketing_calendar")
           .insert({
             title:       f.title,
             description: f.description || null,
@@ -445,7 +445,7 @@ export default function OrcamentosAprovacao() {
         calEventId = evtData.id;
       }
 
-      const { error } = await (supabase.from("budget_requests") as any)
+      const { error } = await (supabase as any).from("budget_requests")
         .update({
           title:             f.title,
           description:       f.description  || null,
@@ -473,7 +473,7 @@ export default function OrcamentosAprovacao() {
           const path     = `${id}/${Date.now()}-${safeName}`;
           const { error: storageErr } = await supabase.storage.from("budget-attachments").upload(path, file);
           if (storageErr) throw new Error(`${file.name}: ${storageErr.message}`);
-          await (supabase.from("budget_attachments") as any).insert({
+          await (supabase as any).from("budget_attachments").insert({
             budget_id: id, file_name: file.name, file_path: path, file_size: file.size,
           });
         }));
@@ -499,7 +499,7 @@ export default function OrcamentosAprovacao() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("budget_requests") as any).delete().eq("id", id);
+      const { error } = await (supabase as any).from("budget_requests").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -512,7 +512,7 @@ export default function OrcamentosAprovacao() {
     mutationFn: async ({
       id, dept, action, notes,
     }: { id: string; dept: "financial" | "operations" | "marketing"; action: "approved" | "rejected"; notes: string }) => {
-      const { error } = await (supabase.from("budget_requests") as any)
+      const { error } = await (supabase as any).from("budget_requests")
         .update({
           [`${dept}_status`]:       action,
           [`${dept}_notes`]:        notes.trim() || null,
@@ -534,7 +534,7 @@ export default function OrcamentosAprovacao() {
         .upload(path, file);
       if (storageErr) throw storageErr;
 
-      const { error: dbErr } = await (supabase.from("budget_attachments") as any).insert({
+      const { error: dbErr } = await (supabase as any).from("budget_attachments").insert({
         budget_id: budgetId,
         file_name: file.name,
         file_path: path,
@@ -552,7 +552,7 @@ export default function OrcamentosAprovacao() {
   const deleteAttachmentMutation = useMutation({
     mutationFn: async ({ id, path }: { id: string; path: string }) => {
       await supabase.storage.from("budget-attachments").remove([path]);
-      const { error } = await (supabase.from("budget_attachments") as any).delete().eq("id", id);
+      const { error } = await (supabase as any).from("budget_attachments").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] }),
