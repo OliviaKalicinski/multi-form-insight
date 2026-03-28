@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     if (data.error) throw new Error(`Meta API: ${data.error.message} (code ${data.error.code})`);
 
     return new Response(JSON.stringify({ ok: true, reply_id: data.id }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (err: any) {
