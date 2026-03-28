@@ -179,8 +179,9 @@ export default function PerformanceInfluenciadores() {
   const { data: influencers = [], isLoading: loadingInfluencers } = useQuery({
     queryKey: ["influencer_registry"],
     queryFn: async () => {
+      // Usa select("*") para não quebrar caso a coluna cpf ainda não exista no banco
       const { data, error } = await (supabase.from("influencer_registry") as any)
-        .select("email, name, instagram, tiktok, cnpj, cpf, coupon")
+        .select("*")
         .order("name", { ascending: true });
       if (error) throw error;
       return (data || []) as Array<{
@@ -250,14 +251,16 @@ export default function PerformanceInfluenciadores() {
   }, [bonifRaw, dateRange]);
 
   // Map: coupon → list of bonification rows
-  const bonifByCoupon = useMemo(() => {
+  // Também rastreia NFs não casadas para diagnóstico
+  const { bonifByCoupon, bonifUnmatched } = useMemo(() => {
     const map = new Map<string, BonifRow[]>();
+    const unmatched: BonifRow[] = [];
 
     for (const row of bonifFiltered) {
-      // 1. Match by email
+      // 1. Match by email (com trim para evitar espaços invisíveis)
       let coupon: string | undefined;
       if (row.cliente_email) {
-        coupon = couponByEmail.get(row.cliente_email.toLowerCase());
+        coupon = couponByEmail.get(row.cliente_email.trim().toLowerCase());
       }
       // 2. Fallback: match by CPF (PF) ou CNPJ (PJ)
       if (!coupon && row.cpf_cnpj) {
@@ -283,11 +286,14 @@ export default function PerformanceInfluenciadores() {
           }
         }
       }
-      if (!coupon) continue;
+      if (!coupon) {
+        unmatched.push(row);
+        continue;
+      }
       if (!map.has(coupon)) map.set(coupon, []);
       map.get(coupon)!.push(row);
     }
-    return map;
+    return { bonifByCoupon: map, bonifUnmatched: unmatched };
   }, [bonifFiltered, couponByEmail, influencers]);
 
   // ── CSV data from Supabase ───────────────────────────────────────────────
@@ -508,6 +514,33 @@ export default function PerformanceInfluenciadores() {
             vincule os coupons para ver nomes e bonificações por influenciadora.
           </span>
         </div>
+      )}
+
+      {/* Diagnóstico: NFs de bonificação não casadas */}
+      {bonifUnmatched.length > 0 && influencers.length > 0 && (
+        <details className="border border-amber-200 bg-amber-50 rounded-lg px-3 py-2 text-sm">
+          <summary className="flex items-center gap-2 cursor-pointer text-amber-800 font-medium select-none">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {bonifUnmatched.length} NF(s) de bonificação sem influenciadora associada — clique para ver
+          </summary>
+          <div className="mt-3 space-y-1.5">
+            <p className="text-xs text-amber-700 mb-2">
+              Estas NFs não casaram por e-mail, CPF/CNPJ nem nome. Verifique se a influenciadora
+              está cadastrada com o coupon vinculado e se o CPF/CNPJ ou e-mail da NF corresponde ao cadastro.
+            </p>
+            {bonifUnmatched.map((b) => (
+              <div key={b.id} className="bg-white border border-amber-100 rounded px-2.5 py-1.5 text-xs flex flex-wrap gap-x-4 gap-y-0.5">
+                <span className="font-medium">{b.data_venda ? format(new Date(b.data_venda), "dd/MM/yyyy") : "—"}</span>
+                <span className="text-rose-700 font-semibold">
+                  {(b.valor_total ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </span>
+                {b.cliente_nome && <span className="text-muted-foreground">👤 {b.cliente_nome}</span>}
+                {b.cliente_email && <span className="text-muted-foreground">✉ {b.cliente_email}</span>}
+                {b.cpf_cnpj && <span className="text-muted-foreground font-mono">doc: {b.cpf_cnpj}</span>}
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
       {/* Empty state */}
