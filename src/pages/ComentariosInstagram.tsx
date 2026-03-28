@@ -143,11 +143,11 @@ export default function ComentariosInstagram() {
     });
   }, [allComments, dateRange]);
 
-  const handleSync = async () => {
+  const doSync = async (fetchAll: boolean) => {
     setSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke("sync-instagram-comments", {
-        body: { limit: 50 },
+        body: fetchAll ? { fetch_all: true } : { limit: 50 },
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error ?? "Erro desconhecido");
@@ -167,6 +167,9 @@ export default function ComentariosInstagram() {
     }
     setSyncing(false);
   };
+
+  const handleSync = () => doSync(false);
+  const handleSyncAll = () => doSync(true);
 
   const handleReply = async (comment: Comment) => {
     if (!replyText.trim()) return;
@@ -254,10 +257,16 @@ export default function ComentariosInstagram() {
             )}
           </p>
         </div>
-        <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
-          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Sincronizando..." : "Sincronizar agora"}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleSyncAll} disabled={syncing} variant="outline" size="sm" className="gap-1.5 text-xs">
+            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+            Buscar todos
+          </Button>
+          <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Sincronizando..." : "Sincronizar recentes"}
+          </Button>
+        </div>
       </div>
 
       {/* Aviso filtro global */}
