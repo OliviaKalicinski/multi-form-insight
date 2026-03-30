@@ -1,6 +1,6 @@
 import { ProcessedOrder, CustomerBehaviorMetrics, ChurnRiskCustomer, SalesPeak, OrderVolumeAnalysis, CustomerSegment } from "@/types/marketing";
 import { format, differenceInDays, startOfWeek, endOfWeek } from "date-fns";
-import { getOfficialRevenue } from "./revenue";
+import { getOfficialRevenue, isRevenueOrder } from "./revenue";
 import { calculateRepurchaseRate } from "./salesCalculator";
 
 /**
@@ -23,19 +23,22 @@ export const analyzeChurn = (
   churnRiskCustomers: ChurnRiskCustomer[];
 } => {
   // Agrupar pedidos por cliente
-  const clientesMap = new Map<string, { ultimaCompra: Date; pedidos: number; valorTotal: number; nome: string }>();
-  
+  const clientesMap = new Map<string, { ultimaCompra: Date; pedidos: number; pedidosReceita: number; valorTotal: number; nome: string }>();
+
   orders.forEach(order => {
+    const isRevenue = isRevenueOrder(order);
     const existing = clientesMap.get(order.cpfCnpj);
     if (!existing || order.dataVenda > existing.ultimaCompra) {
       clientesMap.set(order.cpfCnpj, {
         ultimaCompra: order.dataVenda,
         pedidos: (existing?.pedidos || 0) + 1,
+        pedidosReceita: (existing?.pedidosReceita || 0) + (isRevenue ? 1 : 0),
         valorTotal: (existing?.valorTotal || 0) + getOfficialRevenue(order),
         nome: order.nomeCliente
       });
     } else {
       existing.pedidos += 1;
+      existing.pedidosReceita += isRevenue ? 1 : 0;
       existing.valorTotal += getOfficialRevenue(order);
     }
   });
@@ -51,10 +54,15 @@ export const analyzeChurn = (
 
   clientesMap.forEach((cliente, cpfCnpj) => {
     const diasSemComprar = differenceInDays(dataReferencia, cliente.ultimaCompra);
-    
+
     let riskLevel: 'low' | 'medium' | 'high' | 'critical';
-    
-    if (diasSemComprar <= 30) {
+
+    // Alinhado com a view customer_full do banco:
+    // Clientes com apenas 1 pedido de receita são sempre "active"
+    if (cliente.pedidosReceita <= 1) {
+      clientesAtivos++;
+      riskLevel = 'low';
+    } else if (diasSemComprar <= 30) {
       clientesAtivos++;
       riskLevel = 'low';
     } else if (diasSemComprar <= 60) {
@@ -244,143 +252,6 @@ export const analyzeSalesPeaks = (orders: ProcessedOrder[]): SalesPeak[] => {
     .sort((a, b) => b.orders - a.orders);
 };
 
-/**
- * @deprecated Segmentos agora vêm da tabela `customer`. Use `useCustomerData` hook.
- *
- * Segmenta clientes por comportamento de compra
- */
-export const segmentCustomers = (orders: ProcessedOrder[]): CustomerSegment[] => {
-  const clientesMap = new Map<string, { pedidos: number; valorTotal: number; primeiraCompra: Date; ultimaCompra: Date }>();
-  
-  orders.forEach(order => {
-    const existing = clientesMap.get(order.cpfCnpj);
-    if (!existing) {
-      clientesMap.set(order.cpfCnpj, {
-        pedidos: 1,
-        valorTotal: getOfficialRevenue(order),
-        primeiraCompra: order.dataVenda,
-        ultimaCompra: order.dataVenda
-      });
-    } else {
-      existing.pedidos++;
-      existing.valorTotal += getOfficialRevenue(order);
-      if (order.dataVenda < existing.primeiraCompra) existing.primeiraCompra = order.dataVenda;
-      if (order.dataVenda > existing.ultimaCompra) existing.ultimaCompra = order.dataVenda;
-    }
-  });
-
-  const segments = {
-    'Primeira Compra': { count: 0, totalRevenue: 0, totalOrders: 0 },
-    'Recorrente': { count: 0, totalRevenue: 0, totalOrders: 0 },
-    'Fiel': { count: 0, totalRevenue: 0, totalOrders: 0 },
-    'VIP': { count: 0, totalRevenue: 0, totalOrders: 0 }
-  };
-
-  clientesMap.forEach(cliente => {
-    let segment: 'Primeira Compra' | 'Recorrente' | 'Fiel' | 'VIP';
-    
-    if (cliente.pedidos >= 5 || cliente.valorTotal >= 500) {
-      segment = 'VIP';
-    } else if (cliente.pedidos >= 3) {
-      segment = 'Fiel';
-    } else if (cliente.pedidos === 2) {
-      segment = 'Recorrente';
-    } else {
-      segment = 'Primeira Compra';
-    }
-
-    segments[segment].count++;
-    segments[segment].totalRevenue += cliente.valorTotal;
-    segments[segment].totalOrders += cliente.pedidos;
-  });
-
-  const totalClientes = clientesMap.size;
-
-  const buildSegment = (name: 'Primeira Compra' | 'Recorrente' | 'Fiel' | 'VIP', criteria: string): CustomerSegment => {
-    const s = segments[name];
-    return {
-      segment: name,
-      count: s.count,
-      percentage: totalClientes > 0 ? (s.count / totalClientes) * 100 : 0,
-      totalRevenue: s.totalRevenue,
-      totalOrders: s.totalOrders,
-      ticketMedio: s.totalOrders > 0 ? s.totalRevenue / s.totalOrders : 0,
-      arpu: s.count > 0 ? s.totalRevenue / s.count : 0,
-      criteria,
-    };
-  };
-
-  return [
-    buildSegment('Primeira Compra', 'Apenas 1 pedido'),
-    buildSegment('Recorrente', '2 pedidos'),
-    buildSegment('Fiel', '3-4 pedidos'),
-    buildSegment('VIP', '5+ pedidos ou R$ 500+ gasto'),
-  ];
-};
-
-/**
- * @deprecated Substituído por `useCustomerData` hook que lê de `customer_full`.
- * Mantido apenas para `executiveMetricsCalculator.ts` (migração posterior).
- *
- * Calcula métricas consolidadas de comportamento
- */
-export const calculateCustomerBehaviorMetrics = (orders: ProcessedOrder[]): CustomerBehaviorMetrics => {
-  const churnAnalysis = analyzeChurn(orders);
-  const volumeAnalysis = analyzeOrderVolume(orders);
-  const peaks = analyzeSalesPeaks(orders);
-  const segments = segmentCustomers(orders);
-  
-  // Calcular taxa de recompra (definição comercial: apenas pedidos de receita)
-  const taxaRecompra = calculateRepurchaseRate(orders);
-  
-  // Total de clientes únicos (base comportamental — inclui todos os tipos de pedido)
-  const totalClientes = new Set(orders.map(o => o.cpfCnpj)).size;
-
-  // CLV simplificado: receita fiscal média por cliente
-  const totalRevenue = orders.reduce((sum, order) => sum + getOfficialRevenue(order), 0);
-  const customerLifetimeValue = totalClientes > 0 ? totalRevenue / totalClientes : 0;
-
-  // Média de dias entre compras (clientes com 2+ pedidos)
-  let totalDaysBetween = 0;
-  let countIntervals = 0;
-  
-  const clientePedidos = new Map<string, Date[]>();
-  orders.forEach(order => {
-    if (!clientePedidos.has(order.cpfCnpj)) {
-      clientePedidos.set(order.cpfCnpj, []);
-    }
-    clientePedidos.get(order.cpfCnpj)!.push(order.dataVenda);
-  });
-
-  clientePedidos.forEach(datas => {
-    if (datas.length >= 2) {
-      const sorted = datas.sort((a, b) => a.getTime() - b.getTime());
-      for (let i = 1; i < sorted.length; i++) {
-        totalDaysBetween += differenceInDays(sorted[i], sorted[i-1]);
-        countIntervals++;
-      }
-    }
-  });
-
-  const averageDaysBetweenPurchases = countIntervals > 0 ? totalDaysBetween / countIntervals : 0;
-
-  return {
-    totalClientes,
-    taxaRecompra,
-    clientesAtivos: churnAnalysis.clientesAtivos,
-    clientesEmRisco: churnAnalysis.clientesEmRisco,
-    clientesInativos: churnAnalysis.clientesInativos,
-    clientesChurn: churnAnalysis.clientesChurn,
-    taxaChurn: churnAnalysis.taxaChurn,
-    taxaRetencao: churnAnalysis.taxaRetencao,
-    pedidosPorDia: volumeAnalysis.daily,
-    pedidosPorSemana: volumeAnalysis.weekly,
-    pedidosPorMes: volumeAnalysis.monthly,
-    pedidosPorTrimestre: volumeAnalysis.quarterly,
-    picosVendas: peaks.filter(p => p.isPeak),
-    customerSegmentation: segments,
-    churnRiskCustomers: churnAnalysis.churnRiskCustomers,
-    averageDaysBetweenPurchases,
-    customerLifetimeValue
-  };
-};
+// segmentCustomers e calculateCustomerBehaviorMetrics foram removidos.
+// Segmentos vêm da tabela `customer` via useCustomerData hook.
+// Métricas consolidadas vêm de useCustomerData + hooks específicos.
