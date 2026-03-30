@@ -10,13 +10,25 @@ import {
 } from "@/types/marketing";
 import { differenceInDays } from "date-fns";
 import { breakdownOrders } from "./orderBreakdown";
-import { getOfficialRevenue } from "./revenue";
+import { getOfficialRevenue, getRevenueOrders } from "./revenue"; // [FIX DIV-006] importar getRevenueOrders
 import { isMaterialProduct, isOnlySampleOrder } from "./samplesAnalyzer";
 
 /**
- * KPI 12: Analisa produtos mais vendidos por quantidade
+ * NOTA SOBRE FATURAMENTO POR PRODUTO:
+ * As funções neste arquivo usam produto.preco como proxy de receita por SKU.
+ * Isso difere de getOfficialRevenue(order) (que usa totalFaturado da NF)
+ * porque a NF é emitida no nível do pedido, não por produto.
+ * Esta divergência é INTENCIONAL (DIV-008). Para análise fiscal total, use
+ * financialMetrics.ts que opera no nível de pedido.
+ */
+
+/**
+ * KPI 12: Analisa produtos mais vendidos por quantidade.
+ * [FIX DIV-006] Aplica getRevenueOrders() para excluir brindes e bonificações
+ * do ranking. Quantidades de produtos entregues como brinde não inflam o ranking.
  */
 export const analyzeTopProductsByQuantity = (orders: ProcessedOrder[], limit: number = 20): ProductRanking[] => {
+  const revenueOrders = getRevenueOrders(orders); // [FIX DIV-006] somente vendas
   const productMap = new Map<
     string,
     {
@@ -29,7 +41,7 @@ export const analyzeTopProductsByQuantity = (orders: ProcessedOrder[], limit: nu
     }
   >();
 
-  orders.forEach((order) => {
+  revenueOrders.forEach((order) => { // [FIX DIV-006] usar revenueOrders
     order.produtos.forEach((produto) => {
       if (isMaterialProduct(produto)) return; // exclui materiais de divulgação
       const key = produto.descricaoAjustada;
