@@ -13,6 +13,7 @@ export interface InstagramPost {
   shares: number;
   caption: string | null;
   permalink: string | null;
+  post_type: string | null;
 }
 
 export interface DayOfWeekStat {
@@ -31,7 +32,28 @@ export interface MediaTypeStat {
   avgComments: number;
 }
 
+export interface PostTypeStat {
+  type: string;
+  label: string;
+  posts: number;
+  avgLikes: number;
+  avgComments: number;
+  avgReach: number;
+  avgSaves: number;
+  totalEngagement: number;
+  avgEngagement: number;
+}
+
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+const POST_TYPE_LABELS: Record<string, string> = {
+  manifesto: "Manifesto",
+  educativo: "Educativo",
+  bastidor: "Bastidor",
+  prova_social: "Prova Social",
+  oferta: "Oferta",
+  outro: "Outro",
+};
 
 export function useInstagramPosts() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
@@ -85,10 +107,56 @@ export function useInstagramPosts() {
     };
   }).filter(s => s.posts > 0);
 
+  // --- NEW: Stats por tipo editorial de post ---
+  const postTypeStats: PostTypeStat[] = Object.entries(POST_TYPE_LABELS)
+    .map(([type, label]) => {
+      const typePosts = posts.filter(p => (p.post_type || "outro") === type);
+      const count = typePosts.length;
+      if (count === 0) return null;
+
+      const totalLikes = typePosts.reduce((s, p) => s + (p.likes || 0), 0);
+      const totalComments = typePosts.reduce((s, p) => s + (p.comments || 0), 0);
+      const totalReach = typePosts.reduce((s, p) => s + (p.reach || 0), 0);
+      const totalSaves = typePosts.reduce((s, p) => s + (p.saves || 0), 0);
+      const totalEngagement = totalLikes + totalComments + totalSaves;
+
+      return {
+        type,
+        label,
+        posts: count,
+        avgLikes: Math.round(totalLikes / count),
+        avgComments: Math.round(totalComments / count),
+        avgReach: Math.round(totalReach / count),
+        avgSaves: Math.round(totalSaves / count),
+        totalEngagement,
+        avgEngagement: Math.round(totalEngagement / count),
+      };
+    })
+    .filter((s): s is PostTypeStat => s !== null)
+    .sort((a, b) => b.avgEngagement - a.avgEngagement);
+
+  // --- NEW: Totais gerais de reach e saves ---
+  const totalReach = posts.reduce((s, p) => s + (p.reach || 0), 0);
+  const totalSaves = posts.reduce((s, p) => s + (p.saves || 0), 0);
+  const avgReachPerPost = posts.length > 0 ? Math.round(totalReach / posts.length) : 0;
+  const avgSavesPerPost = posts.length > 0 ? Math.round(totalSaves / posts.length) : 0;
+
   const bestDayToPost = dayOfWeekStats.reduce(
     (best, d) => d.avgEngagement > best.avgEngagement && d.posts >= 2 ? d : best,
     dayOfWeekStats[0]
   );
 
-  return { posts, loading, dayOfWeekStats, mediaTypeStats, bestDayToPost };
+  return {
+    posts,
+    loading,
+    dayOfWeekStats,
+    mediaTypeStats,
+    bestDayToPost,
+    // NEW exports
+    postTypeStats,
+    totalReach,
+    totalSaves,
+    avgReachPerPost,
+    avgSavesPerPost,
+  };
 }
