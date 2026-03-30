@@ -23,21 +23,14 @@ async function fetchRecentPosts(token: string, limit = 50): Promise<{ posts: any
   return { posts: json.data || [], error: null };
 }
 
-function getMetricsForType(mediaType: string): string {
-  if (mediaType === "REEL") {
-    // Reels não suportam impressions
-    return "reach,saved,shares,comments,likes";
-  }
-  // IMAGE, VIDEO, CAROUSEL_ALBUM
-  return "impressions,reach,saved,shares,comments,likes";
-}
-
 async function fetchPostInsights(
   postId: string,
   mediaType: string,
   token: string
 ): Promise<{ metrics: Record<string, number>; usedFallback: boolean; errorMsg: string | null }> {
-  const metricsStr = getMetricsForType(mediaType);
+  // impressions foi removido do nível de post individual na API v20.0+
+  // reach,saved,shares,comments,likes funcionam para todos os tipos
+  const metricsStr = "reach,saved,shares,comments,likes";
 
   const url = new URL(`https://graph.facebook.com/v20.0/${postId}/insights`);
   url.searchParams.set("metric", metricsStr);
@@ -48,7 +41,6 @@ async function fetchPostInsights(
   if (json.error) {
     const errorMsg = `[Meta API ${json.error.code}] ${json.error.message}`;
     console.warn(`Insights falhou para post ${postId} (${mediaType}): ${errorMsg}`);
-    console.warn(`→ Verifique: token tem permissão instagram_manage_insights? Token expirou?`);
     const fallback = await fetchPostBasicMetrics(postId, token);
     return { metrics: fallback, usedFallback: true, errorMsg };
   }
@@ -163,7 +155,7 @@ serve(async (req) => {
         media_type: post.media_type || null,
         caption: post.caption ? post.caption.substring(0, 500) : null,
         published_at: post.timestamp || null,
-        impressions: insights["impressions"] || 0,
+        impressions: 0, // removido da API de post — disponível apenas no nível da conta
         reach: insights["reach"] || 0,
         likes: insights["likes"] || 0,
         comments: insights["comments"] || 0,
