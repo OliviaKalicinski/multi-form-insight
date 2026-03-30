@@ -34,12 +34,29 @@ const churnLabels: Record<string, string> = {
   churned: "Churn",
 };
 
+const journeyStageColors: Record<string, string> = {
+  novo: "bg-sky-500/15 text-sky-700 border-sky-500/30",
+  recorrente: "bg-green-500/15 text-green-700 border-green-500/30",
+  campea: "bg-amber-500/15 text-amber-700 border-amber-500/30",
+  risco: "bg-orange-500/15 text-orange-700 border-orange-500/30",
+  perdido: "bg-red-500/15 text-red-700 border-red-500/30",
+};
+
+const journeyStageLabels: Record<string, string> = {
+  novo: "Novo",
+  recorrente: "Recorrente",
+  campea: "Campeã",
+  risco: "Risco",
+  perdido: "Perdido",
+};
+
 type SortKey =
   | "nome"
   | "total_revenue"
   | "days_since_last_purchase"
   | "last_order_date"
   | "segment"
+  | "journey_stage"
   | "churn_status"
   | "total_orders_revenue"
   | "responsavel"
@@ -57,6 +74,7 @@ export default function Clientes() {
   const [search, setSearch] = useState("");
   const [churnFilter, setChurnFilter] = useState("all");
   const [segmentFilter, setSegmentFilter] = useState("all");
+  const [journeyFilter, setJourneyFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [petFilter, setPetFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("total_revenue");
@@ -131,6 +149,7 @@ export default function Clientes() {
     }
     if (churnFilter !== "all") list = list.filter((c) => c.churn_status === churnFilter);
     if (segmentFilter !== "all") list = list.filter((c) => c.segment === segmentFilter);
+    if (journeyFilter !== "all") list = list.filter((c) => (c as any).journey_stage === journeyFilter);
     if (responsavelFilter !== "all") list = list.filter((c) => c.responsavel === responsavelFilter);
     if (petFilter !== "all") {
       list = list.filter((c) => {
@@ -139,7 +158,7 @@ export default function Clientes() {
       });
     }
     return list;
-  }, [customers, search, churnFilter, segmentFilter, responsavelFilter, petFilter, petMap]);
+  }, [customers, search, churnFilter, segmentFilter, journeyFilter, responsavelFilter, petFilter, petMap]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -165,6 +184,10 @@ export default function Clientes() {
         case "segment":
           va = a.segment ?? "";
           vb = b.segment ?? "";
+          break;
+        case "journey_stage":
+          va = (a as any).journey_stage ?? "";
+          vb = (b as any).journey_stage ?? "";
           break;
         case "churn_status":
           va = a.churn_status ?? "";
@@ -318,6 +341,30 @@ export default function Clientes() {
         }}
       />
 
+      {/* Journey Stage Filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-medium text-muted-foreground">Jornada:</span>
+        <Button
+          variant={journeyFilter === "all" ? "default" : "outline"}
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => { setJourneyFilter("all"); setPage(0); }}
+        >
+          Todas
+        </Button>
+        {Object.entries(journeyStageLabels).map(([key, label]) => (
+          <Button
+            key={key}
+            variant={journeyFilter === key ? "default" : "outline"}
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => { setJourneyFilter(key); setPage(0); }}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -332,6 +379,11 @@ export default function Clientes() {
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("segment")}>
                   <span className="flex items-center gap-1">
                     Segmento <ArrowUpDown className="h-3 w-3" />
+                  </span>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort("journey_stage")}>
+                  <span className="flex items-center gap-1">
+                    Jornada <ArrowUpDown className="h-3 w-3" />
                   </span>
                 </TableHead>
                 <TableHead className="cursor-pointer" onClick={() => toggleSort("churn_status")}>
@@ -382,6 +434,13 @@ export default function Clientes() {
                     {c.segment && (
                       <Badge variant="outline" className={`text-[10px] ${segmentColors[c.segment] ?? ""}`}>
                         {c.segment}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {(c as any).journey_stage && (
+                      <Badge variant="outline" className={`text-[10px] ${journeyStageColors[(c as any).journey_stage] ?? ""}`}>
+                        {journeyStageLabels[(c as any).journey_stage] ?? (c as any).journey_stage}
                       </Badge>
                     )}
                   </TableCell>
