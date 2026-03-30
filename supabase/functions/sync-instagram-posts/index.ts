@@ -23,30 +23,32 @@ async function fetchRecentPosts(token: string, limit = 50): Promise<{ posts: any
   return { posts: json.data || [], error: null };
 }
 
+function getMetricsForType(mediaType: string): string {
+  if (mediaType === "REEL") {
+    // Reels não suportam impressions
+    return "reach,saved,shares,comments,likes";
+  }
+  // IMAGE, VIDEO, CAROUSEL_ALBUM
+  return "impressions,reach,saved,shares,comments,likes";
+}
+
 async function fetchPostInsights(
   postId: string,
   mediaType: string,
   token: string
 ): Promise<{ metrics: Record<string, number>; usedFallback: boolean; errorMsg: string | null }> {
-  let metrics: string;
-  if (mediaType === "VIDEO" || mediaType === "REEL") {
-    metrics = "impressions,reach,saved,shares,comments,likes";
-  } else {
-    metrics = "impressions,reach,saved,shares,comments,likes";
-  }
+  const metricsStr = getMetricsForType(mediaType);
 
   const url = new URL(`https://graph.facebook.com/v20.0/${postId}/insights`);
-  url.searchParams.set("metric", metrics);
+  url.searchParams.set("metric", metricsStr);
   url.searchParams.set("access_token", token);
   const res = await fetch(url.toString());
   const json = await res.json();
 
   if (json.error) {
-    // ── CORRIGIDO: loga o erro real do Meta para diagnóstico ──
     const errorMsg = `[Meta API ${json.error.code}] ${json.error.message}`;
     console.warn(`Insights falhou para post ${postId} (${mediaType}): ${errorMsg}`);
     console.warn(`→ Verifique: token tem permissão instagram_manage_insights? Token expirou?`);
-
     const fallback = await fetchPostBasicMetrics(postId, token);
     return { metrics: fallback, usedFallback: true, errorMsg };
   }
@@ -199,7 +201,6 @@ serve(async (req) => {
       if (demoError) console.warn("Demographics insert error:", demoError.message);
     }
 
-    // ── CORRIGIDO: resposta agora mostra quantos posts falharam no Insights ──
     return new Response(
       JSON.stringify({
         success: true,
