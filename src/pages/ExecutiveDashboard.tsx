@@ -30,10 +30,9 @@ import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard
 import { IncompleteMonthBadge } from "@/components/dashboard/IncompleteMonthBadge";
 import {
   calculateExecutiveMetrics,
-  filterOrdersByMonth as filterExecOrders,
   filterAdsByMonth,
 } from "@/utils/executiveMetricsCalculator";
-import { filterOrdersByDateRange } from "@/utils/salesCalculator";
+import { filterOrdersByMonth as filterExecOrders, filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { gerarAlertas } from "@/utils/alertSystem";
 import { gerarRecomendacoes } from "@/utils/recommendationEngine";
 import { getPlatformPerformance } from "@/utils/financialMetrics";
