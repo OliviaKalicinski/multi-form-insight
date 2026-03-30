@@ -262,6 +262,81 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_performance: {
+        Row: {
+          avg_time_on_page: number | null
+          backlinks: number | null
+          bounce_rate: number | null
+          created_at: string | null
+          ctr: number | null
+          id: string
+          internal_links: number | null
+          keyword_position: number | null
+          measured_at: string | null
+          organic_clicks: number | null
+          organic_impressions: number | null
+          pageviews: number | null
+          post_title: string
+          post_type: string | null
+          post_url: string
+          published_at: string | null
+          revenue: number | null
+          sessions: number | null
+          target_keyword: string | null
+          transactions: number | null
+          updated_at: string | null
+          word_count: number | null
+        }
+        Insert: {
+          avg_time_on_page?: number | null
+          backlinks?: number | null
+          bounce_rate?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          id?: string
+          internal_links?: number | null
+          keyword_position?: number | null
+          measured_at?: string | null
+          organic_clicks?: number | null
+          organic_impressions?: number | null
+          pageviews?: number | null
+          post_title: string
+          post_type?: string | null
+          post_url: string
+          published_at?: string | null
+          revenue?: number | null
+          sessions?: number | null
+          target_keyword?: string | null
+          transactions?: number | null
+          updated_at?: string | null
+          word_count?: number | null
+        }
+        Update: {
+          avg_time_on_page?: number | null
+          backlinks?: number | null
+          bounce_rate?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          id?: string
+          internal_links?: number | null
+          keyword_position?: number | null
+          measured_at?: string | null
+          organic_clicks?: number | null
+          organic_impressions?: number | null
+          pageviews?: number | null
+          post_title?: string
+          post_type?: string | null
+          post_url?: string
+          published_at?: string | null
+          revenue?: number | null
+          sessions?: number | null
+          target_keyword?: string | null
+          transactions?: number | null
+          updated_at?: string | null
+          word_count?: number | null
+        }
+        Relationships: []
+      }
       budget_attachments: {
         Row: {
           budget_id: string
@@ -386,6 +461,7 @@ export type Database = {
           first_order_date: string | null
           id: string
           is_active: boolean
+          journey_stage: string | null
           last_contact_date: string | null
           last_order_date: string | null
           merged_into: string | null
@@ -410,6 +486,7 @@ export type Database = {
           first_order_date?: string | null
           id?: string
           is_active?: boolean
+          journey_stage?: string | null
           last_contact_date?: string | null
           last_order_date?: string | null
           merged_into?: string | null
@@ -434,6 +511,7 @@ export type Database = {
           first_order_date?: string | null
           id?: string
           is_active?: boolean
+          journey_stage?: string | null
           last_contact_date?: string | null
           last_order_date?: string | null
           merged_into?: string | null
@@ -915,6 +993,66 @@ export type Database = {
         }
         Relationships: []
       }
+      influencer_posts: {
+        Row: {
+          comments: number | null
+          coupon: string | null
+          created_at: string | null
+          id: string
+          influencer_instagram: string | null
+          influencer_name: string
+          likes: number | null
+          notes: string | null
+          platform: string | null
+          post_type: string | null
+          post_url: string
+          published_at: string | null
+          reach: number | null
+          saves: number | null
+          shares: number | null
+          updated_at: string | null
+          views: number | null
+        }
+        Insert: {
+          comments?: number | null
+          coupon?: string | null
+          created_at?: string | null
+          id?: string
+          influencer_instagram?: string | null
+          influencer_name: string
+          likes?: number | null
+          notes?: string | null
+          platform?: string | null
+          post_type?: string | null
+          post_url: string
+          published_at?: string | null
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          updated_at?: string | null
+          views?: number | null
+        }
+        Update: {
+          comments?: number | null
+          coupon?: string | null
+          created_at?: string | null
+          id?: string
+          influencer_instagram?: string | null
+          influencer_name?: string
+          likes?: number | null
+          notes?: string | null
+          platform?: string | null
+          post_type?: string | null
+          post_url?: string
+          published_at?: string | null
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          updated_at?: string | null
+          views?: number | null
+        }
+        Relationships: []
+      }
       influencer_registry: {
         Row: {
           address_bairro: string | null
@@ -1118,6 +1256,7 @@ export type Database = {
           media_type: string | null
           permalink: string | null
           post_id: string
+          post_type: string | null
           published_at: string | null
           reach: number | null
           saves: number | null
@@ -1134,6 +1273,7 @@ export type Database = {
           media_type?: string | null
           permalink?: string | null
           post_id: string
+          post_type?: string | null
           published_at?: string | null
           reach?: number | null
           saves?: number | null
@@ -1150,6 +1290,7 @@ export type Database = {
           media_type?: string | null
           permalink?: string | null
           post_id?: string
+          post_type?: string | null
           published_at?: string | null
           reach?: number | null
           saves?: number | null
@@ -1881,6 +2022,7 @@ export type Database = {
           first_order_date: string | null
           id: string
           is_active: boolean
+          journey_stage: string | null
           last_contact_date: string | null
           last_order_date: string | null
           merged_into: string | null
