@@ -10,7 +10,7 @@ import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCar
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { analyzeOrderVolume, analyzeSalesPeaks } from "@/utils/customerBehaviorMetrics";
 import { formatCurrency, filterOrdersByDateRange } from "@/utils/salesCalculator";
-import { benchmarksPetFood } from "@/data/executiveData";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
@@ -31,6 +31,7 @@ export default function ComportamentoCliente() {
   } = useDashboard();
 
   const { segments, churnMetrics, churnRiskCustomers, summaryMetrics, isLoading: customerLoading } = useCustomerData();
+  const { sectorBenchmarks } = useAppSettings();
 
   const b2cSalesData = useMemo(() => getB2COrders(salesData), [salesData]);
 
@@ -198,8 +199,8 @@ export default function ComportamentoCliente() {
                       title="Taxa Recompra"
                       value={`${summaryMetrics.taxaRecompra.toFixed(1)}%`}
                       icon={<RefreshCcw className="h-3.5 w-3.5" />}
-                      status={getStatusFromBenchmark(summaryMetrics.taxaRecompra, benchmarksPetFood.taxaRecompra)}
-                      interpretation={summaryMetrics.taxaRecompra >= benchmarksPetFood.taxaRecompra ? "Acima benchmark" : "Abaixo benchmark"}
+                      status={getStatusFromBenchmark(summaryMetrics.taxaRecompra, sectorBenchmarks.taxaRecompra)}
+                      interpretation={summaryMetrics.taxaRecompra >= sectorBenchmarks.taxaRecompra ? "Acima benchmark" : "Abaixo benchmark"}
                       size="compact"
                       tooltipKey="taxa_recompra"
                     />
@@ -207,7 +208,7 @@ export default function ComportamentoCliente() {
                       title="Taxa Churn"
                       value={`${churnMetrics.taxaChurn.toFixed(1)}%`}
                       icon={<AlertTriangle className="h-3.5 w-3.5" />}
-                      status={getStatusFromBenchmark(churnMetrics.taxaChurn, benchmarksPetFood.taxaChurn, { invertComparison: true })}
+                      status={getStatusFromBenchmark(churnMetrics.taxaChurn, sectorBenchmarks.taxaChurn, { invertComparison: true })}
                       invertTrend
                       interpretation={`${churnMetrics.clientesChurn} perdidos`}
                       size="compact"
