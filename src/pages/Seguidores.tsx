@@ -76,9 +76,9 @@ const Seguidores = () => {
 
   const [chartViewMode, setChartViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
 
-  // Default para mês atual ao entrar nesta página
+  // Default para mês atual APENAS se não há filtro selecionado pelo usuário
   useEffect(() => {
-    if (lastDataDate && (!dateRange || dateRange.label === "30d")) {
+    if (lastDataDate && !dateRange) {
       const anchor = lastDataDate;
       setDateRange({ start: startOfMonth(anchor), end: endOfDay(anchor), label: "current_month" });
     }
