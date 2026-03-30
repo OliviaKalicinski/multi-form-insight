@@ -33,7 +33,9 @@ export const analyzeChurn = (
         ultimaCompra: order.dataVenda,
         pedidos: (existing?.pedidos || 0) + 1,
         pedidosReceita: (existing?.pedidosReceita || 0) + (isRevenue ? 1 : 0),
-        valorTotal: (existing?.valorTotal || 0) + getOfficialRevenue(order),
+        // [FIX DIV-005] valorTotal acumula apenas receita de pedidos tipo 'venda'.
+        // Brindes e bonificações não somam ao valor do cliente.
+        valorTotal: (existing?.valorTotal || 0) + (isRevenueOrder(order) ? getOfficialRevenue(order) : 0),
         nome: order.nomeCliente
       });
     } else {
@@ -118,8 +120,9 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     const date = format(order.dataVenda, 'yyyy-MM-dd');
     const existing = dailyMap.get(date) || { orders: 0, revenue: 0 };
     dailyMap.set(date, {
-      orders: existing.orders + 1,
-      revenue: existing.revenue + getOfficialRevenue(order)
+      orders: existing.orders + 1, // contagem operacional = todos os pedidos
+      // [FIX DIV-005] revenue = somente pedidos tipo 'venda' (fiscal)
+      revenue: existing.revenue + (isRevenueOrder(order) ? getOfficialRevenue(order) : 0)
     });
   });
 
@@ -144,7 +147,7 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     weeklyMap.set(weekKey, {
       ...existing,
       orders: existing.orders + 1,
-      revenue: existing.revenue + getOfficialRevenue(order)
+      revenue: existing.revenue + (isRevenueOrder(order) ? getOfficialRevenue(order) : 0) // [FIX DIV-005]
     });
   });
 
@@ -159,7 +162,7 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     const existing = monthlyMap.get(month) || { orders: 0, revenue: 0 };
     monthlyMap.set(month, {
       orders: existing.orders + 1,
-      revenue: existing.revenue + getOfficialRevenue(order)
+      revenue: existing.revenue + (isRevenueOrder(order) ? getOfficialRevenue(order) : 0) // [FIX DIV-005]
     });
   });
 
@@ -177,7 +180,7 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
     const existing = quarterlyMap.get(quarterKey) || { orders: 0, revenue: 0 };
     quarterlyMap.set(quarterKey, {
       orders: existing.orders + 1,
-      revenue: existing.revenue + getOfficialRevenue(order)
+      revenue: existing.revenue + (isRevenueOrder(order) ? getOfficialRevenue(order) : 0) // [FIX DIV-005]
     });
   });
 
@@ -215,13 +218,14 @@ export const analyzeOrderVolume = (orders: ProcessedOrder[]): OrderVolumeAnalysi
  */
 export const analyzeSalesPeaks = (orders: ProcessedOrder[]): SalesPeak[] => {
   const dailyMap = new Map<string, { orders: number; revenue: number }>();
-  
+
   orders.forEach(order => {
     const date = format(order.dataVenda, 'yyyy-MM-dd');
     const existing = dailyMap.get(date) || { orders: 0, revenue: 0 };
     dailyMap.set(date, {
       orders: existing.orders + 1,
-      revenue: existing.revenue + getOfficialRevenue(order)
+      // [FIX DIV-005] revenue = somente pedidos tipo 'venda'
+      revenue: existing.revenue + (isRevenueOrder(order) ? getOfficialRevenue(order) : 0)
     });
   });
 
