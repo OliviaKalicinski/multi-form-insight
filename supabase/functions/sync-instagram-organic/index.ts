@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const IG_ACCOUNT_ID = "17841470017662704"; // Comida de Dragão
+const IG_ACCOUNT_ID = "17841470017662704";
 
 function defaultDateRange(): { since: string; until: string } {
   const until = new Date();
@@ -31,18 +31,15 @@ async function fetchMetric(
   url.searchParams.set("since", since);
   url.searchParams.set("until", until);
   url.searchParams.set("access_token", token);
-
   const res = await fetch(url.toString());
   const json = await res.json();
-
   if (json.error) {
     console.error(`Erro na métrica ${metricName}:`, JSON.stringify(json.error));
     return [];
   }
-
   const results: Array<{ date: string; value: any }> = [];
-  for (const item of (json.data || [])) {
-    for (const v of (item.values || [])) {
+  for (const item of json.data || []) {
+    for (const v of item.values || []) {
       const date = (v.end_time || "").split("T")[0];
       if (date) results.push({ date, value: v.value });
     }
@@ -54,7 +51,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-
   try {
     const META_TOKEN = Deno.env.get("META_ACCESS_TOKEN");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -82,36 +78,26 @@ serve(async (req) => {
 
     console.log(`Sync Instagram orgânico: ${since} → ${until}`);
 
-    // ── 1. Métricas de conta (removidas deprecated: profile_views, website_clicks)
-    const [
-      impressions,
-      reach,
-      totalInteractions,
-      accountsEngaged,
-      saves,
-      shares,
-      followsUnfollows,
-    ] = await Promise.all([
-      fetchMetric("impressions", since, until, META_TOKEN),
-      fetchMetric("reach", since, until, META_TOKEN),
-      fetchMetric("total_interactions", since, until, META_TOKEN),
-      fetchMetric("accounts_engaged", since, until, META_TOKEN),
-      fetchMetric("saves", since, until, META_TOKEN),
-      fetchMetric("shares", since, until, META_TOKEN),
-      fetchMetric("follows_and_unfollows", since, until, META_TOKEN),
-    ]);
+    const [impressions, reach, totalInteractions, accountsEngaged, saves, shares, followsUnfollows] =
+      await Promise.all([
+        fetchMetric("impressions", since, until, META_TOKEN),
+        fetchMetric("reach", since, until, META_TOKEN),
+        fetchMetric("total_interactions", since, until, META_TOKEN),
+        fetchMetric("accounts_engaged", since, until, META_TOKEN),
+        fetchMetric("saves", since, until, META_TOKEN),
+        fetchMetric("shares", since, until, META_TOKEN),
+        fetchMetric("follows_and_unfollows", since, until, META_TOKEN),
+      ]);
 
-    // ── 2. Total de seguidores atual ──────────────────────────────────
+    // ── Total de seguidores atual (snapshot de hoje) ──
     const profileRes = await fetch(
       `https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}?fields=followers_count&access_token=${META_TOKEN}`
     );
     const profileJson = await profileRes.json();
     const followersCount = profileJson.followers_count || 0;
-    console.log(`Seguidores: ${followersCount}`);
+    console.log(`Seguidores hoje: ${followersCount}`);
 
-    // ── 3. Organiza por data ──────────────────────────────────────────
     const byDate: Record<string, Record<string, number>> = {};
-
     const addMetric = (entries: Array<{ date: string; value: any }>, key: string) => {
       for (const { date, value } of entries) {
         if (!byDate[date]) byDate[date] = {};
@@ -126,7 +112,6 @@ serve(async (req) => {
     addMetric(saves, "saves");
     addMetric(shares, "shares");
 
-    // follows_and_unfollows vem como objeto {FOLLOW: N, UNFOLLOW: N}
     for (const { date, value } of followsUnfollows) {
       if (!byDate[date]) byDate[date] = {};
       byDate[date]["follows"] = value?.FOLLOW ?? value?.follow ?? 0;
@@ -137,17 +122,25 @@ serve(async (req) => {
 
     if (Object.keys(byDate).length === 0) {
       return new Response(
-        JSON.stringify({ success: true, synced: 0, followers_current: followersCount, message: "Nenhum dado no período" }),
+        JSON.stringify({
+          success: true,
+          synced: 0,
+          followers_current: followersCount,
+          message: "Nenhum dado no período",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const today = new Date().toISOString().split("T")[0];
 
-    // ── 4. Upsert followers_data ──────────────────────────────────────
+    // ── CORRIGIDO: total_seguidores só é salvo para hoje ──
+    // Para datas históricas, salvamos apenas novos_seguidores e unfollows.
+    // Isso evita que o gráfico mostre o mesmo número para todos os dias.
     const followersRows = Object.entries(byDate).map(([date, m]) => ({
       data: date,
-      total_seguidores: followersCount,
+      total_seguidores: date === today ? followersCount : null,
       novos_seguidores: m["follows"] || 0,
       unfollows: m["unfollows"] || 0,
       source: "api",
@@ -156,10 +149,9 @@ serve(async (req) => {
     const { error: followersError } = await supabase
       .from("followers_data")
       .upsert(followersRows, { onConflict: "data", ignoreDuplicates: false });
-
     if (followersError) throw new Error(`followers_data: ${followersError.message}`);
 
-    // ── 5. Upsert marketing_data (inclui saves e shares agora) ────────
+    // ── marketing_data (alcance, impressões, saves, shares por dia) ──
     const metricsMap: Record<string, string> = {
       impressions: "visualizacoes",
       reach: "alcance",
@@ -193,17 +185,15 @@ serve(async (req) => {
         period: { since, until },
         marketing_rows: marketingRows.length,
         metrics_fetched: Object.keys(metricsMap),
-        deprecated_removed: ["profile_views", "website_clicks"],
-        message: `${followersRows.length} dias sincronizados (${marketingRows.length} métricas)`,
+        message: `${followersRows.length} dias sincronizados — total_seguidores salvo só para hoje (${today})`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
   } catch (err: any) {
     console.error("Erro:", err);
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
