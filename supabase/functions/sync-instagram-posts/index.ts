@@ -30,7 +30,7 @@ async function fetchPostInsights(
 ): Promise<{ metrics: Record<string, number>; usedFallback: boolean; errorMsg: string | null }> {
   let metrics: string;
   if (mediaType === "VIDEO" || mediaType === "REEL") {
-    metrics = "impressions,reach,saved,shares,comments,likes,plays";
+    metrics = "impressions,reach,saved,shares,comments,likes";
   } else {
     metrics = "impressions,reach,saved,shares,comments,likes";
   }
