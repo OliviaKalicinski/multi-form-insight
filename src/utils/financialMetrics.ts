@@ -116,18 +116,18 @@ export const calculateOrdersByMonthWithTypes = (orders: ProcessedOrder[]): Order
     }));
 };
 /**
- * Filtra pedidos que contêm APENAS Kit de Amostras
- * Retorna apenas pedidos com produtos reais (não apenas R$ 0,01)
+ * [FIX DIV-002] Filtra pedidos "reais" (que contêm produto além de amostras).
+ *
+ * ANTES: hardcode p.descricaoAjustada !== "Kit de Amostras" — detectava apenas
+ * esse padrão exato de nome, ignorando amostras com outros nomes ou preço baixo.
+ *
+ * DEPOIS: usa isOnlySampleOrder() de samplesAnalyzer.ts (fonte canônica),
+ * que detecta amostras por múltiplas keywords E por faixa de preço (R$0,01–R$1,00).
+ *
+ * Mantida como wrapper público para retrocompatibilidade com chamadas existentes.
  */
-export const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] => {
-  return orders.filter((order) => {
-    // Verificar se o pedido tem outros produtos além de Kit de Amostras
-    const nonSampleProducts = order.produtos.filter((p) => p.descricaoAjustada !== "Kit de Amostras");
-
-    // Manter pedido se tiver pelo menos 1 produto que não seja Kit de Amostras
-    return nonSampleProducts.length > 0;
-  });
-};
+export const filterRealOrders = (orders: ProcessedOrder[]): ProcessedOrder[] =>
+  orders.filter((order) => !isOnlySampleOrder(order));
 /**
  * Calcula pedidos trimestrais separados por tipo (só amostras vs produtos)
  */
@@ -161,12 +161,15 @@ export const calculateOrdersByQuarterWithTypes = (orders: ProcessedOrder[]): Ord
 };
 
 /**
- * Calcula faturamento agregado por trimestre
+ * Calcula faturamento agregado por trimestre.
+ * [FIX DIV-004] Proteção interna: aplica getRevenueOrders() para garantir
+ * que brindes/bonificações nunca sejam incluídos, independente do chamador.
  */
 export const calculateQuarterlyRevenue = (orders: ProcessedOrder[]): { quarter: string; revenue: number }[] => {
+  const revenueOrders = getRevenueOrders(orders); // [FIX DIV-004] guard interno
   const quarterlyMap = new Map<string, number>();
 
-  orders.forEach((order) => {
+  revenueOrders.forEach((order) => {
     const date = order.dataVenda;
     const year = date.getFullYear();
     const quarter = Math.floor(date.getMonth() / 3) + 1;
@@ -183,15 +186,18 @@ export const calculateQuarterlyRevenue = (orders: ProcessedOrder[]): { quarter: 
 };
 
 /**
- * Calcula faturamento total por período (dia/mês/ano)
+ * Calcula faturamento total por período (dia/mês/ano).
+ * [FIX DIV-004] Proteção interna: aplica getRevenueOrders() para garantir
+ * que apenas pedidos tipo 'venda' sejam somados.
  */
 export const calculateRevenueByPeriod = (
   orders: ProcessedOrder[],
   periodType: "day" | "month" | "year",
 ): { period: string; revenue: number }[] => {
+  const revenueOrders = getRevenueOrders(orders); // [FIX DIV-004] guard interno
   const revenueMap = new Map<string, number>();
 
-  orders.forEach((order) => {
+  revenueOrders.forEach((order) => {
     let periodKey: string;
     switch (periodType) {
       case "day":
