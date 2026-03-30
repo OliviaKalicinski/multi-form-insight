@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getOfficialRevenue, isRevenueOrder } from "@/utils/revenue";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -163,14 +164,10 @@ export default function PaginaInteligente() {
 
   // ─── Sales computations ────────────────────────────────────────────────────
   const filteredSales = useMemo(() => {
-    if (!dateRange) return salesData;
-    return salesData.filter(
-      (o) =>
-        o.dataVenda >= dateRange.start &&
-        o.dataVenda <= dateRange.end &&
-        o.tipoMovimento !== "devolucao" &&
-        o.tipoMovimento !== "ajuste",
-    );
+    const base = dateRange
+      ? salesData.filter((o) => o.dataVenda >= dateRange.start && o.dataVenda <= dateRange.end)
+      : salesData;
+    return base.filter(isRevenueOrder);
   }, [salesData, dateRange]);
 
   // Units & revenue of Original
@@ -193,8 +190,9 @@ export default function PaginaInteligente() {
     const map = { b2c: 0, b2b: 0, b2b2c: 0, unknown: 0 };
     filteredSales.forEach((o) => {
       const seg = o.segmentoCliente || "unknown";
-      if (seg in map) (map as any)[seg] += o.valorTotal;
-      else map.unknown += o.valorTotal;
+      const rev = getOfficialRevenue(o);
+      if (seg in map) (map as any)[seg] += rev;
+      else map.unknown += rev;
     });
     return map;
   }, [filteredSales]);
