@@ -1,8 +1,9 @@
 import { ExecutiveMetrics } from "@/types/executive";
 import { AdsData, ProcessedOrder } from "@/types/marketing";
-import { calculateSalesMetrics, calculateAverageTicket, calculateRepurchaseRate } from "./salesCalculator";
+import { calculateSalesMetrics, calculateAverageTicket, calculateRepurchaseRate, filterOrdersByMonth } from "./salesCalculator"; // [FIX DIV-001] filterOrdersByMonth importado da fonte canônica
 import { calculateAdsMetrics } from "./adsCalculator";
 import { analyzeChurn } from "./customerBehaviorMetrics";
+import { isOnlySampleOrder } from "./samplesAnalyzer"; // [FIX DIV-002] fonte canônica de detecção de amostras
 import { differenceInDays, parse, min, max } from "date-fns";
 import { getOfficialRevenue, getRevenueOrders, segmentOrders, getB2COrders, SegmentFilter } from "./revenue";
 import { 
@@ -114,10 +115,10 @@ export const calculateExecutiveMetrics = (
   const pedidos = salesMetrics?.totalPedidos || 0;
   const ticketMedio = calculateAverageTicket(filteredOrders);
   
-  // Ticket médio real - exclui pedidos de SOMENTE amostra E não-vendas
-  const pedidosReais = revenueOrders.filter(order => {
-    return order.produtos.some(p => p.descricaoAjustada !== 'Kit de Amostras');
-  });
+  // [FIX DIV-002] Ticket médio real - usa isOnlySampleOrder() da fonte canônica (samplesAnalyzer.ts)
+  // Antes: hardcode p.descricaoAjustada !== 'Kit de Amostras' (detectava apenas um padrão de nome)
+  // Depois: isOnlySampleOrder detecta por múltiplas keywords E por preço (R$0,01–R$1,00)
+  const pedidosReais = revenueOrders.filter(order => !isOnlySampleOrder(order));
   const receitaReal = pedidosReais.reduce((sum, o) => sum + getOfficialRevenue(o), 0);
   const ticketMedioReal = pedidosReais.length > 0 
     ? receitaReal / pedidosReais.length 
@@ -347,19 +348,10 @@ export const calculateExecutiveMetrics = (
   };
 };
 
-/**
- * Filtra pedidos por mês
- */
-export const filterOrdersByMonth = (orders: ProcessedOrder[], month: string): ProcessedOrder[] => {
-  return orders.filter(order => {
-    try {
-      const orderMonth = `${order.dataVenda.getFullYear()}-${String(order.dataVenda.getMonth() + 1).padStart(2, '0')}`;
-      return orderMonth === month;
-    } catch {
-      return false;
-    }
-  });
-};
+// [FIX DIV-001] filterOrdersByMonth REMOVIDO deste arquivo.
+// Use filterOrdersByMonth de ./salesCalculator (implementação canônica completa).
+// Motivo: a versão anterior era simplificada e não tratava 'all', 'last-12-months'
+// nem usava format() de date-fns, gerando resultados divergentes em edge cases.
 
 /**
  * Filtra dados de ads por mês
