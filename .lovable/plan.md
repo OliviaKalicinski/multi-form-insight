@@ -1,10 +1,19 @@
 
 
-## Deploy sync-instagram-comments
+# Plano: Corrigir erro de build + Deploy de Edge Functions
 
-Deploy the `sync-instagram-comments` edge function to production. No code changes needed.
+## 1. Corrigir erro de build em `process-nf-pdf/index.ts`
 
-### Technical detail
-- Function: `supabase/functions/sync-instagram-comments/index.ts`
-- The build error shown is in `process-nf-pdf/index.ts`, unrelated to this function and won't block the deploy.
+**Problema:** Linha 225 — `pdfjsLib.GlobalWorkerOptions.workerSrc = undefined` causa erro TS2322 porque `undefined` não é atribuível a `string`.
+
+**Correção:** Mudar para:
+```ts
+pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+```
+
+## 2. Deploy das Edge Functions
+
+Após corrigir o build, usar a ferramenta de deploy do Supabase para deployar:
+- `sync-instagram-posts`
+- `sync-instagram-organic`
 
