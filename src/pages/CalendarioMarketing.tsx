@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Settings2 } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Settings2 } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -39,6 +39,17 @@ interface EventForm {
 interface CategoryForm {
   name: string;
   color: string;
+}
+
+// [FEATURE] Budget approval warning — tipo dos campos do budget_requests
+interface BudgetRequest {
+  calendar_event_id: string;
+  financial_status: string;
+  operations_status: string;
+  marketing_status: string;
+  needs_financial: boolean;
+  needs_operations: boolean;
+  needs_marketing: boolean;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -103,6 +114,15 @@ function pillStyle(color: string): React.CSSProperties {
     color,
     border: `1px solid ${color}55`,
   };
+}
+
+// [FEATURE] Retorna true se o orçamento está totalmente aprovado
+function isBudgetApproved(b: BudgetRequest): boolean {
+  return (
+    (!b.needs_financial  || b.financial_status  === "approved") &&
+    (!b.needs_operations || b.operations_status === "approved") &&
+    (!b.needs_marketing  || b.marketing_status  === "approved")
+  );
 }
 
 // ─── Color picker sub-component ───────────────────────────────────────────────
@@ -187,6 +207,32 @@ export default function CalendarioMarketing() {
         evt.end_date ? evt.end_date >= rangeStart : evt.start_date >= rangeStart
       );
     },
+  });
+
+  // [FEATURE] Busca os orçamentos vinculados aos eventos do mês visível
+  const eventIds = events.map((e) => e.id);
+  const { data: budgetRequests = [] } = useQuery<BudgetRequest[]>({
+    queryKey: ["budget-requests-calendar", eventIds.join(",")],
+    queryFn: async () => {
+      if (eventIds.length === 0) return [];
+      const { data, error } = await (supabase as any)
+        .from("budget_requests")
+        .select(
+          "calendar_event_id, financial_status, operations_status, marketing_status, needs_financial, needs_operations, needs_marketing"
+        )
+        .in("calendar_event_id", eventIds);
+      if (error) throw error;
+      return (data || []).filter((b: BudgetRequest) => b.calendar_event_id !== null);
+    },
+    enabled: eventIds.length > 0,
+  });
+
+  // [FEATURE] Mapa: calendar_event_id → true (aprovado) | false (pendente/rejeitado)
+  const budgetStatusMap = new Map<string, boolean>();
+  budgetRequests.forEach((b) => {
+    if (b.calendar_event_id) {
+      budgetStatusMap.set(b.calendar_event_id, isBudgetApproved(b));
+    }
   });
 
   const categoryMap = new Map<string, Category>(categories.map((c) => [c.id, c]));
@@ -383,6 +429,11 @@ export default function CalendarioMarketing() {
               {cat.name}
             </div>
           ))}
+          {/* [FEATURE] Legenda do aviso de orçamento */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+            Orçamento pendente
+          </div>
         </div>
       ) : (
         <div className="text-sm text-muted-foreground bg-muted/40 border rounded-lg px-4 py-3">
@@ -455,15 +506,22 @@ export default function CalendarioMarketing() {
                   {dayEvents.slice(0, 3).map((evt) => {
                     const cat   = categoryMap.get(evt.category_id);
                     const color = cat?.color || "#94a3b8";
+                    // [FEATURE] true = aprovado, false = pendente, undefined = sem orçamento vinculado
+                    const budgetApproved = budgetStatusMap.get(evt.id);
+                    const hasPendingBudget = budgetApproved === false;
                     return (
                       <div
                         key={evt.id}
-                        className="text-[10px] leading-snug px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80 font-medium"
+                        className="text-[10px] leading-snug px-1.5 py-0.5 rounded cursor-pointer hover:opacity-80 font-medium flex items-center gap-0.5"
                         style={pillStyle(color)}
-                        title={evt.title}
+                        title={hasPendingBudget ? `${evt.title} — Orçamento pendente de aprovação` : evt.title}
                         onClick={(e) => { e.stopPropagation(); setViewEvent(evt); }}
                       >
-                        {evt.title}
+                        {/* [FEATURE] Ícone de aviso quando orçamento não aprovado */}
+                        {hasPendingBudget && (
+                          <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-amber-500" />
+                        )}
+                        <span className="truncate">{evt.title}</span>
                       </div>
                     );
                   })}
@@ -485,6 +543,9 @@ export default function CalendarioMarketing() {
           {viewEvent && (() => {
             const cat   = categoryMap.get(viewEvent.category_id);
             const color = cat?.color || "#94a3b8";
+            // [FEATURE] Verifica status do orçamento para o evento aberto
+            const budgetApproved = budgetStatusMap.get(viewEvent.id);
+            const hasPendingBudget = budgetApproved === false;
             return (
               <>
                 <DialogHeader>
@@ -499,6 +560,15 @@ export default function CalendarioMarketing() {
                       {cat.name}
                     </span>
                   )}
+
+                  {/* [FEATURE] Badge de orçamento pendente no detalhe do evento */}
+                  {hasPendingBudget && (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      Orçamento pendente de aprovação
+                    </div>
+                  )}
+
                   <p className="text-muted-foreground">
                     {viewEvent.end_date && viewEvent.end_date !== viewEvent.start_date
                       ? `${formatDisplayDate(viewEvent.start_date)} → ${formatDisplayDate(viewEvent.end_date)}`
