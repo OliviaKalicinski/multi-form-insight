@@ -8,6 +8,53 @@ const corsHeaders = {
 
 const IG_ACCOUNT_ID = "17841470017662704";
 
+/**
+ * Infere o tipo editorial do post a partir da legenda.
+ * Valores: manifesto | educativo | bastidor | prova_social | oferta | outro
+ */
+function inferPostType(caption: string | null): string {
+  if (!caption) return "outro";
+  const c = caption.toLowerCase();
+
+  // Oferta/promoção — checar primeiro pois pode coexistir com outros
+  if (
+    c.includes("% off") || c.includes("desconto") || c.includes("promoção") ||
+    c.includes("cupom") || c.includes("sorteio") || c.includes("giveaway") ||
+    c.includes("black friday") || c.includes("cyber") || c.includes("oferta")
+  ) return "oferta";
+
+  // Manifesto / missão / sustentabilidade
+  if (
+    c.includes("nossa missão") || c.includes("acreditamos") || c.includes("revolução") ||
+    c.includes("sustentab") || c.includes("impacto") || c.includes("planeta") ||
+    c.includes("co₂") || c.includes("meio ambiente") || c.includes("manifesto")
+  ) return "manifesto";
+
+  // Prova social — depoimento, review, resultado
+  if (
+    c.includes("depoimento") || c.includes("cliente") || c.includes("resultado") ||
+    c.includes("antes e depois") || c.includes("review") || c.includes("avaliação") ||
+    c.includes("aprovado") || c.includes("testou")
+  ) return "prova_social";
+
+  // Bastidor — processo, equipe, dia a dia
+  if (
+    c.includes("bastidor") || c.includes("por trás") || c.includes("equipe") ||
+    c.includes("produção") || c.includes("fábrica") || c.includes("dia a dia") ||
+    c.includes("nosso time")
+  ) return "bastidor";
+
+  // Educativo — ciência, dica, nutrição, saúde
+  if (
+    c.includes("você sabia") || c.includes("dica") || c.includes("proteína") ||
+    c.includes("nutrição") || c.includes("digestib") || c.includes("aminoácido") ||
+    c.includes("bsf") || c.includes("inseto") || c.includes("saúde") ||
+    c.includes("benefício") || c.includes("ciência")
+  ) return "educativo";
+
+  return "outro";
+}
+
 async function fetchRecentPosts(token: string, limit = 50): Promise<{ posts: any[]; error: string | null }> {
   const url = new URL(`https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}/media`);
   url.searchParams.set("fields", "id,permalink,media_type,caption,timestamp");
@@ -155,6 +202,7 @@ serve(async (req) => {
         media_type: post.media_type || null,
         caption: post.caption ? post.caption.substring(0, 500) : null,
         published_at: post.timestamp || null,
+        post_type: inferPostType(post.caption),
         impressions: 0, // removido da API de post — disponível apenas no nível da conta
         reach: insights["reach"] || 0,
         likes: insights["likes"] || 0,
