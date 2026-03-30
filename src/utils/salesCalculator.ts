@@ -234,15 +234,22 @@ export const countUniqueCustomers = (orders: ProcessedOrder[]): number => {
 };
 
 /**
- * Calcula todas as métricas de vendas
+ * Calcula todas as métricas de vendas.
+ * [FIX DIV-003] totalClientes agora usa getRevenueOrders() para base consistente.
+ *
+ * ANTES: countUniqueCustomers(orders) — contava clientes de TODOS os pedidos
+ * (incluindo brindes/bonificações), inflando o denominador e subdimensionando LTV.
+ *
+ * DEPOIS: countUniqueCustomers(revenueOrders) — base fiscal alinhada com
+ * totalPedidos e faturamentoTotal. Clientes que só receberam brindes não contam.
  */
 export const calculateSalesMetrics = (orders: ProcessedOrder[]): SalesMetrics => {
-  const revenueOrderCount = getRevenueOrders(orders).length;
+  const revenueOrders = getRevenueOrders(orders); // [FIX DIV-003] base fiscal única
   return {
     faturamentoTotal: calculateRevenue(orders),
     ticketMedio: calculateAverageTicket(orders),
-    totalPedidos: revenueOrderCount,
-    totalClientes: countUniqueCustomers(orders),
+    totalPedidos: revenueOrders.length,
+    totalClientes: countUniqueCustomers(revenueOrders), // [FIX DIV-003] base fiscal
     taxaRecompra: calculateRepurchaseRate(orders),
   };
 };
