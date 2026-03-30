@@ -179,21 +179,18 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
 
   const setMarketingData = (data: MarketingData[]) => {
     setMarketingDataState(data);
-    setDateRangeState(null);
+    // Preserva o filtro selecionado pelo usuário; auto-init cuidará se dateRange for null
   };
   const setFollowersData = (data: FollowersData[]) => {
     setFollowersDataState(data);
-    setDateRangeState(null);
   };
   const setAdsData = (data: AdsData[], summaries: AdsMonthSummary[] = [], isHierarchical: boolean = false) => {
     setAdsDataState(data);
     setMonthlySummaries(summaries);
     setHasHierarchicalFormat(isHierarchical);
-    setDateRangeState(null);
   };
   const setSalesData = (data: ProcessedOrder[]) => {
     setSalesDataState(data);
-    setDateRangeState(null);
   };
   const setAudienceData = (data: AudienceData | null) => setAudienceDataState(data);
 
