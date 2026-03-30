@@ -222,7 +222,7 @@ serve(async (req: Request) => {
       const pdfjsLib = await import(
         "npm:pdfjs-dist@4.0.379/legacy/build/pdf.mjs"
       );
-      pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "";
 
       const buffer = await fileData.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({
