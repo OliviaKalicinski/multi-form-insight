@@ -386,9 +386,10 @@ const VisaoExecutivaV2 = () => {
 
   const b2c = useMemo(() => {
     const orders = getB2COrders(filteredOrders);
-    const receitaProdutos = orders.reduce((s, o) => s + o.valorTotal, 0);
-    const frete = orders.reduce((s, o) => s + o.valorFrete, 0);
-    const receitaTotal = receitaProdutos + frete;
+    const revenueOnly = orders.filter(isRevenueOrder);
+    const receitaProdutos = revenueOnly.reduce((s, o) => s + (o.valorTotal || 0), 0);
+    const frete = revenueOnly.reduce((s, o) => s + (o.valorFrete || 0), 0);
+    const receitaTotal = revenueOnly.reduce((s, o) => s + getOfficialRevenue(o), 0);
     const fretePercent = receitaTotal > 0 ? ((frete / receitaTotal) * 100).toFixed(1) : "0";
     const productRevenueMap = buildProductRevenueMap(orders);
     const receitaSemAmostras = Object.values(productRevenueMap).reduce((s, d) => s + d.revenue, 0);
@@ -443,8 +444,8 @@ const VisaoExecutivaV2 = () => {
       const mo = b2cAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       return {
         mes: fmtMonth(m),
-        Produtos: Math.round(mo.reduce((s, o) => s + o.valorTotal, 0)),
-        Frete: Math.round(mo.reduce((s, o) => s + o.valorFrete, 0)),
+        Produtos: Math.round(mo.filter(isRevenueOrder).reduce((s, o) => s + (o.valorTotal || 0), 0)),
+        Frete: Math.round(mo.filter(isRevenueOrder).reduce((s, o) => s + (o.valorFrete || 0), 0)),
       };
     });
     const allProdMap = buildProductRevenueMap(b2cAll);
@@ -597,7 +598,7 @@ const VisaoExecutivaV2 = () => {
       const b2b2cM = b2b2cAll.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       return {
         mes: fmtMonth(m),
-        B2C: Math.round(b2cM.reduce((s, o) => s + o.valorTotal + o.valorFrete, 0)),
+        B2C: Math.round(b2cM.filter(isRevenueOrder).reduce((s, o) => s + getOfficialRevenue(o), 0)),
         B2B: Math.round(b2bM.filter(isRevenueOrder).reduce((s, o) => s + getOfficialRevenue(o), 0)),
         B2B2C: Math.round(b2b2cM.filter(isRevenueOrder).reduce((s, o) => s + getOfficialRevenue(o), 0)),
       };
