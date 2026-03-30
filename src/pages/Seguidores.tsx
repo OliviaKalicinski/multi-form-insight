@@ -688,25 +688,25 @@ const Seguidores = () => {
                     title="Alcance Total (Posts)"
                     value={totalReach.toLocaleString("pt-BR")}
                     icon={Eye}
-                    description="Soma do reach de todos os posts sincronizados"
+                    subtitle="Soma do reach de todos os posts sincronizados"
                   />
                   <MetricCard
                     title="Alcance Médio/Post"
                     value={avgReachPerPost.toLocaleString("pt-BR")}
                     icon={Target}
-                    description="Média de pessoas alcançadas por post"
+                    subtitle="Média de pessoas alcançadas por post"
                   />
                   <MetricCard
                     title="Saves Total"
                     value={totalSaves.toLocaleString("pt-BR")}
                     icon={Heart}
-                    description="Total de salvamentos"
+                    subtitle="Total de salvamentos"
                   />
                   <MetricCard
                     title="Saves Médio/Post"
                     value={avgSavesPerPost.toLocaleString("pt-BR")}
                     icon={BarChart3}
-                    description="Média de salvamentos por post"
+                    subtitle="Média de salvamentos por post"
                   />
                 </div>
                 {/* Gráfico por tipo editorial */}
