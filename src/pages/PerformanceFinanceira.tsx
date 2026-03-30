@@ -34,7 +34,7 @@ import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { getOfficialRevenue, getRevenueOrders, getComiDaDragaoOrders } from "@/utils/revenue";
 import { filterAdsByDateRange } from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
-import { benchmarksPetFood } from "@/data/executiveData";
+// benchmarksPetFood migrado → sectorBenchmarks (useAppSettings)
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -278,7 +278,7 @@ export default function PerformanceFinanceira() {
               value={formatCurrency(financialMetrics.ticketMedioReal)}
               icon={<TrendingUp className="h-3 w-3" />}
               trend={variations?.ticket}
-              status={getStatusFromBenchmark(financialMetrics.ticketMedioReal, benchmarksPetFood.ticketMedio)}
+              status={getStatusFromBenchmark(financialMetrics.ticketMedioReal, sectorBenchmarks.ticketMedio)}
               size="compact"
               tooltipKey="ticket_medio_real"
             />
