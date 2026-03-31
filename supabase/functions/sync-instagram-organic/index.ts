@@ -12,7 +12,7 @@ function defaultDateRange(): { since: string; until: string } {
   const until = new Date();
   until.setDate(until.getDate() - 1);
   const since = new Date(until);
-  since.setDate(since.getDate() - 29); // ← 30 dias ao invés de 7 para maximizar dados salvos
+  since.setDate(since.getDate() - 29);
   return {
     since: since.toISOString().split("T")[0],
     until: until.toISOString().split("T")[0],
@@ -80,9 +80,6 @@ serve(async (req) => {
 
     console.log(`Sync Instagram orgânico: ${since} → ${until}`);
 
-    // Busca todas as métricas em paralelo
-    // reach e profile_views/website_clicks usam period=day sem metric_type
-    // total_interactions, accounts_engaged, saves, shares, follows_and_unfollows precisam de metric_type=total_value
     const [
       reach,
       totalInteractions,
@@ -182,6 +179,11 @@ serve(async (req) => {
           marketingRows.push({ data: date, metrica: dbKey, valor: m[apiKey], source: "api" });
         }
       }
+      // ── FIX: impressions foi deprecado na API v20 ──
+      // Usamos reach como proxy para "visualizacoes" que o frontend espera
+      if (m["reach"] !== undefined) {
+        marketingRows.push({ data: date, metrica: "visualizacoes", valor: m["reach"], source: "api" });
+      }
     }
 
     if (marketingRows.length > 0) {
@@ -198,7 +200,7 @@ serve(async (req) => {
         followers_current: followersCount,
         period: { since, until },
         marketing_rows: marketingRows.length,
-        metrics_fetched: Object.keys(metricsMap),
+        metrics_fetched: [...Object.keys(metricsMap), "visualizacoes"],
         message: `${followersRows.length} dias sincronizados — total_seguidores salvo só para hoje (${today})`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
