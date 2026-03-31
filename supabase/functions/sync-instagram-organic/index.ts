@@ -164,9 +164,8 @@ serve(async (req) => {
       .upsert(followersRows, { onConflict: "data", ignoreDuplicates: false });
     if (followersError) throw new Error(`followers_data: ${followersError.message}`);
 
-    // ── marketing_data: agora inclui visitas e clicks ──
+    // ── marketing_data: métricas orgânicas ──
     const metricsMap: Record<string, string> = {
-      impressions: "visualizacoes",
       reach: "alcance",
       total_interactions: "interacoes",
       accounts_engaged: "engajamentos",
