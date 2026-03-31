@@ -12,7 +12,7 @@ function defaultDateRange(): { since: string; until: string } {
   const until = new Date();
   until.setDate(until.getDate() - 1);
   const since = new Date(until);
-  since.setDate(since.getDate() - 6);
+  since.setDate(since.getDate() - 29); // ← 30 dias ao invés de 7 para maximizar dados salvos
   return {
     since: since.toISOString().split("T")[0],
     until: until.toISOString().split("T")[0],
@@ -78,16 +78,28 @@ serve(async (req) => {
 
     console.log(`Sync Instagram orgânico: ${since} → ${until}`);
 
-    const [impressions, reach, totalInteractions, accountsEngaged, saves, shares, followsUnfollows] =
-      await Promise.all([
-        fetchMetric("impressions", since, until, META_TOKEN),
-        fetchMetric("reach", since, until, META_TOKEN),
-        fetchMetric("total_interactions", since, until, META_TOKEN),
-        fetchMetric("accounts_engaged", since, until, META_TOKEN),
-        fetchMetric("saves", since, until, META_TOKEN),
-        fetchMetric("shares", since, until, META_TOKEN),
-        fetchMetric("follows_and_unfollows", since, until, META_TOKEN),
-      ]);
+    // Busca todas as métricas em paralelo — inclui profile_views e website_clicks
+    const [
+      impressions,
+      reach,
+      totalInteractions,
+      accountsEngaged,
+      saves,
+      shares,
+      followsUnfollows,
+      profileViews,
+      websiteClicks,
+    ] = await Promise.all([
+      fetchMetric("impressions", since, until, META_TOKEN),
+      fetchMetric("reach", since, until, META_TOKEN),
+      fetchMetric("total_interactions", since, until, META_TOKEN),
+      fetchMetric("accounts_engaged", since, until, META_TOKEN),
+      fetchMetric("saves", since, until, META_TOKEN),
+      fetchMetric("shares", since, until, META_TOKEN),
+      fetchMetric("follows_and_unfollows", since, until, META_TOKEN),
+      fetchMetric("profile_views", since, until, META_TOKEN),
+      fetchMetric("website_clicks", since, until, META_TOKEN),
+    ]);
 
     // ── Total de seguidores atual (snapshot de hoje) ──
     const profileRes = await fetch(
@@ -111,6 +123,8 @@ serve(async (req) => {
     addMetric(accountsEngaged, "accounts_engaged");
     addMetric(saves, "saves");
     addMetric(shares, "shares");
+    addMetric(profileViews, "profile_views");
+    addMetric(websiteClicks, "website_clicks");
 
     for (const { date, value } of followsUnfollows) {
       if (!byDate[date]) byDate[date] = {};
@@ -135,9 +149,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const today = new Date().toISOString().split("T")[0];
 
-    // ── CORRIGIDO: total_seguidores só é salvo para hoje ──
-    // Para datas históricas, salvamos apenas novos_seguidores e unfollows.
-    // Isso evita que o gráfico mostre o mesmo número para todos os dias.
+    // ── followers_data: total_seguidores só salvo para hoje ──
     const followersRows = Object.entries(byDate).map(([date, m]) => ({
       data: date,
       total_seguidores: date === today ? followersCount : null,
@@ -151,7 +163,7 @@ serve(async (req) => {
       .upsert(followersRows, { onConflict: "data", ignoreDuplicates: false });
     if (followersError) throw new Error(`followers_data: ${followersError.message}`);
 
-    // ── marketing_data (alcance, impressões, saves, shares por dia) ──
+    // ── marketing_data: agora inclui visitas e clicks ──
     const metricsMap: Record<string, string> = {
       impressions: "visualizacoes",
       reach: "alcance",
@@ -159,6 +171,8 @@ serve(async (req) => {
       accounts_engaged: "engajamentos",
       saves: "saves",
       shares: "shares",
+      profile_views: "visitas",
+      website_clicks: "clicks",
     };
 
     const marketingRows: any[] = [];
