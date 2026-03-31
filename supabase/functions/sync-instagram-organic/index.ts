@@ -119,7 +119,6 @@ serve(async (req) => {
       }
     };
 
-    addMetric(impressions, "impressions");
     addMetric(reach, "reach");
     addMetric(totalInteractions, "total_interactions");
     addMetric(accountsEngaged, "accounts_engaged");
