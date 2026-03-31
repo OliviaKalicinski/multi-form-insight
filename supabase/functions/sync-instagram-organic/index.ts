@@ -23,7 +23,8 @@ async function fetchMetric(
   metricName: string,
   since: string,
   until: string,
-  token: string
+  token: string,
+  metricType?: string
 ): Promise<Array<{ date: string; value: any }>> {
   const url = new URL(`https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}/insights`);
   url.searchParams.set("metric", metricName);
@@ -31,6 +32,7 @@ async function fetchMetric(
   url.searchParams.set("since", since);
   url.searchParams.set("until", until);
   url.searchParams.set("access_token", token);
+  if (metricType) url.searchParams.set("metric_type", metricType);
   const res = await fetch(url.toString());
   const json = await res.json();
   if (json.error) {
@@ -78,9 +80,10 @@ serve(async (req) => {
 
     console.log(`Sync Instagram orgânico: ${since} → ${until}`);
 
-    // Busca todas as métricas em paralelo — inclui profile_views e website_clicks
+    // Busca todas as métricas em paralelo
+    // reach e profile_views/website_clicks usam period=day sem metric_type
+    // total_interactions, accounts_engaged, saves, shares, follows_and_unfollows precisam de metric_type=total_value
     const [
-      impressions,
       reach,
       totalInteractions,
       accountsEngaged,
@@ -90,13 +93,12 @@ serve(async (req) => {
       profileViews,
       websiteClicks,
     ] = await Promise.all([
-      fetchMetric("impressions", since, until, META_TOKEN),
       fetchMetric("reach", since, until, META_TOKEN),
-      fetchMetric("total_interactions", since, until, META_TOKEN),
-      fetchMetric("accounts_engaged", since, until, META_TOKEN),
-      fetchMetric("saves", since, until, META_TOKEN),
-      fetchMetric("shares", since, until, META_TOKEN),
-      fetchMetric("follows_and_unfollows", since, until, META_TOKEN),
+      fetchMetric("total_interactions", since, until, META_TOKEN, "total_value"),
+      fetchMetric("accounts_engaged", since, until, META_TOKEN, "total_value"),
+      fetchMetric("saves", since, until, META_TOKEN, "total_value"),
+      fetchMetric("shares", since, until, META_TOKEN, "total_value"),
+      fetchMetric("follows_and_unfollows", since, until, META_TOKEN, "total_value"),
       fetchMetric("profile_views", since, until, META_TOKEN),
       fetchMetric("website_clicks", since, until, META_TOKEN),
     ]);
@@ -117,7 +119,6 @@ serve(async (req) => {
       }
     };
 
-    addMetric(impressions, "impressions");
     addMetric(reach, "reach");
     addMetric(totalInteractions, "total_interactions");
     addMetric(accountsEngaged, "accounts_engaged");
@@ -163,9 +164,8 @@ serve(async (req) => {
       .upsert(followersRows, { onConflict: "data", ignoreDuplicates: false });
     if (followersError) throw new Error(`followers_data: ${followersError.message}`);
 
-    // ── marketing_data: agora inclui visitas e clicks ──
+    // ── marketing_data: métricas orgânicas ──
     const metricsMap: Record<string, string> = {
-      impressions: "visualizacoes",
       reach: "alcance",
       total_interactions: "interacoes",
       accounts_engaged: "engajamentos",
