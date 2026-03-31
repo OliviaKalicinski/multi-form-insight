@@ -80,9 +80,10 @@ serve(async (req) => {
 
     console.log(`Sync Instagram orgânico: ${since} → ${until}`);
 
-    // Busca todas as métricas em paralelo — inclui profile_views e website_clicks
+    // Busca todas as métricas em paralelo
+    // reach e profile_views/website_clicks usam period=day sem metric_type
+    // total_interactions, accounts_engaged, saves, shares, follows_and_unfollows precisam de metric_type=total_value
     const [
-      impressions,
       reach,
       totalInteractions,
       accountsEngaged,
@@ -92,13 +93,12 @@ serve(async (req) => {
       profileViews,
       websiteClicks,
     ] = await Promise.all([
-      fetchMetric("impressions", since, until, META_TOKEN),
       fetchMetric("reach", since, until, META_TOKEN),
-      fetchMetric("total_interactions", since, until, META_TOKEN),
-      fetchMetric("accounts_engaged", since, until, META_TOKEN),
-      fetchMetric("saves", since, until, META_TOKEN),
-      fetchMetric("shares", since, until, META_TOKEN),
-      fetchMetric("follows_and_unfollows", since, until, META_TOKEN),
+      fetchMetric("total_interactions", since, until, META_TOKEN, "total_value"),
+      fetchMetric("accounts_engaged", since, until, META_TOKEN, "total_value"),
+      fetchMetric("saves", since, until, META_TOKEN, "total_value"),
+      fetchMetric("shares", since, until, META_TOKEN, "total_value"),
+      fetchMetric("follows_and_unfollows", since, until, META_TOKEN, "total_value"),
       fetchMetric("profile_views", since, until, META_TOKEN),
       fetchMetric("website_clicks", since, until, META_TOKEN),
     ]);
