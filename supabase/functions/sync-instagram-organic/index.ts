@@ -23,7 +23,8 @@ async function fetchMetric(
   metricName: string,
   since: string,
   until: string,
-  token: string
+  token: string,
+  metricType?: string
 ): Promise<Array<{ date: string; value: any }>> {
   const url = new URL(`https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}/insights`);
   url.searchParams.set("metric", metricName);
@@ -31,6 +32,7 @@ async function fetchMetric(
   url.searchParams.set("since", since);
   url.searchParams.set("until", until);
   url.searchParams.set("access_token", token);
+  if (metricType) url.searchParams.set("metric_type", metricType);
   const res = await fetch(url.toString());
   const json = await res.json();
   if (json.error) {
