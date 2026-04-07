@@ -2,7 +2,7 @@
 import { useDashboard, DashboardProvider } from "@/contexts/DashboardContext";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { DataChat } from "@/components/dashboard/DataChat";
+import { FeedbackBox } from "@/components/dashboard/FeedbackBox";
 import { GlobalFilter } from "@/components/GlobalFilter";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -36,7 +36,7 @@ const DashboardLayoutInner = ({ children }: { children: React.ReactNode }) => {
           </header>
           <GlobalFilter />
           <main className="flex-1 bg-background">{children}</main>
-          <DataChat />
+          <FeedbackBox />
         </SidebarInset>
       </div>
     </SidebarProvider>
