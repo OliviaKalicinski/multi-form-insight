@@ -94,11 +94,24 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Check if user already exists
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+    const alreadyExists = existingUsers?.users?.some(
+      (u) => u.email?.toLowerCase() === email.toLowerCase().trim()
+    );
+
+    if (alreadyExists) {
+      return new Response(
+        JSON.stringify({ error: "Este email já está cadastrado no sistema" }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Create new user using admin API
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm email
+      email_confirm: true,
     });
 
     if (createError) {

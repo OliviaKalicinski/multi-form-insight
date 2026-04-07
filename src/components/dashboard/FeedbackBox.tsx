@@ -73,7 +73,7 @@ export function FeedbackBox() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      const { error } = await supabase.from("user_feedback").insert({
+      const { error } = await (supabase.from("user_feedback" as any) as any).insert({
         type,
         message: message.trim(),
         page_url: location.pathname,
