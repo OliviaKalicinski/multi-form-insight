@@ -42,11 +42,11 @@ export function FeedbackBox() {
   const fetchHistory = useCallback(async () => {
     setIsLoadingHistory(true);
     try {
-      const { data, error } = await supabase
-        .from("user_feedback")
+      const { data, error } = await (supabase
+        .from("user_feedback" as any)
         .select("id, type, message, page_url, status, created_at")
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(10) as any);
 
       if (!error && data) {
         setHistory(data as FeedbackItem[]);
@@ -73,7 +73,7 @@ export function FeedbackBox() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      const { error } = await supabase.from("user_feedback").insert({
+      const { error } = await (supabase.from("user_feedback" as any) as any).insert({
         type,
         message: message.trim(),
         page_url: location.pathname,
