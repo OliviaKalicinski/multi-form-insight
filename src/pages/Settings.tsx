@@ -22,6 +22,8 @@ import {
   CheckCircle2,
   Users,
   Instagram,
+  Zap,
+  RefreshCw,
 } from "lucide-react";
 
 export default function Settings() {
@@ -43,6 +45,76 @@ export default function Settings() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
+
+  // Meta Token state
+  const [metaTokenExpiry, setMetaTokenExpiry] = useState("");
+  const [metaTokenLoading, setMetaTokenLoading] = useState(false);
+  const [metaTokenSuccess, setMetaTokenSuccess] = useState(false);
+  const [metaTokenError, setMetaTokenError] = useState<string | null>(null);
+  const [metaTokenTesting, setMetaTokenTesting] = useState(false);
+  const [metaTokenTestResult, setMetaTokenTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  useEffect(() => {
+    const loadExpiry = async () => {
+      const { data } = await supabase
+        .from("app_settings")
+        .select("setting_value")
+        .eq("setting_key", "meta_token_expiry")
+        .single();
+      if (data?.setting_value) {
+        const val = data.setting_value as { expires_at?: string };
+        if (val.expires_at) setMetaTokenExpiry(val.expires_at);
+      }
+    };
+    loadExpiry();
+  }, []);
+
+  const handleMetaTokenSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMetaTokenError(null);
+    setMetaTokenSuccess(false);
+    if (!metaTokenExpiry) {
+      setMetaTokenError("Informe a data de expiração.");
+      return;
+    }
+    setMetaTokenLoading(true);
+    try {
+      const { error } = await supabase
+        .from("app_settings")
+        .upsert(
+          { setting_key: "meta_token_expiry", setting_value: { expires_at: metaTokenExpiry }, description: "Data de expiração do token Meta" },
+          { onConflict: "setting_key" }
+        );
+      if (error) throw error;
+      setMetaTokenSuccess(true);
+    } catch (err: any) {
+      setMetaTokenError(err.message || "Erro ao salvar.");
+    } finally {
+      setMetaTokenLoading(false);
+    }
+  };
+
+  const handleMetaTokenTest = async () => {
+    setMetaTokenTesting(true);
+    setMetaTokenTestResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-instagram-organic", {
+        body: {},
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setMetaTokenTestResult({ ok: true, msg: `Conexão OK — ${data?.synced ?? 0} registros sincronizados.` });
+    } catch (err: any) {
+      const msg = err.message || "Erro desconhecido";
+      const tokenErr = msg.toLowerCase().includes("token") || msg.includes("190") || msg.includes("401");
+      setMetaTokenTestResult({
+        ok: false,
+        msg: tokenErr ? "Token inválido ou expirado. Verifique o secret no Lovable." : msg,
+      });
+    } finally {
+      setMetaTokenTesting(false);
+    }
+  };
 
   // Instagram settings state
   const [baselineSeguidores, setBaselineSeguidores] = useState(instagramGoals.baselineSeguidores);
@@ -267,6 +339,85 @@ export default function Settings() {
           </CardFooter>
         </form>
       </Card>
+
+      {/* Meta Token (Admin only) */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Zap className="h-4 w-4 text-blue-500" />
+              Token Meta (Ads &amp; Instagram)
+            </CardTitle>
+            <CardDescription>
+              Registre a data de expiração do token após renovar no Graph API Explorer. O secret em si é atualizado pelo Lovable.
+            </CardDescription>
+          </CardHeader>
+          <form onSubmit={handleMetaTokenSave}>
+            <CardContent className="space-y-4">
+              {metaTokenSuccess && (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <AlertDescription>Data de expiração salva! O alerta do dashboard vai funcionar corretamente.</AlertDescription>
+                </Alert>
+              )}
+              {metaTokenError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{metaTokenError}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="meta-token-expiry">Data de Expiração do Token</Label>
+                <Input
+                  id="meta-token-expiry"
+                  type="date"
+                  value={metaTokenExpiry}
+                  onChange={(e) => setMetaTokenExpiry(e.target.value)}
+                  required
+                  disabled={metaTokenLoading}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Token de longa duração dura ~60 dias. O dashboard vai te avisar 10 dias antes de vencer.
+                </p>
+              </div>
+
+              {metaTokenTestResult && (
+                <Alert className={metaTokenTestResult.ok ? "border-emerald-300 bg-emerald-50" : "border-red-300 bg-red-50"}>
+                  {metaTokenTestResult.ok
+                    ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    : <AlertCircle className="h-4 w-4 text-red-500" />
+                  }
+                  <AlertDescription className={metaTokenTestResult.ok ? "text-emerald-800" : "text-red-800"}>
+                    {metaTokenTestResult.msg}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+            <CardFooter className="flex gap-2">
+              <Button type="submit" disabled={metaTokenLoading}>
+                {metaTokenLoading ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando...</>
+                ) : (
+                  "Salvar Data de Expiração"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={metaTokenTesting}
+                onClick={handleMetaTokenTest}
+              >
+                {metaTokenTesting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Testando...</>
+                ) : (
+                  <><RefreshCw className="mr-2 h-4 w-4" />Testar Conexão</>
+                )}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      )}
 
       {/* Instagram Settings (Admin only) */}
       {isAdmin && (
