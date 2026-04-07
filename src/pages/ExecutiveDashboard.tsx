@@ -219,9 +219,12 @@ export default function ExecutiveDashboard() {
   const { currentMetrics, previousMetrics, platformData, topProducts, segmentBreakdown } = useMemo(() => {
     if (!processedOrders.length)
       return { currentMetrics: null, previousMetrics: null, platformData: [], topProducts: [], segmentBreakdown: null };
-    const isAllMonths = !selectedMonth;
-    const monthOrders = isAllMonths ? processedOrders : filterExecOrders(processedOrders, selectedMonth);
-    const monthAds = isAllMonths ? adsData : filterAdsByMonth(adsData, selectedMonth);
+    // FIX: use the actual dateRange for filtering, not just the start month
+    const isAllMonths = !dateRange;
+    const monthOrders = isAllMonths
+      ? processedOrders
+      : filterOrdersByDateRange(processedOrders, dateRange!.start, dateRange!.end);
+    const monthAds = isAllMonths ? adsData : filterAdsByMonth(adsData, selectedMonth ?? "");
     const segments = segmentOrders(monthOrders);
     const filteredOrders = selectedSegment === "all" ? monthOrders : segments[selectedSegment];
     const segmentBreakdown = SEGMENT_ORDER.reduce(
@@ -236,20 +239,34 @@ export default function ExecutiveDashboard() {
     const currentMetrics = calculateExecutiveMetrics(
       monthOrders,
       monthAds,
-      isAllMonths ? "all" : selectedMonth,
+      isAllMonths ? "all" : (selectedMonth ?? "all"),
       selectedSegment,
     );
     let previousMetrics = null;
-    if (!isAllMonths && selectedMonth) {
-      const prevDate = subMonths(parse(selectedMonth, "yyyy-MM", new Date()), 1);
-      const prevMonth = format(prevDate, "yyyy-MM");
-      const prevMonthOrders = comparison?.isIncomplete
-        ? filterOrdersByDateRange(processedOrders, comparison.comparisonPeriod.start, comparison.comparisonPeriod.end)
-        : filterExecOrders(processedOrders, prevMonth);
+    if (!isAllMonths && dateRange) {
+      // FIX: calculate previous period using actual date range duration
+      const prevMonthStr = selectedMonth
+        ? format(subMonths(parse(selectedMonth, "yyyy-MM", new Date()), 1), "yyyy-MM")
+        : undefined;
+      let prevMonthOrders: ProcessedOrder[];
+      if (comparison?.isIncomplete && dateRange.label === "current_month") {
+        // Special case: current month is incomplete → compare with equal interval of previous month
+        prevMonthOrders = filterOrdersByDateRange(
+          processedOrders,
+          comparison.comparisonPeriod.start,
+          comparison.comparisonPeriod.end,
+        );
+      } else {
+        // General case: previous period = same duration, immediately before current period
+        const duration = dateRange.end.getTime() - dateRange.start.getTime();
+        const prevEnd = new Date(dateRange.start.getTime() - 1);
+        const prevStart = new Date(prevEnd.getTime() - duration);
+        prevMonthOrders = filterOrdersByDateRange(processedOrders, prevStart, prevEnd);
+      }
       previousMetrics = calculateExecutiveMetrics(
         prevMonthOrders,
-        filterAdsByMonth(adsData, prevMonth),
-        prevMonth,
+        prevMonthStr ? filterAdsByMonth(adsData, prevMonthStr) : adsData,
+        prevMonthStr ?? "all",
         selectedSegment,
       );
     }
@@ -270,13 +287,16 @@ export default function ExecutiveDashboard() {
       .sort((a, b) => b.receita - a.receita)
       .slice(0, 5);
     return { currentMetrics, previousMetrics, platformData, topProducts, segmentBreakdown };
-  }, [processedOrders, adsData, selectedMonth, comparison, selectedSegment]);
+  }, [processedOrders, adsData, dateRange, selectedMonth, comparison, selectedSegment]);
 
   const revenueMix = useMemo(() => {
     if (!processedOrders.length) return null;
-    const monthOrders = !selectedMonth ? processedOrders : filterExecOrders(processedOrders, selectedMonth);
+    // FIX: use actual dateRange for filtering
+    const monthOrders = !dateRange
+      ? processedOrders
+      : filterOrdersByDateRange(processedOrders, dateRange.start, dateRange.end);
     return calculateRevenueMix(monthOrders);
-  }, [processedOrders, selectedMonth]);
+  }, [processedOrders, dateRange]);
 
   const variations = useMemo(() => {
     if (!currentMetrics || !previousMetrics) return null;
