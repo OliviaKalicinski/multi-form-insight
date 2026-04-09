@@ -1069,6 +1069,11 @@ export type Database = {
           email: string
           id: string
           instagram: string | null
+          kanban_nicho: string | null
+          kanban_observacoes: string | null
+          kanban_seguidores: number | null
+          kanban_status: string | null
+          na_base: boolean
           name: string
           razao_social: string | null
           tiktok: string | null
@@ -1090,6 +1095,11 @@ export type Database = {
           email: string
           id?: string
           instagram?: string | null
+          kanban_nicho?: string | null
+          kanban_observacoes?: string | null
+          kanban_seguidores?: number | null
+          kanban_status?: string | null
+          na_base?: boolean
           name?: string
           razao_social?: string | null
           tiktok?: string | null
@@ -1111,6 +1121,11 @@ export type Database = {
           email?: string
           id?: string
           instagram?: string | null
+          kanban_nicho?: string | null
+          kanban_observacoes?: string | null
+          kanban_seguidores?: number | null
+          kanban_status?: string | null
+          na_base?: boolean
           name?: string
           razao_social?: string | null
           tiktok?: string | null
