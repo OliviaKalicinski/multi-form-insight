@@ -1,488 +1,172 @@
-import { useState, useMemo, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
-import { useCustomerData } from "@/hooks/useCustomerData";
-import { useDashboard } from "@/contexts/DashboardContext";
-import { buildClientPetMap, getClientPetSpecies } from "@/utils/petProfile";
-import { CustomerFilters } from "@/components/crm/CustomerFilters";
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowUpDown, ExternalLink, Download } from "lucide-react";
-import { BuyerPetProfile, PET_PROFILE_LABELS, PET_PROFILE_COLORS, PET_PROFILE_ORDER } from "@/data/operationalProducts";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { useCustomersOperational, type OperationalCustomer } from "@/hooks/useCustomersOperational";
 
-const segmentColors: Record<string, string> = {
-  VIP: "bg-amber-500/15 text-amber-700 border-amber-500/30",
-  Fiel: "bg-blue-500/15 text-blue-700 border-blue-500/30",
-  Recorrente: "bg-green-500/15 text-green-700 border-green-500/30",
-  "Primeira Compra": "bg-muted text-muted-foreground border-border",
-};
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Pré-preenche o CPF/CNPJ (útil quando o atendimento já digitou no autocomplete) */
+  defaultCpfCnpj?: string;
+  /** Pré-preenche o nome */
+  defaultNome?: string;
+  /** Callback chamado com o cliente recém-criado, depois que o insert deu certo */
+  onCreated?: (customer: OperationalCustomer) => void;
+}
 
-const churnColors: Record<string, string> = {
-  active: "bg-green-500/15 text-green-700 border-green-500/30",
-  at_risk: "bg-yellow-500/15 text-yellow-700 border-yellow-500/30",
-  inactive: "bg-orange-500/15 text-orange-700 border-orange-500/30",
-  churned: "bg-red-500/15 text-red-700 border-red-500/30",
-};
+/**
+ * Modal de criação de cliente provisório.
+ *
+ * Regras (decididas com a usuária):
+ * - CPF/CNPJ é OBRIGATÓRIO desde o primeiro contato. É a chave de
+ *   reconciliação com a NF futura.
+ * - Salvamos só dígitos (sem pontuação) pra garantir match com a NF.
+ * - Validação básica: 11 dígitos = CPF, 14 = CNPJ. Sem dígito verificador
+ *   por enquanto pra não bloquear casos de borda.
+ */
+export function NewCustomerDialog({ open, onOpenChange, defaultCpfCnpj, defaultNome, onCreated }: Props) {
+  const { createCustomer } = useCustomersOperational();
 
-const churnLabels: Record<string, string> = {
-  active: "Ativo",
-  at_risk: "Em Risco",
-  inactive: "Inativo",
-  churned: "Churn",
-};
+  const [nome, setNome] = useState("");
+  const [cpfCnpj, setCpfCnpj] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [email, setEmail] = useState("");
+  const [responsavel, setResponsavel] = useState("");
+  const [observacoes, setObservacoes] = useState("");
 
-const journeyStageColors: Record<string, string> = {
-  novo: "bg-sky-500/15 text-sky-700 border-sky-500/30",
-  recorrente: "bg-green-500/15 text-green-700 border-green-500/30",
-  campea: "bg-amber-500/15 text-amber-700 border-amber-500/30",
-  risco: "bg-orange-500/15 text-orange-700 border-orange-500/30",
-  perdido: "bg-red-500/15 text-red-700 border-red-500/30",
-};
-
-const journeyStageLabels: Record<string, string> = {
-  novo: "Novo",
-  recorrente: "Recorrente",
-  campea: "Campeã",
-  risco: "Risco",
-  perdido: "Perdido",
-};
-
-type SortKey =
-  | "nome"
-  | "total_revenue"
-  | "days_since_last_purchase"
-  | "last_order_date"
-  | "segment"
-  | "journey_stage"
-  | "churn_status"
-  | "total_orders_revenue"
-  | "responsavel"
-  | "pet";
-
-const PAGE_SIZE = 25;
-
-const petSortIndex = Object.fromEntries(PET_PROFILE_ORDER.map((p, i) => [p, i]));
-
-export default function Clientes() {
-  const navigate = useNavigate();
-  const { customers, isLoading } = useCustomerData();
-  const { salesData } = useDashboard();
-
-  const [search, setSearch] = useState("");
-  const [churnFilter, setChurnFilter] = useState("all");
-  const [segmentFilter, setSegmentFilter] = useState("all");
-  const [journeyFilter, setJourneyFilter] = useState("all");
-  const [responsavelFilter, setResponsavelFilter] = useState("all");
-  const [petFilter, setPetFilter] = useState("all");
-  const [sortKey, setSortKey] = useState<SortKey>("total_revenue");
-  const [sortAsc, setSortAsc] = useState(false);
-  const [page, setPage] = useState(0);
-
-  const petMap = useMemo(() => buildClientPetMap(salesData), [salesData]);
-
-  const [phoneMap, setPhoneMap] = useState<Map<string, string>>(new Map());
-
+  // Reset/prefill quando abre
   useEffect(() => {
-    const fetchPhones = async () => {
-      // customer_identifier stores phones keyed by customer_id
-      // customers have cpf_cnpj; we join via customer.id
-      const { data: identifiers } = await supabase
-        .from("customer_identifier")
-        .select("customer_id, value")
-        .eq("type", "phone");
+    if (!open) return;
+    setNome(defaultNome ?? "");
+    setCpfCnpj(defaultCpfCnpj ?? "");
+    setWhatsapp("");
+    setEmail("");
+    setResponsavel("");
+    setObservacoes("");
+  }, [open, defaultCpfCnpj, defaultNome]);
 
-      if (!identifiers?.length) return;
+  const cpfDigits = cpfCnpj.replace(/\D/g, "");
+  const cpfValid = cpfDigits.length === 11 || cpfDigits.length === 14;
+  const cpfLabel =
+    cpfDigits.length === 0
+      ? "CPF/CNPJ *"
+      : cpfDigits.length === 11
+      ? "CPF *"
+      : cpfDigits.length === 14
+      ? "CNPJ *"
+      : `CPF/CNPJ * (${cpfDigits.length}/11 ou 14 dígitos)`;
 
-      // Build map: customer_id → phone
-      const idToPhone = new Map<string, string>();
-      for (const row of identifiers) {
-        if (!idToPhone.has(row.customer_id)) idToPhone.set(row.customer_id, row.value);
-      }
+  const canSubmit = nome.trim().length > 0 && cpfValid && !createCustomer.isPending;
 
-      // customers already have id + cpf_cnpj — map cpf_cnpj_normalized → phone
-      const map = new Map<string, string>();
-      for (const c of customers) {
-        if (!c.id || !c.cpf_cnpj) continue;
-        const phone = idToPhone.get(c.id);
-        if (phone) map.set(c.cpf_cnpj.replace(/\D/g, ""), phone);
-      }
-      setPhoneMap(map);
-    };
-    if (customers.length > 0) fetchPhones();
-  }, [customers]);
-
-  const speciesCache = useMemo(() => {
-    const cache = new Map<string, string>();
-    for (const [cpf, profile] of petMap) {
-      if (profile === "multiplos") {
-        const species = getClientPetSpecies(salesData, cpf);
-        cache.set(cpf, species.map((s) => PET_PROFILE_LABELS[s]).join(" • "));
-      }
-    }
-    return cache;
-  }, [petMap, salesData]);
-
-  const getPetProfile = (cpf: string | null): BuyerPetProfile | null => {
-    if (!cpf) return null;
-    const normalized = cpf.replace(/\D/g, "");
-    return petMap.get(normalized) ?? null;
-  };
-
-  const responsaveis = useMemo(() => {
-    const set = new Set<string>();
-    customers.forEach((c) => {
-      if (c.responsavel) set.add(c.responsavel);
-    });
-    return Array.from(set).sort();
-  }, [customers]);
-
-  const filtered = useMemo(() => {
-    let list = customers;
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (c) => (c.nome ?? "").toLowerCase().includes(q) || (c.cpf_cnpj ?? "").toLowerCase().includes(q),
-      );
-    }
-    if (churnFilter !== "all") list = list.filter((c) => c.churn_status === churnFilter);
-    if (segmentFilter !== "all") list = list.filter((c) => c.segment === segmentFilter);
-    if (journeyFilter !== "all") list = list.filter((c) => (c as any).journey_stage === journeyFilter);
-    if (responsavelFilter !== "all") list = list.filter((c) => c.responsavel === responsavelFilter);
-    if (petFilter !== "all") {
-      list = list.filter((c) => {
-        const pet = getPetProfile(c.cpf_cnpj);
-        return pet === petFilter;
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    try {
+      const created = await createCustomer.mutateAsync({
+        nome: nome.trim(),
+        cpf_cnpj: cpfDigits,
+        whatsapp: whatsapp.trim() || undefined,
+        email: email.trim() || undefined,
+        responsavel: responsavel.trim() || undefined,
+        observacoes: observacoes.trim() || undefined,
       });
+      toast.success("Cliente cadastrado");
+      onCreated?.(created);
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erro ao cadastrar cliente");
     }
-    return list;
-  }, [customers, search, churnFilter, segmentFilter, journeyFilter, responsavelFilter, petFilter, petMap]);
-
-  const sorted = useMemo(() => {
-    const copy = [...filtered];
-    copy.sort((a, b) => {
-      let va: any, vb: any;
-      switch (sortKey) {
-        case "nome":
-          va = a.nome ?? "";
-          vb = b.nome ?? "";
-          break;
-        case "total_revenue":
-          va = a.total_revenue ?? 0;
-          vb = b.total_revenue ?? 0;
-          break;
-        case "days_since_last_purchase":
-          va = a.days_since_last_purchase ?? 9999;
-          vb = b.days_since_last_purchase ?? 9999;
-          break;
-        case "last_order_date":
-          va = a.last_order_date ?? "";
-          vb = b.last_order_date ?? "";
-          break;
-        case "segment":
-          va = a.segment ?? "";
-          vb = b.segment ?? "";
-          break;
-        case "journey_stage":
-          va = (a as any).journey_stage ?? "";
-          vb = (b as any).journey_stage ?? "";
-          break;
-        case "churn_status":
-          va = a.churn_status ?? "";
-          vb = b.churn_status ?? "";
-          break;
-        case "total_orders_revenue":
-          va = a.total_orders_revenue ?? 0;
-          vb = b.total_orders_revenue ?? 0;
-          break;
-        case "responsavel":
-          va = a.responsavel ?? "";
-          vb = b.responsavel ?? "";
-          break;
-        case "pet": {
-          const pa = getPetProfile(a.cpf_cnpj);
-          const pb = getPetProfile(b.cpf_cnpj);
-          va = pa ? (petSortIndex[pa] ?? 99) : 99;
-          vb = pb ? (petSortIndex[pb] ?? 99) : 99;
-          break;
-        }
-      }
-      if (va < vb) return sortAsc ? -1 : 1;
-      if (va > vb) return sortAsc ? 1 : -1;
-      return 0;
-    });
-    return copy;
-  }, [filtered, sortKey, sortAsc, petMap]);
-
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
-  const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else {
-      setSortKey(key);
-      setSortAsc(false);
-    }
-    setPage(0);
   };
-
-  const fmt = (v: number | null) => (v != null ? `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—");
-
-  const handleExportCSV = () => {
-    const rows = sorted.map((c) => {
-      const key = c.cpf_cnpj?.replace(/\D/g, "") ?? "";
-      const telefone = phoneMap.get(key) ?? "";
-      const nome = (c.nome ?? "").replace(/"/g, '""');
-      return `"${nome}","${telefone}"`;
-    });
-    const csv = ["Nome,Telefone", ...rows].join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `clientes_remarketing_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const renderPetBadge = (cpf: string | null) => {
-    const pet = getPetProfile(cpf);
-    if (!pet || pet === "nao_identificado") return <span className="text-muted-foreground">—</span>;
-    const normalizedCpf = cpf?.replace(/\D/g, "") ?? "";
-    const subLabel = pet === "multiplos" ? speciesCache.get(normalizedCpf) : null;
-    return (
-      <div className="flex flex-col gap-0.5">
-        <Badge
-          variant="outline"
-          className="text-[10px] border"
-          style={{
-            backgroundColor: `${PET_PROFILE_COLORS[pet]}20`,
-            color: PET_PROFILE_COLORS[pet],
-            borderColor: `${PET_PROFILE_COLORS[pet]}40`,
-          }}
-        >
-          {PET_PROFILE_LABELS[pet]}
-        </Badge>
-        {subLabel && <span className="text-[9px] text-muted-foreground pl-1">{subLabel}</span>}
-      </div>
-    );
-  };
-
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-[400px] w-full" />
-      </div>
-    );
-  }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Clientes</h1>
-          <p className="text-sm text-muted-foreground">Lista operacional • {filtered.length} clientes</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {phoneMap.size > 0 &&
-            sorted.length > 0 &&
-            (() => {
-              const comTel = sorted.filter((c) => phoneMap.has(c.cpf_cnpj?.replace(/\D/g, "") ?? "")).length;
-              const pct = Math.round((comTel / sorted.length) * 100);
-              const color = pct >= 60 ? "text-green-600" : pct >= 30 ? "text-amber-600" : "text-red-500";
-              return (
-                <span className={`text-xs font-medium ${color}`}>
-                  📞 {comTel}/{sorted.length} com telefone ({pct}%)
-                </span>
-              );
-            })()}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCSV}
-            disabled={sorted.length === 0}
-            className="flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Exportar para remarketing ({sorted.length})
-          </Button>
-        </div>
-      </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Novo Cliente</DialogTitle>
+        </DialogHeader>
 
-      <CustomerFilters
-        search={search}
-        onSearchChange={(v) => {
-          setSearch(v);
-          setPage(0);
-        }}
-        churnFilter={churnFilter}
-        onChurnChange={(v) => {
-          setChurnFilter(v);
-          setPage(0);
-        }}
-        segmentFilter={segmentFilter}
-        onSegmentChange={(v) => {
-          setSegmentFilter(v);
-          setPage(0);
-        }}
-        responsavelFilter={responsavelFilter}
-        onResponsavelChange={(v) => {
-          setResponsavelFilter(v);
-          setPage(0);
-        }}
-        responsaveis={responsaveis}
-        petFilter={petFilter}
-        onPetChange={(v) => {
-          setPetFilter(v);
-          setPage(0);
-        }}
-      />
+        <div className="space-y-4 py-2">
+          <div className="space-y-1">
+            <Label>Nome *</Label>
+            <Input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Nome ou razão social"
+              autoFocus
+            />
+          </div>
 
-      {/* Journey Stage Filter */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium text-muted-foreground">Jornada:</span>
-        <Button
-          variant={journeyFilter === "all" ? "default" : "outline"}
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => { setJourneyFilter("all"); setPage(0); }}
-        >
-          Todas
-        </Button>
-        {Object.entries(journeyStageLabels).map(([key, label]) => (
-          <Button
-            key={key}
-            variant={journeyFilter === key ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => { setJourneyFilter(key); setPage(0); }}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
+          <div className="space-y-1">
+            <Label>{cpfLabel}</Label>
+            <Input
+              value={cpfCnpj}
+              onChange={(e) => setCpfCnpj(e.target.value)}
+              placeholder="Apenas números — ex: 12345678900"
+              inputMode="numeric"
+            />
+            {cpfDigits.length > 0 && !cpfValid && (
+              <p className="text-[11px] text-amber-600">
+                CPF deve ter 11 dígitos e CNPJ 14 dígitos.
+              </p>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Obrigatório. É como vamos reconciliar com a NF depois.
+            </p>
+          </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("nome")}>
-                  <span className="flex items-center gap-1">
-                    Nome <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead>CPF/CNPJ</TableHead>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("segment")}>
-                  <span className="flex items-center gap-1">
-                    Segmento <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("journey_stage")}>
-                  <span className="flex items-center gap-1">
-                    Jornada <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("churn_status")}>
-                  <span className="flex items-center gap-1">
-                    Churn <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("pet")}>
-                  <span className="flex items-center gap-1">
-                    Pet <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort("total_revenue")}>
-                  <span className="flex items-center gap-1 justify-end">
-                    Receita <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort("total_orders_revenue")}>
-                  <span className="flex items-center gap-1 justify-end">
-                    Pedidos <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer" onClick={() => toggleSort("responsavel")}>
-                  <span className="flex items-center gap-1">
-                    Responsável <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort("days_since_last_purchase")}>
-                  <span className="flex items-center gap-1 justify-end">
-                    Dias s/ compra <ArrowUpDown className="h-3 w-3" />
-                  </span>
-                </TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginated.map((c) => (
-                <TableRow
-                  key={c.cpf_cnpj}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/clientes/${encodeURIComponent(c.cpf_cnpj!)}`)}
-                >
-                  <TableCell className="font-medium">{c.nome || "—"}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {(c.cpf_cnpj ?? "").length > 11 ? `${c.cpf_cnpj!.slice(0, 11)}...` : c.cpf_cnpj}
-                  </TableCell>
-                  <TableCell>
-                    {c.segment && (
-                      <Badge variant="outline" className={`text-[10px] ${segmentColors[c.segment] ?? ""}`}>
-                        {c.segment}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {(c as any).journey_stage && (
-                      <Badge variant="outline" className={`text-[10px] ${journeyStageColors[(c as any).journey_stage] ?? ""}`}>
-                        {journeyStageLabels[(c as any).journey_stage] ?? (c as any).journey_stage}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {c.churn_status && (
-                      <Badge variant="outline" className={`text-[10px] ${churnColors[c.churn_status] ?? ""}`}>
-                        {churnLabels[c.churn_status] ?? c.churn_status}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{renderPetBadge(c.cpf_cnpj)}</TableCell>
-                  <TableCell className="text-right">{fmt(c.total_revenue)}</TableCell>
-                  <TableCell className="text-right">{c.total_orders_revenue ?? 0}</TableCell>
-                  <TableCell className="text-sm">{c.responsavel || "—"}</TableCell>
-                  <TableCell className="text-right">{c.days_since_last_purchase ?? "—"}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>WhatsApp</Label>
+              <Input
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="11999990000"
+                inputMode="tel"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>E-mail</Label>
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="cliente@exemplo.com"
+                inputMode="email"
+              />
+            </div>
+          </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, sorted.length)} de {sorted.length}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
-              Anterior
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>
-              Próximo
-            </Button>
+          <div className="space-y-1">
+            <Label>Responsável</Label>
+            <Input
+              value={responsavel}
+              onChange={(e) => setResponsavel(e.target.value)}
+              placeholder="Quem está cuidando desse cliente"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label>Observações</Label>
+            <Textarea
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+              rows={2}
+              placeholder="Notas livres"
+            />
           </div>
         </div>
-      )}
-    </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit} disabled={!canSubmit}>
+            {createCustomer.isPending ? "Salvando..." : "Cadastrar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
