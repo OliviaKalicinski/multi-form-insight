@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAllContactLogs } from "@/hooks/useAllContactLogs";
-import { useCustomerData } from "@/hooks/useCustomerData";
+import { useCustomersOperational } from "@/hooks/useCustomersOperational";
 import { ContactLogFormWithCustomerSelect } from "@/components/crm/ContactLogFormWithCustomerSelect";
 import { ContactLogEditForm } from "@/components/crm/ContactLogEditForm";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -31,7 +31,7 @@ type SortDirection = "asc" | "desc";
 export default function Atendimentos() {
   const navigate = useNavigate();
   const { logs, isLoading, addLog, updateLog } = useAllContactLogs();
-  const { customers } = useCustomerData();
+  const { customers } = useCustomersOperational();
 
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState("all");
