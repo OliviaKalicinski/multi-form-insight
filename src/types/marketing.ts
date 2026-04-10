@@ -243,6 +243,12 @@ export interface ProcessedOrder {
   fretePorConta?: string;
   municipio?: string;
   uf?: string;
+  // Endereço completo (somente NF)
+  logradouro?: string;
+  numeroEndereco?: string;
+  complemento?: string;
+  bairro?: string;
+  cep?: string;
   fonteDados?: "nf" | "ecommerce";
   segmentoCliente?: "b2c" | "b2b2c" | "b2b";
   numeroPedidoPlataforma?: string;
@@ -279,6 +285,11 @@ export interface InvoiceRawData {
   "Frete por conta"?: string;
   Municipio?: string;
   UF?: string;
+  Cep?: string;
+  Endereco?: string;
+  Nro?: string;
+  Bairro?: string;
+  Complemento?: string;
   Observacoes?: string;
   "Nome Cliente"?: string;
   "CPF/CNPJ Cliente"?: string;
