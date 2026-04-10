@@ -284,18 +284,20 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
     const notFound = allNormalizedCpfs.length - cpfToId.size;
 
     // Etapa 3: Montar identificadores
-    const identifiers: { customer_id: string; type: string; value: string }[] = [];
+    // updated_at explícito = NF mais recente vence em recalculate_customer (ORDER BY updated_at DESC)
+    const nowIso = new Date().toISOString();
+    const identifiers: { customer_id: string; type: string; value: string; updated_at: string }[] = [];
 
     emailMap.forEach((emails, cpfNorm) => {
       const customerId = cpfToId.get(cpfNorm);
       if (!customerId) return;
-      emails.forEach((email) => identifiers.push({ customer_id: customerId, type: "email", value: email }));
+      emails.forEach((email) => identifiers.push({ customer_id: customerId, type: "email", value: email, updated_at: nowIso }));
     });
 
     phoneMap.forEach((phones, cpfNorm) => {
       const customerId = cpfToId.get(cpfNorm);
       if (!customerId) return;
-      phones.forEach((phone) => identifiers.push({ customer_id: customerId, type: "phone", value: phone }));
+      phones.forEach((phone) => identifiers.push({ customer_id: customerId, type: "phone", value: phone, updated_at: nowIso }));
     });
 
     const emailCount = identifiers.filter((i) => i.type === "email").length;
@@ -311,7 +313,7 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
         const chunk = upsertChunks[i];
         const { error: upsertError } = await supabase
           .from("customer_identifier")
-          .upsert(chunk, { onConflict: "type,value", ignoreDuplicates: true });
+          .upsert(chunk, { onConflict: "type,value", ignoreDuplicates: false });
 
         if (upsertError) {
           console.error(`[NF-IDENTIFIERS] Erro batch upsert ${i + 1}/${upsertBatches}:`, upsertError);
@@ -608,6 +610,11 @@ export const useDataPersistence = () => {
           frete_por_conta: order.fretePorConta || null,
           municipio: order.municipio || null,
           uf: order.uf || null,
+          logradouro: order.logradouro || null,
+          numero: order.numeroEndereco || null,
+          complemento: order.complemento || null,
+          bairro: order.bairro || null,
+          cep: order.cep || null,
           data_emissao_nf: order.dataEmissao ? format(order.dataEmissao, "yyyy-MM-dd") : null,
           data_saida_nf: null,
           fonte_dados: "nf",
