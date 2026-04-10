@@ -36,12 +36,32 @@ const invoiceRowSchema = z.object({
   "Frete por conta": z.string().optional(),
   "Municipio": z.string().optional(),
   "UF": z.string().optional(),
+  "Cep": z.string().optional(),
+  "Endereco": z.string().optional(),
+  "Nro": z.string().optional(),
+  "Bairro": z.string().optional(),
+  "Complemento": z.string().optional(),
   "Observacoes": z.string().optional(),
   "Nome Cliente": z.string().optional(),
   "CPF/CNPJ Cliente": z.string().optional(),
   "E-mail": z.string().optional(),
   "Fone": z.string().optional(),
 });
+
+// ── Sanitização de campos de endereço ──────────────────────────
+const sanitizeText = (raw?: string): string | undefined => {
+  if (!raw) return undefined;
+  const t = raw.trim();
+  if (!t || t === '0' || t === '--' || t.toLowerCase() === 'n/a') return undefined;
+  return t;
+};
+
+export const sanitizeCep = (raw?: string): string | undefined => {
+  if (!raw) return undefined;
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length !== 8) return undefined;
+  return digits;
+};
 
 // ── Sanitização de identificadores ──────────────────────────────
 export const sanitizeEmail = (raw?: string): string | undefined => {
@@ -146,6 +166,12 @@ const HEADER_ALIASES: Record<string, string> = {
   "Peso líquido": "Peso Liquido",
   "Peso bruto": "Peso Bruto",
   "Data saída": "Data saida",
+  // Endereço — aliases comuns
+  "CEP": "Cep",
+  "Endereço": "Endereco",
+  "Nº": "Nro",
+  "Numero": "Nro",
+  "Número": "Nro",
 };
 
 // Pré-computa mapa normalizado para matching tolerante
@@ -362,6 +388,11 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
       fretePorConta: first["Frete por conta"],
       municipio: first["Municipio"],
       uf: first["UF"],
+      logradouro: sanitizeText(first["Endereco"]),
+      numeroEndereco: sanitizeText(first["Nro"]),
+      complemento: sanitizeText(first["Complemento"]),
+      bairro: sanitizeText(first["Bairro"]),
+      cep: sanitizeCep(first["Cep"]),
       fonteDados: "nf",
       segmentoCliente,
       numeroPedidoPlataforma,
