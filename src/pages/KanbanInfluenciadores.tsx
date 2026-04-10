@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DndContext, DragOverlay, DragStartEvent, DragEndEvent, closestCenter } from "@dnd-kit/core";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Database } from "lucide-react";
+import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Database, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
@@ -95,6 +95,39 @@ function normalizeInstagram(v: string): string {
   return (v || "").trim().replace(/^@/, "").toLowerCase();
 }
 
+const VALID_STATUSES: InfluencerStatus[] = [
+  "prospeccao", "reativacao", "em_contato",
+  "seeding_enviado", "postou", "parceiro", "inativo",
+];
+
+// Accepts a raw value from the spreadsheet and returns a valid InfluencerStatus
+// (normalizing accents/case) or null if not recognized.
+function parseStatusFromSheet(raw: string): InfluencerStatus | null {
+  if (!raw) return null;
+  const norm = raw
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s-]+/g, "_");
+  if ((VALID_STATUSES as string[]).includes(norm)) return norm as InfluencerStatus;
+  // Friendly aliases
+  const aliases: Record<string, InfluencerStatus> = {
+    prospecao: "prospeccao",
+    prospeccao: "prospeccao",
+    contato: "em_contato",
+    em_contato: "em_contato",
+    seeding: "seeding_enviado",
+    seeding_enviado: "seeding_enviado",
+    postou: "postou",
+    parceiro: "parceiro",
+    inativo: "inativo",
+    reativacao: "reativacao",
+  };
+  return aliases[norm] ?? null;
+}
+
 // ─── Import Result ────────────────────────────────────────────────────────────
 interface ImportResult {
   created: number;
@@ -129,14 +162,26 @@ function InfluencerCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="font-medium text-sm leading-tight">{influencer.nome}</div>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <div
+          className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+          // dnd-kit listens to pointerdown on the parent and would steal the click.
+          // Stop the pointer events here so the button onClick can fire normally.
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onEdit(influencer); }}
             className="p-1 rounded hover:bg-gray-100"
           >
             <Pencil className="h-3 w-3 text-gray-400" />
           </button>
           <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onDelete(influencer.id); }}
             className="p-1 rounded hover:bg-red-50"
           >
@@ -275,6 +320,37 @@ function InfluencerDialog({
         }
       : EMPTY_FORM
   );
+
+  // Reset the form whenever the dialog opens or the editing target changes,
+  // so editing always starts populated with the current influencer's data.
+  useEffect(() => {
+    if (!open) return;
+    setForm(
+      initial
+        ? {
+            nome: initial.nome ?? "",
+            instagram: initial.instagram ?? "",
+            tiktok: initial.tiktok ?? "",
+            whatsapp: initial.whatsapp ?? "",
+            email: initial.email ?? "",
+            address_logradouro: initial.address_logradouro ?? "",
+            address_numero: initial.address_numero ?? "",
+            address_complemento: initial.address_complemento ?? "",
+            address_bairro: initial.address_bairro ?? "",
+            address_cep: initial.address_cep ?? "",
+            address_cidade: initial.address_cidade ?? "",
+            address_estado: initial.address_estado ?? "",
+            cnpj: initial.cnpj ?? "",
+            razao_social: initial.razao_social ?? "",
+            nicho: initial.nicho ?? "",
+            seguidores: initial.seguidores ?? "",
+            status: initial.status ?? "em_contato",
+            observacoes: initial.observacoes ?? "",
+            na_base: initial.na_base ?? false,
+          }
+        : EMPTY_FORM
+    );
+  }, [open, initial]);
 
   const set = (key: keyof InfluencerFormData, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -460,7 +536,7 @@ function ImportResultDialog({ open, onClose, result }: { open: boolean; onClose:
           </div>
           {result.created > 0 && (
             <p className="text-sm text-muted-foreground">
-              ✅ {result.created} novo{result.created !== 1 ? "s" : ""} adicionado{result.created !== 1 ? "s" : ""} em <strong>Em Contato</strong>.
+              ✅ {result.created} novo{result.created !== 1 ? "s" : ""} adicionado{result.created !== 1 ? "s" : ""} em <strong>Prospecção</strong> (ou no status indicado na coluna <code>kanban_status</code> da planilha).
             </p>
           )}
           {result.updated > 0 && (
@@ -493,6 +569,7 @@ export default function KanbanInfluenciadores() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importResultOpen, setImportResultOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Load from Supabase ──────────────────────────────────────────────────────
@@ -509,7 +586,23 @@ export default function KanbanInfluenciadores() {
     },
   });
 
-  const influencers = rawInfluencers;
+  // Filter by search query (matches nome, instagram, email, whatsapp).
+  const influencers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rawInfluencers;
+    const norm = (v: string) =>
+      (v || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    const nq = norm(q);
+    return rawInfluencers.filter((i) =>
+      norm(i.nome).includes(nq) ||
+      norm(i.instagram).includes(nq) ||
+      norm(i.email).includes(nq) ||
+      norm(i.whatsapp).includes(nq)
+    );
+  }, [rawInfluencers, search]);
 
   // ── Upsert mutation (create or update) ─────────────────────────────────────
   const upsertMutation = useMutation({
@@ -695,12 +788,22 @@ export default function KanbanInfluenciadores() {
             updated_at: new Date().toISOString(),
           };
 
+          // Status from spreadsheet (column "kanban_status"). If empty/invalid → "prospeccao".
+          const sheetStatus =
+            parseStatusFromSheet(row["kanban_status"] || row["status"] || "");
+          const defaultStatus: InfluencerStatus = sheetStatus ?? "prospeccao";
+
           const existing = existingMap.get(igNorm);
 
           if (existing) {
-            // Update — preserve kanban_status if already set
+            // Update — if the sheet provided an explicit status, honor it.
+            // Otherwise: keep the existing kanban_status if set, else default to "prospeccao".
             const updatePayload: Record<string, unknown> = { ...dbPayload };
-            if (!existing.kanban_status) updatePayload.kanban_status = "em_contato";
+            if (sheetStatus) {
+              updatePayload.kanban_status = sheetStatus;
+            } else if (!existing.kanban_status) {
+              updatePayload.kanban_status = "prospeccao";
+            }
             const { error } = await supabase
               .from("influencer_registry")
               .update(updatePayload)
@@ -708,10 +811,10 @@ export default function KanbanInfluenciadores() {
             if (error) result.errors.push(`Linha ${excelRow}: Erro ao atualizar — ${error.message}`);
             else result.updated++;
           } else {
-            // Create new — always starts in em_contato
+            // Create new — honor sheet status if present, otherwise start in "prospeccao".
             const { error } = await supabase.from("influencer_registry").insert([{
               ...dbPayload,
-              kanban_status: "em_contato",
+              kanban_status: defaultStatus,
               na_base: false,
               created_at: new Date().toISOString(),
             }]);
@@ -751,7 +854,26 @@ export default function KanbanInfluenciadores() {
           <h1 className="text-2xl font-bold">Kanban de Influenciadores</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Pipeline de prospecção e relacionamento</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nome, @, e-mail ou WhatsApp"
+              className="pl-8 pr-8 w-72"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-gray-100"
+                aria-label="Limpar busca"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
             <Upload className="h-4 w-4" /> Importar Planilha
@@ -761,6 +883,13 @@ export default function KanbanInfluenciadores() {
           </Button>
         </div>
       </div>
+
+      {search && (
+        <div className="text-xs text-muted-foreground">
+          {influencers.length} resultado{influencers.length !== 1 ? "s" : ""} para
+          {" "}<strong>"{search}"</strong>
+        </div>
+      )}
 
       {isLoading && (
         <div className="text-sm text-muted-foreground py-8 text-center">Carregando...</div>
