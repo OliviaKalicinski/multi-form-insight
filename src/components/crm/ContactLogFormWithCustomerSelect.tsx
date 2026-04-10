@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { UserPlus } from "lucide-react";
+import { NewCustomerDialog } from "@/components/crm/NewCustomerDialog";
 
 interface Customer {
   id: string | null;
@@ -23,11 +25,13 @@ interface Props {
 export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit, customers, isLoading }: Props) {
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedCustomerName, setSelectedCustomerName] = useState("");
   const [tipo, setTipo] = useState("whatsapp");
   const [motivo, setMotivo] = useState("");
   const [resumo, setResumo] = useState("");
   const [responsavel, setResponsavel] = useState("");
   const [resultado, setResultado] = useState("");
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
   const filteredCustomers = useMemo(() => {
     if (!customerSearch || customerSearch.length < 2) return [];
@@ -37,11 +41,19 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
       .slice(0, 10);
   }, [customers, customerSearch]);
 
+  // Detecta se o que o usuário digitou é um CPF/CNPJ (só dígitos)
+  const searchDigits = customerSearch.replace(/\D/g, "");
+  const searchLooksLikeCpf = searchDigits.length >= 11 && /^\d+$/.test(customerSearch.trim());
+  const defaultCpfForNewCustomer = searchLooksLikeCpf ? searchDigits : undefined;
+  const defaultNomeForNewCustomer = !searchLooksLikeCpf && customerSearch.trim().length >= 2 ? customerSearch.trim() : undefined;
+
   const selectedName = useMemo(() => {
     if (!selectedCustomerId) return "";
     const c = customers.find(c => c.id === selectedCustomerId);
-    return c ? (c.nome ?? c.cpf_cnpj ?? '') : "";
-  }, [selectedCustomerId, customers]);
+    if (c) return c.nome ?? c.cpf_cnpj ?? '';
+    // Cliente recém-criado pode ainda não estar na lista (refetch em andamento)
+    return selectedCustomerName;
+  }, [selectedCustomerId, customers, selectedCustomerName]);
 
   const handleSubmit = () => {
     if (!selectedCustomerId || !resumo.trim()) return;
@@ -60,6 +72,7 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
   const resetForm = () => {
     setCustomerSearch("");
     setSelectedCustomerId("");
+    setSelectedCustomerName("");
     setMotivo("");
     setResumo("");
     setResultado("");
@@ -86,18 +99,31 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
                   onChange={e => setCustomerSearch(e.target.value)}
                   placeholder="Buscar cliente por nome ou CPF/CNPJ..."
                 />
-                {filteredCustomers.length > 0 && (
-                  <div className="border rounded-md max-h-40 overflow-y-auto">
+                {customerSearch.length >= 2 && (
+                  <div className="border rounded-md max-h-48 overflow-y-auto">
                     {filteredCustomers.map(c => (
                       <button
                         key={c.id}
+                        type="button"
                         className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
-                        onClick={() => { setSelectedCustomerId(c.id!); setCustomerSearch(""); }}
+                        onClick={() => {
+                          setSelectedCustomerId(c.id!);
+                          setSelectedCustomerName(c.nome ?? c.cpf_cnpj ?? '');
+                          setCustomerSearch("");
+                        }}
                       >
                         <span className="font-medium">{c.nome ?? '—'}</span>
                         <span className="text-muted-foreground ml-2 text-xs">{c.cpf_cnpj}</span>
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors border-t flex items-center gap-2 text-primary"
+                      onClick={() => setNewCustomerOpen(true)}
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      <span>Criar novo cliente{filteredCustomers.length === 0 ? ` "${customerSearch}"` : ""}</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -137,6 +163,19 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
           </Button>
         </div>
       </DialogContent>
+
+      <NewCustomerDialog
+        open={newCustomerOpen}
+        onOpenChange={setNewCustomerOpen}
+        defaultCpfCnpj={defaultCpfForNewCustomer}
+        defaultNome={defaultNomeForNewCustomer}
+        onCreated={(c) => {
+          setSelectedCustomerId(c.id);
+          setSelectedCustomerName(c.nome ?? c.cpf_cnpj ?? "");
+          setCustomerSearch("");
+          setNewCustomerOpen(false);
+        }}
+      />
     </Dialog>
   );
 }
