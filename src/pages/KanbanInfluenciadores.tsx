@@ -141,10 +141,12 @@ function InfluencerCard({
   influencer,
   onEdit,
   onDelete,
+  responsaveis,
 }: {
   influencer: Influencer;
   onEdit: (i: Influencer) => void;
   onDelete: (id: string) => void;
+  responsaveis?: string[];
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: influencer.id });
   const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined;
@@ -234,6 +236,20 @@ function InfluencerCard({
       {influencer.observacoes && (
         <p className="text-[11px] text-muted-foreground line-clamp-2">{influencer.observacoes}</p>
       )}
+
+      {/* Responsáveis badges */}
+      {responsaveis && responsaveis.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {responsaveis.map((nome) => {
+            const color = getResponsavelColor(nome);
+            return (
+              <span key={nome} className={cn("text-[9px] px-1.5 py-0 rounded-full border font-medium", color.bg, color.text, color.border)}>
+                {nome}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -244,11 +260,13 @@ function KanbanCol({
   influencers,
   onEdit,
   onDelete,
+  responsaveisMap,
 }: {
   col: (typeof COLUMNS)[number];
   influencers: Influencer[];
   onEdit: (i: Influencer) => void;
   onDelete: (id: string) => void;
+  responsaveisMap: Map<string, string[]>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.key });
   return (
@@ -266,7 +284,7 @@ function KanbanCol({
         )}
       >
         {influencers.map((inf) => (
-          <InfluencerCard key={inf.id} influencer={inf} onEdit={onEdit} onDelete={onDelete} />
+          <InfluencerCard key={inf.id} influencer={inf} onEdit={onEdit} onDelete={onDelete} responsaveis={responsaveisMap.get(inf.id)} />
         ))}
       </div>
     </div>
@@ -295,6 +313,161 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
   );
 }
 
+// ─── Responsável colors (hash-based palette) ────────────────────────────────
+const RESP_COLORS = [
+  { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
+  { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200" },
+  { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-200" },
+  { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
+  { bg: "bg-rose-100", text: "text-rose-700", border: "border-rose-200" },
+  { bg: "bg-cyan-100", text: "text-cyan-700", border: "border-cyan-200" },
+  { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
+  { bg: "bg-indigo-100", text: "text-indigo-700", border: "border-indigo-200" },
+];
+
+function getResponsavelColor(nome: string) {
+  let hash = 0;
+  for (let i = 0; i < nome.length; i++) hash = nome.charCodeAt(i) + ((hash << 5) - hash);
+  return RESP_COLORS[Math.abs(hash) % RESP_COLORS.length];
+}
+
+// ─── Responsável Section (inside InfluencerDialog) ──────────────────────────
+function ResponsavelSection({ influencerId }: { influencerId: string }) {
+  const queryClient = useQueryClient();
+  const [input, setInput] = useState("");
+
+  const { data: responsaveis = [] } = useQuery({
+    queryKey: ["influencer_responsaveis", influencerId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("influencer_responsavel" as any)
+        .select("id, responsavel_nome")
+        .eq("influencer_id", influencerId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as { id: string; responsavel_nome: string }[];
+    },
+    enabled: !!influencerId,
+  });
+
+  // Todos os nomes únicos para autocomplete
+  const { data: allNomes = [] } = useQuery({
+    queryKey: ["all_responsavel_nomes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("influencer_responsavel" as any)
+        .select("responsavel_nome");
+      if (error) throw error;
+      const set = new Set((data ?? []).map((r: any) => r.responsavel_nome as string));
+      return Array.from(set).sort();
+    },
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (nome: string) => {
+      const { error } = await supabase.from("influencer_responsavel" as any).insert([{
+        influencer_id: influencerId,
+        responsavel_nome: nome.trim(),
+      }] as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer_responsaveis", influencerId] });
+      queryClient.invalidateQueries({ queryKey: ["all_responsavel_nomes"] });
+      queryClient.invalidateQueries({ queryKey: ["influencer_responsavel_index"] });
+      setInput("");
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("influencer_responsavel" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer_responsaveis", influencerId] });
+      queryClient.invalidateQueries({ queryKey: ["influencer_responsavel_index"] });
+    },
+  });
+
+  const handleAdd = () => {
+    const nome = input.trim();
+    if (!nome) return;
+    if (responsaveis.some((r) => r.responsavel_nome.toLowerCase() === nome.toLowerCase())) return;
+    addMutation.mutate(nome);
+  };
+
+  // Sugestões filtradas
+  const suggestions = input.trim()
+    ? allNomes.filter(
+        (n) =>
+          n.toLowerCase().includes(input.trim().toLowerCase()) &&
+          !responsaveis.some((r) => r.responsavel_nome.toLowerCase() === n.toLowerCase())
+      )
+    : [];
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-medium flex items-center gap-1.5">
+        <Users className="h-3.5 w-3.5" />
+        Responsáveis
+      </Label>
+
+      {/* Tags atuais */}
+      <div className="flex flex-wrap gap-1.5">
+        {responsaveis.map((r) => {
+          const color = getResponsavelColor(r.responsavel_nome);
+          return (
+            <span
+              key={r.id}
+              className={cn("inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium", color.bg, color.text, color.border)}
+            >
+              {r.responsavel_nome}
+              <button
+                type="button"
+                onClick={() => removeMutation.mutate(r.id)}
+                className="hover:opacity-70"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Input + suggestions */}
+      <div className="relative">
+        <div className="flex gap-1.5">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAdd())}
+            placeholder="Adicionar responsável..."
+            className="h-7 text-xs flex-1"
+          />
+          <Button size="sm" variant="outline" onClick={handleAdd} disabled={!input.trim()} className="h-7 px-2 text-xs">
+            +
+          </Button>
+        </div>
+        {suggestions.length > 0 && (
+          <div className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-md max-h-28 overflow-y-auto">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className="w-full text-left px-2 py-1 text-xs hover:bg-gray-100"
+                onClick={() => { addMutation.mutate(s); setInput(""); }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Contact Log Section (inside InfluencerDialog) ──────────────────────────
 interface ContactLog {
   id: string;
@@ -313,7 +486,7 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
     queryKey: ["influencer_contact_log", influencerId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("influencer_contact_log")
+        .from("influencer_contact_log" as any)
         .select("*")
         .eq("influencer_id", influencerId)
         .order("created_at", { ascending: false });
@@ -325,7 +498,7 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
 
   const addMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("influencer_contact_log").insert([{
+      const { error } = await supabase.from("influencer_contact_log" as any).insert([{
         influencer_id: influencerId,
         responsavel: responsavel.trim(),
         observacao: observacao.trim() || null,
@@ -623,7 +796,8 @@ function InfluencerDialog({
             <Textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} placeholder="Notas, contatos, links..." rows={3} />
           </div>
 
-          {/* Log de contato — só aparece na edição */}
+          {/* Responsáveis + Log de contato — só aparece na edição */}
+          {initial && <ResponsavelSection influencerId={initial.id} />}
           {initial && <ContactLogSection influencerId={initial.id} />}
         </div>
 
@@ -721,29 +895,40 @@ export default function KanbanInfluenciadores() {
     },
   });
 
-  // ── IDs com contato do responsável selecionado (para filtro) ──
-  const { data: contactLogIndex = [] } = useQuery({
-    queryKey: ["influencer_contact_log_index"],
+  // ── Responsáveis por influenciador (para badges nos cards + filtro) ──
+  const { data: responsavelIndex = [] } = useQuery({
+    queryKey: ["influencer_responsavel_index"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("influencer_contact_log")
-        .select("influencer_id, responsavel");
+        .from("influencer_responsavel" as any)
+        .select("influencer_id, responsavel_nome");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as { influencer_id: string; responsavel_nome: string }[];
     },
   });
 
+  // Mapa: influencer_id → nomes dos responsáveis
+  const responsaveisMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const r of responsavelIndex) {
+      const arr = map.get(r.influencer_id) || [];
+      arr.push(r.responsavel_nome);
+      map.set(r.influencer_id, arr);
+    }
+    return map;
+  }, [responsavelIndex]);
+
   // Responsáveis únicos para o dropdown
   const responsavelOptions = useMemo(() => {
-    const set = new Set(contactLogIndex.map((r) => r.responsavel));
-    return Array.from(set).sort();
-  }, [contactLogIndex]);
+    const s = new Set(responsavelIndex.map((r: any) => r.responsavel_nome));
+    return Array.from(s).sort();
+  }, [responsavelIndex]);
 
   // IDs filtrados por responsável
   const filteredByResponsavel = useMemo(() => {
     if (!filterResponsavel) return null; // null = sem filtro
-    return new Set(contactLogIndex.filter((r) => r.responsavel === filterResponsavel).map((r) => r.influencer_id));
-  }, [contactLogIndex, filterResponsavel]);
+    return new Set(responsavelIndex.filter((r: any) => r.responsavel_nome === filterResponsavel).map((r: any) => r.influencer_id));
+  }, [responsavelIndex, filterResponsavel]);
 
   // Filter by search query (matches nome, instagram, email, whatsapp) + responsável.
   const influencers = useMemo(() => {
@@ -780,12 +965,12 @@ export default function KanbanInfluenciadores() {
     }) => {
       const { instagram, data, isNew } = payload;
       if (isNew) {
-        const { error } = await supabase.from("influencer_registry").insert([data]);
+        const { error } = await supabase.from("influencer_registry").insert([data] as any);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("influencer_registry")
-          .update(data)
+          .update(data as any)
           .eq("instagram", instagram);
         if (error) throw error;
       }
@@ -1066,7 +1251,7 @@ export default function KanbanInfluenciadores() {
             }
             const { error } = await supabase
               .from("influencer_registry")
-              .update(updatePayload)
+              .update(updatePayload as any)
               .eq("id", existing.id);
             if (error) result.errors.push(`Linha ${fileRow}: Erro ao atualizar — ${error.message}`);
             else result.updated++;
@@ -1076,7 +1261,7 @@ export default function KanbanInfluenciadores() {
               kanban_status: defaultStatus,
               na_base: false,
               created_at: new Date().toISOString(),
-            }]);
+            }] as any);
             if (error) result.errors.push(`Linha ${fileRow}: Erro ao criar — ${error.message}`);
             else result.created++;
           }
@@ -1178,6 +1363,7 @@ export default function KanbanInfluenciadores() {
                 influencers={byStatus[col.key]}
                 onEdit={(i) => setEditing(i)}
                 onDelete={handleDelete}
+                responsaveisMap={responsaveisMap}
               />
             ))}
           </div>
