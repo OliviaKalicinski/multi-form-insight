@@ -613,7 +613,7 @@ export default function KanbanInfluenciadores() {
     }) => {
       const { instagram, data, isNew } = payload;
       if (isNew) {
-        const { error } = await supabase.from("influencer_registry").insert([data]);
+        const { error } = await supabase.from("influencer_registry").insert([data as any]);
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -817,7 +817,7 @@ export default function KanbanInfluenciadores() {
               kanban_status: defaultStatus,
               na_base: false,
               created_at: new Date().toISOString(),
-            }]);
+            } as any]);
             if (error) result.errors.push(`Linha ${excelRow}: Erro ao criar — ${error.message}`);
             else result.created++;
           }
