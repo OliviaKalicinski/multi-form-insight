@@ -1,18 +1,30 @@
 import { useMemo, useState } from "react";
+import { Users, RefreshCcw, AlertTriangle, UserCheck, DollarSign, Calendar, TrendingUp, TrendingDown, Info, UserMinus, FileWarning, PieChart, Package, ShoppingCart, ShoppingBag, Target, Clock, Percent, ArrowRight } from "lucide-react";
+import { format } from "date-fns";
+
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useCustomerData } from "@/hooks/useCustomerData";
-import { Users, RefreshCcw, AlertTriangle, UserCheck, DollarSign, Calendar, TrendingUp, Info, UserMinus, TrendingDown, FileWarning, PieChart } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAppSettings } from "@/hooks/useAppSettings";
+
+import { calculateBehaviorComparison, BehaviorComparison, PathKPIs } from "@/utils/behaviorComparison";
+import { calculateAllSampleMetrics, calculateDataPeriod, isSampleProduct } from "@/utils/samplesAnalyzer";
+import { analyzeOrderVolume, analyzeSalesPeaks } from "@/utils/customerBehaviorMetrics";
+import { formatCurrency, filterOrdersByDateRange } from "@/utils/salesCalculator";
+import { getB2COrders } from "@/utils/revenue";
+import { PET_PROFILE_ORDER, PET_PROFILE_LABELS, PET_PROFILE_COLORS, BuyerPetProfile } from "@/data/operationalProducts";
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { OrderVolumeChart } from "@/components/dashboard/OrderVolumeChart";
 import { SalesPeaksChart } from "@/components/dashboard/SalesPeaksChart";
 import { VolumeKPICards } from "@/components/dashboard/VolumeKPICards";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
-import { analyzeOrderVolume, analyzeSalesPeaks } from "@/utils/customerBehaviorMetrics";
-import { formatCurrency, filterOrdersByDateRange } from "@/utils/salesCalculator";
-import { useAppSettings } from "@/hooks/useAppSettings";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomerSegmentationChart } from "@/components/dashboard/CustomerSegmentationChart";
 import { SegmentRevenueChart } from "@/components/dashboard/SegmentRevenueChart";
 import { SegmentDetailTable } from "@/components/dashboard/SegmentDetailTable";
@@ -20,546 +32,932 @@ import { ChurnFunnelChart } from "@/components/dashboard/ChurnFunnelChart";
 import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { EmptyState } from "@/components/EmptyState";
-import { getB2COrders } from "@/utils/revenue";
+import { ConversionFunnelChart } from "@/components/dashboard/ConversionFunnelChart";
+import { SampleProductsTable } from "@/components/dashboard/SampleProductsTable";
 
-export default function ComportamentoCliente() {
-  const {
-    salesData,
-    dateRange,
-    comparisonDateRange,
-    comparisonMode,
-  } = useDashboard();
+import { cn } from "@/lib/utils";
 
-  const { segments, churnMetrics, churnRiskCustomers, summaryMetrics, isLoading: customerLoading } = useCustomerData();
-  const { sectorBenchmarks } = useAppSettings();
+// ============================================================================
+// HELPER: PathCard for Comparativo tab
+// ============================================================================
 
-  const b2cSalesData = useMemo(() => getB2COrders(salesData), [salesData]);
+interface PathCardProps {
+  title: string;
+  description: string;
+  pathKPIs: PathKPIs;
+  comparisonPathKPIs: PathKPIs;
+  sectorBenchmarks: any;
+}
 
-  const [volumeView, setVolumeView] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('daily');
+function PathCard({ title, description, pathKPIs, comparisonPathKPIs, sectorBenchmarks }: PathCardProps) {
+  const getComparisonBadge = (value: number, comparisonValue: number) => {
+    const diff = value - comparisonValue;
+    const percentDiff = (diff / comparisonValue) * 100;
 
-  const filteredOrders = useMemo(() => {
-    if (b2cSalesData.length === 0) return [];
-    return dateRange ? filterOrdersByDateRange(b2cSalesData, dateRange.start, dateRange.end) : b2cSalesData;
-  }, [b2cSalesData, dateRange]);
-
-  const volumeAnalysisData = useMemo(() => {
-    if (filteredOrders.length === 0) return null;
-    return analyzeOrderVolume(filteredOrders);
-  }, [filteredOrders]);
-
-  const peaksData = useMemo(() => {
-    if (filteredOrders.length === 0) return [];
-    return analyzeSalesPeaks(filteredOrders).filter(p => p.isPeak);
-  }, [filteredOrders]);
-
-  const volumeTrend = useMemo(() => {
-    if (!dateRange || !comparisonDateRange || b2cSalesData.length === 0) return undefined;
-    const currentOrders = filterOrdersByDateRange(b2cSalesData, dateRange.start, dateRange.end);
-    const previousOrders = filterOrdersByDateRange(b2cSalesData, comparisonDateRange.start, comparisonDateRange.end);
-    if (previousOrders.length === 0) return undefined;
-    return ((currentOrders.length - previousOrders.length) / previousOrders.length) * 100;
-  }, [b2cSalesData, dateRange, comparisonDateRange]);
-
-  const volumeAnalysis = useMemo(() => {
-    if (!volumeAnalysisData?.daily || volumeAnalysisData.daily.length === 0) {
-      return { peakDay: { date: '', orders: 0 }, lowDay: { date: '', orders: 0 }, averageDaily: 0 };
+    if (Math.abs(percentDiff) < 5) {
+      return <TrendingUp className="w-4 h-4 text-gray-400" />;
     }
-    const days = volumeAnalysisData.daily;
-    const peakDay = days.reduce((max, curr) => curr.orders > max.orders ? curr : max, days[0]);
-    const lowDay = days.reduce((min, curr) => curr.orders < min.orders ? curr : min, days[0]);
-    const averageDaily = days.reduce((sum, d) => sum + d.orders, 0) / days.length;
-    return { peakDay, lowDay, averageDaily };
-  }, [volumeAnalysisData]);
-
-  const clienteBreakdown = useMemo(() => {
-    const primeiraCompraSegment = segments.find(s => s.segment === 'Primeira Compra');
-    const novos = primeiraCompraSegment?.count || 0;
-    const total = segments.reduce((sum, s) => sum + s.count, 0);
-    return { novos, recorrentes: total - novos };
-  }, [segments]);
-
-  const comparisonMetrics = useMemo(() => {
-    if (!comparisonMode || !comparisonDateRange || b2cSalesData.length === 0) return null;
-    const COLORS = ["#8b5cf6", "#3b82f6"];
-    const periods = [
-      { range: dateRange, label: "Período A", color: COLORS[0] },
-      { range: comparisonDateRange, label: "Período B", color: COLORS[1] },
-    ].filter(p => p.range);
-    const volumePorMes = periods.map(({ range, label, color }) => {
-      const orders = filterOrdersByDateRange(b2cSalesData, range!.start, range!.end);
-      return { month: label.toLowerCase().replace(" ", "-"), monthLabel: label, value: orders.length, color };
-    });
-    if (volumePorMes.length > 1) {
-      const base = volumePorMes[0].value;
-      volumePorMes.forEach((item, idx) => { if (idx > 0 && base > 0) (item as any).percentageChange = ((item.value - base) / base) * 100; });
-    }
-    return { volumePorMes };
-  }, [comparisonMode, comparisonDateRange, dateRange, b2cSalesData]);
-
-  if (b2cSalesData.length === 0 && !customerLoading) {
-    return (
-      <div className="container mx-auto px-6 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-6 h-6" />
-              👥 Comportamento do Cliente
-            </CardTitle>
-            <CardDescription>
-              Carregue os dados de vendas na página "Upload" para visualizar as análises de comportamento.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+    return percentDiff > 0 ? (
+      <TrendingUp className="w-4 h-4 text-green-600" />
+    ) : (
+      <TrendingDown className="w-4 h-4 text-red-600" />
     );
-  }
-
-  const totalClientes = churnMetrics.totalClientes;
-  const { totalClientes: _, clientesAtivos, clientesEmRisco, clientesInativos, clientesChurn, taxaChurn } = churnMetrics;
-  const valorEmRisco = churnRiskCustomers.reduce((sum, c) => sum + c.valorTotal, 0);
+  };
 
   return (
-    <div className="container mx-auto px-6 py-8 space-y-8">
+    <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
+      <CardHeader>
+        <CardTitle className="text-lg">{title}</CardTitle>
+        <CardDescription className="text-sm text-slate-600">{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Total Customers */}
+        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium text-slate-700">Total de Clientes</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-slate-900">{pathKPIs.totalCustomers}</span>
+            {getComparisonBadge(pathKPIs.totalCustomers, comparisonPathKPIs.totalCustomers)}
+          </div>
+        </div>
+
+        {/* Repurchase Rate */}
+        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2">
+            <RefreshCcw className="w-4 h-4 text-purple-600" />
+            <span className="text-sm font-medium text-slate-700">Taxa de Recompra (%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-slate-900">
+              {(pathKPIs.repurchaseRate * 100).toFixed(1)}%
+            </span>
+            {getComparisonBadge(pathKPIs.repurchaseRate, comparisonPathKPIs.repurchaseRate)}
+          </div>
+        </div>
+
+        {/* Ticket Médio */}
+        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4 text-green-600" />
+            <span className="text-sm font-medium text-slate-700">Ticket Médio (R$)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-slate-900">
+              {formatCurrency(pathKPIs.avgTicketMedio)}
+            </span>
+            {getComparisonBadge(pathKPIs.avgTicketMedio, comparisonPathKPIs.avgTicketMedio)}
+          </div>
+        </div>
+
+        {/* LTV Médio */}
+        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-yellow-600" />
+            <span className="text-sm font-medium text-slate-700">LTV Médio (R$)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-slate-900">
+              {formatCurrency(pathKPIs.avgLTV)}
+            </span>
+            {getComparisonBadge(pathKPIs.avgLTV, comparisonPathKPIs.avgLTV)}
+          </div>
+        </div>
+
+        {/* Days Between Purchases */}
+        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-indigo-600" />
+            <span className="text-sm font-medium text-slate-700">Dias entre Compras</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-slate-900">
+              {pathKPIs.avgDaysBetweenPurchases.toFixed(0)}d
+            </span>
+            {getComparisonBadge(
+              -pathKPIs.avgDaysBetweenPurchases,
+              -comparisonPathKPIs.avgDaysBetweenPurchases
+            )}
+          </div>
+        </div>
+
+        {/* Days to Second Purchase */}
+        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2">
+            <ArrowRight className="w-4 h-4 text-cyan-600" />
+            <span className="text-sm font-medium text-slate-700">Dias até 2ª Compra</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-slate-900">
+              {pathKPIs.avgDaysToSecondPurchase ? pathKPIs.avgDaysToSecondPurchase.toFixed(0) : "—"}d
+            </span>
+            {pathKPIs.avgDaysToSecondPurchase ? (
+              getComparisonBadge(
+                -pathKPIs.avgDaysToSecondPurchase,
+                -(comparisonPathKPIs.avgDaysToSecondPurchase || 0)
+              )
+            ) : (
+              <TrendingUp className="w-4 h-4 text-gray-400" />
+            )}
+          </div>
+        </div>
+
+        {/* Churn Rate */}
+        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2">
+            <UserMinus className="w-4 h-4 text-red-600" />
+            <span className="text-sm font-medium text-slate-700">Taxa de Churn (%)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-slate-900">
+              {(pathKPIs.churnRate * 100).toFixed(1)}%
+            </span>
+            {getComparisonBadge(
+              -pathKPIs.churnRate,
+              -comparisonPathKPIs.churnRate
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export default function ComportamentoCliente() {
+  const { salesData, dateRange, comparisonMode } = useDashboard();
+  const { segments, churnMetrics, churnRiskCustomers, summaryMetrics, isLoading: customerDataLoading } = useCustomerData();
+  const { sectorBenchmarks } = useAppSettings();
+  const [volumeTimeframe, setVolumeTimeframe] = useState("daily");
+
+  // ============================================================================
+  // Comparativo Tab Logic
+  // ============================================================================
+
+  const behaviorComparison = useMemo(() => {
+    if (!salesData || salesData.length === 0) return null;
+    return calculateBehaviorComparison(salesData);
+  }, [salesData]);
+
+  // ============================================================================
+  // Amostras Tab Logic
+  // ============================================================================
+
+  const filteredOrdersForSamples = useMemo(() => {
+    if (!salesData) return [];
+    if (!dateRange) return salesData;
+    return filterOrdersByDateRange(salesData, dateRange.start, dateRange.end);
+  }, [salesData, dateRange]);
+
+  const sampleMetrics = useMemo(() => {
+    if (!filteredOrdersForSamples || filteredOrdersForSamples.length === 0) return null;
+    return calculateAllSampleMetrics(filteredOrdersForSamples, salesData || []);
+  }, [filteredOrdersForSamples, salesData]);
+
+  const samplePeriod = useMemo(() => {
+    if (!filteredOrdersForSamples || filteredOrdersForSamples.length === 0) return null;
+    return calculateDataPeriod(filteredOrdersForSamples);
+  }, [filteredOrdersForSamples]);
+
+  // ============================================================================
+  // Volume & Padrões Tab Logic
+  // ============================================================================
+
+  const b2cOrders = useMemo(() => {
+    return getB2COrders(salesData || []);
+  }, [salesData]);
+
+  const filteredB2COrders = useMemo(() => {
+    if (!dateRange) return b2cOrders;
+    return filterOrdersByDateRange(b2cOrders, dateRange.start, dateRange.end);
+  }, [b2cOrders, dateRange]);
+
+  const volumeAnalysis = useMemo(() => {
+    if (!filteredB2COrders || filteredB2COrders.length === 0) return null;
+    return analyzeOrderVolume(filteredB2COrders);
+  }, [filteredB2COrders]);
+
+  const salesPeaks = useMemo(() => {
+    if (!filteredB2COrders || filteredB2COrders.length === 0) return null;
+    return analyzeSalesPeaks(filteredB2COrders);
+  }, [filteredB2COrders]);
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
+  return (
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Users className="w-8 h-8 text-primary" />
+        <div className="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg">
+          <Users className="w-6 h-6 text-white" />
+        </div>
         <div>
-          <h1 className="text-3xl font-bold">👥 Comportamento do Cliente</h1>
-          <p className="text-muted-foreground">
-            Análise de recompra, churn, volume de pedidos e segmentação
+          <h1 className="text-3xl font-bold text-slate-900">Comportamento do Cliente</h1>
+          <p className="text-slate-600 text-sm mt-1">
+            Análise comparativa, amostras, segmentação, churn e padrões de compra
           </p>
         </div>
       </div>
 
-      <Tabs defaultValue="comportamento">
-        <TabsList>
-          <TabsTrigger value="comportamento">Comportamento</TabsTrigger>
-          <TabsTrigger value="segmentos">Segmentos</TabsTrigger>
-          <TabsTrigger value="churn">Risco de Churn</TabsTrigger>
+      {/* Main Tabs */}
+      <Tabs defaultValue="comparativo" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="comparativo">Comparativo</TabsTrigger>
+          <TabsTrigger value="amostras">Amostras</TabsTrigger>
+          <TabsTrigger value="segmentos-churn">Segmentos & Churn</TabsTrigger>
+          <TabsTrigger value="volume">Volume & Padrões</TabsTrigger>
         </TabsList>
 
-        {/* ── ABA 1: Comportamento (conteúdo original) ── */}
-        <TabsContent value="comportamento" className="space-y-8">
-          {/* Indicador de período */}
-          {!comparisonMode && (
-            <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-              <CardContent className="py-3">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  💡 <strong>Métricas de cliente:</strong> todo o histórico (banco de dados).
-                  <strong> Volume de pedidos:</strong> período selecionado no filtro.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Cards resumo - HERO + SATÉLITES */}
-          {!comparisonMode && (
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-              <Card className="md:col-span-3 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-                <CardContent className="pt-6">
-                  {customerLoading ? (
-                    <Skeleton className="h-32" />
-                  ) : (
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          Total de Clientes
-                        </p>
-                        <p className="text-5xl font-bold mt-2">{totalClientes.toLocaleString('pt-BR')}</p>
-                        <div className="flex gap-4 mt-4 text-sm">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                            <span className="text-muted-foreground">Novos: <strong>{clienteBreakdown.novos}</strong></span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-blue-500" />
-                            <span className="text-muted-foreground">Recorrentes: <strong>{clienteBreakdown.recorrentes}</strong></span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">CLV Médio</p>
-                        <p className="text-2xl font-bold text-primary">{formatCurrency(summaryMetrics.customerLifetimeValue)}</p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          ~{summaryMetrics.averageDaysBetweenPurchases.toFixed(0)} dias entre compras
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <div className="md:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {customerLoading ? (
-                  Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24" />)
-                ) : (
-                  <>
-                    <StatusMetricCard
-                      title="Taxa Recompra"
-                      value={`${summaryMetrics.taxaRecompra.toFixed(1)}%`}
-                      icon={<RefreshCcw className="h-3.5 w-3.5" />}
-                      status={getStatusFromBenchmark(summaryMetrics.taxaRecompra, sectorBenchmarks.taxaRecompra)}
-                      interpretation={summaryMetrics.taxaRecompra >= sectorBenchmarks.taxaRecompra ? "Acima benchmark" : "Abaixo benchmark"}
-                      size="compact"
-                      tooltipKey="taxa_recompra"
-                    />
-                    <StatusMetricCard
-                      title="Taxa Churn"
-                      value={`${churnMetrics.taxaChurn.toFixed(1)}%`}
-                      icon={<AlertTriangle className="h-3.5 w-3.5" />}
-                      status={getStatusFromBenchmark(churnMetrics.taxaChurn, sectorBenchmarks.taxaChurn, { invertComparison: true })}
-                      invertTrend
-                      interpretation={`${churnMetrics.clientesChurn} perdidos`}
-                      size="compact"
-                      tooltipKey="taxa_churn"
-                    />
-                    <StatusMetricCard
-                      title="CLV"
-                      value={formatCurrency(summaryMetrics.customerLifetimeValue)}
-                      icon={<DollarSign className="h-3.5 w-3.5" />}
-                      status="success"
-                      interpretation="Valor por cliente"
-                      size="compact"
-                      tooltipKey="clv"
-                    />
-                    <StatusMetricCard
-                      title="Ativos"
-                      value={churnMetrics.clientesAtivos.toLocaleString('pt-BR')}
-                      icon={<UserCheck className="h-3.5 w-3.5" />}
-                      status="success"
-                      interpretation={`${totalClientes > 0 ? ((churnMetrics.clientesAtivos / totalClientes) * 100).toFixed(0) : 0}% da base`}
-                      size="compact"
-                      tooltipKey="clientes_ativos"
-                    />
-                    <StatusMetricCard
-                      title="Em Risco"
-                      value={churnMetrics.clientesEmRisco.toLocaleString('pt-BR')}
-                      icon={<AlertTriangle className="h-3.5 w-3.5" />}
-                      status={churnMetrics.clientesEmRisco > churnMetrics.clientesAtivos * 0.3 ? 'warning' : 'neutral'}
-                      interpretation="31-60 dias"
-                      size="compact"
-                      tooltipKey="clientes_em_risco"
-                    />
-                    <StatusMetricCard
-                      title="Inativos"
-                      value={churnMetrics.clientesInativos.toLocaleString('pt-BR')}
-                      icon={<Calendar className="h-3.5 w-3.5" />}
-                      status="neutral"
-                      interpretation="61-90 dias"
-                      size="compact"
-                      tooltipKey="clientes_inativos"
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Cards de comparação multi-mês */}
-          {comparisonMode && comparisonMetrics && (
-            <div className="space-y-4">
-              <Card className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
-                <CardContent className="py-3">
-                  <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
-                    <Info className="h-4 w-4" />
-                    Métricas de cliente (recompra, churn, segmentação) são históricas e não variam por mês. Apenas volume de pedidos é comparado.
-                  </p>
-                </CardContent>
-              </Card>
-              <div className="grid gap-6 md:grid-cols-2">
-                <ComparisonMetricCard
-                  title="Volume de Pedidos"
-                  icon={TrendingUp}
-                  metrics={comparisonMetrics.volumePorMes}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* SEÇÃO: VOLUME E PADRÕES */}
-          <section className="space-y-6">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">📊</span>
-              <div>
-                <h2 className="text-xl font-semibold">Volume e Padrões</h2>
-                <p className="text-sm text-muted-foreground">Evolução de pedidos e identificação de picos</p>
-              </div>
-            </div>
-
-            <VolumeKPICards
-              averageDaily={volumeAnalysis.averageDaily}
-              peakDay={volumeAnalysis.peakDay}
-              lowDay={volumeAnalysis.lowDay}
-              trend={volumeTrend}
+        {/* ====================================================================
+            TAB 1: COMPARATIVO
+            ==================================================================== */}
+        <TabsContent value="comparativo" className="space-y-6">
+          {!behaviorComparison || !salesData || salesData.length === 0 ? (
+            <EmptyState
+              title="Sem dados disponíveis"
+              description="Nenhum dado de comportamento de cliente encontrado para o período selecionado."
+              icon={AlertTriangle}
             />
-
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <CardTitle>Evolução de Pedidos</CardTitle>
-                    <CardDescription>
-                      Volume de pedidos ao longo do tempo
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    {(['daily', 'weekly', 'monthly', 'quarterly'] as const).map(view => (
-                      <button
-                        key={view}
-                        className={`px-4 py-2 rounded text-sm ${volumeView === view ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
-                        onClick={() => setVolumeView(view)}
-                      >
-                        {view === 'daily' ? 'Diário' : view === 'weekly' ? 'Semanal' : view === 'monthly' ? 'Mensal' : 'Trimestre'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <OrderVolumeChart
-                  data={
-                    volumeView === 'daily' ? volumeAnalysisData?.daily || [] :
-                    volumeView === 'weekly' ? volumeAnalysisData?.weekly.map(w => ({ date: w.week, orders: w.orders })) || [] :
-                    volumeView === 'quarterly' ? volumeAnalysisData?.quarterly.map(q => ({ date: q.quarter, orders: q.orders })) || [] :
-                    volumeAnalysisData?.monthly.map(m => ({ date: m.month, orders: m.orders })) || []
-                  }
-                  viewMode={volumeView}
+          ) : (
+            <>
+              {/* Two-Column Comparison */}
+              <div className="grid grid-cols-2 gap-6">
+                <PathCard
+                  title="Começou com Amostra"
+                  description="Clientes que iniciaram com produto de amostra"
+                  pathKPIs={behaviorComparison.pathA}
+                  comparisonPathKPIs={behaviorComparison.pathB}
+                  sectorBenchmarks={sectorBenchmarks}
                 />
-              </CardContent>
-            </Card>
+                <PathCard
+                  title="Começou com Produto"
+                  description="Clientes que iniciaram com produto regular"
+                  pathKPIs={behaviorComparison.pathB}
+                  comparisonPathKPIs={behaviorComparison.pathA}
+                  sectorBenchmarks={sectorBenchmarks}
+                />
+              </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>⚡ Dias de Pico</CardTitle>
-                <CardDescription>
-                  Top 20 dias com maior volume - destaque para picos acima da média + 2σ
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SalesPeaksChart peaks={peaksData} />
-              </CardContent>
-            </Card>
-          </section>
+              {/* Insights */}
+              {behaviorComparison.insights && behaviorComparison.insights.length > 0 && (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Info className="w-5 h-5 text-blue-600" />
+                      Insights
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2">
+                      {behaviorComparison.insights.map((insight, idx) => (
+                        <li key={idx} className="flex gap-2 text-sm text-slate-700">
+                          <span className="text-blue-600 font-bold">•</span>
+                          <span>{insight}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
         </TabsContent>
 
-        {/* ── ABA 2: Segmentos ── */}
-        <TabsContent value="segmentos" className="space-y-8">
-          {customerLoading ? (
-            <div className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <Skeleton className="h-80" />
-                <Skeleton className="h-80" />
-              </div>
-              <Skeleton className="h-64" />
-            </div>
-          ) : segments.length === 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PieChart className="w-6 h-6" />
-                  🎯 Segmentação de Clientes
-                </CardTitle>
-                <CardDescription>
-                  Carregue os dados de vendas na página "Upload" para visualizar a segmentação de clientes.
-                </CardDescription>
-              </CardHeader>
-            </Card>
+        {/* ====================================================================
+            TAB 2: AMOSTRAS
+            ==================================================================== */}
+        <TabsContent value="amostras" className="space-y-6">
+          {!sampleMetrics ? (
+            <EmptyState
+              title="Sem dados de amostra"
+              description="Nenhum produto de amostra encontrado para o período selecionado."
+              icon={Package}
+            />
           ) : (
-            <div className="space-y-6">
-              <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                <CardContent className="py-3">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    💡 <strong>Período:</strong> Exibindo dados de <strong>todo o histórico</strong> (fonte: banco de dados).
-                  </p>
-                </CardContent>
-              </Card>
+            <>
+              {/* Hero Card with Conversion Rate */}
+              {sampleMetrics.volume && (
+                <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <CardHeader>
+                    <CardTitle className="text-xl">Conversão Amostra → Produto Regular</CardTitle>
+                    <CardDescription>
+                      Taxa de conversão e métricas gerais de amostra para {samplePeriod ? format(samplePeriod.start, "MMM yyyy") : "período"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-blue-600">
+                          {(
+                            (sampleMetrics.volume.samplesConvertedToRegular /
+                              sampleMetrics.volume.totalSamples) *
+                            100
+                          ).toFixed(1)}
+                          %
+                        </div>
+                        <p className="text-sm text-slate-600 mt-1">Taxa de Conversão</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-green-600">
+                          {sampleMetrics.volume.totalSamples}
+                        </div>
+                        <p className="text-sm text-slate-600 mt-1">Total de Amostras</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-purple-600">
+                          {sampleMetrics.volume.samplesConvertedToRegular}
+                        </div>
+                        <p className="text-sm text-slate-600 mt-1">Convertidas</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-              <div className="grid gap-6 md:grid-cols-2">
+              {/* Satellite KPI Cards (8 cards in grid) */}
+              {sampleMetrics && (
+                <div className="grid grid-cols-4 gap-4">
+                  {/* Avg Repurchase Rate */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-slate-700">
+                        Taxa Média de Recompra
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-slate-900">
+                        {(sampleMetrics.repurchase?.avgRepurchaseRate * 100 || 0).toFixed(1)}%
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Avg Ticket */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-slate-700">
+                        Ticket Médio
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-slate-900">
+                        {formatCurrency(sampleMetrics.volume?.avgTicketMedio || 0)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Avg LTV */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-slate-700">
+                        LTV Médio
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-slate-900">
+                        {formatCurrency(sampleMetrics.volume?.avgLTV || 0)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Cross-sell Rate */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-slate-700">
+                        Taxa Cross-sell
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-slate-900">
+                        {(sampleMetrics.crossSell?.crossSellRate * 100 || 0).toFixed(1)}%
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Avg Days to Second Purchase */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-slate-700">
+                        Dias até 2ª Compra
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-slate-900">
+                        {(sampleMetrics.volume?.avgDaysToSecondPurchase || 0).toFixed(0)}d
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Quality Score */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-slate-700">
+                        Pontuação de Qualidade
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-slate-900">
+                        {(sampleMetrics.quality?.qualityScore || 0).toFixed(2)}/5
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Maturity Score */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-slate-700">
+                        Nível de Maturidade
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-slate-900">
+                        {sampleMetrics.maturity?.maturityLevel || "—"}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Conversion by Time (30d) */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-slate-700">
+                        Conversão 30d
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-slate-900">
+                        {(sampleMetrics.conversionByTime?.["30days"] * 100 || 0).toFixed(1)}%
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Inner Tabs for Sample Analysis */}
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-6">
+                  <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+                  <TabsTrigger value="repurchase">Recompra</TabsTrigger>
+                  <TabsTrigger value="cohort">Coorte</TabsTrigger>
+                  <TabsTrigger value="crosssell">Cross-sell</TabsTrigger>
+                  <TabsTrigger value="profile">Perfil</TabsTrigger>
+                  <TabsTrigger value="trends">Tendências</TabsTrigger>
+                </TabsList>
+
+                {/* Visão Geral */}
+                <TabsContent value="overview" className="space-y-6">
+                  {sampleMetrics?.volume && (
+                    <>
+                      {/* Sample Products Table */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Produtos de Amostra</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <SampleProductsTable data={sampleMetrics.volume.samplesByProduct || []} />
+                        </CardContent>
+                      </Card>
+
+                      {/* Conversion by Time */}
+                      {sampleMetrics.conversionByTime && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Taxa de Conversão por Período</CardTitle>
+                            <CardDescription>
+                              Conversão de amostra para produto regular em diferentes períodos
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-4 gap-4">
+                              <div className="text-center p-4 bg-slate-50 rounded-lg border">
+                                <div className="text-2xl font-bold text-slate-900">
+                                  {(sampleMetrics.conversionByTime["30days"] * 100).toFixed(1)}%
+                                </div>
+                                <p className="text-sm text-slate-600 mt-1">30 dias</p>
+                              </div>
+                              <div className="text-center p-4 bg-slate-50 rounded-lg border">
+                                <div className="text-2xl font-bold text-slate-900">
+                                  {(sampleMetrics.conversionByTime["60days"] * 100).toFixed(1)}%
+                                </div>
+                                <p className="text-sm text-slate-600 mt-1">60 dias</p>
+                              </div>
+                              <div className="text-center p-4 bg-slate-50 rounded-lg border">
+                                <div className="text-2xl font-bold text-slate-900">
+                                  {(sampleMetrics.conversionByTime["90days"] * 100).toFixed(1)}%
+                                </div>
+                                <p className="text-sm text-slate-600 mt-1">90 dias</p>
+                              </div>
+                              <div className="text-center p-4 bg-slate-50 rounded-lg border">
+                                <div className="text-2xl font-bold text-slate-900">
+                                  {(sampleMetrics.conversionByTime["180days"] * 100).toFixed(1)}%
+                                </div>
+                                <p className="text-sm text-slate-600 mt-1">180 dias</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Basket Metrics */}
+                      {sampleMetrics.basket && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Análise de Cesta</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="text-center">
+                                <div className="text-3xl font-bold text-slate-900">
+                                  {sampleMetrics.basket.avgBasketSize.toFixed(2)}
+                                </div>
+                                <p className="text-sm text-slate-600 mt-1">Tamanho Médio da Cesta</p>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-3xl font-bold text-slate-900">
+                                  {formatCurrency(sampleMetrics.basket.avgBasketValue)}
+                                </div>
+                                <p className="text-sm text-slate-600 mt-1">Valor Médio da Cesta</p>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-3xl font-bold text-slate-900">
+                                  {(sampleMetrics.basket.sampleShareOfBasket * 100).toFixed(1)}%
+                                </div>
+                                <p className="text-sm text-slate-600 mt-1">% da Cesta (Amostra)</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  )}
+                </TabsContent>
+
+                {/* Recompra */}
+                <TabsContent value="repurchase" className="space-y-6">
+                  {sampleMetrics?.repurchase && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Métricas de Recompra</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-slate-900">
+                              {(sampleMetrics.repurchase.avgRepurchaseRate * 100).toFixed(1)}%
+                            </div>
+                            <p className="text-sm text-slate-600 mt-1">Taxa de Recompra</p>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-slate-900">
+                              {sampleMetrics.repurchase.avgDaysBetweenRepurchases.toFixed(0)}d
+                            </div>
+                            <p className="text-sm text-slate-600 mt-1">Dias entre Compras</p>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-slate-900">
+                              {sampleMetrics.repurchase.totalRepurchasers}
+                            </div>
+                            <p className="text-sm text-slate-600 mt-1">Clientes Recompra</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                {/* Coorte */}
+                <TabsContent value="cohort" className="space-y-6">
+                  {sampleMetrics?.cohortAnalysis && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Análise de Coorte</CardTitle>
+                        <CardDescription>
+                          Retenção de clientes por período de primeira compra
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-center p-4 text-slate-600">
+                          {Object.entries(sampleMetrics.cohortAnalysis).length > 0 ? (
+                            <div className="grid grid-cols-2 gap-4">
+                              {Object.entries(sampleMetrics.cohortAnalysis).map(([period, data]: any) => (
+                                <div key={period} className="p-4 border rounded-lg bg-slate-50">
+                                  <p className="font-medium text-slate-900">{period}</p>
+                                  <p className="text-sm text-slate-600 mt-1">
+                                    {typeof data === 'object' ? JSON.stringify(data) : data}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            "Sem dados de coorte disponíveis"
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                {/* Cross-sell */}
+                <TabsContent value="crosssell" className="space-y-6">
+                  {sampleMetrics?.crossSell && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Análise de Cross-sell</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-slate-900">
+                              {(sampleMetrics.crossSell.crossSellRate * 100).toFixed(1)}%
+                            </div>
+                            <p className="text-sm text-slate-600 mt-1">Taxa de Cross-sell</p>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-slate-900">
+                              {sampleMetrics.crossSell.totalCrossSells}
+                            </div>
+                            <p className="text-sm text-slate-600 mt-1">Total de Cross-sells</p>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-slate-900">
+                              {formatCurrency(sampleMetrics.crossSell.avgCrossSellValue)}
+                            </div>
+                            <p className="text-sm text-slate-600 mt-1">Valor Médio</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                {/* Perfil */}
+                <TabsContent value="profile" className="space-y-6">
+                  {sampleMetrics?.profile && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Perfil de Clientes (Pet Types)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-4 gap-4">
+                          {PET_PROFILE_ORDER.map((petType: BuyerPetProfile) => {
+                            const profileData = sampleMetrics.profile[petType] || { count: 0, percentage: 0, revenue: 0 };
+                            return (
+                              <div key={petType} className="p-4 border rounded-lg bg-slate-50">
+                                <p className="font-medium text-slate-900">{PET_PROFILE_LABELS[petType]}</p>
+                                <p className="text-2xl font-bold text-slate-900 mt-2">
+                                  {profileData.percentage.toFixed(1)}%
+                                </p>
+                                <p className="text-sm text-slate-600 mt-1">
+                                  {profileData.count} clientes
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+
+                {/* Tendências */}
+                <TabsContent value="trends" className="space-y-6">
+                  {sampleMetrics?.temporal && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Tendências Temporais</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-center p-4 text-slate-600">
+                          {Object.entries(sampleMetrics.temporal).length > 0 ? (
+                            <div className="grid grid-cols-2 gap-4">
+                              {Object.entries(sampleMetrics.temporal).map(([period, metrics]: any) => (
+                                <div key={period} className="p-4 border rounded-lg bg-slate-50">
+                                  <p className="font-medium text-slate-900">{period}</p>
+                                  <p className="text-sm text-slate-600 mt-1">
+                                    {typeof metrics === 'object' ? JSON.stringify(metrics) : metrics}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            "Sem dados temporais disponíveis"
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
+        </TabsContent>
+
+        {/* ====================================================================
+            TAB 3: SEGMENTOS & CHURN
+            ==================================================================== */}
+        <TabsContent value="segmentos-churn" className="space-y-6">
+          {customerDataLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-20" />
+              <Skeleton className="h-80" />
+            </div>
+          ) : !segments || segments.length === 0 ? (
+            <EmptyState
+              title="Sem dados de segmentação"
+              description="Nenhum dado de segmentação de clientes disponível."
+              icon={AlertTriangle}
+            />
+          ) : (
+            <>
+              {/* Period Info */}
+              <Alert className="border-blue-200 bg-blue-50">
+                <Calendar className="h-4 w-4 text-blue-600" />
+                <AlertTitle>Período: Todo o histórico (fonte: banco de dados)</AlertTitle>
+                <AlertDescription>
+                  Análise completa desde a primeira transação registrada
+                </AlertDescription>
+              </Alert>
+
+              {/* Segmentation Charts */}
+              <div className="grid grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>Distribuição de Clientes</CardTitle>
-                    <CardDescription>Segmentação por comportamento de compra</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <CustomerSegmentationChart segments={segments} />
+                    <CustomerSegmentationChart data={segments} />
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
                     <CardTitle>Receita por Segmento</CardTitle>
-                    <CardDescription>Contribuição de cada perfil para o faturamento</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <SegmentRevenueChart segments={segments} />
+                    <SegmentRevenueChart data={segments} />
                   </CardContent>
                 </Card>
               </div>
 
+              {/* Segment Detail Table */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Análise Detalhada por Segmento</CardTitle>
-                  <CardDescription>Métricas completas de cada perfil de cliente</CardDescription>
+                  <CardTitle>Detalhamento por Segmento</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <SegmentDetailTable segments={segments} />
+                  <SegmentDetailTable data={segments} />
                 </CardContent>
               </Card>
-            </div>
+
+              {/* Separator */}
+              <div className="border-t my-6" />
+
+              {/* Churn KPIs */}
+              {churnMetrics && (
+                <div className="grid grid-cols-5 gap-4">
+                  <KPITooltip
+                    title="Taxa de Churn"
+                    value={(churnMetrics.taxaChurn * 100).toFixed(1)}
+                    unit="%"
+                    icon={<Percent className="w-4 h-4" />}
+                    description="Percentual de clientes inativos"
+                  />
+                  <KPITooltip
+                    title="Clientes Ativos"
+                    value={churnMetrics.clientesAtivos}
+                    icon={<UserCheck className="w-4 h-4" />}
+                    description="Clientes com compras recentes"
+                  />
+                  <KPITooltip
+                    title="Em Risco"
+                    value={churnMetrics.clientesEmRisco}
+                    icon={<AlertTriangle className="w-4 h-4" />}
+                    description="Clientes com inatividade"
+                  />
+                  <KPITooltip
+                    title="Inativos"
+                    value={churnMetrics.clientesInativos}
+                    icon={<UserMinus className="w-4 h-4" />}
+                    description="Sem atividade há muito tempo"
+                  />
+                  <KPITooltip
+                    title="Valor em Risco"
+                    value={formatCurrency(
+                      (churnRiskCustomers || []).reduce((sum, c) => sum + (c.valorTotal || 0), 0)
+                    )}
+                    icon={<DollarSign className="w-4 h-4" />}
+                    description="LTV dos clientes em risco"
+                  />
+                </div>
+              )}
+
+              {/* Churn Funnel */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Funil de Churn</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {churnMetrics && (
+                    <ChurnFunnelChart
+                      data={{
+                        totalClientes: churnMetrics.totalClientes,
+                        clientesAtivos: churnMetrics.clientesAtivos,
+                        clientesEmRisco: churnMetrics.clientesEmRisco,
+                        clientesInativos: churnMetrics.clientesInativos,
+                      }}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Churn Risk Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Clientes em Risco</CardTitle>
+                  <CardDescription>
+                    Top clientes com maior valor em risco de churn
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChurnRiskTable data={churnRiskCustomers || []} />
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
-        {/* ── ABA 3: Risco de Churn ── */}
-        <TabsContent value="churn" className="space-y-6">
-          {customerLoading ? (
-            <div className="space-y-6">
-              <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
-              </div>
-              <Skeleton className="h-80" />
-            </div>
-          ) : churnMetrics.totalClientes === 0 ? (
+        {/* ====================================================================
+            TAB 4: VOLUME & PADRÕES
+            ==================================================================== */}
+        <TabsContent value="volume" className="space-y-6">
+          {!filteredB2COrders || filteredB2COrders.length === 0 ? (
             <EmptyState
-              icon={<FileWarning className="h-8 w-8 text-muted-foreground" />}
-              title="Sem dados de clientes"
-              description="Faça upload de dados de vendas para visualizar a análise de churn."
+              title="Sem dados de volume"
+              description="Nenhum pedido B2C encontrado para o período selecionado."
+              icon={AlertTriangle}
             />
           ) : (
             <>
-              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  📅 <strong>Período:</strong> Todo o histórico (fonte: banco de dados)
-                </p>
-              </div>
+              {/* Volume KPI Cards */}
+              {volumeAnalysis && (
+                <VolumeKPICards
+                  data={{
+                    daily: volumeAnalysis.daily,
+                    weekly: volumeAnalysis.weekly,
+                    monthly: volumeAnalysis.monthly,
+                    quarterly: volumeAnalysis.quarterly,
+                  }}
+                />
+              )}
 
-              <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-                <KPITooltip metricKey="taxa_churn">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardDescription className="flex items-center gap-2">
-                        <TrendingDown className="h-4 w-4" />
-                        Taxa de Churn
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-destructive">
-                        {taxaChurn.toFixed(1)}%
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">Clientes que pararam de comprar</p>
-                    </CardContent>
-                  </Card>
-                </KPITooltip>
-
-                <KPITooltip metricKey="clientes_ativos">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardDescription className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        Clientes Ativos
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-green-600">
-                        {clientesAtivos.toLocaleString('pt-BR')}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {totalClientes > 0 ? ((clientesAtivos / totalClientes) * 100).toFixed(1) : 0}% da base
-                      </p>
-                    </CardContent>
-                  </Card>
-                </KPITooltip>
-
-                <KPITooltip metricKey="clientes_em_risco">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardDescription className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        Em Risco
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-amber-600">
-                        {clientesEmRisco.toLocaleString('pt-BR')}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {totalClientes > 0 ? ((clientesEmRisco / totalClientes) * 100).toFixed(1) : 0}% da base
-                      </p>
-                    </CardContent>
-                  </Card>
-                </KPITooltip>
-
-                <KPITooltip metricKey="clientes_inativos">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardDescription className="flex items-center gap-2">
-                        <UserMinus className="h-4 w-4" />
-                        Inativos
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-orange-600">
-                        {clientesInativos.toLocaleString('pt-BR')}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {totalClientes > 0 ? ((clientesInativos / totalClientes) * 100).toFixed(1) : 0}% da base
-                      </p>
-                    </CardContent>
-                  </Card>
-                </KPITooltip>
-
-                <KPITooltip metricKey="valor_em_risco">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardDescription className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        Valor em Risco
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-destructive">
-                        R$ {valorEmRisco.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">Receita potencial perdida</p>
-                    </CardContent>
-                  </Card>
-                </KPITooltip>
-              </div>
-
+              {/* Order Volume Chart with Timeframe Toggle */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Funil de Retenção
-                  </CardTitle>
-                  <CardDescription>Distribuição de clientes por status de atividade</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Volume de Pedidos</CardTitle>
+                    <CardDescription>
+                      {volumeTimeframe === "daily" && "Diário"}
+                      {volumeTimeframe === "weekly" && "Semanal"}
+                      {volumeTimeframe === "monthly" && "Mensal"}
+                      {volumeTimeframe === "quarterly" && "Trimestral"}
+                    </CardDescription>
+                  </div>
+                  <Select value={volumeTimeframe} onValueChange={setVolumeTimeframe}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Diário</SelectItem>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                      <SelectItem value="quarterly">Trimestral</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </CardHeader>
-                <CardContent className="h-80">
-                  <ChurnFunnelChart
-                    ativos={clientesAtivos}
-                    emRisco={clientesEmRisco}
-                    inativos={clientesInativos}
-                    churn={clientesChurn}
-                  />
+                <CardContent>
+                  {volumeAnalysis && (
+                    <OrderVolumeChart
+                      data={volumeAnalysis[volumeTimeframe as keyof typeof volumeAnalysis] || []}
+                      timeframe={volumeTimeframe}
+                    />
+                  )}
                 </CardContent>
               </Card>
 
+              {/* Sales Peaks Chart */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" />
-                    Clientes em Risco de Churn
-                  </CardTitle>
-                  <CardDescription>Lista de clientes que podem abandonar a marca</CardDescription>
+                  <CardTitle>Dias de Pico</CardTitle>
+                  <CardDescription>
+                    Identificação de padrões de vendas por dia da semana
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {churnRiskCustomers.length > 0 ? (
-                    <ChurnRiskTable customers={churnRiskCustomers} />
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      Nenhum cliente em risco identificado.
-                    </div>
-                  )}
+                  {salesPeaks && <SalesPeaksChart data={salesPeaks} />}
                 </CardContent>
               </Card>
             </>
