@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DndContext, DragOverlay, DragStartEvent, DragEndEvent, closestCenter } from "@dnd-kit/core";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Database, Search, X } from "lucide-react";
+import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Database, Search, X, MessageSquare, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
@@ -92,18 +92,7 @@ const NICHO_OPTIONS = ["Pets", "Nutrição Animal", "Veterinária", "Lifestyle",
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function normalizeInstagram(v: string): string {
-  return (v || "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/.*$/, "").toLowerCase();
-}
-
-function parseFollowerCount(raw: string): number | null {
-  if (!raw) return null;
-  const s = raw.toString().trim().toLowerCase().replace(/,/g, ".");
-  const match = s.match(/^([\d.]+)\s*([km])?$/);
-  if (!match) return null;
-  const num = parseFloat(match[1]);
-  if (isNaN(num)) return null;
-  const mult = match[2] === "k" ? 1000 : match[2] === "m" ? 1000000 : 1;
-  return Math.round(num * mult);
+  return (v || "").trim().replace(/^@/, "").toLowerCase();
 }
 
 const VALID_STATUSES: InfluencerStatus[] = [
@@ -137,34 +126,6 @@ function parseStatusFromSheet(raw: string): InfluencerStatus | null {
     reativacao: "reativacao",
   };
   return aliases[norm] ?? null;
-}
-
-// Detect if CSV headers match the prospection export format
-function isProspectionFormat(headers: string[]): boolean {
-  const lowerHeaders = headers.map(h => h.toLowerCase().trim());
-  return lowerHeaders.some(h => h === "creator" || h === "username" || h === "instagram link");
-}
-
-// Map a prospection CSV row to a DB payload
-function mapProspectionRow(row: Record<string, string>): { nome: string; instagram: string; email: string; seguidores: number | null; observacoes: string } {
-  const get = (keys: string[]) => {
-    for (const k of keys) {
-      const val = row[k]?.trim();
-      if (val) return val;
-    }
-    return "";
-  };
-  const nome = get(["Creator", "creator"]);
-  const igRaw = get(["Username", "username", "Instagram Link", "instagram link"]);
-  const email = get(["Email address", "email address", "Email", "email"]);
-  const followersRaw = get(["Followers", "followers"]);
-  const seguidores = parseFollowerCount(followersRaw);
-  const extras: string[] = [];
-  const er = get(["ER%", "er%", "ER", "er"]);
-  if (er) extras.push(`ER: ${er}`);
-  const contato = get(["Contato", "contato"]);
-  if (contato) extras.push(`Contato: ${contato}`);
-  return { nome, instagram: normalizeInstagram(igRaw), email, seguidores, observacoes: extras.join(" | ") };
 }
 
 // ─── Import Result ────────────────────────────────────────────────────────────
@@ -239,10 +200,20 @@ function InfluencerCard({
         </div>
       )}
 
-      {influencer.instagram && (
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Instagram className="h-3 w-3" />
-          <span>@{normalizeInstagram(influencer.instagram)}</span>
+      {(influencer.instagram || influencer.tiktok) && (
+        <div className="space-y-0.5">
+          {influencer.instagram && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Instagram className="h-3 w-3" />
+              <span>@{normalizeInstagram(influencer.instagram)}</span>
+            </div>
+          )}
+          {influencer.tiktok && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span className="h-3 w-3 text-[10px] font-bold leading-3 text-center">TT</span>
+              <span>@{influencer.tiktok.replace(/^@/, "")}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -318,6 +289,127 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
       {open && (
         <div className="px-3 pb-3 pt-2 space-y-3 border-t bg-gray-50/40">
           {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Contact Log Section (inside InfluencerDialog) ──────────────────────────
+interface ContactLog {
+  id: string;
+  responsavel: string;
+  observacao: string | null;
+  created_at: string;
+}
+
+function ContactLogSection({ influencerId }: { influencerId: string }) {
+  const queryClient = useQueryClient();
+  const [responsavel, setResponsavel] = useState("");
+  const [observacao, setObservacao] = useState("");
+  const [open, setOpen] = useState(true);
+
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ["influencer_contact_log", influencerId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("influencer_contact_log")
+        .select("*")
+        .eq("influencer_id", influencerId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ContactLog[];
+    },
+    enabled: !!influencerId,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("influencer_contact_log").insert([{
+        influencer_id: influencerId,
+        responsavel: responsavel.trim(),
+        observacao: observacao.trim() || null,
+      }]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer_contact_log", influencerId] });
+      setResponsavel("");
+      setObservacao("");
+    },
+  });
+
+  const handleAdd = () => {
+    if (!responsavel.trim()) return;
+    addMutation.mutate();
+  };
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }) +
+      " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className="border rounded-lg">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-gray-50 rounded-lg"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="flex items-center gap-2">
+          <MessageSquare className="h-4 w-4" />
+          Histórico de Contato ({logs.length})
+        </span>
+        {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3 space-y-3">
+          {/* Formulário de novo registro */}
+          <div className="flex gap-2">
+            <Input
+              value={responsavel}
+              onChange={(e) => setResponsavel(e.target.value)}
+              placeholder="Responsável"
+              className="flex-1 h-8 text-xs"
+            />
+            <Input
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              placeholder="Obs (opcional)"
+              className="flex-1 h-8 text-xs"
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleAdd}
+              disabled={!responsavel.trim() || addMutation.isPending}
+              className="h-8 px-2"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+
+          {/* Lista de registros */}
+          {isLoading ? (
+            <p className="text-xs text-muted-foreground">Carregando...</p>
+          ) : logs.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-2">Nenhum contato registrado.</p>
+          ) : (
+            <div className="max-h-40 overflow-y-auto space-y-1.5">
+              {logs.map((log) => (
+                <div key={log.id} className="flex items-start gap-2 text-xs border-l-2 border-primary/30 pl-2 py-0.5">
+                  <div className="flex-1">
+                    <span className="font-medium">{log.responsavel}</span>
+                    {log.observacao && <span className="text-muted-foreground"> — {log.observacao}</span>}
+                  </div>
+                  <span className="text-muted-foreground whitespace-nowrap shrink-0">{formatDate(log.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -530,6 +622,9 @@ function InfluencerDialog({
             <Label>Observações</Label>
             <Textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} placeholder="Notas, contatos, links..." rows={3} />
           </div>
+
+          {/* Log de contato — só aparece na edição */}
+          {initial && <ContactLogSection influencerId={initial.id} />}
         </div>
 
         <DialogFooter>
@@ -609,6 +704,7 @@ export default function KanbanInfluenciadores() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importResultOpen, setImportResultOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [filterResponsavel, setFilterResponsavel] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Load from Supabase ──────────────────────────────────────────────────────
@@ -625,23 +721,55 @@ export default function KanbanInfluenciadores() {
     },
   });
 
-  // Filter by search query (matches nome, instagram, email, whatsapp).
+  // ── IDs com contato do responsável selecionado (para filtro) ──
+  const { data: contactLogIndex = [] } = useQuery({
+    queryKey: ["influencer_contact_log_index"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("influencer_contact_log")
+        .select("influencer_id, responsavel");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Responsáveis únicos para o dropdown
+  const responsavelOptions = useMemo(() => {
+    const set = new Set(contactLogIndex.map((r) => r.responsavel));
+    return Array.from(set).sort();
+  }, [contactLogIndex]);
+
+  // IDs filtrados por responsável
+  const filteredByResponsavel = useMemo(() => {
+    if (!filterResponsavel) return null; // null = sem filtro
+    return new Set(contactLogIndex.filter((r) => r.responsavel === filterResponsavel).map((r) => r.influencer_id));
+  }, [contactLogIndex, filterResponsavel]);
+
+  // Filter by search query (matches nome, instagram, email, whatsapp) + responsável.
   const influencers = useMemo(() => {
+    let list = rawInfluencers;
+
+    // Filtro por responsável
+    if (filteredByResponsavel) {
+      list = list.filter((i) => filteredByResponsavel.has(i.id));
+    }
+
+    // Filtro por busca textual
     const q = search.trim().toLowerCase();
-    if (!q) return rawInfluencers;
+    if (!q) return list;
     const norm = (v: string) =>
       (v || "")
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
     const nq = norm(q);
-    return rawInfluencers.filter((i) =>
+    return list.filter((i) =>
       norm(i.nome).includes(nq) ||
       norm(i.instagram).includes(nq) ||
       norm(i.email).includes(nq) ||
       norm(i.whatsapp).includes(nq)
     );
-  }, [rawInfluencers, search]);
+  }, [rawInfluencers, search, filteredByResponsavel]);
 
   // ── Upsert mutation (create or update) ─────────────────────────────────────
   const upsertMutation = useMutation({
@@ -652,7 +780,7 @@ export default function KanbanInfluenciadores() {
     }) => {
       const { instagram, data, isNew } = payload;
       if (isNew) {
-        const { error } = await supabase.from("influencer_registry").insert([data as any]);
+        const { error } = await supabase.from("influencer_registry").insert([data]);
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -761,7 +889,100 @@ export default function KanbanInfluenciadores() {
     statusMutation.mutate({ id: active.id as string, status: newStatus });
   };
 
-  // ── Spreadsheet Import ────────────────────────────────────────────────────────
+  // ── Import helpers ─────────────────────────────────────────────────────────
+
+  /** Detecta se o arquivo é CSV de prospecção pelo cabeçalho */
+  const isProspectionFormat = (headers: string[]) =>
+    headers.some((h) => /^creator$/i.test(h.trim()) || /^username$/i.test(h.trim()));
+
+  /** Detecta plataforma: "Instagram Link" → instagram, "TikTok Link" → tiktok */
+  const detectPlatform = (headers: string[]): "instagram" | "tiktok" => {
+    if (headers.some((h) => /tiktok\s*link/i.test(h.trim()))) return "tiktok";
+    return "instagram"; // default
+  };
+
+  /** Normaliza contagens como "12.5k" → 12500, "1M" → 1000000, "394.8k" → 394800 */
+  const parseFollowerCount = (raw: string): number | null => {
+    if (!raw) return null;
+    const cleaned = raw.trim().replace(/,/g, "").toLowerCase();
+    const match = cleaned.match(/^([\d.]+)\s*(k|m|mil)?$/);
+    if (!match) {
+      const asNum = parseInt(cleaned, 10);
+      return isNaN(asNum) ? null : asNum;
+    }
+    const num = parseFloat(match[1]);
+    const suffix = match[2];
+    if (suffix === "k" || suffix === "mil") return Math.round(num * 1000);
+    if (suffix === "m") return Math.round(num * 1_000_000);
+    return Math.round(num);
+  };
+
+  /** Mapeia uma row CSV de prospecção para o payload interno */
+  const mapProspectionRow = (row: Record<string, string>, platform: "instagram" | "tiktok"): Record<string, unknown> => {
+    const nome = (row["Creator"] || "").trim();
+    const username = (row["Username"] || "").trim().replace(/^@/, "");
+    const linkCol = platform === "tiktok" ? (row["TikTok Link"] || "").trim() : (row["Instagram Link"] || "").trim();
+    const handle = username || linkCol.replace(/^@/, "");
+    const email = (row["Email address"] || row["Email"] || "").trim();
+    const seguidores = parseFollowerCount(row["Followers"] || "");
+    const contato = (row["Contato"] || "").trim();
+
+    // Para upsert, precisamos de um identificador único — usar o handle da plataforma
+    // Instagram: normalizar como antes. TikTok: usar handle direto.
+    const igNorm = platform === "instagram" ? normalizeInstagram(handle) : null;
+    const tiktokHandle = platform === "tiktok" ? handle : null;
+
+    // _igNorm é usado para dedup — usar o handle da plataforma correspondente
+    const dedupKey = platform === "instagram" ? (igNorm || "") : (tiktokHandle || "");
+
+    return {
+      _nome: nome,
+      _igRaw: handle,
+      _igNorm: dedupKey,
+      _platform: platform,
+      payload: {
+        name: nome,
+        instagram: igNorm,
+        tiktok: tiktokHandle,
+        email: email || null,
+        whatsapp: contato || null,
+        kanban_seguidores: seguidores,
+        updated_at: new Date().toISOString(),
+      },
+    };
+  };
+
+  /** Mapeia uma row do formato interno (XLSX da planilha interna) */
+  const mapInternalRow = (row: Record<string, string>): Record<string, unknown> => {
+    const nome = (row["name_full_text"] || "").trim();
+    const igRaw = (row["contact_instagram_text"] || "").trim();
+    const igNorm = normalizeInstagram(igRaw);
+
+    return {
+      _nome: nome,
+      _igRaw: igRaw,
+      _igNorm: igNorm,
+      payload: {
+        name: nome,
+        instagram: igNorm,
+        tiktok: (row["contact_tiktok_text"] || "").trim().replace(/^@/, "") || null,
+        whatsapp: (row["contact_whatsapp_text"] || "").trim() || null,
+        email: (row["email"] || "").trim() || null,
+        address_logradouro: (row["address_logradouro_text"] || "").trim() || null,
+        address_numero: (row["address_numero_text"] || "").trim() || null,
+        address_complemento: (row["address_complemento_text"] || "").trim() || null,
+        address_bairro: (row["address_bairro_text"] || "").trim() || null,
+        address_cep: (row["address_cep_text"] || "").trim() || null,
+        address_cidade: (row["address_cidade_text"] || "").trim() || null,
+        address_estado: (row["address_estado_text"] || "").trim().toUpperCase() || null,
+        cnpj: (row["paym_pj_cnpj_text"] || "").trim() || null,
+        razao_social: (row["paym_pj_razao_social_text"] || "").trim() || null,
+        updated_at: new Date().toISOString(),
+      },
+    };
+  };
+
+  // ── Spreadsheet / CSV Import ─────────────────────────────────────────────────
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -778,91 +999,76 @@ export default function KanbanInfluenciadores() {
         const sheet = workbook.Sheets[sheetName];
 
         const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "", raw: false });
-        const headers = Object.keys(jsonData[0] || {});
-        const isProspection = isProspectionFormat(headers);
+        if (jsonData.length === 0) {
+          setImportResult({ created: 0, updated: 0, skipped: 0, errors: ["Arquivo vazio ou sem dados."] });
+          setImportResultOpen(true);
+          return;
+        }
 
-        // For internal template, skip 2 label/example rows. For CSV prospection, use all rows.
+        // Detectar formato pelo cabeçalho (keys da primeira row)
+        const headers = Object.keys(jsonData[0]);
+        const isProspection = isProspectionFormat(headers);
+        const platform = isProspection ? detectPlatform(headers) : "instagram";
+
+        // Formato interno: pula 2 rows (label + exemplo). CSV prospecção: dados começam na row 1.
         const dataRows = isProspection ? jsonData : jsonData.slice(2);
+        const rowOffset = isProspection ? 2 : 4; // para mensagens de erro (linha no arquivo original)
 
         const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
+        // Load existing para upsert check — por instagram E por tiktok
         const { data: existing } = await supabase
           .from("influencer_registry")
-          .select("id, instagram, kanban_status");
-        const existingMap = new Map((existing ?? []).map((r) => [normalizeInstagram(r.instagram ?? ""), r]));
+          .select("id, instagram, tiktok, kanban_status");
+        const igMap = new Map((existing ?? []).filter(r => r.instagram).map((r) => [normalizeInstagram(r.instagram!), r]));
+        const ttMap = new Map((existing ?? []).filter(r => r.tiktok).map((r) => [r.tiktok!.replace(/^@/, "").toLowerCase(), r]));
 
         for (let idx = 0; idx < dataRows.length; idx++) {
           const row = dataRows[idx];
-          const rowNum = isProspection ? idx + 2 : idx + 4;
+          const fileRow = idx + rowOffset;
 
-          let nome: string;
-          let igNorm: string;
-          let dbPayload: Record<string, unknown>;
+          // Mapear conforme formato detectado
+          const mapped = isProspection ? mapProspectionRow(row, platform) : mapInternalRow(row);
+          const nome = mapped._nome as string;
+          const igRaw = mapped._igRaw as string;
+          const dedupKey = mapped._igNorm as string;
+          const dbPayload = mapped.payload as Record<string, unknown>;
 
-          if (isProspection) {
-            const mapped = mapProspectionRow(row);
-            nome = mapped.nome;
-            igNorm = mapped.instagram;
-            dbPayload = {
-              name: nome,
-              instagram: igNorm,
-              email: mapped.email || "",
-              kanban_seguidores: mapped.seguidores,
-              kanban_observacoes: mapped.observacoes || null,
-              updated_at: new Date().toISOString(),
-            };
-          } else {
-            nome = (row["name_full_text"] || "").trim();
-            const igRaw = (row["contact_instagram_text"] || "").trim();
-            igNorm = normalizeInstagram(igRaw);
-            dbPayload = {
-              name: nome,
-              instagram: igNorm,
-              tiktok: (row["contact_tiktok_text"] || "").trim().replace(/^@/, "") || null,
-              whatsapp: (row["contact_whatsapp_text"] || "").trim() || null,
-              email: (row["email"] || "").trim() || "",
-              address_logradouro: (row["address_logradouro_text"] || "").trim() || null,
-              address_numero: (row["address_numero_text"] || "").trim() || null,
-              address_complemento: (row["address_complemento_text"] || "").trim() || null,
-              address_bairro: (row["address_bairro_text"] || "").trim() || null,
-              address_cep: (row["address_cep_text"] || "").trim() || null,
-              address_cidade: (row["address_cidade_text"] || "").trim() || null,
-              address_estado: (row["address_estado_text"] || "").trim().toUpperCase() || null,
-              cnpj: (row["paym_pj_cnpj_text"] || "").trim() || null,
-              razao_social: (row["paym_pj_razao_social_text"] || "").trim() || null,
-              updated_at: new Date().toISOString(),
-            };
-          }
+          if (!nome && !igRaw) { result.skipped++; continue; }
 
-          if (!nome && !igNorm) { result.skipped++; continue; }
           if (!nome) {
-            result.errors.push(`Linha ${rowNum}: Nome obrigatório vazio (Instagram: ${igNorm || "—"})`);
+            result.errors.push(`Linha ${fileRow}: Nome obrigatório vazio (${platform === "tiktok" ? "TikTok" : "Instagram"}: ${igRaw || "—"})`);
             result.skipped++;
             continue;
           }
-          if (!igNorm) {
-            result.errors.push(`Linha ${rowNum}: Instagram obrigatório vazio (Nome: ${nome})`);
+          if (!dedupKey) {
+            result.errors.push(`Linha ${fileRow}: ${platform === "tiktok" ? "TikTok" : "Instagram"} obrigatório vazio (Nome: ${nome})`);
             result.skipped++;
             continue;
           }
 
-          const sheetStatus = parseStatusFromSheet(row["kanban_status"] || row["status"] || "");
+          // Status from spreadsheet (column "kanban_status"). If empty/invalid → "prospeccao".
+          const sheetStatus =
+            parseStatusFromSheet(row["kanban_status"] || row["status"] || "");
           const defaultStatus: InfluencerStatus = sheetStatus ?? "prospeccao";
 
-          const existingEntry = existingMap.get(igNorm);
+          // Dedup: checar por instagram OU tiktok dependendo da plataforma
+          const existingByIg = igMap.get(dedupKey);
+          const existingByTt = ttMap.get(dedupKey.toLowerCase());
+          const existing = (platform === "tiktok" ? (existingByTt || existingByIg) : (existingByIg || existingByTt));
 
-          if (existingEntry) {
+          if (existing) {
             const updatePayload: Record<string, unknown> = { ...dbPayload };
             if (sheetStatus) {
               updatePayload.kanban_status = sheetStatus;
-            } else if (!existingEntry.kanban_status) {
+            } else if (!existing.kanban_status) {
               updatePayload.kanban_status = "prospeccao";
             }
             const { error } = await supabase
               .from("influencer_registry")
               .update(updatePayload)
-              .eq("id", existingEntry.id);
-            if (error) result.errors.push(`Linha ${rowNum}: Erro ao atualizar — ${error.message}`);
+              .eq("id", existing.id);
+            if (error) result.errors.push(`Linha ${fileRow}: Erro ao atualizar — ${error.message}`);
             else result.updated++;
           } else {
             const { error } = await supabase.from("influencer_registry").insert([{
@@ -870,8 +1076,8 @@ export default function KanbanInfluenciadores() {
               kanban_status: defaultStatus,
               na_base: false,
               created_at: new Date().toISOString(),
-            } as any]);
-            if (error) result.errors.push(`Linha ${rowNum}: Erro ao criar — ${error.message}`);
+            }]);
+            if (error) result.errors.push(`Linha ${fileRow}: Erro ao criar — ${error.message}`);
             else result.created++;
           }
         }
@@ -880,7 +1086,7 @@ export default function KanbanInfluenciadores() {
         setImportResult(result);
         setImportResultOpen(true);
       } catch (err) {
-        setImportResult({ created: 0, updated: 0, skipped: 0, errors: ["Erro ao ler o arquivo. Verifique se é um arquivo válido."] });
+        setImportResult({ created: 0, updated: 0, skipped: 0, errors: ["Erro ao ler o arquivo. Verifique se é um .xlsx ou .csv válido."] });
         setImportResultOpen(true);
       }
     };
@@ -927,9 +1133,22 @@ export default function KanbanInfluenciadores() {
               </button>
             )}
           </div>
+          {responsavelOptions.length > 0 && (
+            <Select value={filterResponsavel} onValueChange={(v) => setFilterResponsavel(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-44 h-9">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                {responsavelOptions.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
-            <Upload className="h-4 w-4" /> Importar Planilha
+            <Upload className="h-4 w-4" /> Importar
           </Button>
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Novo Influenciador
