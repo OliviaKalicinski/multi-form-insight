@@ -282,7 +282,7 @@ export default function ComportamentoCliente() {
             <EmptyState
               title="Sem dados disponíveis"
               description="Nenhum dado de comportamento de cliente encontrado para o período selecionado."
-              icon={AlertTriangle}
+              icon={<AlertTriangle className="w-12 h-12" />}
             />
           ) : (
             <>
@@ -337,7 +337,7 @@ export default function ComportamentoCliente() {
             <EmptyState
               title="Sem dados de amostra"
               description="Nenhum produto de amostra encontrado para o período selecionado."
-              icon={Package}
+              icon={<Package className="w-12 h-12" />}
             />
           ) : (
             <>
@@ -347,34 +347,31 @@ export default function ComportamentoCliente() {
                   <CardHeader>
                     <CardTitle className="text-xl">Conversão Amostra → Produto Regular</CardTitle>
                     <CardDescription>
-                      Taxa de conversão e métricas gerais de amostra para {samplePeriod ? format(samplePeriod.start, "MMM yyyy") : "período"}
+                      Taxa de conversão e métricas gerais de amostra para {samplePeriod?.startDate ? format(samplePeriod.startDate, "MMM yyyy") : "período"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center">
-                        <div className="text-4xl font-bold text-blue-600">
-                          {(
-                            (sampleMetrics.volume.samplesConvertedToRegular /
-                              sampleMetrics.volume.totalSamples) *
-                            100
-                          ).toFixed(1)}
-                          %
-                        </div>
-                        <p className="text-sm text-slate-600 mt-1">Taxa de Conversão</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-4xl font-bold text-green-600">
-                          {sampleMetrics.volume.totalSamples}
-                        </div>
-                        <p className="text-sm text-slate-600 mt-1">Total de Amostras</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-4xl font-bold text-purple-600">
-                          {sampleMetrics.volume.samplesConvertedToRegular}
-                        </div>
-                        <p className="text-sm text-slate-600 mt-1">Convertidas</p>
-                      </div>
+                     <div className="grid grid-cols-3 gap-4">
+                       <div className="text-center">
+                         <div className="text-4xl font-bold text-blue-600">
+                           {sampleMetrics.volume.totalSamples > 0
+                             ? ((sampleMetrics.repurchase.customersWhoRepurchased / sampleMetrics.volume.totalSamples) * 100).toFixed(1)
+                             : "0.0"}%
+                         </div>
+                         <p className="text-sm text-slate-600 mt-1">Taxa de Conversão</p>
+                       </div>
+                       <div className="text-center">
+                         <div className="text-4xl font-bold text-green-600">
+                           {sampleMetrics.volume.totalSamples}
+                         </div>
+                         <p className="text-sm text-slate-600 mt-1">Total de Amostras</p>
+                       </div>
+                       <div className="text-center">
+                         <div className="text-4xl font-bold text-purple-600">
+                           {sampleMetrics.repurchase.customersWhoRepurchased}
+                         </div>
+                         <p className="text-sm text-slate-600 mt-1">Convertidas</p>
+                       </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -392,7 +389,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {(sampleMetrics.repurchase?.avgRepurchaseRate * 100 || 0).toFixed(1)}%
+                        {(sampleMetrics.repurchase?.repurchaseRate * 100 || 0).toFixed(1)}%
                       </div>
                     </CardContent>
                   </Card>
@@ -406,7 +403,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {formatCurrency(sampleMetrics.volume?.avgTicketMedio || 0)}
+                        {formatCurrency(sampleMetrics.repurchase?.avgTicketRepurchase || 0)}
                       </div>
                     </CardContent>
                   </Card>
@@ -420,7 +417,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {formatCurrency(sampleMetrics.volume?.avgLTV || 0)}
+                        {formatCurrency(sampleMetrics.quality?.avgLTV || 0)}
                       </div>
                     </CardContent>
                   </Card>
@@ -434,7 +431,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {(sampleMetrics.crossSell?.crossSellRate * 100 || 0).toFixed(1)}%
+                        {(sampleMetrics.crossSell ? (sampleMetrics.crossSell.samplePlusOthers / Math.max(sampleMetrics.crossSell.onlySample + sampleMetrics.crossSell.samplePlusOthers, 1)) * 100 : 0).toFixed(1)}%
                       </div>
                     </CardContent>
                   </Card>
@@ -448,7 +445,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {(sampleMetrics.volume?.avgDaysToSecondPurchase || 0).toFixed(0)}d
+                        {(sampleMetrics.repurchase?.avgDaysToFirstRepurchase || 0).toFixed(0)}d
                       </div>
                     </CardContent>
                   </Card>
@@ -462,7 +459,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {(sampleMetrics.quality?.qualityScore || 0).toFixed(2)}/5
+                        {(sampleMetrics.quality?.avgRepurchasesPerCustomer || 0).toFixed(2)}
                       </div>
                     </CardContent>
                   </Card>
@@ -476,7 +473,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {sampleMetrics.maturity?.maturityLevel || "—"}
+                        {sampleMetrics.maturity?.isReliableAnalysis ? "Confiável" : "Imatura"}
                       </div>
                     </CardContent>
                   </Card>
@@ -518,7 +515,7 @@ export default function ComportamentoCliente() {
                           <CardTitle>Produtos de Amostra</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <SampleProductsTable data={sampleMetrics.volume.samplesByProduct || []} />
+                          <SampleProductsTable title="Produtos de Amostra" products={sampleMetrics.crossSell?.topProductsWithSample || []} />
                         </CardContent>
                       </Card>
 
@@ -535,25 +532,25 @@ export default function ComportamentoCliente() {
                             <div className="grid grid-cols-4 gap-4">
                               <div className="text-center p-4 bg-slate-50 rounded-lg border">
                                 <div className="text-2xl font-bold text-slate-900">
-                                  {(sampleMetrics.conversionByTime["30days"] * 100).toFixed(1)}%
+                                  {(sampleMetrics.conversionByTime.days30 * 100).toFixed(1)}%
                                 </div>
                                 <p className="text-sm text-slate-600 mt-1">30 dias</p>
                               </div>
                               <div className="text-center p-4 bg-slate-50 rounded-lg border">
                                 <div className="text-2xl font-bold text-slate-900">
-                                  {(sampleMetrics.conversionByTime["60days"] * 100).toFixed(1)}%
+                                  {(sampleMetrics.conversionByTime.days60 * 100).toFixed(1)}%
                                 </div>
                                 <p className="text-sm text-slate-600 mt-1">60 dias</p>
                               </div>
                               <div className="text-center p-4 bg-slate-50 rounded-lg border">
                                 <div className="text-2xl font-bold text-slate-900">
-                                  {(sampleMetrics.conversionByTime["90days"] * 100).toFixed(1)}%
+                                  {(sampleMetrics.conversionByTime.days90 * 100).toFixed(1)}%
                                 </div>
                                 <p className="text-sm text-slate-600 mt-1">90 dias</p>
                               </div>
                               <div className="text-center p-4 bg-slate-50 rounded-lg border">
                                 <div className="text-2xl font-bold text-slate-900">
-                                  {(sampleMetrics.conversionByTime["180days"] * 100).toFixed(1)}%
+                                  {(sampleMetrics.conversionByTime.days180 * 100).toFixed(1)}%
                                 </div>
                                 <p className="text-sm text-slate-600 mt-1">180 dias</p>
                               </div>
@@ -578,15 +575,15 @@ export default function ComportamentoCliente() {
                               </div>
                               <div className="text-center">
                                 <div className="text-3xl font-bold text-slate-900">
-                                  {formatCurrency(sampleMetrics.basket.avgBasketValue)}
+                                  {sampleMetrics.basket.avgBasketSize.toFixed(2)}
                                 </div>
                                 <p className="text-sm text-slate-600 mt-1">Valor Médio da Cesta</p>
                               </div>
                               <div className="text-center">
                                 <div className="text-3xl font-bold text-slate-900">
-                                  {(sampleMetrics.basket.sampleShareOfBasket * 100).toFixed(1)}%
+                                  {sampleMetrics.basket.topCombinations.length}
                                 </div>
-                                <p className="text-sm text-slate-600 mt-1">% da Cesta (Amostra)</p>
+                                <p className="text-sm text-slate-600 mt-1">Combinações Encontradas</p>
                               </div>
                             </div>
                           </CardContent>
@@ -607,19 +604,19 @@ export default function ComportamentoCliente() {
                         <div className="grid grid-cols-3 gap-4">
                           <div className="text-center">
                             <div className="text-3xl font-bold text-slate-900">
-                              {(sampleMetrics.repurchase.avgRepurchaseRate * 100).toFixed(1)}%
+                              {(sampleMetrics.repurchase.repurchaseRate * 100).toFixed(1)}%
                             </div>
                             <p className="text-sm text-slate-600 mt-1">Taxa de Recompra</p>
                           </div>
                           <div className="text-center">
                             <div className="text-3xl font-bold text-slate-900">
-                              {sampleMetrics.repurchase.avgDaysBetweenRepurchases.toFixed(0)}d
+                              {sampleMetrics.repurchase.avgDaysToFirstRepurchase.toFixed(0)}d
                             </div>
                             <p className="text-sm text-slate-600 mt-1">Dias entre Compras</p>
                           </div>
                           <div className="text-center">
                             <div className="text-3xl font-bold text-slate-900">
-                              {sampleMetrics.repurchase.totalRepurchasers}
+                              {sampleMetrics.repurchase.customersWhoRepurchased}
                             </div>
                             <p className="text-sm text-slate-600 mt-1">Clientes Recompra</p>
                           </div>
@@ -672,19 +669,19 @@ export default function ComportamentoCliente() {
                         <div className="grid grid-cols-3 gap-4">
                           <div className="text-center">
                             <div className="text-3xl font-bold text-slate-900">
-                              {(sampleMetrics.crossSell.crossSellRate * 100).toFixed(1)}%
+                              {(sampleMetrics.crossSell.samplePlusOthers / Math.max(sampleMetrics.crossSell.onlySample + sampleMetrics.crossSell.samplePlusOthers, 1) * 100).toFixed(1)}%
                             </div>
                             <p className="text-sm text-slate-600 mt-1">Taxa de Cross-sell</p>
                           </div>
                           <div className="text-center">
                             <div className="text-3xl font-bold text-slate-900">
-                              {sampleMetrics.crossSell.totalCrossSells}
+                              {sampleMetrics.crossSell.samplePlusOthers}
                             </div>
                             <p className="text-sm text-slate-600 mt-1">Total de Cross-sells</p>
                           </div>
                           <div className="text-center">
                             <div className="text-3xl font-bold text-slate-900">
-                              {formatCurrency(sampleMetrics.crossSell.avgCrossSellValue)}
+                              {formatCurrency(sampleMetrics.crossSell.avgTicketSamplePlusOthers)}
                             </div>
                             <p className="text-sm text-slate-600 mt-1">Valor Médio</p>
                           </div>
@@ -769,7 +766,7 @@ export default function ComportamentoCliente() {
             <EmptyState
               title="Sem dados de segmentação"
               description="Nenhum dado de segmentação de clientes disponível."
-              icon={AlertTriangle}
+              icon={<AlertTriangle className="w-12 h-12" />}
             />
           ) : (
             <>
@@ -789,7 +786,7 @@ export default function ComportamentoCliente() {
                     <CardTitle>Distribuição de Clientes</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CustomerSegmentationChart data={segments} />
+                    <CustomerSegmentationChart segments={segments} />
                   </CardContent>
                 </Card>
 
@@ -798,7 +795,7 @@ export default function ComportamentoCliente() {
                     <CardTitle>Receita por Segmento</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <SegmentRevenueChart data={segments} />
+                    <SegmentRevenueChart segments={segments} />
                   </CardContent>
                 </Card>
               </div>
@@ -809,7 +806,7 @@ export default function ComportamentoCliente() {
                   <CardTitle>Detalhamento por Segmento</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <SegmentDetailTable data={segments} />
+                  <SegmentDetailTable segments={segments} />
                 </CardContent>
               </Card>
 
@@ -819,39 +816,36 @@ export default function ComportamentoCliente() {
               {/* Churn KPIs */}
               {churnMetrics && (
                 <div className="grid grid-cols-5 gap-4">
-                  <KPITooltip
-                    title="Taxa de Churn"
-                    value={(churnMetrics.taxaChurn * 100).toFixed(1)}
-                    unit="%"
-                    icon={<Percent className="w-4 h-4" />}
-                    description="Percentual de clientes inativos"
-                  />
-                  <KPITooltip
-                    title="Clientes Ativos"
-                    value={churnMetrics.clientesAtivos}
-                    icon={<UserCheck className="w-4 h-4" />}
-                    description="Clientes com compras recentes"
-                  />
-                  <KPITooltip
-                    title="Em Risco"
-                    value={churnMetrics.clientesEmRisco}
-                    icon={<AlertTriangle className="w-4 h-4" />}
-                    description="Clientes com inatividade"
-                  />
-                  <KPITooltip
-                    title="Inativos"
-                    value={churnMetrics.clientesInativos}
-                    icon={<UserMinus className="w-4 h-4" />}
-                    description="Sem atividade há muito tempo"
-                  />
-                  <KPITooltip
-                    title="Valor em Risco"
-                    value={formatCurrency(
-                      (churnRiskCustomers || []).reduce((sum, c) => sum + (c.valorTotal || 0), 0)
-                    )}
-                    icon={<DollarSign className="w-4 h-4" />}
-                    description="LTV dos clientes em risco"
-                  />
+                  <KPITooltip metricKey="taxa_churn">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><Percent className="h-4 w-4" /><span>Taxa de Churn</span></div>
+                      <p className="text-2xl font-bold">{(churnMetrics.taxaChurn * 100).toFixed(1)}%</p>
+                    </CardContent></Card>
+                  </KPITooltip>
+                  <KPITooltip metricKey="clientes_ativos">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><UserCheck className="h-4 w-4" /><span>Clientes Ativos</span></div>
+                      <p className="text-2xl font-bold">{churnMetrics.clientesAtivos}</p>
+                    </CardContent></Card>
+                  </KPITooltip>
+                  <KPITooltip metricKey="clientes_em_risco">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><AlertTriangle className="h-4 w-4" /><span>Em Risco</span></div>
+                      <p className="text-2xl font-bold">{churnMetrics.clientesEmRisco}</p>
+                    </CardContent></Card>
+                  </KPITooltip>
+                  <KPITooltip metricKey="clientes_inativos">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><UserMinus className="h-4 w-4" /><span>Inativos</span></div>
+                      <p className="text-2xl font-bold">{churnMetrics.clientesInativos}</p>
+                    </CardContent></Card>
+                  </KPITooltip>
+                  <KPITooltip metricKey="valor_em_risco">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><DollarSign className="h-4 w-4" /><span>Valor em Risco</span></div>
+                      <p className="text-2xl font-bold">{formatCurrency((churnRiskCustomers || []).reduce((sum, c) => sum + (c.valorTotal || 0), 0))}</p>
+                    </CardContent></Card>
+                  </KPITooltip>
                 </div>
               )}
 
@@ -863,12 +857,10 @@ export default function ComportamentoCliente() {
                 <CardContent>
                   {churnMetrics && (
                     <ChurnFunnelChart
-                      data={{
-                        totalClientes: churnMetrics.totalClientes,
-                        clientesAtivos: churnMetrics.clientesAtivos,
-                        clientesEmRisco: churnMetrics.clientesEmRisco,
-                        clientesInativos: churnMetrics.clientesInativos,
-                      }}
+                      ativos={churnMetrics.clientesAtivos}
+                      emRisco={churnMetrics.clientesEmRisco}
+                      inativos={churnMetrics.clientesInativos}
+                      churn={churnMetrics.totalClientes - churnMetrics.clientesAtivos - churnMetrics.clientesEmRisco - churnMetrics.clientesInativos}
                     />
                   )}
                 </CardContent>
@@ -883,7 +875,7 @@ export default function ComportamentoCliente() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChurnRiskTable data={churnRiskCustomers || []} />
+                  <ChurnRiskTable customers={churnRiskCustomers || []} />
                 </CardContent>
               </Card>
             </>
@@ -898,19 +890,16 @@ export default function ComportamentoCliente() {
             <EmptyState
               title="Sem dados de volume"
               description="Nenhum pedido B2C encontrado para o período selecionado."
-              icon={AlertTriangle}
+              icon={<AlertTriangle className="w-12 h-12" />}
             />
           ) : (
             <>
               {/* Volume KPI Cards */}
               {volumeAnalysis && (
                 <VolumeKPICards
-                  data={{
-                    daily: volumeAnalysis.daily,
-                    weekly: volumeAnalysis.weekly,
-                    monthly: volumeAnalysis.monthly,
-                    quarterly: volumeAnalysis.quarterly,
-                  }}
+                  averageDaily={volumeAnalysis.averageDaily}
+                  peakDay={volumeAnalysis.peakDay}
+                  lowDay={volumeAnalysis.lowDay}
                 />
               )}
 
@@ -939,10 +928,10 @@ export default function ComportamentoCliente() {
                   </Select>
                 </CardHeader>
                 <CardContent>
-                  {volumeAnalysis && (
+                {volumeAnalysis && (
                     <OrderVolumeChart
-                      data={volumeAnalysis[volumeTimeframe as keyof typeof volumeAnalysis] || []}
-                      timeframe={volumeTimeframe}
+                      data={(volumeAnalysis[volumeTimeframe as 'daily' | 'weekly' | 'monthly' | 'quarterly'] || []).map((d: any) => ({ date: d.date || d.week || d.month || d.quarter, orders: d.orders }))}
+                      viewMode={volumeTimeframe as 'daily' | 'weekly' | 'monthly' | 'quarterly'}
                     />
                   )}
                 </CardContent>
@@ -957,7 +946,7 @@ export default function ComportamentoCliente() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {salesPeaks && <SalesPeaksChart data={salesPeaks} />}
+                  {salesPeaks && <SalesPeaksChart peaks={salesPeaks} />}
                 </CardContent>
               </Card>
             </>
