@@ -282,7 +282,7 @@ export default function ComportamentoCliente() {
             <EmptyState
               title="Sem dados disponíveis"
               description="Nenhum dado de comportamento de cliente encontrado para o período selecionado."
-              icon={AlertTriangle}
+              icon={<AlertTriangle className="w-12 h-12" />}
             />
           ) : (
             <>
@@ -337,7 +337,7 @@ export default function ComportamentoCliente() {
             <EmptyState
               title="Sem dados de amostra"
               description="Nenhum produto de amostra encontrado para o período selecionado."
-              icon={Package}
+              icon={<Package className="w-12 h-12" />}
             />
           ) : (
             <>
@@ -351,30 +351,27 @@ export default function ComportamentoCliente() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center">
-                        <div className="text-4xl font-bold text-blue-600">
-                          {(
-                            (sampleMetrics.volume.samplesConvertedToRegular /
-                              sampleMetrics.volume.totalSamples) *
-                            100
-                          ).toFixed(1)}
-                          %
-                        </div>
-                        <p className="text-sm text-slate-600 mt-1">Taxa de Conversão</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-4xl font-bold text-green-600">
-                          {sampleMetrics.volume.totalSamples}
-                        </div>
-                        <p className="text-sm text-slate-600 mt-1">Total de Amostras</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-4xl font-bold text-purple-600">
-                          {sampleMetrics.volume.samplesConvertedToRegular}
-                        </div>
-                        <p className="text-sm text-slate-600 mt-1">Convertidas</p>
-                      </div>
+                     <div className="grid grid-cols-3 gap-4">
+                       <div className="text-center">
+                         <div className="text-4xl font-bold text-blue-600">
+                           {sampleMetrics.volume.totalSamples > 0
+                             ? ((sampleMetrics.repurchase.customersWhoRepurchased / sampleMetrics.volume.totalSamples) * 100).toFixed(1)
+                             : "0.0"}%
+                         </div>
+                         <p className="text-sm text-slate-600 mt-1">Taxa de Conversão</p>
+                       </div>
+                       <div className="text-center">
+                         <div className="text-4xl font-bold text-green-600">
+                           {sampleMetrics.volume.totalSamples}
+                         </div>
+                         <p className="text-sm text-slate-600 mt-1">Total de Amostras</p>
+                       </div>
+                       <div className="text-center">
+                         <div className="text-4xl font-bold text-purple-600">
+                           {sampleMetrics.repurchase.customersWhoRepurchased}
+                         </div>
+                         <p className="text-sm text-slate-600 mt-1">Convertidas</p>
+                       </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -392,7 +389,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {(sampleMetrics.repurchase?.avgRepurchaseRate * 100 || 0).toFixed(1)}%
+                        {(sampleMetrics.repurchase?.repurchaseRate * 100 || 0).toFixed(1)}%
                       </div>
                     </CardContent>
                   </Card>
@@ -406,7 +403,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {formatCurrency(sampleMetrics.volume?.avgTicketMedio || 0)}
+                        {formatCurrency(sampleMetrics.repurchase?.avgTicketRepurchase || 0)}
                       </div>
                     </CardContent>
                   </Card>
@@ -420,7 +417,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {formatCurrency(sampleMetrics.volume?.avgLTV || 0)}
+                        {formatCurrency(sampleMetrics.quality?.avgLTV || 0)}
                       </div>
                     </CardContent>
                   </Card>
@@ -434,7 +431,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {(sampleMetrics.crossSell?.crossSellRate * 100 || 0).toFixed(1)}%
+                        {(sampleMetrics.crossSell ? (sampleMetrics.crossSell.samplePlusOthers / Math.max(sampleMetrics.crossSell.onlySample + sampleMetrics.crossSell.samplePlusOthers, 1)) * 100 : 0).toFixed(1)}%
                       </div>
                     </CardContent>
                   </Card>
@@ -448,7 +445,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {(sampleMetrics.volume?.avgDaysToSecondPurchase || 0).toFixed(0)}d
+                        {(sampleMetrics.repurchase?.avgDaysToFirstRepurchase || 0).toFixed(0)}d
                       </div>
                     </CardContent>
                   </Card>
@@ -462,7 +459,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {(sampleMetrics.quality?.qualityScore || 0).toFixed(2)}/5
+                        {(sampleMetrics.quality?.avgRepurchasesPerCustomer || 0).toFixed(2)}
                       </div>
                     </CardContent>
                   </Card>
@@ -476,7 +473,7 @@ export default function ComportamentoCliente() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-slate-900">
-                        {sampleMetrics.maturity?.maturityLevel || "—"}
+                        {sampleMetrics.maturity?.isReliableAnalysis ? "Confiável" : "Imatura"}
                       </div>
                     </CardContent>
                   </Card>
@@ -518,7 +515,7 @@ export default function ComportamentoCliente() {
                           <CardTitle>Produtos de Amostra</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <SampleProductsTable data={sampleMetrics.volume.samplesByProduct || []} />
+                          <SampleProductsTable title="Produtos de Amostra" products={sampleMetrics.crossSell?.topProductsWithSample || []} />
                         </CardContent>
                       </Card>
 
@@ -535,25 +532,25 @@ export default function ComportamentoCliente() {
                             <div className="grid grid-cols-4 gap-4">
                               <div className="text-center p-4 bg-slate-50 rounded-lg border">
                                 <div className="text-2xl font-bold text-slate-900">
-                                  {(sampleMetrics.conversionByTime["30days"] * 100).toFixed(1)}%
+                                  {(sampleMetrics.conversionByTime.days30 * 100).toFixed(1)}%
                                 </div>
                                 <p className="text-sm text-slate-600 mt-1">30 dias</p>
                               </div>
                               <div className="text-center p-4 bg-slate-50 rounded-lg border">
                                 <div className="text-2xl font-bold text-slate-900">
-                                  {(sampleMetrics.conversionByTime["60days"] * 100).toFixed(1)}%
+                                  {(sampleMetrics.conversionByTime.days60 * 100).toFixed(1)}%
                                 </div>
                                 <p className="text-sm text-slate-600 mt-1">60 dias</p>
                               </div>
                               <div className="text-center p-4 bg-slate-50 rounded-lg border">
                                 <div className="text-2xl font-bold text-slate-900">
-                                  {(sampleMetrics.conversionByTime["90days"] * 100).toFixed(1)}%
+                                  {(sampleMetrics.conversionByTime.days90 * 100).toFixed(1)}%
                                 </div>
                                 <p className="text-sm text-slate-600 mt-1">90 dias</p>
                               </div>
                               <div className="text-center p-4 bg-slate-50 rounded-lg border">
                                 <div className="text-2xl font-bold text-slate-900">
-                                  {(sampleMetrics.conversionByTime["180days"] * 100).toFixed(1)}%
+                                  {(sampleMetrics.conversionByTime.days180 * 100).toFixed(1)}%
                                 </div>
                                 <p className="text-sm text-slate-600 mt-1">180 dias</p>
                               </div>
