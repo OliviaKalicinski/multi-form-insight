@@ -347,7 +347,7 @@ export default function ComportamentoCliente() {
                   <CardHeader>
                     <CardTitle className="text-xl">Conversão Amostra → Produto Regular</CardTitle>
                     <CardDescription>
-                      Taxa de conversão e métricas gerais de amostra para {samplePeriod ? format(samplePeriod.start, "MMM yyyy") : "período"}
+                      Taxa de conversão e métricas gerais de amostra para {samplePeriod?.startDate ? format(samplePeriod.startDate, "MMM yyyy") : "período"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
