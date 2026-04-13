@@ -816,39 +816,36 @@ export default function ComportamentoCliente() {
               {/* Churn KPIs */}
               {churnMetrics && (
                 <div className="grid grid-cols-5 gap-4">
-                  <KPITooltip
-                    title="Taxa de Churn"
-                    value={(churnMetrics.taxaChurn * 100).toFixed(1)}
-                    unit="%"
-                    icon={<Percent className="w-4 h-4" />}
-                    description="Percentual de clientes inativos"
-                  />
-                  <KPITooltip
-                    title="Clientes Ativos"
-                    value={churnMetrics.clientesAtivos}
-                    icon={<UserCheck className="w-4 h-4" />}
-                    description="Clientes com compras recentes"
-                  />
-                  <KPITooltip
-                    title="Em Risco"
-                    value={churnMetrics.clientesEmRisco}
-                    icon={<AlertTriangle className="w-4 h-4" />}
-                    description="Clientes com inatividade"
-                  />
-                  <KPITooltip
-                    title="Inativos"
-                    value={churnMetrics.clientesInativos}
-                    icon={<UserMinus className="w-4 h-4" />}
-                    description="Sem atividade há muito tempo"
-                  />
-                  <KPITooltip
-                    title="Valor em Risco"
-                    value={formatCurrency(
-                      (churnRiskCustomers || []).reduce((sum, c) => sum + (c.valorTotal || 0), 0)
-                    )}
-                    icon={<DollarSign className="w-4 h-4" />}
-                    description="LTV dos clientes em risco"
-                  />
+                  <KPITooltip metricKey="taxa_churn">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><Percent className="h-4 w-4" /><span>Taxa de Churn</span></div>
+                      <p className="text-2xl font-bold">{(churnMetrics.taxaChurn * 100).toFixed(1)}%</p>
+                    </CardContent></Card>
+                  </KPITooltip>
+                  <KPITooltip metricKey="clientes_ativos">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><UserCheck className="h-4 w-4" /><span>Clientes Ativos</span></div>
+                      <p className="text-2xl font-bold">{churnMetrics.clientesAtivos}</p>
+                    </CardContent></Card>
+                  </KPITooltip>
+                  <KPITooltip metricKey="clientes_em_risco">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><AlertTriangle className="h-4 w-4" /><span>Em Risco</span></div>
+                      <p className="text-2xl font-bold">{churnMetrics.clientesEmRisco}</p>
+                    </CardContent></Card>
+                  </KPITooltip>
+                  <KPITooltip metricKey="clientes_inativos">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><UserMinus className="h-4 w-4" /><span>Inativos</span></div>
+                      <p className="text-2xl font-bold">{churnMetrics.clientesInativos}</p>
+                    </CardContent></Card>
+                  </KPITooltip>
+                  <KPITooltip metricKey="valor_em_risco">
+                    <Card><CardContent className="pt-4 pb-3">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1"><DollarSign className="h-4 w-4" /><span>Valor em Risco</span></div>
+                      <p className="text-2xl font-bold">{formatCurrency((churnRiskCustomers || []).reduce((sum, c) => sum + (c.valorTotal || 0), 0))}</p>
+                    </CardContent></Card>
+                  </KPITooltip>
                 </div>
               )}
 
@@ -860,12 +857,10 @@ export default function ComportamentoCliente() {
                 <CardContent>
                   {churnMetrics && (
                     <ChurnFunnelChart
-                      data={{
-                        totalClientes: churnMetrics.totalClientes,
-                        clientesAtivos: churnMetrics.clientesAtivos,
-                        clientesEmRisco: churnMetrics.clientesEmRisco,
-                        clientesInativos: churnMetrics.clientesInativos,
-                      }}
+                      ativos={churnMetrics.clientesAtivos}
+                      emRisco={churnMetrics.clientesEmRisco}
+                      inativos={churnMetrics.clientesInativos}
+                      churn={churnMetrics.totalClientes - churnMetrics.clientesAtivos - churnMetrics.clientesEmRisco - churnMetrics.clientesInativos}
                     />
                   )}
                 </CardContent>
@@ -880,7 +875,7 @@ export default function ComportamentoCliente() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChurnRiskTable data={churnRiskCustomers || []} />
+                  <ChurnRiskTable customers={churnRiskCustomers || []} />
                 </CardContent>
               </Card>
             </>
@@ -895,19 +890,16 @@ export default function ComportamentoCliente() {
             <EmptyState
               title="Sem dados de volume"
               description="Nenhum pedido B2C encontrado para o período selecionado."
-              icon={AlertTriangle}
+              icon={<AlertTriangle className="w-12 h-12" />}
             />
           ) : (
             <>
               {/* Volume KPI Cards */}
               {volumeAnalysis && (
                 <VolumeKPICards
-                  data={{
-                    daily: volumeAnalysis.daily,
-                    weekly: volumeAnalysis.weekly,
-                    monthly: volumeAnalysis.monthly,
-                    quarterly: volumeAnalysis.quarterly,
-                  }}
+                  averageDaily={volumeAnalysis.averageDaily}
+                  peakDay={volumeAnalysis.peakDay}
+                  lowDay={volumeAnalysis.lowDay}
                 />
               )}
 
@@ -936,10 +928,10 @@ export default function ComportamentoCliente() {
                   </Select>
                 </CardHeader>
                 <CardContent>
-                  {volumeAnalysis && (
+                {volumeAnalysis && (
                     <OrderVolumeChart
-                      data={volumeAnalysis[volumeTimeframe as keyof typeof volumeAnalysis] || []}
-                      timeframe={volumeTimeframe}
+                      data={(volumeAnalysis[volumeTimeframe as 'daily' | 'weekly' | 'monthly' | 'quarterly'] || []).map((d: any) => ({ date: d.date || d.week || d.month || d.quarter, orders: d.orders }))}
+                      viewMode={volumeTimeframe as 'daily' | 'weekly' | 'monthly' | 'quarterly'}
                     />
                   )}
                 </CardContent>
@@ -954,7 +946,7 @@ export default function ComportamentoCliente() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {salesPeaks && <SalesPeaksChart data={salesPeaks} />}
+                  {salesPeaks && <SalesPeaksChart peaks={salesPeaks} />}
                 </CardContent>
               </Card>
             </>
