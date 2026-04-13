@@ -16,7 +16,7 @@ import {
 import {
   LayoutDashboard,
   TrendingUp,
-  Gift,
+  // Gift removido (Amostras unificada em Comportamento)
   Users,
   UserCheck,
   Package,
@@ -102,7 +102,6 @@ const navSections: NavSection[] = [
     items: [
       { title: "Performance Financeira", url: "/performance-financeira", icon: TrendingUp },
       { title: "Comportamento", url: "/comportamento-cliente", icon: UserCheck },
-      { title: "Amostras", url: "/analise-samples", icon: Gift },
       { title: "Anúncios Meta", url: "/ads", icon: Megaphone },
       { title: "Seguidores", url: "/seguidores", icon: Instagram },
       { title: "Comentários", url: "/comentarios-instagram", icon: MessageCircle },
