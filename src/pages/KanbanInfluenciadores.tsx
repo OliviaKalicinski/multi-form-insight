@@ -777,13 +777,15 @@ export default function KanbanInfluenciadores() {
           : workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
 
-        // Row 1 = field keys (headers), rows 2-3 = labels/example, row 4+ = data
         const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "", raw: false });
-        const dataRows = jsonData.slice(2); // skip display-label row and example row
+        const headers = Object.keys(jsonData[0] || {});
+        const isProspection = isProspectionFormat(headers);
+
+        // For internal template, skip 2 label/example rows. For CSV prospection, use all rows.
+        const dataRows = isProspection ? jsonData : jsonData.slice(2);
 
         const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
-        // Load all existing instagram handles from Supabase for upsert check
         const { data: existing } = await supabase
           .from("influencer_registry")
           .select("id, instagram, kanban_status");
@@ -791,73 +793,85 @@ export default function KanbanInfluenciadores() {
 
         for (let idx = 0; idx < dataRows.length; idx++) {
           const row = dataRows[idx];
-          const excelRow = idx + 4;
-          const nome = (row["name_full_text"] || "").trim();
-          const igRaw = (row["contact_instagram_text"] || "").trim();
-          const igNorm = normalizeInstagram(igRaw);
+          const rowNum = isProspection ? idx + 2 : idx + 4;
 
-          if (!nome && !igRaw) { result.skipped++; continue; }
+          let nome: string;
+          let igNorm: string;
+          let dbPayload: Record<string, unknown>;
 
+          if (isProspection) {
+            const mapped = mapProspectionRow(row);
+            nome = mapped.nome;
+            igNorm = mapped.instagram;
+            dbPayload = {
+              name: nome,
+              instagram: igNorm,
+              email: mapped.email || "",
+              kanban_seguidores: mapped.seguidores,
+              kanban_observacoes: mapped.observacoes || null,
+              updated_at: new Date().toISOString(),
+            };
+          } else {
+            nome = (row["name_full_text"] || "").trim();
+            const igRaw = (row["contact_instagram_text"] || "").trim();
+            igNorm = normalizeInstagram(igRaw);
+            dbPayload = {
+              name: nome,
+              instagram: igNorm,
+              tiktok: (row["contact_tiktok_text"] || "").trim().replace(/^@/, "") || null,
+              whatsapp: (row["contact_whatsapp_text"] || "").trim() || null,
+              email: (row["email"] || "").trim() || "",
+              address_logradouro: (row["address_logradouro_text"] || "").trim() || null,
+              address_numero: (row["address_numero_text"] || "").trim() || null,
+              address_complemento: (row["address_complemento_text"] || "").trim() || null,
+              address_bairro: (row["address_bairro_text"] || "").trim() || null,
+              address_cep: (row["address_cep_text"] || "").trim() || null,
+              address_cidade: (row["address_cidade_text"] || "").trim() || null,
+              address_estado: (row["address_estado_text"] || "").trim().toUpperCase() || null,
+              cnpj: (row["paym_pj_cnpj_text"] || "").trim() || null,
+              razao_social: (row["paym_pj_razao_social_text"] || "").trim() || null,
+              updated_at: new Date().toISOString(),
+            };
+          }
+
+          if (!nome && !igNorm) { result.skipped++; continue; }
           if (!nome) {
-            result.errors.push(`Linha ${excelRow}: Nome obrigatório vazio (Instagram: ${igRaw || "—"})`);
+            result.errors.push(`Linha ${rowNum}: Nome obrigatório vazio (Instagram: ${igNorm || "—"})`);
             result.skipped++;
             continue;
           }
           if (!igNorm) {
-            result.errors.push(`Linha ${excelRow}: Instagram obrigatório vazio (Nome: ${nome})`);
+            result.errors.push(`Linha ${rowNum}: Instagram obrigatório vazio (Nome: ${nome})`);
             result.skipped++;
             continue;
           }
 
-          const dbPayload: Record<string, unknown> = {
-            name: nome,
-            instagram: igNorm,
-            tiktok: (row["contact_tiktok_text"] || "").trim().replace(/^@/, "") || null,
-            whatsapp: (row["contact_whatsapp_text"] || "").trim() || null,
-            email: (row["email"] || "").trim() || "",
-            address_logradouro: (row["address_logradouro_text"] || "").trim() || null,
-            address_numero: (row["address_numero_text"] || "").trim() || null,
-            address_complemento: (row["address_complemento_text"] || "").trim() || null,
-            address_bairro: (row["address_bairro_text"] || "").trim() || null,
-            address_cep: (row["address_cep_text"] || "").trim() || null,
-            address_cidade: (row["address_cidade_text"] || "").trim() || null,
-            address_estado: (row["address_estado_text"] || "").trim().toUpperCase() || null,
-            cnpj: (row["paym_pj_cnpj_text"] || "").trim() || null,
-            razao_social: (row["paym_pj_razao_social_text"] || "").trim() || null,
-            updated_at: new Date().toISOString(),
-          };
-
-          // Status from spreadsheet (column "kanban_status"). If empty/invalid → "prospeccao".
-          const sheetStatus =
-            parseStatusFromSheet(row["kanban_status"] || row["status"] || "");
+          const sheetStatus = parseStatusFromSheet(row["kanban_status"] || row["status"] || "");
           const defaultStatus: InfluencerStatus = sheetStatus ?? "prospeccao";
 
-          const existing = existingMap.get(igNorm);
+          const existingEntry = existingMap.get(igNorm);
 
-          if (existing) {
-            // Update — if the sheet provided an explicit status, honor it.
-            // Otherwise: keep the existing kanban_status if set, else default to "prospeccao".
+          if (existingEntry) {
             const updatePayload: Record<string, unknown> = { ...dbPayload };
             if (sheetStatus) {
               updatePayload.kanban_status = sheetStatus;
-            } else if (!existing.kanban_status) {
+            } else if (!existingEntry.kanban_status) {
               updatePayload.kanban_status = "prospeccao";
             }
             const { error } = await supabase
               .from("influencer_registry")
               .update(updatePayload)
-              .eq("id", existing.id);
-            if (error) result.errors.push(`Linha ${excelRow}: Erro ao atualizar — ${error.message}`);
+              .eq("id", existingEntry.id);
+            if (error) result.errors.push(`Linha ${rowNum}: Erro ao atualizar — ${error.message}`);
             else result.updated++;
           } else {
-            // Create new — honor sheet status if present, otherwise start in "prospeccao".
             const { error } = await supabase.from("influencer_registry").insert([{
               ...dbPayload,
               kanban_status: defaultStatus,
               na_base: false,
               created_at: new Date().toISOString(),
             } as any]);
-            if (error) result.errors.push(`Linha ${excelRow}: Erro ao criar — ${error.message}`);
+            if (error) result.errors.push(`Linha ${rowNum}: Erro ao criar — ${error.message}`);
             else result.created++;
           }
         }
@@ -866,7 +880,7 @@ export default function KanbanInfluenciadores() {
         setImportResult(result);
         setImportResultOpen(true);
       } catch (err) {
-        setImportResult({ created: 0, updated: 0, skipped: 0, errors: ["Erro ao ler o arquivo. Verifique se é um .xlsx válido."] });
+        setImportResult({ created: 0, updated: 0, skipped: 0, errors: ["Erro ao ler o arquivo. Verifique se é um arquivo válido."] });
         setImportResultOpen(true);
       }
     };
