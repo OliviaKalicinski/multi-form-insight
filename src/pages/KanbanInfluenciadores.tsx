@@ -163,7 +163,9 @@ function InfluencerCard({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="font-medium text-sm leading-tight">{influencer.nome}</div>
+        <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5 rounded-md max-w-[150px] truncate block leading-tight">
+          {influencer.nome}
+        </Badge>
         <div
           className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
           // dnd-kit listens to pointerdown on the parent and would steal the click.
@@ -192,8 +194,8 @@ function InfluencerCard({
         </div>
       </div>
 
-      {/* Na Base tag */}
-      {influencer.na_base && (
+      {/* Na Base tag — também aparece automaticamente em Parceiro e Inativo */}
+      {(influencer.na_base || influencer.status === "parceiro" || influencer.status === "inativo") && (
         <div className="flex items-center gap-1">
           <Badge className="text-[9px] px-1.5 py-0 h-4 bg-rose-100 text-rose-700 border border-rose-200 font-normal gap-1">
             <Database className="h-2.5 w-2.5" />
@@ -480,7 +482,6 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
   const queryClient = useQueryClient();
   const [responsavel, setResponsavel] = useState("");
   const [observacao, setObservacao] = useState("");
-  const [open, setOpen] = useState(true);
 
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["influencer_contact_log", influencerId],
@@ -524,65 +525,73 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
   };
 
   return (
-    <div className="border rounded-lg">
-      <button
-        type="button"
-        className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-gray-50 rounded-lg"
-        onClick={() => setOpen(!open)}
-      >
-        <span className="flex items-center gap-2">
-          <MessageSquare className="h-4 w-4" />
-          Histórico de Contato ({logs.length})
-        </span>
-        {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-      </button>
+    <div className="space-y-3">
+      {/* Cabeçalho — sempre visível, estilo Reclamações */}
+      <div className="flex items-center gap-2 pb-1 border-b">
+        <MessageSquare className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">Log de Comunicação</span>
+        {logs.length > 0 && (
+          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 py-0 ml-0.5">
+            {logs.length}
+          </Badge>
+        )}
+      </div>
 
-      {open && (
-        <div className="px-3 pb-3 space-y-3">
-          {/* Formulário de novo registro */}
-          <div className="flex gap-2">
-            <Input
-              value={responsavel}
-              onChange={(e) => setResponsavel(e.target.value)}
-              placeholder="Responsável"
-              className="flex-1 h-8 text-xs"
-            />
-            <Input
-              value={observacao}
-              onChange={(e) => setObservacao(e.target.value)}
-              placeholder="Obs (opcional)"
-              className="flex-1 h-8 text-xs"
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleAdd}
-              disabled={!responsavel.trim() || addMutation.isPending}
-              className="h-8 px-2"
-            >
-              <Send className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+      {/* Formulário de novo registro — mais visível */}
+      <div className="bg-muted/40 border rounded-lg p-3 space-y-2">
+        <Input
+          value={responsavel}
+          onChange={(e) => setResponsavel(e.target.value)}
+          placeholder="Responsável *"
+          className="h-8 text-xs"
+        />
+        <Textarea
+          value={observacao}
+          onChange={(e) => setObservacao(e.target.value)}
+          placeholder="O que foi discutido, próximos passos..."
+          rows={2}
+          className="text-xs resize-none"
+          onKeyDown={(e) => e.key === "Enter" && e.ctrlKey && handleAdd()}
+        />
+        <Button
+          size="sm"
+          onClick={handleAdd}
+          disabled={!responsavel.trim() || addMutation.isPending}
+          className="w-full h-8 text-xs"
+        >
+          <Send className="h-3.5 w-3.5 mr-1.5" />
+          Registrar contato
+        </Button>
+      </div>
 
-          {/* Lista de registros */}
-          {isLoading ? (
-            <p className="text-xs text-muted-foreground">Carregando...</p>
-          ) : logs.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-2">Nenhum contato registrado.</p>
-          ) : (
-            <div className="max-h-40 overflow-y-auto space-y-1.5">
-              {logs.map((log) => (
-                <div key={log.id} className="flex items-start gap-2 text-xs border-l-2 border-primary/30 pl-2 py-0.5">
-                  <div className="flex-1">
-                    <span className="font-medium">{log.responsavel}</span>
-                    {log.observacao && <span className="text-muted-foreground"> — {log.observacao}</span>}
-                  </div>
-                  <span className="text-muted-foreground whitespace-nowrap shrink-0">{formatDate(log.created_at)}</span>
+      {/* Lista de registros — cards ao estilo Reclamações */}
+      {isLoading ? (
+        <p className="text-xs text-muted-foreground">Carregando...</p>
+      ) : logs.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-3">Nenhum contato registrado ainda.</p>
+      ) : (
+        <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
+          {logs.map((log) => {
+            const color = getResponsavelColor(log.responsavel);
+            return (
+              <div key={log.id} className="bg-white border rounded-lg p-2.5 space-y-1.5 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <Badge
+                    variant="outline"
+                    className={cn("text-[10px] px-1.5 py-0 h-5 font-medium", color.bg, color.text, color.border)}
+                  >
+                    {log.responsavel}
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {formatDate(log.created_at)}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+                {log.observacao && (
+                  <p className="text-xs text-foreground/80 leading-relaxed">{log.observacao}</p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
