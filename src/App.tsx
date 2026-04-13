@@ -17,7 +17,7 @@ import Operacoes from "./pages/Operacoes";
 import Ads from "./pages/Ads";
 import PerformanceFinanceira from "./pages/PerformanceFinanceira";
 import ComportamentoCliente from "./pages/ComportamentoCliente";
-import AnaliseSamples from "./pages/AnaliseSamples";
+// AnaliseSamples removido — conteúdo unificado em ComportamentoCliente
 import Publico from "./pages/Publico";
 import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
 import Clientes from "./pages/Clientes";
@@ -188,15 +188,7 @@ const App = () => (
           <Route path="/segmentacao-clientes" element={<Navigate to="/comportamento-cliente" replace />} />
           <Route path="/analise-churn" element={<Navigate to="/comportamento-cliente" replace />} />
 
-          <Route
-            path="/analise-samples"
-            element={
-              <ProtectedRoute>
-                <AuthenticatedLayout>
-                  <AnaliseSamples />
-                </AuthenticatedLayout>
-              </ProtectedRoute>
-            }
+          <Route path="/analise-samples" element={<Navigate to="/comportamento-cliente" replace />}
           />
 
           <Route
