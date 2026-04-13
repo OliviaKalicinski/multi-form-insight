@@ -927,7 +927,7 @@ export default function KanbanInfluenciadores() {
               </button>
             )}
           </div>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
             <Upload className="h-4 w-4" /> Importar Planilha
           </Button>
