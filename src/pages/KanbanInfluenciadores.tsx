@@ -92,7 +92,18 @@ const NICHO_OPTIONS = ["Pets", "Nutrição Animal", "Veterinária", "Lifestyle",
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function normalizeInstagram(v: string): string {
-  return (v || "").trim().replace(/^@/, "").toLowerCase();
+  return (v || "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/.*$/, "").toLowerCase();
+}
+
+function parseFollowerCount(raw: string): number | null {
+  if (!raw) return null;
+  const s = raw.toString().trim().toLowerCase().replace(/,/g, ".");
+  const match = s.match(/^([\d.]+)\s*([km])?$/);
+  if (!match) return null;
+  const num = parseFloat(match[1]);
+  if (isNaN(num)) return null;
+  const mult = match[2] === "k" ? 1000 : match[2] === "m" ? 1000000 : 1;
+  return Math.round(num * mult);
 }
 
 const VALID_STATUSES: InfluencerStatus[] = [
@@ -126,6 +137,34 @@ function parseStatusFromSheet(raw: string): InfluencerStatus | null {
     reativacao: "reativacao",
   };
   return aliases[norm] ?? null;
+}
+
+// Detect if CSV headers match the prospection export format
+function isProspectionFormat(headers: string[]): boolean {
+  const lowerHeaders = headers.map(h => h.toLowerCase().trim());
+  return lowerHeaders.some(h => h === "creator" || h === "username" || h === "instagram link");
+}
+
+// Map a prospection CSV row to a DB payload
+function mapProspectionRow(row: Record<string, string>): { nome: string; instagram: string; email: string; seguidores: number | null; observacoes: string } {
+  const get = (keys: string[]) => {
+    for (const k of keys) {
+      const val = row[k]?.trim();
+      if (val) return val;
+    }
+    return "";
+  };
+  const nome = get(["Creator", "creator"]);
+  const igRaw = get(["Username", "username", "Instagram Link", "instagram link"]);
+  const email = get(["Email address", "email address", "Email", "email"]);
+  const followersRaw = get(["Followers", "followers"]);
+  const seguidores = parseFollowerCount(followersRaw);
+  const extras: string[] = [];
+  const er = get(["ER%", "er%", "ER", "er"]);
+  if (er) extras.push(`ER: ${er}`);
+  const contato = get(["Contato", "contato"]);
+  if (contato) extras.push(`Contato: ${contato}`);
+  return { nome, instagram: normalizeInstagram(igRaw), email, seguidores, observacoes: extras.join(" | ") };
 }
 
 // ─── Import Result ────────────────────────────────────────────────────────────
