@@ -456,16 +456,23 @@ export type Database = {
       customer: {
         Row: {
           average_days_between_purchases: number | null
+          bairro: string | null
+          cep: string | null
+          complemento: string | null
           cpf_cnpj: string
           created_at: string | null
+          email: string | null
           first_order_date: string | null
           id: string
           is_active: boolean
           journey_stage: string | null
           last_contact_date: string | null
           last_order_date: string | null
+          logradouro: string | null
           merged_into: string | null
+          municipio: string | null
           nome: string | null
+          numero: string | null
           observacoes: string | null
           prioridade: string | null
           recalculated_at: string | null
@@ -473,24 +480,33 @@ export type Database = {
           segment: string | null
           status_manual: string | null
           tags: Json | null
+          telefone: string | null
           ticket_medio: number | null
           total_orders_all: number
           total_orders_revenue: number
           total_revenue: number
+          uf: string | null
           updated_at: string | null
         }
         Insert: {
           average_days_between_purchases?: number | null
+          bairro?: string | null
+          cep?: string | null
+          complemento?: string | null
           cpf_cnpj: string
           created_at?: string | null
+          email?: string | null
           first_order_date?: string | null
           id?: string
           is_active?: boolean
           journey_stage?: string | null
           last_contact_date?: string | null
           last_order_date?: string | null
+          logradouro?: string | null
           merged_into?: string | null
+          municipio?: string | null
           nome?: string | null
+          numero?: string | null
           observacoes?: string | null
           prioridade?: string | null
           recalculated_at?: string | null
@@ -498,24 +514,33 @@ export type Database = {
           segment?: string | null
           status_manual?: string | null
           tags?: Json | null
+          telefone?: string | null
           ticket_medio?: number | null
           total_orders_all?: number
           total_orders_revenue?: number
           total_revenue?: number
+          uf?: string | null
           updated_at?: string | null
         }
         Update: {
           average_days_between_purchases?: number | null
+          bairro?: string | null
+          cep?: string | null
+          complemento?: string | null
           cpf_cnpj?: string
           created_at?: string | null
+          email?: string | null
           first_order_date?: string | null
           id?: string
           is_active?: boolean
           journey_stage?: string | null
           last_contact_date?: string | null
           last_order_date?: string | null
+          logradouro?: string | null
           merged_into?: string | null
+          municipio?: string | null
           nome?: string | null
+          numero?: string | null
           observacoes?: string | null
           prioridade?: string | null
           recalculated_at?: string | null
@@ -523,10 +548,12 @@ export type Database = {
           segment?: string | null
           status_manual?: string | null
           tags?: Json | null
+          telefone?: string | null
           ticket_medio?: number | null
           total_orders_all?: number
           total_orders_revenue?: number
           total_revenue?: number
+          uf?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -713,6 +740,7 @@ export type Database = {
           id: string
           is_primary: boolean | null
           type: string
+          updated_at: string | null
           value: string
         }
         Insert: {
@@ -721,6 +749,7 @@ export type Database = {
           id?: string
           is_primary?: boolean | null
           type: string
+          updated_at?: string | null
           value: string
         }
         Update: {
@@ -729,6 +758,7 @@ export type Database = {
           id?: string
           is_primary?: boolean | null
           type?: string
+          updated_at?: string | null
           value?: string
         }
         Relationships: [
@@ -1674,12 +1704,15 @@ export type Database = {
       }
       sales_data: {
         Row: {
+          bairro: string | null
           canal: string | null
+          cep: string | null
           cfop: string | null
           chave_acesso: string | null
           cidade: string | null
           cliente_email: string | null
           cliente_nome: string | null
+          complemento: string | null
           cpf_cnpj: string | null
           created_at: string | null
           cupom: string | null
@@ -1692,9 +1725,11 @@ export type Database = {
           frete_por_conta: string | null
           id: string
           id_nota: string | null
+          logradouro: string | null
           municipio: string | null
           natureza_operacao: string | null
           ncm: string | null
+          numero: string | null
           numero_nota: string | null
           numero_pedido: string | null
           numero_pedido_plataforma: string | null
@@ -1717,12 +1752,15 @@ export type Database = {
           valor_total: number
         }
         Insert: {
+          bairro?: string | null
           canal?: string | null
+          cep?: string | null
           cfop?: string | null
           chave_acesso?: string | null
           cidade?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
+          complemento?: string | null
           cpf_cnpj?: string | null
           created_at?: string | null
           cupom?: string | null
@@ -1735,9 +1773,11 @@ export type Database = {
           frete_por_conta?: string | null
           id?: string
           id_nota?: string | null
+          logradouro?: string | null
           municipio?: string | null
           natureza_operacao?: string | null
           ncm?: string | null
+          numero?: string | null
           numero_nota?: string | null
           numero_pedido?: string | null
           numero_pedido_plataforma?: string | null
@@ -1760,12 +1800,15 @@ export type Database = {
           valor_total: number
         }
         Update: {
+          bairro?: string | null
           canal?: string | null
+          cep?: string | null
           cfop?: string | null
           chave_acesso?: string | null
           cidade?: string | null
           cliente_email?: string | null
           cliente_nome?: string | null
+          complemento?: string | null
           cpf_cnpj?: string | null
           created_at?: string | null
           cupom?: string | null
@@ -1778,9 +1821,11 @@ export type Database = {
           frete_por_conta?: string | null
           id?: string
           id_nota?: string | null
+          logradouro?: string | null
           municipio?: string | null
           natureza_operacao?: string | null
           ncm?: string | null
+          numero?: string | null
           numero_nota?: string | null
           numero_pedido?: string | null
           numero_pedido_plataforma?: string | null
@@ -2062,16 +2107,23 @@ export type Database = {
         Args: { p_value: string }
         Returns: {
           average_days_between_purchases: number | null
+          bairro: string | null
+          cep: string | null
+          complemento: string | null
           cpf_cnpj: string
           created_at: string | null
+          email: string | null
           first_order_date: string | null
           id: string
           is_active: boolean
           journey_stage: string | null
           last_contact_date: string | null
           last_order_date: string | null
+          logradouro: string | null
           merged_into: string | null
+          municipio: string | null
           nome: string | null
+          numero: string | null
           observacoes: string | null
           prioridade: string | null
           recalculated_at: string | null
@@ -2079,10 +2131,12 @@ export type Database = {
           segment: string | null
           status_manual: string | null
           tags: Json | null
+          telefone: string | null
           ticket_medio: number | null
           total_orders_all: number
           total_orders_revenue: number
           total_revenue: number
+          uf: string | null
           updated_at: string | null
         }[]
         SetofOptions: {
