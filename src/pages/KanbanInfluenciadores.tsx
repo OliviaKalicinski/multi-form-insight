@@ -482,6 +482,8 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
   const queryClient = useQueryClient();
   const [responsavel, setResponsavel] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editObservacao, setEditObservacao] = useState("");
 
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["influencer_contact_log", influencerId],
@@ -513,9 +515,34 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
     },
   });
 
+  const editMutation = useMutation({
+    mutationFn: async ({ id, observacao }: { id: string; observacao: string }) => {
+      const { error } = await supabase
+        .from("influencer_contact_log" as any)
+        .update({ observacao: observacao.trim() || null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer_contact_log", influencerId] });
+      setEditingId(null);
+      setEditObservacao("");
+    },
+  });
+
   const handleAdd = () => {
     if (!responsavel.trim()) return;
     addMutation.mutate();
+  };
+
+  const handleEditStart = (log: ContactLog) => {
+    setEditingId(log.id);
+    setEditObservacao(log.observacao ?? "");
+  };
+
+  const handleEditSave = () => {
+    if (!editingId) return;
+    editMutation.mutate({ id: editingId, observacao: editObservacao });
   };
 
   const formatDate = (iso: string) => {
@@ -526,7 +553,7 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
 
   return (
     <div className="space-y-3">
-      {/* Cabeçalho — sempre visível, estilo Reclamações */}
+      {/* Cabeçalho */}
       <div className="flex items-center gap-2 pb-1 border-b">
         <MessageSquare className="h-4 w-4 text-primary" />
         <span className="text-sm font-semibold">Log de Comunicação</span>
@@ -537,7 +564,7 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
         )}
       </div>
 
-      {/* Formulário de novo registro — mais visível */}
+      {/* Formulário de novo registro */}
       <div className="bg-muted/40 border rounded-lg p-3 space-y-2">
         <Input
           value={responsavel}
@@ -560,11 +587,11 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
           className="w-full h-8 text-xs"
         >
           <Send className="h-3.5 w-3.5 mr-1.5" />
-          Registrar contato
+          {addMutation.isPending ? "Registrando..." : "Registrar contato"}
         </Button>
       </div>
 
-      {/* Lista de registros — cards ao estilo Reclamações */}
+      {/* Lista de registros */}
       {isLoading ? (
         <p className="text-xs text-muted-foreground">Carregando...</p>
       ) : logs.length === 0 ? (
@@ -573,6 +600,7 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
         <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
           {logs.map((log) => {
             const color = getResponsavelColor(log.responsavel);
+            const isEditing = editingId === log.id;
             return (
               <div key={log.id} className="bg-white border rounded-lg p-2.5 space-y-1.5 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
@@ -582,12 +610,55 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
                   >
                     {log.responsavel}
                   </Badge>
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                    {formatDate(log.created_at)}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      {formatDate(log.created_at)}
+                    </span>
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => handleEditStart(log)}
+                        className="p-0.5 rounded hover:bg-gray-100 ml-1"
+                        title="Editar nota"
+                      >
+                        <Pencil className="h-3 w-3 text-gray-400" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {log.observacao && (
-                  <p className="text-xs text-foreground/80 leading-relaxed">{log.observacao}</p>
+
+                {isEditing ? (
+                  <div className="space-y-1.5">
+                    <Textarea
+                      value={editObservacao}
+                      onChange={(e) => setEditObservacao(e.target.value)}
+                      rows={2}
+                      className="text-xs resize-none"
+                      autoFocus
+                    />
+                    <div className="flex gap-1.5">
+                      <Button
+                        size="sm"
+                        onClick={handleEditSave}
+                        disabled={editMutation.isPending}
+                        className="h-7 text-xs px-2"
+                      >
+                        {editMutation.isPending ? "Salvando..." : "Salvar"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setEditingId(null); setEditObservacao(""); }}
+                        className="h-7 text-xs px-2"
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  log.observacao && (
+                    <p className="text-xs text-foreground/80 leading-relaxed">{log.observacao}</p>
+                  )
                 )}
               </div>
             );
@@ -612,11 +683,13 @@ function InfluencerDialog({
   onClose,
   onSave,
   initial,
+  isPending,
 }: {
   open: boolean;
   onClose: () => void;
   onSave: (data: InfluencerFormData) => void;
   initial?: Influencer;
+  isPending?: boolean;
 }) {
   const [form, setForm] = useState<InfluencerFormData>(
     initial
@@ -812,8 +885,8 @@ function InfluencerDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={!form.nome.trim()}>
-            {initial ? "Salvar" : "Adicionar"}
+          <Button onClick={handleSave} disabled={!form.nome.trim() || isPending}>
+            {isPending ? "Salvando..." : initial ? "Salvar" : "Adicionar"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1393,13 +1466,14 @@ export default function KanbanInfluenciadores() {
       )}
 
       {/* Dialogs */}
-      <InfluencerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSave={handleAdd} />
+      <InfluencerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSave={handleAdd} isPending={upsertMutation.isPending} />
       <InfluencerDialog
         key={editing?.id ?? "novo"}
         open={!!editing}
         onClose={() => setEditing(null)}
         onSave={handleEdit}
         initial={editing ?? undefined}
+        isPending={upsertMutation.isPending}
       />
       <ImportResultDialog open={importResultOpen} onClose={() => setImportResultOpen(false)} result={importResult} />
     </div>
