@@ -149,7 +149,13 @@ function InfluencerCard({
   responsaveis?: string[];
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: influencer.id });
-  const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined;
+  // When a DragOverlay is used, the overlay handles the visual feedback.
+  // Do NOT apply the transform to the original card — that would produce two
+  // moving copies (the card itself + the overlay). Instead, keep the card in
+  // place as an invisible placeholder while dragging.
+  const style = (!isDragging && transform)
+    ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
+    : undefined;
 
   return (
     <div
@@ -159,7 +165,7 @@ function InfluencerCard({
       {...attributes}
       className={cn(
         "bg-white border rounded-lg p-3 shadow-sm cursor-grab select-none space-y-2 group",
-        isDragging && "opacity-40",
+        isDragging && "opacity-0 pointer-events-none",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -1121,11 +1127,25 @@ export default function KanbanInfluenciadores() {
   });
 
   const handleAdd = (data: InfluencerFormData) => {
-    upsertMutation.mutate({
-      instagram: normalizeInstagram(data.instagram),
-      data: { ...formToDbRow(data), created_at: new Date().toISOString() },
-      isNew: true,
-    });
+    const igNorm = normalizeInstagram(data.instagram);
+    // Check against the full (unfiltered) list to avoid duplicate records in the DB
+    const alreadyExists = rawInfluencers.some(
+      (i) => normalizeInstagram(i.instagram) === igNorm
+    );
+    if (alreadyExists) {
+      // Influencer already in the kanban — update instead of creating a duplicate
+      upsertMutation.mutate({
+        instagram: igNorm,
+        data: formToDbRow(data),
+        isNew: false,
+      });
+    } else {
+      upsertMutation.mutate({
+        instagram: igNorm,
+        data: { ...formToDbRow(data), created_at: new Date().toISOString() },
+        isNew: true,
+      });
+    }
   };
 
   const handleEdit = (data: InfluencerFormData) => {
@@ -1151,7 +1171,8 @@ export default function KanbanInfluenciadores() {
     if (!over) return;
     const newStatus = over.id as InfluencerStatus;
     if (!COLUMNS.find((c) => c.key === newStatus)) return;
-    const influencer = influencers.find((i) => i.id === active.id);
+    // Use rawInfluencers so drag-and-drop works even when a search/filter is active
+    const influencer = rawInfluencers.find((i) => i.id === active.id);
     if (!influencer || influencer.status === newStatus) return;
     statusMutation.mutate({ id: active.id as string, status: newStatus });
   };
@@ -1370,7 +1391,8 @@ export default function KanbanInfluenciadores() {
     return map;
   }, [influencers]);
 
-  const activeInfluencer = influencers.find((i) => i.id === activeId);
+  // Use rawInfluencers so the DragOverlay works even with an active search/filter
+  const activeInfluencer = rawInfluencers.find((i) => i.id === activeId);
 
   return (
     <div className="p-4 md:p-6 space-y-4">
