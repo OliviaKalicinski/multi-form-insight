@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useCustomerData } from "@/hooks/useCustomerData";
-import { Users, RefreshCcw, AlertTriangle, DollarSign, Calendar, TrendingUp, Info, UserMinus, TrendingDown, FileWarning, PieChart } from "lucide-react";
+import {
+  Users, RefreshCcw, AlertTriangle, DollarSign, Calendar, TrendingUp,
+  Info, UserMinus, TrendingDown, FileWarning, PieChart,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrderVolumeChart } from "@/components/dashboard/OrderVolumeChart";
 import { SalesPeaksChart } from "@/components/dashboard/SalesPeaksChart";
@@ -22,14 +25,460 @@ import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { EmptyState } from "@/components/EmptyState";
 import { getB2COrders } from "@/utils/revenue";
 import { computeBehaviorMetrics } from "@/utils/computeBehaviorMetrics";
+import { isSampleProduct } from "@/utils/samplesAnalyzer";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+  ResponsiveContainer, Legend, Cell,
+} from "recharts";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import type { ProcessedOrder } from "@/types/marketing";
 
+// ─── Journey Types ─────────────────────────────────────────────────────────────
+type JourneyType = "amostra" | "produto" | "misto";
+
+const JOURNEY_CONFIG: Record<
+  JourneyType,
+  { label: string; shortLabel: string; icon: string; color: string; bg: string; border: string; text: string }
+> = {
+  amostra: {
+    label: "Iniciou com Amostra",
+    shortLabel: "Só Amostra",
+    icon: "🎁",
+    color: "#8b5cf6",
+    bg: "bg-violet-50",
+    border: "border-violet-200",
+    text: "text-violet-700",
+  },
+  produto: {
+    label: "Iniciou com Produto",
+    shortLabel: "Só Produto",
+    icon: "📦",
+    color: "#3b82f6",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    text: "text-blue-700",
+  },
+  misto: {
+    label: "Produto + Amostra",
+    shortLabel: "Misto",
+    icon: "🎁📦",
+    color: "#10b981",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    text: "text-emerald-700",
+  },
+};
+
+const JOURNEY_TYPES: JourneyType[] = ["amostra", "produto", "misto"];
+
+// ─── Journey Analysis Logic ────────────────────────────────────────────────────
+function isValidCustomer(cpf: string | null | undefined): cpf is string {
+  return !!cpf && !cpf.startsWith("nf-") && cpf.trim().length > 3;
+}
+
+function classifyFirstPurchase(firstOrder: ProcessedOrder): JourneyType {
+  const hasSample = firstOrder.produtos.some((p) => isSampleProduct(p));
+  const hasRegular = firstOrder.produtos.some((p) => !isSampleProduct(p));
+  if (hasSample && hasRegular) return "misto";
+  if (hasSample) return "amostra";
+  return "produto";
+}
+
+interface JourneyMetrics {
+  count: number;
+  repurchaseRate: number;
+  avgDaysToRepurchase: number;
+  ticketMedio: number;
+  ltv: number;
+  conv30: number;
+  conv60: number;
+  conv90: number;
+  conv180: number;
+}
+
+interface JourneyAnalysis {
+  amostra: JourneyMetrics;
+  produto: JourneyMetrics;
+  misto: JourneyMetrics;
+  total: number;
+}
+
+function emptyMetrics(): JourneyMetrics {
+  return { count: 0, repurchaseRate: 0, avgDaysToRepurchase: 0, ticketMedio: 0, ltv: 0, conv30: 0, conv60: 0, conv90: 0, conv180: 0 };
+}
+
+function computeJourneyAnalysis(
+  allB2cOrders: ProcessedOrder[],
+  dateStart?: Date | null,
+  dateEnd?: Date | null,
+): JourneyAnalysis {
+  if (allB2cOrders.length === 0) {
+    return { amostra: emptyMetrics(), produto: emptyMetrics(), misto: emptyMetrics(), total: 0 };
+  }
+
+  // 1. Group ALL B2C orders by customer (for lifetime history)
+  const customerMap = new Map<string, ProcessedOrder[]>();
+  for (const o of allB2cOrders) {
+    if (!isValidCustomer(o.cpfCnpj)) continue;
+    const list = customerMap.get(o.cpfCnpj) ?? [];
+    list.push(o);
+    customerMap.set(o.cpfCnpj, list);
+  }
+
+  // 2. Per-type buckets
+  type CustomerRow = {
+    hasRepurchased: boolean;
+    daysToRepurchase: number | null;
+    totalRevenue: number;
+    orderCount: number;
+  };
+  const buckets: Record<JourneyType, CustomerRow[]> = { amostra: [], produto: [], misto: [] };
+
+  for (const [, orders] of customerMap) {
+    const sorted = [...orders].sort((a, b) => a.dataVenda.getTime() - b.dataVenda.getTime());
+    const first = sorted[0];
+
+    // Filter: first purchase must fall inside the selected date window
+    if (dateStart && first.dataVenda < dateStart) continue;
+    if (dateEnd && first.dataVenda > dateEnd) continue;
+
+    const type = classifyFirstPurchase(first);
+
+    // Subsequent orders that contain at least one regular (non-sample) product
+    const repurchaseOrders = sorted
+      .slice(1)
+      .filter((o) => o.produtos.some((p) => !isSampleProduct(p)));
+
+    const hasRepurchased = repurchaseOrders.length > 0;
+    const daysToRepurchase = hasRepurchased
+      ? (repurchaseOrders[0].dataVenda.getTime() - first.dataVenda.getTime()) / 86_400_000
+      : null;
+
+    const totalRevenue = sorted.reduce((s, o) => s + o.valorTotal, 0);
+
+    buckets[type].push({ hasRepurchased, daysToRepurchase, totalRevenue, orderCount: sorted.length });
+  }
+
+  // 3. Aggregate metrics per bucket
+  function aggregate(rows: CustomerRow[]): JourneyMetrics {
+    const n = rows.length;
+    if (n === 0) return emptyMetrics();
+
+    const repurchased = rows.filter((r) => r.hasRepurchased).length;
+    const withDays = rows.filter((r) => r.daysToRepurchase !== null);
+    const avgDays =
+      withDays.length > 0
+        ? withDays.reduce((s, r) => s + r.daysToRepurchase!, 0) / withDays.length
+        : 0;
+
+    const totalRev = rows.reduce((s, r) => s + r.totalRevenue, 0);
+    const totalOrd = rows.reduce((s, r) => s + r.orderCount, 0);
+
+    const convRate = (maxDays: number) =>
+      (rows.filter((r) => r.daysToRepurchase !== null && r.daysToRepurchase <= maxDays).length / n) * 100;
+
+    return {
+      count: n,
+      repurchaseRate: (repurchased / n) * 100,
+      avgDaysToRepurchase: avgDays,
+      ticketMedio: totalOrd > 0 ? totalRev / totalOrd : 0,
+      ltv: totalRev / n,
+      conv30: convRate(30),
+      conv60: convRate(60),
+      conv90: convRate(90),
+      conv180: convRate(180),
+    };
+  }
+
+  const result = {
+    amostra: aggregate(buckets.amostra),
+    produto: aggregate(buckets.produto),
+    misto: aggregate(buckets.misto),
+    total: buckets.amostra.length + buckets.produto.length + buckets.misto.length,
+  };
+
+  return result;
+}
+
+// ─── Journey Tab ───────────────────────────────────────────────────────────────
+function JourneyTab({ analysis }: { analysis: JourneyAnalysis }) {
+  if (analysis.total === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Nenhum cliente encontrado no período</CardTitle>
+          <CardDescription>
+            Ajuste o filtro de datas ou carregue dados na página "Upload".
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  // Chart: repurchase rate (horizontal bars)
+  const repurchaseData = JOURNEY_TYPES.map((t) => ({
+    name: JOURNEY_CONFIG[t].shortLabel,
+    "Recompra %": +analysis[t].repurchaseRate.toFixed(1),
+    fill: JOURNEY_CONFIG[t].color,
+  }));
+
+  // Chart: LTV + ticket
+  const ltvData = JOURNEY_TYPES.map((t) => ({
+    name: JOURNEY_CONFIG[t].shortLabel,
+    LTV: +analysis[t].ltv.toFixed(2),
+    "Ticket Médio": +analysis[t].ticketMedio.toFixed(2),
+    fill: JOURNEY_CONFIG[t].color,
+  }));
+
+  // Chart: conversion funnel
+  const funnelData = [30, 60, 90, 180].map((days) => ({
+    days: `${days}d`,
+    ...Object.fromEntries(
+      JOURNEY_TYPES.map((t) => [
+        JOURNEY_CONFIG[t].shortLabel,
+        +analysis[t][`conv${days}` as "conv30" | "conv60" | "conv90" | "conv180"].toFixed(1),
+      ])
+    ),
+  }));
+
+  // Chart: avg days to repurchase
+  const daysData = JOURNEY_TYPES.filter((t) => analysis[t].avgDaysToRepurchase > 0).map((t) => ({
+    name: JOURNEY_CONFIG[t].shortLabel,
+    "Dias até recomprar": +analysis[t].avgDaysToRepurchase.toFixed(0),
+    fill: JOURNEY_CONFIG[t].color,
+  }));
+
+  return (
+    <div className="space-y-6">
+      {/* Info banner */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="py-3">
+          <p className="text-sm text-blue-800">
+            💡 Clientes classificados pelo tipo do <strong>primeiro pedido</strong>. O filtro de datas
+            controla <strong>quando esse primeiro pedido aconteceu</strong>. O histórico completo de cada
+            cliente é usado para calcular recompra e LTV.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* ── 3 Profile Cards ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {JOURNEY_TYPES.map((type) => {
+          const cfg = JOURNEY_CONFIG[type];
+          const m = analysis[type];
+          const pct = analysis.total > 0 ? ((m.count / analysis.total) * 100).toFixed(0) : "0";
+          return (
+            <Card key={type} className={cn("border-2", cfg.border)}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className={cn("text-base leading-snug", cfg.text)}>
+                    {cfg.icon} {cfg.label}
+                  </CardTitle>
+                  <Badge variant="outline" className={cn("shrink-0 text-xs", cfg.bg, cfg.text, cfg.border)}>
+                    {pct}% da base
+                  </Badge>
+                </div>
+                <p className={cn("text-4xl font-bold mt-1", cfg.text)}>{m.count.toLocaleString("pt-BR")}</p>
+                <p className="text-xs text-muted-foreground">clientes</p>
+              </CardHeader>
+              <CardContent className="space-y-2.5 text-sm pt-0">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <RefreshCcw className="h-3.5 w-3.5" /> Taxa de recompra
+                  </span>
+                  <span className="font-bold text-base">{m.repurchaseRate.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Dias até recomprar</span>
+                  <span className="font-semibold">
+                    {m.avgDaysToRepurchase > 0 ? `${m.avgDaysToRepurchase.toFixed(0)}d` : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ticket médio</span>
+                  <span className="font-semibold">{formatCurrency(m.ticketMedio)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">LTV</span>
+                  <span className="font-semibold">{formatCurrency(m.ltv)}</span>
+                </div>
+                <div className="pt-1 grid grid-cols-4 gap-1 text-center text-[10px] text-muted-foreground">
+                  {([30, 60, 90, 180] as const).map((d) => {
+                    const key = `conv${d}` as "conv30" | "conv60" | "conv90" | "conv180";
+                    return (
+                      <div key={d} className={cn("rounded p-1", cfg.bg)}>
+                        <div className={cn("font-bold text-sm", cfg.text)}>{m[key].toFixed(0)}%</div>
+                        <div>{d}d</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* ── Comparison Charts Row ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Repurchase Rate */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Taxa de Recompra por Perfil</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={repurchaseData} layout="vertical" margin={{ left: 8, right: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" unit="%" domain={[0, 100]} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                  <RechartsTooltip formatter={(v) => [`${v}%`, "Recompra"]} />
+                  <Bar dataKey="Recompra %" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, formatter: (v: number) => `${v}%` }}>
+                    {JOURNEY_TYPES.map((t) => (
+                      <Cell key={t} fill={JOURNEY_CONFIG[t].color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* LTV + Ticket */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">LTV e Ticket Médio por Perfil</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ltvData} margin={{ right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tickFormatter={(v) => `R$${v}`} tick={{ fontSize: 10 }} />
+                  <RechartsTooltip formatter={(v) => formatCurrency(Number(v))} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="LTV" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Ticket Médio" fill="#c4b5fd" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Conversion Funnel by Time Window ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Funil de Conversão — Recompra por Janela de Tempo</CardTitle>
+          <CardDescription>
+            % de clientes de cada perfil que fez ao menos 1 recompra (produto regular) dentro do prazo
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="h-60">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={funnelData} margin={{ right: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="days" />
+                <YAxis unit="%" domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <RechartsTooltip formatter={(v) => `${v}%`} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {JOURNEY_TYPES.map((t) => (
+                  <Bar
+                    key={t}
+                    dataKey={JOURNEY_CONFIG[t].shortLabel}
+                    fill={JOURNEY_CONFIG[t].color}
+                    radius={[4, 4, 0, 0]}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border rounded-lg overflow-hidden">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left py-2 px-3 font-medium text-muted-foreground">Perfil</th>
+                  <th className="text-center py-2 px-3 font-medium">Clientes</th>
+                  <th className="text-center py-2 px-3 font-medium">30d</th>
+                  <th className="text-center py-2 px-3 font-medium">60d</th>
+                  <th className="text-center py-2 px-3 font-medium">90d</th>
+                  <th className="text-center py-2 px-3 font-medium">180d</th>
+                  <th className="text-center py-2 px-3 font-medium">Recompra total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {JOURNEY_TYPES.map((t) => {
+                  const m = analysis[t];
+                  const cfg = JOURNEY_CONFIG[t];
+                  return (
+                    <tr key={t} className="border-t">
+                      <td className="py-2.5 px-3">
+                        <span className={cn("font-semibold", cfg.text)}>
+                          {cfg.icon} {cfg.label}
+                        </span>
+                      </td>
+                      <td className="text-center py-2.5 px-3 text-muted-foreground">
+                        {m.count.toLocaleString("pt-BR")}
+                      </td>
+                      <td className="text-center py-2.5 px-3 font-medium">{m.conv30.toFixed(1)}%</td>
+                      <td className="text-center py-2.5 px-3 font-medium">{m.conv60.toFixed(1)}%</td>
+                      <td className="text-center py-2.5 px-3 font-medium">{m.conv90.toFixed(1)}%</td>
+                      <td className="text-center py-2.5 px-3 font-medium">{m.conv180.toFixed(1)}%</td>
+                      <td className="text-center py-2.5 px-3 font-bold">{m.repurchaseRate.toFixed(1)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Avg Days to Repurchase ── */}
+      {daysData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Tempo Médio até a Primeira Recompra</CardTitle>
+            <CardDescription>
+              Calculado apenas entre clientes que efetivamente recompraram
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={daysData} layout="vertical" margin={{ left: 8, right: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" unit="d" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                  <RechartsTooltip formatter={(v) => [`${v} dias`, "Média"]} />
+                  <Bar
+                    dataKey="Dias até recomprar"
+                    radius={[0, 4, 4, 0]}
+                    label={{ position: "right", fontSize: 11, formatter: (v: number) => `${v}d` }}
+                  >
+                    {daysData.map((d, i) => (
+                      <Cell key={i} fill={d.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function ComportamentoCliente() {
-  const {
-    salesData,
-    dateRange,
-    comparisonDateRange,
-    comparisonMode,
-  } = useDashboard();
+  const { salesData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
 
   // useCustomerData → apenas para aba Churn (lifecycle, sempre histórico completo)
   const { churnMetrics, churnRiskCustomers, isLoading: customerLoading } = useCustomerData();
@@ -37,14 +486,26 @@ export default function ComportamentoCliente() {
 
   const b2cSalesData = useMemo(() => getB2COrders(salesData), [salesData]);
 
-  const [volumeView, setVolumeView] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('daily');
+  const [volumeView, setVolumeView] = useState<"daily" | "weekly" | "monthly" | "quarterly">("daily");
 
   const filteredOrders = useMemo(() => {
     if (b2cSalesData.length === 0) return [];
     return dateRange ? filterOrdersByDateRange(b2cSalesData, dateRange.start, dateRange.end) : b2cSalesData;
   }, [b2cSalesData, dateRange]);
 
-  // ── Métricas computadas a partir dos orders filtrados (respeitam o filtro de data) ──
+  // ── Journey Analysis (new) ──────────────────────────────────────────────────
+  // Uses ALL b2c orders for full customer history; dateRange filters first-purchase date
+  const journeyAnalysis = useMemo(
+    () =>
+      computeJourneyAnalysis(
+        b2cSalesData,
+        dateRange?.start ?? null,
+        dateRange?.end ?? null,
+      ),
+    [b2cSalesData, dateRange],
+  );
+
+  // ── Behaviour metrics (period-filtered) ────────────────────────────────────
   const behaviorMetrics = useMemo(() => computeBehaviorMetrics(filteredOrders), [filteredOrders]);
   const { summary: summaryMetrics, segments } = behaviorMetrics;
 
@@ -55,32 +516,30 @@ export default function ComportamentoCliente() {
 
   const peaksData = useMemo(() => {
     if (filteredOrders.length === 0) return [];
-    return analyzeSalesPeaks(filteredOrders).filter(p => p.isPeak);
+    return analyzeSalesPeaks(filteredOrders).filter((p) => p.isPeak);
   }, [filteredOrders]);
 
   const volumeTrend = useMemo(() => {
     if (!dateRange || !comparisonDateRange || b2cSalesData.length === 0) return undefined;
-    const currentOrders = filterOrdersByDateRange(b2cSalesData, dateRange.start, dateRange.end);
-    const previousOrders = filterOrdersByDateRange(b2cSalesData, comparisonDateRange.start, comparisonDateRange.end);
-    if (previousOrders.length === 0) return undefined;
-    return ((currentOrders.length - previousOrders.length) / previousOrders.length) * 100;
+    const curr = filterOrdersByDateRange(b2cSalesData, dateRange.start, dateRange.end);
+    const prev = filterOrdersByDateRange(b2cSalesData, comparisonDateRange.start, comparisonDateRange.end);
+    if (prev.length === 0) return undefined;
+    return ((curr.length - prev.length) / prev.length) * 100;
   }, [b2cSalesData, dateRange, comparisonDateRange]);
 
   const volumeAnalysis = useMemo(() => {
-    if (!volumeAnalysisData?.daily || volumeAnalysisData.daily.length === 0) {
-      return { peakDay: { date: '', orders: 0 }, lowDay: { date: '', orders: 0 }, averageDaily: 0 };
-    }
+    if (!volumeAnalysisData?.daily?.length)
+      return { peakDay: { date: "", orders: 0 }, lowDay: { date: "", orders: 0 }, averageDaily: 0 };
     const days = volumeAnalysisData.daily;
-    const peakDay = days.reduce((max, curr) => curr.orders > max.orders ? curr : max, days[0]);
-    const lowDay = days.reduce((min, curr) => curr.orders < min.orders ? curr : min, days[0]);
-    const averageDaily = days.reduce((sum, d) => sum + d.orders, 0) / days.length;
-    return { peakDay, lowDay, averageDaily };
+    const peakDay = days.reduce((max, c) => (c.orders > max.orders ? c : max), days[0]);
+    const lowDay = days.reduce((min, c) => (c.orders < min.orders ? c : min), days[0]);
+    return { peakDay, lowDay, averageDaily: days.reduce((s, d) => s + d.orders, 0) / days.length };
   }, [volumeAnalysisData]);
 
-  const clienteBreakdown = useMemo(() => ({
-    novos: summaryMetrics.clientesNovos,
-    recorrentes: summaryMetrics.clientesRecorrentes,
-  }), [summaryMetrics]);
+  const clienteBreakdown = useMemo(
+    () => ({ novos: summaryMetrics.clientesNovos, recorrentes: summaryMetrics.clientesRecorrentes }),
+    [summaryMetrics],
+  );
 
   const comparisonMetrics = useMemo(() => {
     if (!comparisonMode || !comparisonDateRange || b2cSalesData.length === 0) return null;
@@ -88,14 +547,17 @@ export default function ComportamentoCliente() {
     const periods = [
       { range: dateRange, label: "Período A", color: COLORS[0] },
       { range: comparisonDateRange, label: "Período B", color: COLORS[1] },
-    ].filter(p => p.range);
+    ].filter((p) => p.range);
     const volumePorMes = periods.map(({ range, label, color }) => {
       const orders = filterOrdersByDateRange(b2cSalesData, range!.start, range!.end);
       return { month: label.toLowerCase().replace(" ", "-"), monthLabel: label, value: orders.length, color };
     });
     if (volumePorMes.length > 1) {
       const base = volumePorMes[0].value;
-      volumePorMes.forEach((item, idx) => { if (idx > 0 && base > 0) (item as any).percentageChange = ((item.value - base) / base) * 100; });
+      volumePorMes.forEach((item, idx) => {
+        if (idx > 0 && base > 0)
+          (item as any).percentageChange = ((item.value - base) / base) * 100;
+      });
     }
     return { volumePorMes };
   }, [comparisonMode, comparisonDateRange, dateRange, b2cSalesData]);
@@ -118,9 +580,7 @@ export default function ComportamentoCliente() {
     );
   }
 
-  // Total de clientes do período filtrado (para aba Comportamento/Segmentos)
   const totalClientes = summaryMetrics.totalClientes;
-  // Churn metrics — sempre histórico completo (aba Churn)
   const totalClientesHistorico = churnMetrics.totalClientes;
   const { clientesAtivos, clientesEmRisco, clientesInativos, clientesChurn, taxaChurn } = churnMetrics;
   const valorEmRisco = churnRiskCustomers.reduce((sum, c) => sum + c.valorTotal, 0);
@@ -133,21 +593,26 @@ export default function ComportamentoCliente() {
         <div>
           <h1 className="text-3xl font-bold">👥 Comportamento do Cliente</h1>
           <p className="text-muted-foreground">
-            Análise de recompra, churn, volume de pedidos e segmentação
+            Jornada de entrada, recompra, churn, volume e segmentação
           </p>
         </div>
       </div>
 
-      <Tabs defaultValue="comportamento">
+      <Tabs defaultValue="jornada">
         <TabsList>
+          <TabsTrigger value="jornada">🗺️ Jornada de Entrada</TabsTrigger>
           <TabsTrigger value="comportamento">Comportamento</TabsTrigger>
           <TabsTrigger value="segmentos">Segmentos</TabsTrigger>
           <TabsTrigger value="churn">Risco de Churn</TabsTrigger>
         </TabsList>
 
-        {/* ── ABA 1: Comportamento (conteúdo original) ── */}
+        {/* ── ABA 0: Jornada de Entrada (nova) ── */}
+        <TabsContent value="jornada" className="space-y-6">
+          <JourneyTab analysis={journeyAnalysis} />
+        </TabsContent>
+
+        {/* ── ABA 1: Comportamento ── */}
         <TabsContent value="comportamento" className="space-y-8">
-          {/* Indicador de período */}
           {!comparisonMode && (
             <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
               <CardContent className="py-3">
@@ -159,7 +624,6 @@ export default function ComportamentoCliente() {
             </Card>
           )}
 
-          {/* Cards resumo - HERO + SATÉLITES (todos filtrados pelo período) */}
           {!comparisonMode && (
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <Card className="md:col-span-3 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
@@ -170,21 +634,27 @@ export default function ComportamentoCliente() {
                         <Users className="h-4 w-4" />
                         Clientes no Período
                       </p>
-                      <p className="text-5xl font-bold mt-2">{totalClientes.toLocaleString('pt-BR')}</p>
+                      <p className="text-5xl font-bold mt-2">{totalClientes.toLocaleString("pt-BR")}</p>
                       <div className="flex gap-4 mt-4 text-sm">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                          <span className="text-muted-foreground">Novos: <strong>{clienteBreakdown.novos}</strong></span>
+                          <span className="text-muted-foreground">
+                            Novos: <strong>{clienteBreakdown.novos}</strong>
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-blue-500" />
-                          <span className="text-muted-foreground">Recorrentes: <strong>{clienteBreakdown.recorrentes}</strong></span>
+                          <span className="text-muted-foreground">
+                            Recorrentes: <strong>{clienteBreakdown.recorrentes}</strong>
+                          </span>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Receita/Cliente</p>
-                      <p className="text-2xl font-bold text-primary">{formatCurrency(summaryMetrics.customerLifetimeValue)}</p>
+                      <p className="text-2xl font-bold text-primary">
+                        {formatCurrency(summaryMetrics.customerLifetimeValue)}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-2">
                         ~{summaryMetrics.averageDaysBetweenPurchases.toFixed(0)} dias entre compras
                       </p>
@@ -223,7 +693,7 @@ export default function ComportamentoCliente() {
                 />
                 <StatusMetricCard
                   title="Total Pedidos"
-                  value={summaryMetrics.totalOrders.toLocaleString('pt-BR')}
+                  value={summaryMetrics.totalOrders.toLocaleString("pt-BR")}
                   icon={<TrendingUp className="h-3.5 w-3.5" />}
                   status="neutral"
                   interpretation="No período"
@@ -252,7 +722,6 @@ export default function ComportamentoCliente() {
             </div>
           )}
 
-          {/* Cards de comparação multi-mês */}
           {comparisonMode && comparisonMetrics && (
             <div className="space-y-4">
               <Card className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
@@ -264,16 +733,11 @@ export default function ComportamentoCliente() {
                 </CardContent>
               </Card>
               <div className="grid gap-6 md:grid-cols-2">
-                <ComparisonMetricCard
-                  title="Volume de Pedidos"
-                  icon={TrendingUp}
-                  metrics={comparisonMetrics.volumePorMes}
-                />
+                <ComparisonMetricCard title="Volume de Pedidos" icon={TrendingUp} metrics={comparisonMetrics.volumePorMes} />
               </div>
             </div>
           )}
 
-          {/* SEÇÃO: VOLUME E PADRÕES */}
           <section className="space-y-6">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📊</span>
@@ -295,18 +759,16 @@ export default function ComportamentoCliente() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
                     <CardTitle>Evolução de Pedidos</CardTitle>
-                    <CardDescription>
-                      Volume de pedidos ao longo do tempo
-                    </CardDescription>
+                    <CardDescription>Volume de pedidos ao longo do tempo</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    {(['daily', 'weekly', 'monthly', 'quarterly'] as const).map(view => (
+                    {(["daily", "weekly", "monthly", "quarterly"] as const).map((view) => (
                       <button
                         key={view}
-                        className={`px-4 py-2 rounded text-sm ${volumeView === view ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                        className={`px-4 py-2 rounded text-sm ${volumeView === view ? "bg-primary text-primary-foreground" : "bg-muted"}`}
                         onClick={() => setVolumeView(view)}
                       >
-                        {view === 'daily' ? 'Diário' : view === 'weekly' ? 'Semanal' : view === 'monthly' ? 'Mensal' : 'Trimestre'}
+                        {view === "daily" ? "Diário" : view === "weekly" ? "Semanal" : view === "monthly" ? "Mensal" : "Trimestre"}
                       </button>
                     ))}
                   </div>
@@ -315,10 +777,10 @@ export default function ComportamentoCliente() {
               <CardContent>
                 <OrderVolumeChart
                   data={
-                    volumeView === 'daily' ? volumeAnalysisData?.daily || [] :
-                    volumeView === 'weekly' ? volumeAnalysisData?.weekly.map(w => ({ date: w.week, orders: w.orders })) || [] :
-                    volumeView === 'quarterly' ? volumeAnalysisData?.quarterly.map(q => ({ date: q.quarter, orders: q.orders })) || [] :
-                    volumeAnalysisData?.monthly.map(m => ({ date: m.month, orders: m.orders })) || []
+                    volumeView === "daily" ? volumeAnalysisData?.daily || [] :
+                    volumeView === "weekly" ? volumeAnalysisData?.weekly.map((w) => ({ date: w.week, orders: w.orders })) || [] :
+                    volumeView === "quarterly" ? volumeAnalysisData?.quarterly.map((q) => ({ date: q.quarter, orders: q.orders })) || [] :
+                    volumeAnalysisData?.monthly.map((m) => ({ date: m.month, orders: m.orders })) || []
                   }
                   viewMode={volumeView}
                 />
@@ -328,9 +790,7 @@ export default function ComportamentoCliente() {
             <Card>
               <CardHeader>
                 <CardTitle>⚡ Dias de Pico</CardTitle>
-                <CardDescription>
-                  Top 20 dias com maior volume - destaque para picos acima da média + 2σ
-                </CardDescription>
+                <CardDescription>Top 20 dias com maior volume — destaque para picos acima da média + 2σ</CardDescription>
               </CardHeader>
               <CardContent>
                 <SalesPeaksChart peaks={peaksData} />
@@ -362,7 +822,6 @@ export default function ComportamentoCliente() {
                   </p>
                 </CardContent>
               </Card>
-
               <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                   <CardHeader>
@@ -373,7 +832,6 @@ export default function ComportamentoCliente() {
                     <CustomerSegmentationChart segments={segments} />
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader>
                     <CardTitle>Receita por Segmento</CardTitle>
@@ -384,7 +842,6 @@ export default function ComportamentoCliente() {
                   </CardContent>
                 </Card>
               </div>
-
               <Card>
                 <CardHeader>
                   <CardTitle>Análise Detalhada por Segmento</CardTitle>
@@ -426,14 +883,11 @@ export default function ComportamentoCliente() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardDescription className="flex items-center gap-2">
-                        <TrendingDown className="h-4 w-4" />
-                        Taxa de Churn
+                        <TrendingDown className="h-4 w-4" /> Taxa de Churn
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-destructive">
-                        {taxaChurn.toFixed(1)}%
-                      </div>
+                      <div className="text-2xl font-bold text-destructive">{taxaChurn.toFixed(1)}%</div>
                       <p className="text-xs text-muted-foreground mt-1">Clientes que pararam de comprar</p>
                     </CardContent>
                   </Card>
@@ -443,14 +897,11 @@ export default function ComportamentoCliente() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardDescription className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        Clientes Ativos
+                        <Users className="h-4 w-4" /> Clientes Ativos
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600">
-                        {clientesAtivos.toLocaleString('pt-BR')}
-                      </div>
+                      <div className="text-2xl font-bold text-green-600">{clientesAtivos.toLocaleString("pt-BR")}</div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {totalClientesHistorico > 0 ? ((clientesAtivos / totalClientesHistorico) * 100).toFixed(1) : 0}% da base
                       </p>
@@ -462,14 +913,11 @@ export default function ComportamentoCliente() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardDescription className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        Em Risco
+                        <AlertTriangle className="h-4 w-4" /> Em Risco
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-amber-600">
-                        {clientesEmRisco.toLocaleString('pt-BR')}
-                      </div>
+                      <div className="text-2xl font-bold text-amber-600">{clientesEmRisco.toLocaleString("pt-BR")}</div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {totalClientesHistorico > 0 ? ((clientesEmRisco / totalClientesHistorico) * 100).toFixed(1) : 0}% da base
                       </p>
@@ -481,14 +929,11 @@ export default function ComportamentoCliente() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardDescription className="flex items-center gap-2">
-                        <UserMinus className="h-4 w-4" />
-                        Inativos
+                        <UserMinus className="h-4 w-4" /> Inativos
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-orange-600">
-                        {clientesInativos.toLocaleString('pt-BR')}
-                      </div>
+                      <div className="text-2xl font-bold text-orange-600">{clientesInativos.toLocaleString("pt-BR")}</div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {totalClientesHistorico > 0 ? ((clientesInativos / totalClientesHistorico) * 100).toFixed(1) : 0}% da base
                       </p>
@@ -500,13 +945,12 @@ export default function ComportamentoCliente() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardDescription className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        Valor em Risco
+                        <DollarSign className="h-4 w-4" /> Valor em Risco
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-destructive">
-                        R$ {valorEmRisco.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        R$ {valorEmRisco.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">Receita potencial perdida</p>
                     </CardContent>
@@ -517,8 +961,7 @@ export default function ComportamentoCliente() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Funil de Retenção
+                    <Users className="h-5 w-5" /> Funil de Retenção
                   </CardTitle>
                   <CardDescription>Distribuição de clientes por status de atividade</CardDescription>
                 </CardHeader>
@@ -535,8 +978,7 @@ export default function ComportamentoCliente() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" />
-                    Clientes em Risco de Churn
+                    <AlertTriangle className="h-5 w-5 text-amber-600" /> Clientes em Risco de Churn
                   </CardTitle>
                   <CardDescription>Lista de clientes que podem abandonar a marca</CardDescription>
                 </CardHeader>
