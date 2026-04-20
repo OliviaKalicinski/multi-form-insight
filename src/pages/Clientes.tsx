@@ -8,10 +8,9 @@ import {
   SegmentFilter,
   SEGMENT_LABELS,
   SEGMENT_COLORS,
-  SEGMENT_ORDER,
 } from "@/utils/revenue";
-import { CustomerFilters } from "@/components/crm/CustomerFilters";
-import { LeadsFilters, LeadOrigin, LeadContact } from "@/components/crm/LeadsFilters";
+import { UnifiedFilters } from "@/components/crm/UnifiedFilters";
+import { useCustomerFilters, ViewMode } from "@/hooks/useCustomerFilters";
 import { NewCustomerDialog } from "@/components/crm/NewCustomerDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
