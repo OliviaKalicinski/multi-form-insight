@@ -102,7 +102,7 @@ export function UnifiedFilters({
           </Select>
 
           <Select value={segmentFilter} onValueChange={onSegmentChange}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-[170px]">
               <SelectValue placeholder="Segmento" />
             </SelectTrigger>
             <SelectContent>
@@ -111,6 +111,8 @@ export function UnifiedFilters({
               <SelectItem value="Recorrente">Recorrente</SelectItem>
               <SelectItem value="Fiel">Fiel</SelectItem>
               <SelectItem value="VIP">VIP</SelectItem>
+              <div className="my-1 h-px bg-border" />
+              <SelectItem value="apenas-amostras">Apenas Amostras</SelectItem>
             </SelectContent>
           </Select>
 

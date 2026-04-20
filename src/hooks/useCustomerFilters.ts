@@ -28,6 +28,12 @@ interface UseCustomerFiltersArgs<C> {
   getPhone: (c: any) => string;
   getChannel: (cpf: string | null) => Exclude<SegmentFilter, "all"> | null;
   getPetProfile: (cpf: string | null) => BuyerPetProfile | null;
+  /**
+   * Set de CPFs (normalizados, só dígitos OU como armazenado em customer.cpf_cnpj)
+   * cuja vida inteira de pedidos é exclusivamente amostra (100%).
+   * Usado pelo filtro segmentFilter === "apenas-amostras".
+   */
+  sampleOnlyCpfSet?: Set<string>;
 }
 
 function getLeadOrigin(cpfCnpj: string | null): "shopify" | "manual" {
@@ -58,6 +64,7 @@ export function useCustomerFilters<C extends Record<string, any>>({
   getPhone,
   getChannel,
   getPetProfile,
+  sampleOnlyCpfSet,
 }: UseCustomerFiltersArgs<C>) {
   const [search, setSearch] = useState("");
   // REGRA: a aba Leads é exclusivamente B2C (origem Shopify Comida de Dragão).
@@ -130,7 +137,17 @@ export function useCustomerFilters<C extends Record<string, any>>({
       const { churn, journey } = resolveStatus(statusFilter);
       if (churn !== "all") list = list.filter((c) => c.churn_status === churn);
       if (journey !== "all") list = list.filter((c) => (c as any).journey_stage === journey);
-      if (segmentFilter !== "all") list = list.filter((c) => c.segment === segmentFilter);
+      if (segmentFilter === "apenas-amostras") {
+        // Cliente cuja vida inteira de pedidos é 100% amostra (nunca comprou nada além).
+        const set = sampleOnlyCpfSet ?? new Set<string>();
+        list = list.filter((c) => {
+          const raw = c.cpf_cnpj ?? "";
+          const norm = raw.replace(/\D/g, "");
+          return set.has(norm) || set.has(raw);
+        });
+      } else if (segmentFilter !== "all") {
+        list = list.filter((c) => c.segment === segmentFilter);
+      }
       if (petFilter !== "all") list = list.filter((c) => getPetProfile(c.cpf_cnpj) === petFilter);
     }
 
@@ -166,6 +183,7 @@ export function useCustomerFilters<C extends Record<string, any>>({
     statusFilter, segmentFilter, petFilter,
     leadOriginFilter, leadContactFilter, responsavelFilter,
     getEmail, getPhone, getChannel, getPetProfile,
+    sampleOnlyCpfSet,
   ]);
 
   return { filters, setters, filtered };

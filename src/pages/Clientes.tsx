@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpDown, ExternalLink, Download, Plus, Upload as UploadIcon, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
+import { isSampleOrder } from "@/utils/samplesAnalyzer";
 import { BuyerPetProfile, PET_PROFILE_LABELS, PET_PROFILE_COLORS, PET_PROFILE_ORDER } from "@/data/operationalProducts";
 
 const segmentColors: Record<string, string> = {
@@ -225,6 +226,26 @@ export default function Clientes() {
     return { customers: customersCount, leads: leadsCount, all: customersCount + leadsCount };
   }, [customers]);
 
+  // ── "Apenas amostras" — clientes cuja vida inteira de pedidos é 100% amostra ──
+  // Regra: se o cliente fez 1 pedido normal em qualquer momento, sai do filtro.
+  const sampleOnlyCpfSet = useMemo(() => {
+    const byCpf = new Map<string, { total: number; samples: number }>();
+    for (const o of salesData ?? []) {
+      const cpfRaw = (o as any).cpfCnpj ?? "";
+      const cpf = String(cpfRaw).replace(/\D/g, "");
+      if (!cpf) continue;
+      const cur = byCpf.get(cpf) ?? { total: 0, samples: 0 };
+      cur.total++;
+      if (isSampleOrder(o)) cur.samples++;
+      byCpf.set(cpf, cur);
+    }
+    const out = new Set<string>();
+    byCpf.forEach((v, cpf) => {
+      if (v.total > 0 && v.total === v.samples) out.add(cpf);
+    });
+    return out;
+  }, [salesData]);
+
   // ── Filtros centralizados (search, canal, status, segmento, pet, leads, responsável) ─────
   const { filters, setters, filtered } = useCustomerFilters({
     customers,
@@ -233,6 +254,7 @@ export default function Clientes() {
     getPhone,
     getChannel,
     getPetProfile,
+    sampleOnlyCpfSet,
   });
   const {
     search, channelFilter, statusFilter, segmentFilter, petFilter,
@@ -293,11 +315,10 @@ export default function Clientes() {
     setPage(0);
   };
 
-  // ── Contadores de contato (para o card de reengajamento) ─────────
-  const leadsContactStats = useMemo(() => {
-    if (viewMode !== "leads") return null;
+  // ── Estatísticas de contato (vale para qualquer aba; reflete os filtros ativos) ──
+  const contactStats = useMemo(() => {
     let total = 0, withEmail = 0, withPhone = 0, withBoth = 0, none = 0;
-    for (const c of sorted) {
+    for (const c of filtered) {
       total += 1;
       const hasEmail = !!getEmail(c);
       const hasPhone = !!getPhone(c);
@@ -306,8 +327,13 @@ export default function Clientes() {
       if (hasEmail && hasPhone) withBoth += 1;
       if (!hasEmail && !hasPhone) none += 1;
     }
-    return { total, withEmail, withPhone, withBoth, none };
-  }, [sorted, viewMode, emailMap, phoneMap]);
+    const pct = (n: number) =>
+      total > 0 ? (n / total * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0,0";
+    return { total, withEmail, withPhone, withBoth, none, pctEmail: pct(withEmail), pctPhone: pct(withPhone), pctNone: pct(none) };
+  }, [filtered, emailMap, phoneMap]);
+
+  // Alias mantido para o card de reengajamento da aba Leads
+  const leadsContactStats = viewMode === "leads" ? contactStats : null;
 
   const fmt = (v: number | null) =>
     v != null ? `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—";
@@ -456,6 +482,23 @@ export default function Clientes() {
                 ? `Clientes com compra • ${filtered.length} de ${totalCounts.customers}`
                 : `Base completa • ${filtered.length} de ${totalCounts.all}`}
           </p>
+          {contactStats.total > 0 && (
+            <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                <Mail className="h-3 w-3" />
+                {contactStats.withEmail} com email ({contactStats.pctEmail}%)
+              </span>
+              <span aria-hidden>·</span>
+              <span className="inline-flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {contactStats.withPhone} com telefone ({contactStats.pctPhone}%)
+              </span>
+              <span aria-hidden>·</span>
+              <span className={contactStats.none > 0 ? "text-amber-600 font-medium" : ""}>
+                ⚠ {contactStats.none} sem contato ({contactStats.pctNone}%)
+              </span>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <Button
