@@ -22,6 +22,7 @@ import Publico from "./pages/Publico";
 import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
 import Clientes from "./pages/Clientes";
 import ClientePerfil from "./pages/ClientePerfil";
+import ImportarClientesShopify from "./pages/ImportarClientesShopify";
 import Reclamacoes from "./pages/Reclamacoes";
 import Atendimentos from "./pages/Atendimentos";
 import ReclamacaoNova from "./pages/ReclamacaoNova";
@@ -210,6 +211,17 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <Clientes />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/clientes/importar"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ImportarClientesShopify />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }

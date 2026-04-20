@@ -10,3 +10,6 @@ verify_jwt = false
 verify_jwt = false
 [functions.sync-ga4]
 verify_jwt = false
+
+[functions.import-shopify-customers]
+verify_jwt = false

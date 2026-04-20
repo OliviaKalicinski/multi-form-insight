@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowUpDown, ExternalLink, Download, Plus } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Download, Plus, Upload as UploadIcon } from "lucide-react";
+import { toast } from "sonner";
 import { BuyerPetProfile, PET_PROFILE_LABELS, PET_PROFILE_COLORS, PET_PROFILE_ORDER } from "@/data/operationalProducts";
 
 const segmentColors: Record<string, string> = {
@@ -86,34 +87,49 @@ export default function Clientes() {
   const petMap = useMemo(() => buildClientPetMap(salesData), [salesData]);
 
   const [phoneMap, setPhoneMap] = useState<Map<string, string>>(new Map());
+  const [emailMap, setEmailMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
-    const fetchPhones = async () => {
-      // customer_identifier stores phones keyed by customer_id
-      // customers have cpf_cnpj; we join via customer.id
-      const { data: identifiers } = await supabase
-        .from("customer_identifier")
-        .select("customer_id, value")
-        .eq("type", "phone");
+    const fetchContacts = async () => {
+      // Busca telefones e emails em paralelo
+      const [phonesRes, emailsRes] = await Promise.all([
+        supabase.from("customer_identifier").select("customer_id, value").eq("type", "phone"),
+        supabase.from("customer_identifier").select("customer_id, value").eq("type", "email"),
+      ]);
 
-      if (!identifiers?.length) return;
-
-      // Build map: customer_id → phone
       const idToPhone = new Map<string, string>();
-      for (const row of identifiers) {
+      for (const row of phonesRes.data ?? []) {
         if (!idToPhone.has(row.customer_id)) idToPhone.set(row.customer_id, row.value);
       }
-
-      // customers already have id + cpf_cnpj — map cpf_cnpj_normalized → phone
-      const map = new Map<string, string>();
-      for (const c of customers) {
-        if (!c.id || !c.cpf_cnpj) continue;
-        const phone = idToPhone.get(c.id);
-        if (phone) map.set(c.cpf_cnpj.replace(/\D/g, ""), phone);
+      const idToEmail = new Map<string, string>();
+      for (const row of emailsRes.data ?? []) {
+        if (!idToEmail.has(row.customer_id)) idToEmail.set(row.customer_id, row.value);
       }
-      setPhoneMap(map);
+
+      // Usa c.cpf_cnpj como chave (mantém compatibilidade com o código existente).
+      // Pra clientes sintéticos (shopify-*, nf-*) também guardamos a chave bruta
+      // pra conseguir achar no mapa.
+      const pmap = new Map<string, string>();
+      const emap = new Map<string, string>();
+      for (const c of customers) {
+        if (!c.id) continue;
+        const keyRaw = c.cpf_cnpj ?? "";
+        const keyNorm = keyRaw.replace(/\D/g, "");
+        const phone = idToPhone.get(c.id);
+        const email = idToEmail.get(c.id);
+        if (phone) {
+          if (keyNorm) pmap.set(keyNorm, phone);
+          pmap.set(keyRaw, phone);
+        }
+        if (email) {
+          if (keyNorm) emap.set(keyNorm, email);
+          emap.set(keyRaw, email);
+        }
+      }
+      setPhoneMap(pmap);
+      setEmailMap(emap);
     };
-    if (customers.length > 0) fetchPhones();
+    if (customers.length > 0) fetchContacts();
   }, [customers]);
 
   const speciesCache = useMemo(() => {
@@ -233,13 +249,31 @@ export default function Clientes() {
   const fmt = (v: number | null) => (v != null ? `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—");
 
   const handleExportCSV = () => {
+    const q = (v: string) => `"${(v ?? "").replace(/"/g, '""')}"`;
+
+    let semContato = 0;
     const rows = sorted.map((c) => {
-      const key = c.cpf_cnpj?.replace(/\D/g, "") ?? "";
-      const telefone = phoneMap.get(key) ?? "";
-      const nome = (c.nome ?? "").replace(/"/g, '""');
-      return `"${nome}","${telefone}"`;
+      const keyRaw = c.cpf_cnpj ?? "";
+      const keyNorm = keyRaw.replace(/\D/g, "");
+      const telefone = phoneMap.get(keyNorm) ?? phoneMap.get(keyRaw) ?? "";
+      const email = emailMap.get(keyNorm) ?? emailMap.get(keyRaw) ?? "";
+      if (!telefone && !email) semContato += 1;
+      const jornada = journeyStageLabels[(c as any).journey_stage] ?? "";
+      return [
+        q(c.nome ?? ""),
+        q(c.cpf_cnpj ?? ""),
+        q(email),
+        q(telefone),
+        q(c.segment ?? ""),
+        q(jornada),
+        q(c.responsavel ?? ""),
+        q((c.total_revenue ?? 0).toFixed(2)),
+        q(String(c.total_orders_revenue ?? 0)),
+      ].join(",");
     });
-    const csv = ["Nome,Telefone", ...rows].join("\n");
+
+    const header = "Nome,CPF/CNPJ,Email,Telefone,Segmento,Jornada,Responsavel,Receita,Pedidos";
+    const csv = [header, ...rows].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -247,6 +281,15 @@ export default function Clientes() {
     a.download = `clientes_remarketing_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+
+    if (semContato > 0) {
+      toast.warning(
+        `${semContato} de ${sorted.length} clientes exportados estão sem email e sem telefone. Importe sua base do Shopify pra completar esses contatos.`,
+        { duration: 8000 },
+      );
+    } else {
+      toast.success(`${sorted.length} clientes exportados — todos com ao menos 1 contato.`);
+    }
   };
 
   const renderPetBadge = (cpf: string | null) => {
@@ -289,18 +332,30 @@ export default function Clientes() {
           <p className="text-sm text-muted-foreground">Lista operacional • {filtered.length} clientes</p>
         </div>
         <div className="flex items-center gap-3">
-          {phoneMap.size > 0 &&
-            sorted.length > 0 &&
+          {sorted.length > 0 && (phoneMap.size > 0 || emailMap.size > 0) &&
             (() => {
-              const comTel = sorted.filter((c) => phoneMap.has(c.cpf_cnpj?.replace(/\D/g, "") ?? "")).length;
-              const pct = Math.round((comTel / sorted.length) * 100);
-              const color = pct >= 60 ? "text-green-600" : pct >= 30 ? "text-amber-600" : "text-red-500";
+              const comContato = sorted.filter((c) => {
+                const raw = c.cpf_cnpj ?? "";
+                const norm = raw.replace(/\D/g, "");
+                return phoneMap.has(norm) || phoneMap.has(raw) || emailMap.has(norm) || emailMap.has(raw);
+              }).length;
+              const pct = Math.round((comContato / sorted.length) * 100);
+              const color = pct >= 80 ? "text-green-600" : pct >= 50 ? "text-amber-600" : "text-red-500";
               return (
                 <span className={`text-xs font-medium ${color}`}>
-                  📞 {comTel}/{sorted.length} com telefone ({pct}%)
+                  📇 {comContato}/{sorted.length} com contato ({pct}%)
                 </span>
               );
             })()}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/clientes/importar")}
+            className="flex items-center gap-2"
+          >
+            <UploadIcon className="h-4 w-4" />
+            Importar Shopify
+          </Button>
           <Button
             variant="outline"
             size="sm"
