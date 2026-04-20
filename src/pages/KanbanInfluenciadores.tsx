@@ -1578,7 +1578,7 @@ export default function KanbanInfluenciadores() {
             Quantos influenciadores entraram no kanban a cada semana. <strong>Roxo</strong> = ainda em prospecção (não contatados). <strong>Azul</strong> = já avançaram para contato ou além.
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={weeklyChartData} barCategoryGap="30%" barGap={4}>
+            <BarChart data={weeklyChartData} barCategoryGap="10%" barGap={2}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
               <XAxis
                 dataKey="label"
