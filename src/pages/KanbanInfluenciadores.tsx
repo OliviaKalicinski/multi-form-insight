@@ -353,7 +353,7 @@ function ResponsavelSection({ influencerId }: { influencerId: string }) {
         .eq("influencer_id", influencerId)
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as { id: string; responsavel_nome: string }[];
+      return (data ?? []) as unknown as { id: string; responsavel_nome: string }[];
     },
     enabled: !!influencerId,
   });
@@ -500,7 +500,7 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
         .eq("influencer_id", influencerId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as ContactLog[];
+      return (data ?? []) as unknown as ContactLog[];
     },
     enabled: !!influencerId,
   });
@@ -991,7 +991,7 @@ export default function KanbanInfluenciadores() {
         .from("influencer_responsavel" as any)
         .select("influencer_id, responsavel_nome");
       if (error) throw error;
-      return (data ?? []) as { influencer_id: string; responsavel_nome: string }[];
+      return (data ?? []) as unknown as { influencer_id: string; responsavel_nome: string }[];
     },
   });
 
