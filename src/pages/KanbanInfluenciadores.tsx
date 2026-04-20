@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Database, Search, X, MessageSquare, Send, CalendarDays, Download, TrendingUp } from "lucide-react";
+import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Database, Search, X, MessageSquare, Send, CalendarDays, Download } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
@@ -1417,21 +1418,70 @@ export default function KanbanInfluenciadores() {
     return map;
   }, [influencers]);
 
-  // ── Stats para o painel de resumo ──────────────────────────────────────────
-  const stats = useMemo(() => {
-    const week = startOfWeek();
-    const month = startOfMonth();
-    let novosNaSemana = 0;
-    let novosNoMes = 0;
-    for (const i of rawInfluencers) {
-      const d = new Date(i.created_at);
-      if (d >= week) novosNaSemana++;
-      if (d >= month) novosNoMes++;
+  // ── Dados semanais acumulados para o gráfico ──────────────────────────────
+  // Mostra o total acumulado de prospecções e contatos a cada semana,
+  // para que o gráfico cresça conforme o pipeline evolui.
+  const weeklyChartData = useMemo(() => {
+    if (rawInfluencers.length === 0) return [];
+
+    // Semana mais antiga (primeiro influenciador adicionado)
+    const oldest = rawInfluencers.reduce((min, i) =>
+      new Date(i.created_at) < new Date(min.created_at) ? i : min
+    );
+
+    // Início da semana (segunda-feira) do influenciador mais antigo
+    const firstMonday = new Date(oldest.created_at);
+    firstMonday.setHours(0, 0, 0, 0);
+    const d0 = firstMonday.getDay();
+    firstMonday.setDate(firstMonday.getDate() - (d0 === 0 ? 6 : d0 - 1));
+
+    // Início da semana atual
+    const now = new Date();
+    const thisMonday = new Date(now);
+    thisMonday.setHours(0, 0, 0, 0);
+    const dn = thisMonday.getDay();
+    thisMonday.setDate(thisMonday.getDate() - (dn === 0 ? 6 : dn - 1));
+
+    // Total de semanas entre a mais antiga e a atual
+    const totalWeeks = Math.round(
+      (thisMonday.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)
+    ) + 1;
+    const NUM_WEEKS = Math.min(totalWeeks, 24); // cap de 24 semanas para legibilidade
+    const startWeek = new Date(thisMonday);
+    startWeek.setDate(thisMonday.getDate() - (NUM_WEEKS - 1) * 7);
+
+    // Gera slots semanais
+    const weeks: { label: string; weekStart: Date; prospeccao: number; em_contato: number }[] = [];
+    for (let w = 0; w < NUM_WEEKS; w++) {
+      const weekStart = new Date(startWeek);
+      weekStart.setDate(startWeek.getDate() + w * 7);
+      const dd = String(weekStart.getDate()).padStart(2, "0");
+      const mm = String(weekStart.getMonth() + 1).padStart(2, "0");
+      weeks.push({ label: `${dd}/${mm}`, weekStart, prospeccao: 0, em_contato: 0 });
     }
-    const ativos = rawInfluencers.filter(
-      (i) => i.status !== "inativo"
-    ).length;
-    return { total: rawInfluencers.length, ativos, novosNaSemana, novosNoMes };
+
+    // Conta influenciadores por semana de entrada (created_at)
+    for (const inf of rawInfluencers) {
+      const created = new Date(inf.created_at);
+      for (const slot of weeks) {
+        const slotEnd = new Date(slot.weekStart);
+        slotEnd.setDate(slot.weekStart.getDate() + 7);
+        if (created >= slot.weekStart && created < slotEnd) {
+          if (inf.status === "prospeccao") slot.prospeccao += 1;
+          else slot.em_contato += 1; // todas as etapas >= em_contato
+          break;
+        }
+      }
+    }
+
+    // Acumula os totais semana a semana
+    let cumProspeccao = 0;
+    let cumEmContato = 0;
+    return weeks.map(({ label, prospeccao, em_contato }) => {
+      cumProspeccao += prospeccao;
+      cumEmContato += em_contato;
+      return { label, prospeccao: cumProspeccao, em_contato: cumEmContato };
+    });
   }, [rawInfluencers]);
 
   // ── Export XLSX ────────────────────────────────────────────────────────────
@@ -1518,38 +1568,50 @@ export default function KanbanInfluenciadores() {
         </div>
       </div>
 
-      {/* Painel de resumo — primeiro contato e métricas do pipeline */}
+      {/* Gráfico semanal — Prospecção vs Em Contato */}
       {!isLoading && rawInfluencers.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-lg border bg-card p-3 space-y-0.5">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total no pipeline</p>
-            <p className="text-2xl font-semibold">{stats.total}</p>
-            <p className="text-[11px] text-muted-foreground">{stats.ativos} ativos</p>
+        <div className="rounded-lg border bg-card p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-semibold">Crescimento acumulado do pipeline — por semana</p>
           </div>
-          <div className="rounded-lg border bg-card p-3 space-y-0.5">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-              <CalendarDays className="h-3 w-3" /> Esta semana
-            </p>
-            <p className="text-2xl font-semibold text-violet-700">{stats.novosNaSemana}</p>
-            <p className="text-[11px] text-muted-foreground">novos 1ºs contatos</p>
-          </div>
-          <div className="rounded-lg border bg-card p-3 space-y-0.5">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" /> Este mês
-            </p>
-            <p className="text-2xl font-semibold text-blue-700">{stats.novosNoMes}</p>
-            <p className="text-[11px] text-muted-foreground">novos 1ºs contatos</p>
-          </div>
-          <div className="rounded-lg border bg-card p-3 space-y-1">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Por etapa</p>
-            <div className="flex flex-wrap gap-1">
-              {COLUMNS.filter((c) => byStatus[c.key].length > 0).map((c) => (
-                <span key={c.key} className={cn("text-[10px] px-1.5 py-0.5 rounded-full border font-medium", c.color)}>
-                  {c.title.split(" ")[0]} {byStatus[c.key].length}
-                </span>
-              ))}
-            </div>
-          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Total acumulado de influenciadores que ficaram só em prospecção vs. os que avançamos para contato. Cresce conforme o pipeline evolui.
+          </p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={weeklyChartData} barCategoryGap="30%" barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: "#888" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 11, fill: "#888" }}
+                axisLine={false}
+                tickLine={false}
+                width={28}
+              />
+              <Tooltip
+                contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+                formatter={(value: number, name: string) => [
+                  value,
+                  name === "prospeccao" ? "Total só em prospecção" : "Total que entramos em contato",
+                ]}
+                labelFormatter={(label) => `Até a semana de ${label}`}
+              />
+              <Legend
+                formatter={(value) =>
+                  value === "prospeccao" ? "Só em prospecção" : "Entramos em contato"
+                }
+                wrapperStyle={{ fontSize: 12 }}
+              />
+              <Bar dataKey="prospeccao" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="prospeccao" />
+              <Bar dataKey="em_contato" fill="#3b82f6" radius={[4, 4, 0, 0]} name="em_contato" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 
