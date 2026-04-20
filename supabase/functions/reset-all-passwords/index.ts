@@ -29,7 +29,8 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user: currentUser }, error: userError } = await userClient.auth.getUser();
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: currentUser }, error: userError } = await userClient.auth.getUser(token);
     if (userError || !currentUser) {
       return new Response(JSON.stringify({ error: "Usuário não autenticado" }), {
         status: 401,
