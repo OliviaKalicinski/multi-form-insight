@@ -72,7 +72,6 @@ type SortKey =
   | "pet"
   | "created_at";
 
-type ViewMode = "customers" | "leads" | "all";
 
 const PAGE_SIZE = 25;
 
