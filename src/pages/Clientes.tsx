@@ -8,10 +8,9 @@ import {
   SegmentFilter,
   SEGMENT_LABELS,
   SEGMENT_COLORS,
-  SEGMENT_ORDER,
 } from "@/utils/revenue";
-import { CustomerFilters } from "@/components/crm/CustomerFilters";
-import { LeadsFilters, LeadOrigin, LeadContact } from "@/components/crm/LeadsFilters";
+import { UnifiedFilters } from "@/components/crm/UnifiedFilters";
+import { useCustomerFilters, ViewMode } from "@/hooks/useCustomerFilters";
 import { NewCustomerDialog } from "@/components/crm/NewCustomerDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,7 +72,6 @@ type SortKey =
   | "pet"
   | "created_at";
 
-type ViewMode = "customers" | "leads" | "all";
 
 const PAGE_SIZE = 25;
 
@@ -107,24 +105,8 @@ export default function Clientes() {
   // View mode — separa clientes com compra dos leads/provisórios
   const [viewMode, setViewMode] = useState<ViewMode>("customers");
 
-  // Filtros comuns
-  const [search, setSearch] = useState("");
-  const [channelFilter, setChannelFilter] = useState<SegmentFilter>("all");
-
-  // Filtros da visão Clientes
-  const [churnFilter, setChurnFilter] = useState("all");
-  const [segmentFilter, setSegmentFilter] = useState("all");
-  const [journeyFilter, setJourneyFilter] = useState("all");
-  const [responsavelFilter, setResponsavelFilter] = useState("all");
-  const [petFilter, setPetFilter] = useState("all");
-
-  // Filtros da visão Leads
-  const [leadOriginFilter, setLeadOriginFilter] = useState<LeadOrigin>("all");
-  const [leadContactFilter, setLeadContactFilter] = useState<LeadContact>("all");
-
   const [sortKey, setSortKey] = useState<SortKey>("total_revenue");
   const [sortAsc, setSortAsc] = useState(false);
-  const [page, setPage] = useState(0);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
   // ── Mapas auxiliares ─────────────────────────────────────────────
@@ -243,72 +225,20 @@ export default function Clientes() {
     return { customers: customersCount, leads: leadsCount, all: customersCount + leadsCount };
   }, [customers]);
 
-  // ── Filtro em cascata ─────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let list = customers;
-
-    // 1. View mode — primeiro corte (Clientes / Leads / Todos)
-    if (viewMode === "customers") list = list.filter((c) => !c.is_provisional);
-    else if (viewMode === "leads") list = list.filter((c) => c.is_provisional);
-
-    // 2. Busca livre — nome, CPF, email, telefone
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((c) => {
-        const nome = (c.nome ?? "").toLowerCase();
-        const cpf = (c.cpf_cnpj ?? "").toLowerCase();
-        const email = getEmail(c).toLowerCase();
-        const phone = getPhone(c).toLowerCase();
-        return nome.includes(q) || cpf.includes(q) || email.includes(q) || phone.includes(q);
-      });
-    }
-
-    // 3. Canal (B2B/B2C/B2B2C) — vale para clientes com pedidos. Leads ficam
-    // classificados só se tiverem ao menos 1 pedido histórico no salesData.
-    if (channelFilter !== "all") {
-      list = list.filter((c) => getChannel(c.cpf_cnpj) === channelFilter);
-    }
-
-    // 4. Filtros específicos da visão
-    if (viewMode === "customers" || viewMode === "all") {
-      if (churnFilter !== "all") list = list.filter((c) => c.churn_status === churnFilter);
-      if (segmentFilter !== "all") list = list.filter((c) => c.segment === segmentFilter);
-      if (journeyFilter !== "all") list = list.filter((c) => (c as any).journey_stage === journeyFilter);
-      if (petFilter !== "all") {
-        list = list.filter((c) => getPetProfile(c.cpf_cnpj) === petFilter);
-      }
-    }
-
-    if (viewMode === "leads" || viewMode === "all") {
-      if (leadOriginFilter !== "all") {
-        list = list.filter((c) => {
-          if (!c.is_provisional && viewMode === "all") return true; // não restringe clientes não-provisórios no "Todos"
-          return getLeadOrigin(c.cpf_cnpj) === leadOriginFilter;
-        });
-      }
-      if (leadContactFilter !== "all") {
-        list = list.filter((c) => {
-          const hasEmail = !!getEmail(c);
-          const hasPhone = !!getPhone(c);
-          switch (leadContactFilter) {
-            case "email": return hasEmail;
-            case "phone": return hasPhone;
-            case "both": return hasEmail && hasPhone;
-            case "none": return !hasEmail && !hasPhone;
-          }
-        });
-      }
-    }
-
-    if (responsavelFilter !== "all") list = list.filter((c) => c.responsavel === responsavelFilter);
-
-    return list;
-  }, [
-    customers, viewMode, search, channelFilter,
-    churnFilter, segmentFilter, journeyFilter, petFilter,
-    leadOriginFilter, leadContactFilter, responsavelFilter,
-    petMap, emailMap, phoneMap, customerChannelMap,
-  ]);
+  // ── Filtros centralizados (search, canal, status, segmento, pet, leads, responsável) ─────
+  const { filters, setters, filtered } = useCustomerFilters({
+    customers,
+    viewMode,
+    getEmail,
+    getPhone,
+    getChannel,
+    getPetProfile,
+  });
+  const {
+    search, channelFilter, statusFilter, segmentFilter, petFilter,
+    responsavelFilter, leadOriginFilter, leadContactFilter, page,
+  } = filters;
+  const { setPage } = setters;
 
   // ── Sort ─────────────────────────────────────────────────────────
   const sorted = useMemo(() => {
@@ -578,6 +508,13 @@ export default function Clientes() {
         </TabsList>
       </Tabs>
 
+      {viewMode === "leads" && (
+        <p className="text-xs text-muted-foreground -mt-2">
+          <Badge variant="outline" className="mr-2 text-[10px]">B2C</Badge>
+          Origem dos dados: <span className="font-medium">Shopify · Comida de Dragão</span>
+        </p>
+      )}
+
       {/* Card de reengajamento — só na visão Leads */}
       {viewMode === "leads" && leadsContactStats && leadsContactStats.total > 0 && (
         <Card className="border-violet-300/40 bg-violet-50/30">
@@ -614,89 +551,27 @@ export default function Clientes() {
         </Card>
       )}
 
-      {/* Filtros contextuais */}
-      {viewMode === "leads" ? (
-        <LeadsFilters
-          search={search}
-          onSearchChange={(v) => { setSearch(v); setPage(0); }}
-          originFilter={leadOriginFilter}
-          onOriginChange={(v) => { setLeadOriginFilter(v); setPage(0); }}
-          contactFilter={leadContactFilter}
-          onContactChange={(v) => { setLeadContactFilter(v); setPage(0); }}
-          responsavelFilter={responsavelFilter}
-          onResponsavelChange={(v) => { setResponsavelFilter(v); setPage(0); }}
-          responsaveis={responsaveis}
-        />
-      ) : (
-        <CustomerFilters
-          search={search}
-          onSearchChange={(v) => { setSearch(v); setPage(0); }}
-          churnFilter={churnFilter}
-          onChurnChange={(v) => { setChurnFilter(v); setPage(0); }}
-          segmentFilter={segmentFilter}
-          onSegmentChange={(v) => { setSegmentFilter(v); setPage(0); }}
-          responsavelFilter={responsavelFilter}
-          onResponsavelChange={(v) => { setResponsavelFilter(v); setPage(0); }}
-          responsaveis={responsaveis}
-          petFilter={petFilter}
-          onPetChange={(v) => { setPetFilter(v); setPage(0); }}
-        />
-      )}
-
-      {/* Filtro por canal — sempre visível, aplica em todas as visões */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium text-muted-foreground">Canal:</span>
-        <Button
-          variant={channelFilter === "all" ? "default" : "outline"}
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => { setChannelFilter("all"); setPage(0); }}
-        >
-          Todos
-        </Button>
-        {SEGMENT_ORDER.map((key) => (
-          <Button
-            key={key}
-            variant={channelFilter === key ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => { setChannelFilter(key); setPage(0); }}
-            style={
-              channelFilter === key
-                ? { backgroundColor: SEGMENT_COLORS[key], borderColor: SEGMENT_COLORS[key] }
-                : { color: SEGMENT_COLORS[key], borderColor: `${SEGMENT_COLORS[key]}60` }
-            }
-          >
-            {SEGMENT_LABELS[key]}
-          </Button>
-        ))}
-      </div>
-
-      {/* Jornada — só faz sentido para clientes com compra */}
-      {viewMode !== "leads" && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-muted-foreground">Jornada:</span>
-          <Button
-            variant={journeyFilter === "all" ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => { setJourneyFilter("all"); setPage(0); }}
-          >
-            Todas
-          </Button>
-          {Object.entries(journeyStageLabels).map(([key, label]) => (
-            <Button
-              key={key}
-              variant={journeyFilter === key ? "default" : "outline"}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => { setJourneyFilter(key); setPage(0); }}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-      )}
+      {/* Painel de filtros unificado */}
+      <UnifiedFilters
+        viewMode={viewMode}
+        search={search}
+        onSearchChange={setters.setSearch}
+        channelFilter={channelFilter}
+        onChannelChange={setters.setChannelFilter}
+        statusFilter={statusFilter}
+        onStatusChange={setters.setStatusFilter}
+        segmentFilter={segmentFilter}
+        onSegmentChange={setters.setSegmentFilter}
+        petFilter={petFilter}
+        onPetChange={setters.setPetFilter}
+        leadOriginFilter={leadOriginFilter}
+        onLeadOriginChange={setters.setLeadOriginFilter}
+        leadContactFilter={leadContactFilter}
+        onLeadContactChange={setters.setLeadContactFilter}
+        responsavelFilter={responsavelFilter}
+        onResponsavelChange={setters.setResponsavelFilter}
+        responsaveis={responsaveis}
+      />
 
       {/* Tabela */}
       <Card>
