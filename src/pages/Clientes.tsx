@@ -108,7 +108,6 @@ export default function Clientes() {
   const [sortKey, setSortKey] = useState<SortKey>("total_revenue");
   const [sortAsc, setSortAsc] = useState(false);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
-  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
   // ── Mapas auxiliares ─────────────────────────────────────────────
   const petMap = useMemo(() => buildClientPetMap(salesData), [salesData]);
