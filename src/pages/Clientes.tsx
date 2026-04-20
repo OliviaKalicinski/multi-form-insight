@@ -508,6 +508,13 @@ export default function Clientes() {
         </TabsList>
       </Tabs>
 
+      {viewMode === "leads" && (
+        <p className="text-xs text-muted-foreground -mt-2">
+          <Badge variant="outline" className="mr-2 text-[10px]">B2C</Badge>
+          Origem dos dados: <span className="font-medium">Shopify · Comida de Dragão</span>
+        </p>
+      )}
+
       {/* Card de reengajamento — só na visão Leads */}
       {viewMode === "leads" && leadsContactStats && leadsContactStats.total > 0 && (
         <Card className="border-violet-300/40 bg-violet-50/30">
