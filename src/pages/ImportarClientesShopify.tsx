@@ -44,7 +44,7 @@ interface ImportSummary {
   created_new: number;
   errors: number;
   error_details: Array<{ row: number; shopify_id: string; error: string }>;
-  phones_overwritten: number;
+  phones_added: number;
   emails_added: number;
   skipped_no_contact: number;
 }
@@ -61,7 +61,7 @@ function emptySummary(total: number): ImportSummary {
     created_new: 0,
     errors: 0,
     error_details: [],
-    phones_overwritten: 0,
+    phones_added: 0,
     emails_added: 0,
     skipped_no_contact: 0,
   };
@@ -77,7 +77,7 @@ function mergeSummary(acc: ImportSummary, add: ImportSummary): ImportSummary {
     created_new: acc.created_new + add.created_new,
     errors: acc.errors + add.errors,
     error_details: [...acc.error_details, ...add.error_details].slice(0, 50),
-    phones_overwritten: acc.phones_overwritten + add.phones_overwritten,
+    phones_added: acc.phones_added + add.phones_added,
     emails_added: acc.emails_added + add.emails_added,
     skipped_no_contact: acc.skipped_no_contact + add.skipped_no_contact,
   };
@@ -279,7 +279,7 @@ export default function ImportarClientesShopify() {
               <AlertDescription className="text-xs space-y-1 mt-2">
                 <div>• Cada lote é processado separadamente (evita timeout na Edge Function).</div>
                 <div>• Emails novos serão <strong>adicionados</strong> aos clientes que já existem.</div>
-                <div>• Telefones em conflito serão <strong>sobrescritos</strong> (Shopify é a fonte de verdade).</div>
+                <div>• Telefones são <strong>adicionados apenas se o cliente ainda não tiver um</strong> — a planilha fiscal é a fonte de verdade.</div>
                 <div>• Clientes novos entram como <strong>provisórios</strong> com CPF "shopify-…".</div>
                 <div>• A importação é idempotente: rodar de novo não duplica nada.</div>
                 <div>• Tempo estimado: ~{Math.ceil(batches * 0.5)} a {batches * 1} minutos.</div>
@@ -329,7 +329,7 @@ export default function ImportarClientesShopify() {
               />
               <Stat label="Criados" value={result.created_new} tone="positive" />
               <Stat label="Emails adicionados" value={result.emails_added} />
-              <Stat label="Telefones sobrescritos" value={result.phones_overwritten} />
+              <Stat label="Telefones adicionados" value={result.phones_added} />
               <Stat label="Ignorados sem contato" value={result.skipped_no_contact} />
               <Stat label="Erros" value={result.errors} tone={result.errors > 0 ? "danger" : undefined} />
             </div>
