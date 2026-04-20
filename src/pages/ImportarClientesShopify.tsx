@@ -178,7 +178,11 @@ export default function ImportarClientesShopify() {
         total: batches.length,
         label: `${dryRun ? "Calculando preview" : "Importando"} lote ${i + 1}/${batches.length}`,
       });
+      const t0 = Date.now();
+      console.log(`[shopify-import] starting batch ${i + 1}/${batches.length} (${batches[i].length} rows)`);
       const batchSummary = await callImportBatch(batches[i], dryRun, i + 1, batches.length);
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      console.log(`[shopify-import] batch ${i + 1}/${batches.length} done in ${elapsed}s`, batchSummary);
       acc = mergeSummary(acc, batchSummary);
     }
 
