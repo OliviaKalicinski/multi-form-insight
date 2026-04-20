@@ -47,9 +47,10 @@ interface Influencer {
   observacoes: string;
   na_base: boolean;
   created_at: string;
+  data_primeiro_contato: string; // data real do primeiro contato (preenchida manualmente)
 }
 
-type InfluencerFormData = Omit<Influencer, "id" | "created_at">;
+type InfluencerFormData = Omit<Influencer, "id" | "created_at" | "data_primeiro_contato"> & { data_primeiro_contato: string };
 
 // ─── DB row → Influencer ────────────────────────────────────────────────────
 function rowToInfluencer(row: Record<string, unknown>): Influencer {
@@ -75,6 +76,7 @@ function rowToInfluencer(row: Record<string, unknown>): Influencer {
     observacoes: (row.kanban_observacoes as string) || "",
     na_base: (row.na_base as boolean) ?? false,
     created_at: (row.created_at as string) || new Date().toISOString(),
+    data_primeiro_contato: (row.data_primeiro_contato as string) || "",
   };
 }
 
@@ -281,9 +283,15 @@ function InfluencerCard({
       )}
 
       {/* Data do primeiro contato */}
-      <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-0.5 border-t border-dashed border-gray-100 mt-1">
-        <CalendarDays className="h-3 w-3 shrink-0" />
-        <span>1º contato: {formatDate(influencer.created_at)}</span>
+      <div className="flex items-center gap-1 text-[10px] pt-0.5 border-t border-dashed border-gray-100 mt-1">
+        <CalendarDays className="h-3 w-3 shrink-0 text-muted-foreground" />
+        {influencer.data_primeiro_contato ? (
+          <span className="text-blue-600 font-medium">
+            1º contato: {formatDate(influencer.data_primeiro_contato)}
+          </span>
+        ) : (
+          <span className="text-muted-foreground italic">Sem data de contato</span>
+        )}
       </div>
     </div>
   );
@@ -709,6 +717,7 @@ const EMPTY_FORM: InfluencerFormData = {
   address_bairro: "", address_cep: "", address_cidade: "", address_estado: "",
   cnpj: "", razao_social: "",
   nicho: "", seguidores: "", status: "em_contato", observacoes: "", na_base: false,
+  data_primeiro_contato: "",
 };
 
 function InfluencerDialog({
@@ -736,6 +745,7 @@ function InfluencerDialog({
           razao_social: initial.razao_social, nicho: initial.nicho,
           seguidores: initial.seguidores, status: initial.status,
           observacoes: initial.observacoes, na_base: initial.na_base,
+          data_primeiro_contato: initial.data_primeiro_contato ?? "",
         }
       : EMPTY_FORM
   );
@@ -766,6 +776,7 @@ function InfluencerDialog({
             status: initial.status ?? "em_contato",
             observacoes: initial.observacoes ?? "",
             na_base: initial.na_base ?? false,
+            data_primeiro_contato: initial.data_primeiro_contato ?? "",
           }
         : EMPTY_FORM
     );
@@ -905,6 +916,19 @@ function InfluencerDialog({
               <Input value={form.razao_social} onChange={(e) => set("razao_social", e.target.value)} placeholder="Nome Empresa ME" />
             </div>
           </CollapsibleSection>
+
+          <div className="space-y-1">
+            <Label className="flex items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+              Data do 1º Contato
+            </Label>
+            <Input
+              type="date"
+              value={form.data_primeiro_contato}
+              onChange={(e) => set("data_primeiro_contato", e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">Preencha quando efetivamente entrar em contato com o influenciador.</p>
+          </div>
 
           <div className="space-y-1">
             <Label>Observações</Label>
@@ -1150,6 +1174,7 @@ export default function KanbanInfluenciadores() {
     kanban_status: data.status,
     kanban_observacoes: data.observacoes || null,
     na_base: data.na_base,
+    data_primeiro_contato: data.data_primeiro_contato || null,
     updated_at: new Date().toISOString(),
   });
 
@@ -1462,15 +1487,19 @@ export default function KanbanInfluenciadores() {
       weeks.push({ label: `${dd}/${mm}`, weekStart, prospeccao: 0, em_contato: 0 });
     }
 
-    // Distribui cada influenciador pela semana em que entrou no kanban
+    // Distribui cada influenciador pela semana em que entrou no kanban (created_at).
+    // Dentro dessa semana, separa por status atual:
+    // - se tem data_primeiro_contato preenchida → conta como "em_contato" (azul)
+    // - se ainda está em prospeccao sem contato → conta como "prospeccao" (roxo)
     for (const inf of rawInfluencers) {
       const created = new Date(inf.created_at);
       for (const slot of weeks) {
         const slotEnd = new Date(slot.weekStart);
         slotEnd.setDate(slot.weekStart.getDate() + 7);
         if (created >= slot.weekStart && created < slotEnd) {
-          if (inf.status === "prospeccao") slot.prospeccao += 1;
-          else slot.em_contato += 1;
+          const foiContatado = !!inf.data_primeiro_contato || inf.status !== "prospeccao";
+          if (foiContatado) slot.em_contato += 1;
+          else slot.prospeccao += 1;
           break;
         }
       }
@@ -1500,8 +1529,10 @@ export default function KanbanInfluenciadores() {
       Status: colLabel[i.status] ?? i.status,
       "Na Base": i.na_base ? "Sim" : "Não",
       Responsáveis: (responsaveisMap.get(i.id) ?? []).join(", "),
-      "1º Contato": formatDate(i.created_at),
-      "Data Completa": i.created_at ? new Date(i.created_at).toLocaleDateString("pt-BR") : "",
+      "Entrada no Kanban": formatDate(i.created_at),
+      "1º Contato Real": i.data_primeiro_contato
+        ? new Date(i.data_primeiro_contato).toLocaleDateString("pt-BR")
+        : "",
       Observações: i.observacoes,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -1575,7 +1606,7 @@ export default function KanbanInfluenciadores() {
             <p className="text-sm font-semibold">Entradas por semana no pipeline</p>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Quantos influenciadores entraram no kanban a cada semana. <strong>Roxo</strong> = ainda em prospecção (não contatados). <strong>Azul</strong> = já avançaram para contato ou além.
+            Cada barra = total que entrou no kanban naquela semana. <strong className="text-blue-600">Azul</strong> = já avançamos para contato. <strong className="text-violet-600">Roxo</strong> = ainda só em prospecção.
           </p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={weeklyChartData} barCategoryGap="10%" barGap={2}>
@@ -1607,8 +1638,8 @@ export default function KanbanInfluenciadores() {
                 }
                 wrapperStyle={{ fontSize: 12 }}
               />
-              <Bar dataKey="prospeccao" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="prospeccao" />
-              <Bar dataKey="em_contato" fill="#3b82f6" radius={[4, 4, 0, 0]} name="em_contato" />
+              <Bar dataKey="em_contato" stackId="a" fill="#3b82f6" name="em_contato" />
+              <Bar dataKey="prospeccao" stackId="a" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="prospeccao" />
             </BarChart>
           </ResponsiveContainer>
         </div>
