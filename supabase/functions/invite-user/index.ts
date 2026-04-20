@@ -94,8 +94,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user already exists
-    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+    // Check if user already exists (paginate up to 1000)
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
     const alreadyExists = existingUsers?.users?.some(
       (u) => u.email?.toLowerCase() === email.toLowerCase().trim()
     );
@@ -116,8 +116,15 @@ Deno.serve(async (req) => {
 
     if (createError) {
       console.error("User creation failed:", createError);
+      const msg = createError.message || "";
+      if (msg.toLowerCase().includes("already been registered") || msg.toLowerCase().includes("already registered")) {
+        return new Response(
+          JSON.stringify({ error: "Este email já está cadastrado no sistema" }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
-        JSON.stringify({ error: createError.message }),
+        JSON.stringify({ error: msg }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

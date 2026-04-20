@@ -13,6 +13,17 @@ import { useToast } from "@/hooks/use-toast";
 import { UserManagement } from "@/components/settings/UserManagement";
 import { isValidDomain, getDomainValidationError } from "@/utils/domainValidation";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Settings as SettingsIcon,
   Key,
   UserPlus,
@@ -24,6 +35,7 @@ import {
   Instagram,
   Zap,
   RefreshCw,
+  KeyRound,
 } from "lucide-react";
 
 export default function Settings() {
@@ -45,6 +57,34 @@ export default function Settings() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
+
+  // Reset all passwords state
+  const [resetLoading, setResetLoading] = useState(false);
+
+  const handleResetAllPasswords = async () => {
+    setResetLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("reset-all-passwords", {
+        body: {},
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const failures = data?.failures?.length ?? 0;
+      toast({
+        title: "Senhas resetadas!",
+        description: `${data?.updated ?? 0} de ${data?.total ?? 0} usuários atualizados para senha "123456".${failures > 0 ? ` ${failures} falhas.` : ""}`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao resetar senhas",
+        description: err.message || "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   // Meta Token state
   const [metaTokenExpiry, setMetaTokenExpiry] = useState("");
@@ -502,6 +542,60 @@ export default function Settings() {
 
       {/* User Management (Admin only) */}
       {isAdmin && <UserManagement />}
+
+      {/* Reset all passwords (Admin only) */}
+      {isAdmin && (
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-destructive" />
+              Resetar Senha de Todos os Usuários
+            </CardTitle>
+            <CardDescription>
+              Define a senha de <strong>todos</strong> os usuários para <code className="font-mono">123456</code>. Use com cautela.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Ação irreversível. Todos precisarão fazer login novamente com a senha temporária <strong>123456</strong> e trocar imediatamente.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+          <CardFooter>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={resetLoading}>
+                  {resetLoading ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Resetando...</>
+                  ) : (
+                    <><KeyRound className="mr-2 h-4 w-4" />Resetar senhas para 123456</>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirmar reset de senhas</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Isso vai sobrescrever a senha de <strong>todos os usuários</strong> do sistema para <code className="font-mono">123456</code>.
+                    Esta ação não pode ser desfeita. Tem certeza?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleResetAllPasswords}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Sim, resetar todas
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardFooter>
+        </Card>
+      )}
 
       {/* Invite User (Admin only) */}
       {isAdmin && (

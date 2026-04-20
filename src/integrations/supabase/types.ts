@@ -1023,6 +1023,38 @@ export type Database = {
         }
         Relationships: []
       }
+      influencer_contact_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          influencer_id: string
+          observacao: string | null
+          responsavel: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          influencer_id: string
+          observacao?: string | null
+          responsavel: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          influencer_id?: string
+          observacao?: string | null
+          responsavel?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "influencer_contact_log_influencer_id_fkey"
+            columns: ["influencer_id"]
+            isOneToOne: false
+            referencedRelation: "influencer_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       influencer_posts: {
         Row: {
           comments: number | null
@@ -1096,7 +1128,7 @@ export type Database = {
           coupon: string | null
           cpf: string | null
           created_at: string | null
-          email: string
+          email: string | null
           id: string
           instagram: string | null
           kanban_nicho: string | null
@@ -1122,7 +1154,7 @@ export type Database = {
           coupon?: string | null
           cpf?: string | null
           created_at?: string | null
-          email: string
+          email?: string | null
           id?: string
           instagram?: string | null
           kanban_nicho?: string | null
@@ -1148,7 +1180,7 @@ export type Database = {
           coupon?: string | null
           cpf?: string | null
           created_at?: string | null
-          email?: string
+          email?: string | null
           id?: string
           instagram?: string | null
           kanban_nicho?: string | null
@@ -1163,6 +1195,35 @@ export type Database = {
           whatsapp?: string | null
         }
         Relationships: []
+      }
+      influencer_responsavel: {
+        Row: {
+          created_at: string | null
+          id: string
+          influencer_id: string
+          responsavel_nome: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          influencer_id: string
+          responsavel_nome: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          influencer_id?: string
+          responsavel_nome?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "influencer_responsavel_influencer_id_fkey"
+            columns: ["influencer_id"]
+            isOneToOne: false
+            referencedRelation: "influencer_registry"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       influencer_sales: {
         Row: {
