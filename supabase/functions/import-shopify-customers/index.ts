@@ -203,18 +203,21 @@ async function applyRow(
     }
   }
 
+  // narrowing: a este ponto customerId é garantidamente string
+  const cid: string = customerId!;
+
   // Email
   if (emailNorm) {
     if (!idx.emailIndex.has(emailNorm)) {
       const { error: emailErr } = await db.from("customer_identifier").insert({
-        customer_id: customerId,
+        customer_id: cid,
         type: "email",
         value: emailNorm,
         is_primary: true,
       });
       if (!emailErr) {
         counters.emails_added += 1;
-        idx.emailIndex.set(emailNorm, customerId);
+        idx.emailIndex.set(emailNorm, cid);
       }
     }
   }
@@ -224,18 +227,18 @@ async function applyRow(
   // o telefone do destinatário da entrega, que difere do cadastro fiscal.
   if (phoneNorm && phoneNorm.length >= 10) {
     const alreadyMappedTo = idx.phoneIndex.get(phoneNorm);
-    if (alreadyMappedTo === customerId) {
+    if (alreadyMappedTo === cid) {
       // já tem exatamente esse número, nada a fazer
     } else if (!alreadyMappedTo) {
       // Telefone ainda não existe em nenhum customer — insere
       const { error: phoneErr } = await db.from("customer_identifier").insert({
-        customer_id: customerId,
+        customer_id: cid,
         type: "phone",
         value: phoneNorm,
         is_primary: true,
       });
       if (!phoneErr) {
-        idx.phoneIndex.set(phoneNorm, customerId);
+        idx.phoneIndex.set(phoneNorm, cid);
       }
     }
     // Se alreadyMappedTo !== customerId && alreadyMappedTo !== undefined:
