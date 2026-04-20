@@ -14,7 +14,7 @@ interface ShopifyRow {
   first_name: string;
   last_name: string;
   email: string;
-  phone: string;          // melhor telefone disponível (Phone > Default Address Phone)
+  phone: string;
   total_spent: number;
   total_orders: number;
   accepts_email_marketing: boolean;
@@ -28,10 +28,8 @@ interface ShopifyRow {
 }
 
 interface MatchResult {
-  customer_id: string | null;          // null = cliente novo a criar
+  customer_id: string | null;
   match_type: "shopify_id" | "email" | "phone" | "name" | "new";
-  existing_phone?: string | null;      // pra decidir sobrescrita
-  existing_email?: string | null;
 }
 
 interface ImportSummary {
@@ -46,6 +44,13 @@ interface ImportSummary {
   phones_overwritten: number;
   emails_added: number;
   skipped_no_contact: number;
+}
+
+interface Indices {
+  shopifyIdIndex: Map<string, string>;
+  emailIndex: Map<string, string>;
+  phoneIndex: Map<string, string>;
+  nameIndex: Map<string, string>;
 }
 
 // ── Normalização ───────────────────────────────────────────────────────
@@ -71,79 +76,87 @@ function fullName(first: string, last: string): string {
   return `${(first ?? "").trim()} ${(last ?? "").trim()}`.trim();
 }
 
-// ── Matching ───────────────────────────────────────────────────────────
+// ── Paginação (default Supabase é 1000 rows) ──────────────────────────
 
-async function matchRow(
-  row: ShopifyRow,
-  db: any,
-  nameIndex: Map<string, string>, // nome_norm → customer_id (já carregado)
-): Promise<MatchResult> {
-  // 1. Match por shopify_customer_id (reimportação idempotente)
-  if (row.shopify_id) {
-    const { data } = await db
-      .from("customer")
-      .select("id")
-      .eq("shopify_customer_id", row.shopify_id)
-      .maybeSingle();
-    if (data) {
-      return { customer_id: data.id, match_type: "shopify_id" };
-    }
+async function fetchAllRows<T = any>(buildQuery: () => any): Promise<T[]> {
+  const all: T[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
+// ── Carrega índices em memória (1x por invocação) ─────────────────────
+
+async function loadIndices(db: any): Promise<Indices> {
+  const [customers, identifiers] = await Promise.all([
+    fetchAllRows<{ id: string; nome: string | null; shopify_customer_id: string | null }>(
+      () => db.from("customer").select("id, nome, shopify_customer_id").eq("is_active", true),
+    ),
+    fetchAllRows<{ customer_id: string; type: string; value: string }>(
+      () => db.from("customer_identifier").select("customer_id, type, value"),
+    ),
+  ]);
+
+  const shopifyIdIndex = new Map<string, string>();
+  const nameIndex = new Map<string, string>();
+  for (const c of customers) {
+    if (c.shopify_customer_id) shopifyIdIndex.set(String(c.shopify_customer_id), c.id);
+    const nn = normName(c.nome ?? "");
+    if (nn && !nameIndex.has(nn)) nameIndex.set(nn, c.id);
   }
 
-  // 2. Match por email
+  const emailIndex = new Map<string, string>();
+  const phoneIndex = new Map<string, string>();
+  for (const id of identifiers) {
+    if (id.type === "email" && id.value) emailIndex.set(id.value, id.customer_id);
+    else if (id.type === "phone" && id.value) phoneIndex.set(id.value, id.customer_id);
+  }
+
+  return { shopifyIdIndex, emailIndex, phoneIndex, nameIndex };
+}
+
+// ── Matching (100% em memória, zero query) ─────────────────────────────
+
+function matchRow(row: ShopifyRow, idx: Indices): MatchResult {
+  if (row.shopify_id && idx.shopifyIdIndex.has(String(row.shopify_id))) {
+    return { customer_id: idx.shopifyIdIndex.get(String(row.shopify_id))!, match_type: "shopify_id" };
+  }
   const emailNorm = normEmail(row.email);
-  if (emailNorm) {
-    const { data } = await db
-      .from("customer_identifier")
-      .select("customer_id")
-      .eq("type", "email")
-      .eq("value", emailNorm)
-      .limit(1)
-      .maybeSingle();
-    if (data) {
-      return { customer_id: data.customer_id, match_type: "email" };
-    }
+  if (emailNorm && idx.emailIndex.has(emailNorm)) {
+    return { customer_id: idx.emailIndex.get(emailNorm)!, match_type: "email" };
   }
-
-  // 3. Match por telefone
   const phoneNorm = normPhone(row.phone);
-  if (phoneNorm && phoneNorm.length >= 10) {
-    const { data } = await db
-      .from("customer_identifier")
-      .select("customer_id")
-      .eq("type", "phone")
-      .eq("value", phoneNorm)
-      .limit(1)
-      .maybeSingle();
-    if (data) {
-      return { customer_id: data.customer_id, match_type: "phone" };
-    }
+  if (phoneNorm.length >= 10 && idx.phoneIndex.has(phoneNorm)) {
+    return { customer_id: idx.phoneIndex.get(phoneNorm)!, match_type: "phone" };
   }
-
-  // 4. Match por nome idêntico (normalizado)
   const nameNorm = normName(fullName(row.first_name, row.last_name));
-  if (nameNorm && nameIndex.has(nameNorm)) {
-    return { customer_id: nameIndex.get(nameNorm)!, match_type: "name" };
+  if (nameNorm && idx.nameIndex.has(nameNorm)) {
+    return { customer_id: idx.nameIndex.get(nameNorm)!, match_type: "name" };
   }
-
-  // 5. Sem match → novo
   return { customer_id: null, match_type: "new" };
 }
 
-// ── Aplicação (apenas em modo execute) ─────────────────────────────────
+// ── Aplicação (writes) ────────────────────────────────────────────────
 
 async function applyRow(
   row: ShopifyRow,
   match: MatchResult,
   db: any,
   counters: ImportSummary,
+  idx: Indices,
 ): Promise<void> {
   const emailNorm = normEmail(row.email);
   const phoneNorm = normPhone(row.phone);
-
   let customerId = match.customer_id;
 
-  // Cria customer novo se não houve match
   if (!customerId) {
     const nome = fullName(row.first_name, row.last_name) || row.email || `Shopify ${row.shopify_id}`;
     const syntheticCpf = `shopify-${row.shopify_id}`;
@@ -173,61 +186,63 @@ async function applyRow(
     if (insertErr) throw insertErr;
     customerId = inserted.id;
     counters.created_new += 1;
+
+    // Atualiza índices pra linhas seguintes do mesmo batch
+    idx.shopifyIdIndex.set(String(row.shopify_id), customerId);
+    const nn = normName(nome);
+    if (nn && !idx.nameIndex.has(nn)) idx.nameIndex.set(nn, customerId);
   } else {
-    // Garante que o customer.shopify_customer_id esteja preenchido
     await db
       .from("customer")
       .update({ shopify_customer_id: row.shopify_id })
       .eq("id", customerId)
       .is("shopify_customer_id", null);
+    idx.shopifyIdIndex.set(String(row.shopify_id), customerId);
   }
 
-  // Email: adiciona se não existir (não sobrescreve, emails raramente mudam)
+  // Email
   if (emailNorm) {
-    const { data: existingEmail } = await db
-      .from("customer_identifier")
-      .select("id")
-      .eq("customer_id", customerId)
-      .eq("type", "email")
-      .eq("value", emailNorm)
-      .maybeSingle();
-
-    if (!existingEmail) {
-      await db.from("customer_identifier").insert({
+    if (!idx.emailIndex.has(emailNorm)) {
+      const { error: emailErr } = await db.from("customer_identifier").insert({
         customer_id: customerId,
         type: "email",
         value: emailNorm,
         is_primary: true,
       });
-      counters.emails_added += 1;
+      if (!emailErr) {
+        counters.emails_added += 1;
+        idx.emailIndex.set(emailNorm, customerId);
+      }
     }
   }
 
   // Telefone: sobrescreve (regra decidida com a Olivia)
   if (phoneNorm && phoneNorm.length >= 10) {
-    const { data: existingPhones } = await db
-      .from("customer_identifier")
-      .select("id, value")
-      .eq("customer_id", customerId)
-      .eq("type", "phone");
-
-    const alreadyHas = existingPhones?.some((p: any) => p.value === phoneNorm);
-    if (alreadyHas) {
-      // Mesmo telefone, nada a fazer
-    } else if (existingPhones && existingPhones.length > 0) {
-      // Sobrescreve o primeiro, mantém os outros (se houver)
-      await db
-        .from("customer_identifier")
-        .update({ value: phoneNorm, is_primary: true })
-        .eq("id", existingPhones[0].id);
-      counters.phones_overwritten += 1;
+    const alreadyMappedTo = idx.phoneIndex.get(phoneNorm);
+    if (alreadyMappedTo === customerId) {
+      // já tem esse telefone, nada a fazer
     } else {
-      await db.from("customer_identifier").insert({
-        customer_id: customerId,
-        type: "phone",
-        value: phoneNorm,
-        is_primary: true,
-      });
+      const { data: existingPhones } = await db
+        .from("customer_identifier")
+        .select("id, value")
+        .eq("customer_id", customerId)
+        .eq("type", "phone");
+
+      if (existingPhones && existingPhones.length > 0) {
+        await db
+          .from("customer_identifier")
+          .update({ value: phoneNorm, is_primary: true })
+          .eq("id", existingPhones[0].id);
+        counters.phones_overwritten += 1;
+      } else {
+        await db.from("customer_identifier").insert({
+          customer_id: customerId,
+          type: "phone",
+          value: phoneNorm,
+          is_primary: true,
+        });
+      }
+      idx.phoneIndex.set(phoneNorm, customerId);
     }
   }
 }
@@ -243,7 +258,6 @@ serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-  // Auth: precisa estar logado
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -264,13 +278,13 @@ serve(async (req: Request) => {
     });
   }
 
-  // Admin client (bypassa RLS pra escrever em customer)
   const adminClient = createClient(supabaseUrl, serviceKey);
 
   try {
     const body = await req.json();
     const rows: ShopifyRow[] = body.rows ?? [];
     const dryRun: boolean = body.dry_run ?? true;
+    const batchInfo: { index?: number; total?: number } = body.batch ?? {};
 
     if (!Array.isArray(rows) || rows.length === 0) {
       return new Response(JSON.stringify({ error: "rows is required (non-empty array)" }), {
@@ -279,17 +293,13 @@ serve(async (req: Request) => {
       });
     }
 
-    // Pré-carrega índice de nomes → customer_id (1 query só, evita N+1)
-    const { data: allCustomers } = await adminClient
-      .from("customer")
-      .select("id, nome")
-      .eq("is_active", true);
-
-    const nameIndex = new Map<string, string>();
-    for (const c of allCustomers ?? []) {
-      const nn = normName(c.nome ?? "");
-      if (nn && !nameIndex.has(nn)) nameIndex.set(nn, c.id);
-    }
+    const startedAt = Date.now();
+    const indices = await loadIndices(adminClient);
+    const indexLoadMs = Date.now() - startedAt;
+    console.log(
+      `[import] batch ${batchInfo.index ?? "?"}/${batchInfo.total ?? "?"} — rows=${rows.length} dryRun=${dryRun} indices loaded in ${indexLoadMs}ms ` +
+        `(customers=${indices.nameIndex.size} emails=${indices.emailIndex.size} phones=${indices.phoneIndex.size})`,
+    );
 
     const summary: ImportSummary = {
       total_rows: rows.length,
@@ -305,7 +315,6 @@ serve(async (req: Request) => {
       skipped_no_contact: 0,
     };
 
-    // Cria log da execução
     const { data: logRow } = await adminClient
       .from("shopify_import_log")
       .insert({
@@ -319,11 +328,9 @@ serve(async (req: Request) => {
 
     const logId = logRow?.id;
 
-    // Processa linhas
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       try {
-        // Filtra linhas sem nenhum contato (a regra da Olivia)
         const hasEmail = !!normEmail(row.email);
         const hasPhone = normPhone(row.phone).length >= 10;
         if (!hasEmail && !hasPhone) {
@@ -331,20 +338,19 @@ serve(async (req: Request) => {
           continue;
         }
 
-        const match = await matchRow(row, adminClient, nameIndex);
+        const match = matchRow(row, indices);
 
         switch (match.match_type) {
           case "shopify_id": summary.matched_shopify_id += 1; break;
           case "email": summary.matched_email += 1; break;
           case "phone": summary.matched_phone += 1; break;
           case "name": summary.matched_name += 1; break;
-          case "new": /* summary.created_new incrementado no applyRow */ break;
+          case "new": /* incrementado no applyRow */ break;
         }
 
         if (!dryRun) {
-          await applyRow(row, match, adminClient, summary);
+          await applyRow(row, match, adminClient, summary, indices);
         } else if (match.match_type === "new") {
-          // No dry-run, contamos os "novos" só pra preview
           summary.created_new += 1;
         }
       } catch (err: any) {
@@ -359,7 +365,6 @@ serve(async (req: Request) => {
       }
     }
 
-    // Atualiza o log com resultado
     if (logId) {
       await adminClient
         .from("shopify_import_log")
@@ -375,6 +380,9 @@ serve(async (req: Request) => {
         })
         .eq("id", logId);
     }
+
+    const totalMs = Date.now() - startedAt;
+    console.log(`[import] batch done in ${totalMs}ms — created=${summary.created_new} errors=${summary.errors}`);
 
     return new Response(
       JSON.stringify({ success: true, dry_run: dryRun, log_id: logId, summary }),
