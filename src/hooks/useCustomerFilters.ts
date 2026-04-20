@@ -51,16 +51,7 @@ function resolveStatus(status: UnifiedStatus): { churn: string; journey: string 
   }
 }
 
-export function useCustomerFilters<
-  C extends {
-    cpf_cnpj: string | null;
-    nome: string | null;
-    is_provisional?: boolean;
-    churn_status?: string | null;
-    segment?: string | null;
-    responsavel?: string | null;
-  },
->({
+export function useCustomerFilters<C extends Record<string, any>>({
   customers,
   viewMode,
   getEmail,
