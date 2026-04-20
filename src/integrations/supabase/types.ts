@@ -478,6 +478,7 @@ export type Database = {
           recalculated_at: string | null
           responsavel: string | null
           segment: string | null
+          shopify_customer_id: string | null
           status_manual: string | null
           tags: Json | null
           telefone: string | null
@@ -512,6 +513,7 @@ export type Database = {
           recalculated_at?: string | null
           responsavel?: string | null
           segment?: string | null
+          shopify_customer_id?: string | null
           status_manual?: string | null
           tags?: Json | null
           telefone?: string | null
@@ -546,6 +548,7 @@ export type Database = {
           recalculated_at?: string | null
           responsavel?: string | null
           segment?: string | null
+          shopify_customer_id?: string | null
           status_manual?: string | null
           tags?: Json | null
           telefone?: string | null
@@ -1960,6 +1963,54 @@ export type Database = {
         }
         Relationships: []
       }
+      shopify_import_log: {
+        Row: {
+          created_by: string | null
+          created_new: number
+          dry_run: boolean
+          error_details: Json | null
+          errors: number
+          finished_at: string | null
+          id: string
+          matched_email: number
+          matched_name: number
+          matched_phone: number
+          matched_shopify_id: number
+          started_at: string
+          total_rows: number
+        }
+        Insert: {
+          created_by?: string | null
+          created_new?: number
+          dry_run?: boolean
+          error_details?: Json | null
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          matched_email?: number
+          matched_name?: number
+          matched_phone?: number
+          matched_shopify_id?: number
+          started_at?: string
+          total_rows?: number
+        }
+        Update: {
+          created_by?: string | null
+          created_new?: number
+          dry_run?: boolean
+          error_details?: Json | null
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          matched_email?: number
+          matched_name?: number
+          matched_phone?: number
+          matched_shopify_id?: number
+          started_at?: string
+          total_rows?: number
+        }
+        Relationships: []
+      }
       upload_history: {
         Row: {
           created_at: string
@@ -2190,6 +2241,7 @@ export type Database = {
           recalculated_at: string | null
           responsavel: string | null
           segment: string | null
+          shopify_customer_id: string | null
           status_manual: string | null
           tags: Json | null
           telefone: string | null
