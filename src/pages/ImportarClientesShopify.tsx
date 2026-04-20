@@ -5,8 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Play, CheckCircle2, AlertTriangle, Info } from "lucide-react";
+
+const BATCH_SIZE = 500;
 
 interface ShopifyRow {
   shopify_id: string;
@@ -40,7 +43,39 @@ interface ImportSummary {
   skipped_no_contact: number;
 }
 
-type Stage = "upload" | "preview" | "executing" | "done";
+type Stage = "upload" | "ready" | "running" | "done";
+
+function emptySummary(total: number): ImportSummary {
+  return {
+    total_rows: total,
+    matched_shopify_id: 0,
+    matched_email: 0,
+    matched_phone: 0,
+    matched_name: 0,
+    created_new: 0,
+    errors: 0,
+    error_details: [],
+    phones_overwritten: 0,
+    emails_added: 0,
+    skipped_no_contact: 0,
+  };
+}
+
+function mergeSummary(acc: ImportSummary, add: ImportSummary): ImportSummary {
+  return {
+    total_rows: acc.total_rows,
+    matched_shopify_id: acc.matched_shopify_id + add.matched_shopify_id,
+    matched_email: acc.matched_email + add.matched_email,
+    matched_phone: acc.matched_phone + add.matched_phone,
+    matched_name: acc.matched_name + add.matched_name,
+    created_new: acc.created_new + add.created_new,
+    errors: acc.errors + add.errors,
+    error_details: [...acc.error_details, ...add.error_details].slice(0, 50),
+    phones_overwritten: acc.phones_overwritten + add.phones_overwritten,
+    emails_added: acc.emails_added + add.emails_added,
+    skipped_no_contact: acc.skipped_no_contact + add.skipped_no_contact,
+  };
+}
 
 function parseShopifyCsv(file: File): Promise<ShopifyRow[]> {
   return new Promise((resolve, reject) => {
@@ -53,7 +88,6 @@ function parseShopifyCsv(file: File): Promise<ShopifyRow[]> {
           first_name: (r["First Name"] ?? "").trim(),
           last_name: (r["Last Name"] ?? "").trim(),
           email: (r["Email"] ?? "").trim(),
-          // Prioriza Phone (SMS opt-in) sobre Default Address Phone
           phone: ((r["Phone"] ?? r["Default Address Phone"]) ?? "").trim(),
           total_spent: parseFloat(r["Total Spent"] ?? "0") || 0,
           total_orders: parseInt(r["Total Orders"] ?? "0") || 0,
@@ -65,7 +99,7 @@ function parseShopifyCsv(file: File): Promise<ShopifyRow[]> {
           tags: r["Tags"] || undefined,
           city: r["Default Address City"] || undefined,
           state: r["Default Address Province Code"] || undefined,
-        })).filter((r) => r.shopify_id); // descarta linhas sem Customer ID
+        })).filter((r) => r.shopify_id);
         resolve(rows);
       },
       error: (err) => reject(err),
@@ -73,21 +107,40 @@ function parseShopifyCsv(file: File): Promise<ShopifyRow[]> {
   });
 }
 
-async function callImport(rows: ShopifyRow[], dryRun: boolean): Promise<ImportSummary> {
+async function callImportBatch(
+  rows: ShopifyRow[],
+  dryRun: boolean,
+  batchIndex: number,
+  batchTotal: number,
+): Promise<ImportSummary> {
   const { data, error } = await supabase.functions.invoke("import-shopify-customers", {
-    body: { rows, dry_run: dryRun },
+    body: {
+      rows,
+      dry_run: dryRun,
+      batch: { index: batchIndex, total: batchTotal },
+    },
   });
   if (error) throw new Error(error.message ?? "Erro ao chamar função");
   if (!data?.success) throw new Error(data?.error ?? "Resposta inválida");
   return data.summary as ImportSummary;
 }
 
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 export default function ImportarClientesShopify() {
   const navigate = useNavigate();
   const [stage, setStage] = useState<Stage>("upload");
   const [rows, setRows] = useState<ShopifyRow[]>([]);
-  const [preview, setPreview] = useState<ImportSummary | null>(null);
-  const [finalResult, setFinalResult] = useState<ImportSummary | null>(null);
+  const [result, setResult] = useState<ImportSummary | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number; label: string }>({
+    done: 0,
+    total: 0,
+    label: "",
+  });
   const [busy, setBusy] = useState(false);
 
   const handleFile = async (file: File) => {
@@ -100,11 +153,7 @@ export default function ImportarClientesShopify() {
       }
       setRows(parsed);
       toast.success(`${parsed.length} linhas lidas do CSV`);
-
-      // Dispara dry-run pra montar o preview
-      const summary = await callImport(parsed, true);
-      setPreview(summary);
-      setStage("preview");
+      setStage("ready");
     } catch (err: any) {
       toast.error(err?.message ?? "Erro ao processar arquivo");
     } finally {
@@ -112,21 +161,42 @@ export default function ImportarClientesShopify() {
     }
   };
 
+  const runBatched = async (dryRun: boolean): Promise<ImportSummary> => {
+    const batches = chunk(rows, BATCH_SIZE);
+    let acc = emptySummary(rows.length);
+    setProgress({ done: 0, total: batches.length, label: dryRun ? "Calculando preview" : "Importando" });
+
+    for (let i = 0; i < batches.length; i++) {
+      setProgress({
+        done: i,
+        total: batches.length,
+        label: `${dryRun ? "Calculando preview" : "Importando"} lote ${i + 1}/${batches.length}`,
+      });
+      const batchSummary = await callImportBatch(batches[i], dryRun, i + 1, batches.length);
+      acc = mergeSummary(acc, batchSummary);
+    }
+
+    setProgress({ done: batches.length, total: batches.length, label: "Concluído" });
+    return acc;
+  };
+
   const handleConfirm = async () => {
-    setStage("executing");
+    setStage("running");
     setBusy(true);
     try {
-      const summary = await callImport(rows, false);
-      setFinalResult(summary);
+      const summary = await runBatched(false);
+      setResult(summary);
       setStage("done");
       toast.success("Importação concluída");
     } catch (err: any) {
       toast.error(err?.message ?? "Erro na importação");
-      setStage("preview");
+      setStage("ready");
     } finally {
       setBusy(false);
     }
   };
+
+  const batches = Math.ceil(rows.length / BATCH_SIZE);
 
   return (
     <div className="p-6 space-y-6 max-w-4xl">
@@ -173,95 +243,65 @@ export default function ImportarClientesShopify() {
               </AlertDescription>
             </Alert>
             {busy && (
-              <p className="text-sm text-muted-foreground animate-pulse">Lendo arquivo e calculando preview…</p>
+              <p className="text-sm text-muted-foreground animate-pulse">Lendo arquivo…</p>
             )}
           </CardContent>
         </Card>
       )}
 
-      {stage === "preview" && preview && (
+      {stage === "ready" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Info className="h-4 w-4" />
-              2. Preview da importação (nada foi salvo ainda)
+              2. Pronto pra importar
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Stat label="Linhas no CSV" value={preview.total_rows} />
-              <Stat label="Match por Shopify ID" value={preview.matched_shopify_id} hint="já importado antes" />
-              <Stat label="Match por email" value={preview.matched_email} />
-              <Stat label="Match por telefone" value={preview.matched_phone} />
-              <Stat label="Match por nome idêntico" value={preview.matched_name} />
-              <Stat
-                label="Clientes novos a criar"
-                value={preview.created_new}
-                tone="positive"
-                hint="leads sem compra no dash"
-              />
-              <Stat
-                label="Ignorados (sem contato)"
-                value={preview.skipped_no_contact}
-                tone={preview.skipped_no_contact > 0 ? "warning" : undefined}
-              />
-              <Stat
-                label="Erros no dry-run"
-                value={preview.errors}
-                tone={preview.errors > 0 ? "danger" : undefined}
-              />
+              <Stat label="Linhas no CSV" value={rows.length} />
+              <Stat label="Lotes" value={batches} hint={`${BATCH_SIZE} linhas cada`} />
             </div>
-
-            {preview.errors > 0 && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Atenção — {preview.errors} erros no dry-run</AlertTitle>
-                <AlertDescription>
-                  <ul className="text-xs mt-2 space-y-1 max-h-32 overflow-auto">
-                    {preview.error_details.slice(0, 10).map((e, i) => (
-                      <li key={i}>
-                        Linha {e.row} (Shopify ID {e.shopify_id}): {e.error}
-                      </li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
 
             <Alert>
               <Info className="h-4 w-4" />
-              <AlertTitle>O que vai acontecer se você confirmar</AlertTitle>
+              <AlertTitle>O que vai acontecer</AlertTitle>
               <AlertDescription className="text-xs space-y-1 mt-2">
+                <div>• Cada lote é processado separadamente (evita timeout na Edge Function).</div>
                 <div>• Emails novos serão <strong>adicionados</strong> aos clientes que já existem.</div>
-                <div>• Telefones em conflito serão <strong>sobrescritos</strong> (Shopify é a fonte de verdade pra contato).</div>
-                <div>• Clientes novos entram como <strong>provisórios</strong> e aparecem na lista de Clientes com o CPF começando com "shopify-".</div>
-                <div>• A importação é idempotente: você pode rodar de novo que ela reconhece o que já foi feito.</div>
+                <div>• Telefones em conflito serão <strong>sobrescritos</strong> (Shopify é a fonte de verdade).</div>
+                <div>• Clientes novos entram como <strong>provisórios</strong> com CPF "shopify-…".</div>
+                <div>• A importação é idempotente: rodar de novo não duplica nada.</div>
+                <div>• Tempo estimado: ~{Math.ceil(batches * 0.5)} a {batches * 1} minutos.</div>
               </AlertDescription>
             </Alert>
 
             <div className="flex gap-3 justify-end">
-              <Button variant="outline" onClick={() => { setStage("upload"); setRows([]); setPreview(null); }}>
+              <Button variant="outline" onClick={() => { setStage("upload"); setRows([]); }}>
                 Voltar
               </Button>
-              <Button onClick={handleConfirm} disabled={busy || preview.errors > preview.total_rows / 2}>
+              <Button onClick={handleConfirm} disabled={busy}>
                 <Play className="h-4 w-4 mr-2" />
-                Confirmar importação ({preview.total_rows - preview.skipped_no_contact} clientes)
+                Importar {rows.length} clientes ({batches} lotes)
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {stage === "executing" && (
+      {stage === "running" && (
         <Card>
-          <CardContent className="py-12 text-center space-y-2">
-            <p className="text-lg animate-pulse">Importando {rows.length} clientes…</p>
-            <p className="text-xs text-muted-foreground">Isso pode levar alguns minutos. Não feche a página.</p>
+          <CardContent className="py-12 space-y-4">
+            <p className="text-lg text-center animate-pulse">{progress.label}…</p>
+            <Progress value={(progress.done / Math.max(1, progress.total)) * 100} />
+            <p className="text-xs text-muted-foreground text-center">
+              {progress.done} de {progress.total} lotes concluídos — não feche a página
+            </p>
           </CardContent>
         </Card>
       )}
 
-      {stage === "done" && finalResult && (
+      {stage === "done" && result && (
         <Card className="border-green-500/40">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base text-green-700">
@@ -271,14 +311,35 @@ export default function ImportarClientesShopify() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Stat label="Total processado" value={finalResult.total_rows} />
-              <Stat label="Atualizados" value={finalResult.matched_shopify_id + finalResult.matched_email + finalResult.matched_phone + finalResult.matched_name} tone="positive" />
-              <Stat label="Criados" value={finalResult.created_new} tone="positive" />
-              <Stat label="Emails adicionados" value={finalResult.emails_added} />
-              <Stat label="Telefones sobrescritos" value={finalResult.phones_overwritten} />
-              <Stat label="Ignorados sem contato" value={finalResult.skipped_no_contact} />
-              <Stat label="Erros" value={finalResult.errors} tone={finalResult.errors > 0 ? "danger" : undefined} />
+              <Stat label="Total processado" value={result.total_rows} />
+              <Stat
+                label="Atualizados"
+                value={result.matched_shopify_id + result.matched_email + result.matched_phone + result.matched_name}
+                tone="positive"
+              />
+              <Stat label="Criados" value={result.created_new} tone="positive" />
+              <Stat label="Emails adicionados" value={result.emails_added} />
+              <Stat label="Telefones sobrescritos" value={result.phones_overwritten} />
+              <Stat label="Ignorados sem contato" value={result.skipped_no_contact} />
+              <Stat label="Erros" value={result.errors} tone={result.errors > 0 ? "danger" : undefined} />
             </div>
+
+            {result.errors > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>{result.errors} erros durante a importação</AlertTitle>
+                <AlertDescription>
+                  <ul className="text-xs mt-2 space-y-1 max-h-40 overflow-auto">
+                    {result.error_details.slice(0, 20).map((e, i) => (
+                      <li key={i}>
+                        Linha {e.row} (Shopify ID {e.shopify_id}): {e.error}
+                      </li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex gap-3 justify-end">
               <Button onClick={() => navigate("/clientes")}>Ver base de clientes</Button>
             </div>
