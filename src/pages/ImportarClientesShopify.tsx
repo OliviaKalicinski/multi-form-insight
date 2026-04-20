@@ -9,7 +9,13 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Play, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 
-const BATCH_SIZE = 500;
+const BATCH_SIZE = 150;
+
+function hasContact(r: ShopifyRow): boolean {
+  const email = (r.email ?? "").trim();
+  const phoneDigits = (r.phone ?? "").replace(/\D/g, "");
+  return !!email || phoneDigits.length >= 10;
+}
 
 interface ShopifyRow {
   shopify_id: string;
