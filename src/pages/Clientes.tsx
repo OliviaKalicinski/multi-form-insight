@@ -544,89 +544,27 @@ export default function Clientes() {
         </Card>
       )}
 
-      {/* Filtros contextuais */}
-      {viewMode === "leads" ? (
-        <LeadsFilters
-          search={search}
-          onSearchChange={(v) => { setSearch(v); setPage(0); }}
-          originFilter={leadOriginFilter}
-          onOriginChange={(v) => { setLeadOriginFilter(v); setPage(0); }}
-          contactFilter={leadContactFilter}
-          onContactChange={(v) => { setLeadContactFilter(v); setPage(0); }}
-          responsavelFilter={responsavelFilter}
-          onResponsavelChange={(v) => { setResponsavelFilter(v); setPage(0); }}
-          responsaveis={responsaveis}
-        />
-      ) : (
-        <CustomerFilters
-          search={search}
-          onSearchChange={(v) => { setSearch(v); setPage(0); }}
-          churnFilter={churnFilter}
-          onChurnChange={(v) => { setChurnFilter(v); setPage(0); }}
-          segmentFilter={segmentFilter}
-          onSegmentChange={(v) => { setSegmentFilter(v); setPage(0); }}
-          responsavelFilter={responsavelFilter}
-          onResponsavelChange={(v) => { setResponsavelFilter(v); setPage(0); }}
-          responsaveis={responsaveis}
-          petFilter={petFilter}
-          onPetChange={(v) => { setPetFilter(v); setPage(0); }}
-        />
-      )}
-
-      {/* Filtro por canal — sempre visível, aplica em todas as visões */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium text-muted-foreground">Canal:</span>
-        <Button
-          variant={channelFilter === "all" ? "default" : "outline"}
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => { setChannelFilter("all"); setPage(0); }}
-        >
-          Todos
-        </Button>
-        {SEGMENT_ORDER.map((key) => (
-          <Button
-            key={key}
-            variant={channelFilter === key ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => { setChannelFilter(key); setPage(0); }}
-            style={
-              channelFilter === key
-                ? { backgroundColor: SEGMENT_COLORS[key], borderColor: SEGMENT_COLORS[key] }
-                : { color: SEGMENT_COLORS[key], borderColor: `${SEGMENT_COLORS[key]}60` }
-            }
-          >
-            {SEGMENT_LABELS[key]}
-          </Button>
-        ))}
-      </div>
-
-      {/* Jornada — só faz sentido para clientes com compra */}
-      {viewMode !== "leads" && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-muted-foreground">Jornada:</span>
-          <Button
-            variant={journeyFilter === "all" ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => { setJourneyFilter("all"); setPage(0); }}
-          >
-            Todas
-          </Button>
-          {Object.entries(journeyStageLabels).map(([key, label]) => (
-            <Button
-              key={key}
-              variant={journeyFilter === key ? "default" : "outline"}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => { setJourneyFilter(key); setPage(0); }}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-      )}
+      {/* Painel de filtros unificado */}
+      <UnifiedFilters
+        viewMode={viewMode}
+        search={search}
+        onSearchChange={setters.setSearch}
+        channelFilter={channelFilter}
+        onChannelChange={setters.setChannelFilter}
+        statusFilter={statusFilter}
+        onStatusChange={setters.setStatusFilter}
+        segmentFilter={segmentFilter}
+        onSegmentChange={setters.setSegmentFilter}
+        petFilter={petFilter}
+        onPetChange={setters.setPetFilter}
+        leadOriginFilter={leadOriginFilter}
+        onLeadOriginChange={setters.setLeadOriginFilter}
+        leadContactFilter={leadContactFilter}
+        onLeadContactChange={setters.setLeadContactFilter}
+        responsavelFilter={responsavelFilter}
+        onResponsavelChange={setters.setResponsavelFilter}
+        responsaveis={responsaveis}
+      />
 
       {/* Tabela */}
       <Card>
