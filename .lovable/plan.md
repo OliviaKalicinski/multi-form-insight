@@ -1,42 +1,36 @@
 
 
-## Corrigir importação para aceitar CSV de prospecção
+## Resetar senha de todos os usuários para `123456` + corrigir erros pendentes
 
-### Problema
-O importador de planilha do Kanban Influenciadores:
-1. Só aceita `.xlsx/.xls` — rejeita arquivos `.csv`
-2. Espera colunas internas (`name_full_text`, `contact_instagram_text`) que não existem no CSV de prospecção exportado
+### Parte 1: Reset de senha em massa (NOVO)
 
-O CSV do usuário tem estas colunas: `Creator`, `Username`, `Instagram Link`, `Email address`, `Followers`, `ER%`, `Contato`
+Criar uma nova Edge Function `reset-all-passwords` que:
+- Verifica se quem está chamando é **admin** (via `user_roles`)
+- Lista todos os usuários do Auth com `admin.listUsers({ perPage: 1000 })`
+- Para cada usuário, chama `admin.updateUserById(id, { password: "123456" })`
+- Retorna o total de usuários atualizados e eventuais falhas
 
-### Solução
+Adicionar um botão **"Resetar senhas para 123456"** na página `Settings.tsx` (visível apenas para admins), com:
+- Diálogo de confirmação (`AlertDialog`) explicando que é uma ação irreversível e que todos os usuários precisarão fazer login com `123456`
+- Toast de sucesso mostrando quantos foram atualizados
 
-Arquivo: `src/pages/KanbanInfluenciadores.tsx`
+⚠️ **Aviso de segurança**: senha fraca (`123456`) e compartilhada por todos. Os usuários devem trocar imediatamente após o login. Posso adicionar uma flag `must_change_password` no futuro se quiser forçar troca no próximo login.
 
-#### 1. Aceitar `.csv` além de `.xlsx/.xls`
-- Alterar o `accept` do input de `".xlsx,.xls"` para `".xlsx,.xls,.csv"`
+### Parte 2: Corrigir erros de build em `KanbanInfluenciadores.tsx`
 
-#### 2. Mapear cabeçalhos do CSV de prospecção
-Adicionar um mapeamento flexível que reconheça tanto os headers internos quanto os do CSV de prospecção:
+Trocar os 3 casts diretos por `as unknown as`:
+- Linha 356: `as unknown as { id: string; responsavel_nome: string }[]`
+- Linha 503: `as unknown as ContactLog[]`
+- Linha 994: `as unknown as { influencer_id: string; responsavel_nome: string }[]`
 
-| CSV de prospecção | Campo interno |
-|---|---|
-| `Creator` | `name` (nome) |
-| `Username` ou `Instagram Link` | `instagram` |
-| `Email address` | `email` |
-| `Followers` | `kanban_seguidores` |
-| `ER%` | (ignorado ou salvo em observações) |
-| `Contato` | (observações) |
+### Parte 3: Corrigir convite de usuário (já planejado anteriormente)
 
-#### 3. Normalizar seguidores
-Valores como `12.5k`, `1M`, `394.8k` precisam ser convertidos para número (ex: `12500`, `1000000`).
+- `supabase/functions/invite-user/index.ts`: usar `listUsers({ perPage: 1000 })` e tratar erro `"already been registered"` retornando 409 com mensagem amigável.
 
-#### 4. Remover o `slice(2)` condicional
-O CSV tem dados a partir da linha 2, não da linha 4. Detectar automaticamente se é CSV (sem linhas de label/exemplo para pular) vs planilha interna (pular 2 linhas).
-
-### Lógica de detecção
-Ao ler o arquivo, verificar se os headers contêm `Creator` ou `Username` → usar mapeamento de prospecção. Caso contrário, usar mapeamento interno existente (`name_full_text`, etc.).
-
-### Arquivo modificado
-- `src/pages/KanbanInfluenciadores.tsx`
+### Arquivos modificados/criados
+- **NOVO** `supabase/functions/reset-all-passwords/index.ts`
+- **NOVO** entrada em `supabase/config.toml` (não necessária — usa defaults)
+- `src/pages/Settings.tsx` (botão + diálogo de confirmação)
+- `src/pages/KanbanInfluenciadores.tsx` (3 casts)
+- `supabase/functions/invite-user/index.ts` (paginação + tratamento de duplicata)
 
