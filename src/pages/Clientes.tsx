@@ -20,7 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpDown, ExternalLink, Download, Plus, Upload as UploadIcon, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
-import { isSampleOrder } from "@/utils/samplesAnalyzer";
+import { isOnlySampleOrder } from "@/utils/samplesAnalyzer";
 import { BuyerPetProfile, PET_PROFILE_LABELS, PET_PROFILE_COLORS, PET_PROFILE_ORDER } from "@/data/operationalProducts";
 
 const segmentColors: Record<string, string> = {
@@ -236,7 +236,7 @@ export default function Clientes() {
       if (!cpf) continue;
       const cur = byCpf.get(cpf) ?? { total: 0, samples: 0 };
       cur.total++;
-      if (isSampleOrder(o)) cur.samples++;
+      if (isOnlySampleOrder(o)) cur.samples++;
       byCpf.set(cpf, cur);
     }
     const out = new Set<string>();
