@@ -105,7 +105,7 @@ function parseShopifyCsv(file: File): Promise<ShopifyRow[]> {
           tags: r["Tags"] || undefined,
           city: r["Default Address City"] || undefined,
           state: r["Default Address Province Code"] || undefined,
-        })).filter((r) => r.shopify_id);
+        })).filter((r) => r.shopify_id && hasContact(r));
         resolve(rows);
       },
       error: (err) => reject(err),
