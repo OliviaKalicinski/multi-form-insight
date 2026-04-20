@@ -303,7 +303,28 @@ async function syncIdentifiers(orders: ProcessedOrder[]): Promise<void> {
     const emailCount = identifiers.filter((i) => i.type === "email").length;
     const phoneCount = identifiers.filter((i) => i.type === "phone").length;
 
-    // Etapa 4: Batch upsert em lotes de 500
+    // Etapa 4a: Para telefones — DELETE os existentes dos customers da NF, depois INSERT frescos.
+    // Isso garante que o telefone da NF fiscal sempre vença, revertendo qualquer sobrescrita
+    // que tenha vindo de uma importação Shopify anterior.
+    const customerIdsWithPhone = [...new Set(
+      identifiers.filter((i) => i.type === "phone").map((i) => i.customer_id)
+    )];
+    let deletedPhones = 0;
+    if (customerIdsWithPhone.length > 0) {
+      const DELETE_BATCH = 200;
+      const deleteChunks = chunkArray(customerIdsWithPhone, DELETE_BATCH);
+      for (const chunk of deleteChunks) {
+        const { count } = await supabase
+          .from("customer_identifier")
+          .delete({ count: "exact" })
+          .in("customer_id", chunk)
+          .eq("type", "phone");
+        deletedPhones += count ?? 0;
+      }
+      console.log(`[NF-IDENTIFIERS] Telefones anteriores removidos: ${deletedPhones}`);
+    }
+
+    // Etapa 4b: Batch upsert em lotes de 500 (emails + novos telefones NF)
     if (identifiers.length > 0) {
       const UPSERT_BATCH = 500;
       const upsertChunks = chunkArray(identifiers, UPSERT_BATCH);
