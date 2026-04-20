@@ -24,8 +24,8 @@ export type UnifiedStatus =
 interface UseCustomerFiltersArgs<C> {
   customers: C[];
   viewMode: ViewMode;
-  getEmail: (c: C) => string;
-  getPhone: (c: C) => string;
+  getEmail: (c: any) => string;
+  getPhone: (c: any) => string;
   getChannel: (cpf: string | null) => Exclude<SegmentFilter, "all"> | null;
   getPetProfile: (cpf: string | null) => BuyerPetProfile | null;
 }
