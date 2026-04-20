@@ -9,7 +9,13 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Play, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 
-const BATCH_SIZE = 500;
+const BATCH_SIZE = 150;
+
+function hasContact(r: ShopifyRow): boolean {
+  const email = (r.email ?? "").trim();
+  const phoneDigits = (r.phone ?? "").replace(/\D/g, "");
+  return !!email || phoneDigits.length >= 10;
+}
 
 interface ShopifyRow {
   shopify_id: string;
@@ -99,7 +105,7 @@ function parseShopifyCsv(file: File): Promise<ShopifyRow[]> {
           tags: r["Tags"] || undefined,
           city: r["Default Address City"] || undefined,
           state: r["Default Address Province Code"] || undefined,
-        })).filter((r) => r.shopify_id);
+        })).filter((r) => r.shopify_id && hasContact(r));
         resolve(rows);
       },
       error: (err) => reject(err),
@@ -172,7 +178,11 @@ export default function ImportarClientesShopify() {
         total: batches.length,
         label: `${dryRun ? "Calculando preview" : "Importando"} lote ${i + 1}/${batches.length}`,
       });
+      const t0 = Date.now();
+      console.log(`[shopify-import] starting batch ${i + 1}/${batches.length} (${batches[i].length} rows)`);
       const batchSummary = await callImportBatch(batches[i], dryRun, i + 1, batches.length);
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      console.log(`[shopify-import] batch ${i + 1}/${batches.length} done in ${elapsed}s`, batchSummary);
       acc = mergeSummary(acc, batchSummary);
     }
 

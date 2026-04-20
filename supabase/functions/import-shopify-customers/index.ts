@@ -192,12 +192,15 @@ async function applyRow(
     const nn = normName(nome);
     if (nn && !idx.nameIndex.has(nn)) idx.nameIndex.set(nn, customerId);
   } else {
-    await db
-      .from("customer")
-      .update({ shopify_customer_id: row.shopify_id })
-      .eq("id", customerId)
-      .is("shopify_customer_id", null);
-    idx.shopifyIdIndex.set(String(row.shopify_id), customerId);
+    // Só atualiza shopify_customer_id se ainda não estiver mapeado pra esse customer
+    if (idx.shopifyIdIndex.get(String(row.shopify_id)) !== customerId) {
+      await db
+        .from("customer")
+        .update({ shopify_customer_id: row.shopify_id })
+        .eq("id", customerId)
+        .is("shopify_customer_id", null);
+      idx.shopifyIdIndex.set(String(row.shopify_id), customerId);
+    }
   }
 
   // Email
@@ -216,23 +219,22 @@ async function applyRow(
     }
   }
 
-  // Telefone: sobrescreve (regra decidida com a Olivia)
+  // Telefone: sobrescreve sem SELECT prévio (usa phoneIndex em memória)
   if (phoneNorm && phoneNorm.length >= 10) {
     const alreadyMappedTo = idx.phoneIndex.get(phoneNorm);
     if (alreadyMappedTo === customerId) {
       // já tem esse telefone, nada a fazer
     } else {
-      const { data: existingPhones } = await db
+      // Verifica se o customer já tem ALGUM telefone no índice (busca reversa cara, então usamos heurística:
+      // tentamos update direto; se não afetou linha, inserimos)
+      const { data: updated, error: updErr } = await db
         .from("customer_identifier")
-        .select("id, value")
+        .update({ value: phoneNorm, is_primary: true })
         .eq("customer_id", customerId)
-        .eq("type", "phone");
+        .eq("type", "phone")
+        .select("id");
 
-      if (existingPhones && existingPhones.length > 0) {
-        await db
-          .from("customer_identifier")
-          .update({ value: phoneNorm, is_primary: true })
-          .eq("id", existingPhones[0].id);
+      if (!updErr && updated && updated.length > 0) {
         counters.phones_overwritten += 1;
       } else {
         await db.from("customer_identifier").insert({
