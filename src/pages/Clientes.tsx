@@ -225,72 +225,20 @@ export default function Clientes() {
     return { customers: customersCount, leads: leadsCount, all: customersCount + leadsCount };
   }, [customers]);
 
-  // ── Filtro em cascata ─────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let list = customers;
-
-    // 1. View mode — primeiro corte (Clientes / Leads / Todos)
-    if (viewMode === "customers") list = list.filter((c) => !c.is_provisional);
-    else if (viewMode === "leads") list = list.filter((c) => c.is_provisional);
-
-    // 2. Busca livre — nome, CPF, email, telefone
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((c) => {
-        const nome = (c.nome ?? "").toLowerCase();
-        const cpf = (c.cpf_cnpj ?? "").toLowerCase();
-        const email = getEmail(c).toLowerCase();
-        const phone = getPhone(c).toLowerCase();
-        return nome.includes(q) || cpf.includes(q) || email.includes(q) || phone.includes(q);
-      });
-    }
-
-    // 3. Canal (B2B/B2C/B2B2C) — vale para clientes com pedidos. Leads ficam
-    // classificados só se tiverem ao menos 1 pedido histórico no salesData.
-    if (channelFilter !== "all") {
-      list = list.filter((c) => getChannel(c.cpf_cnpj) === channelFilter);
-    }
-
-    // 4. Filtros específicos da visão
-    if (viewMode === "customers" || viewMode === "all") {
-      if (churnFilter !== "all") list = list.filter((c) => c.churn_status === churnFilter);
-      if (segmentFilter !== "all") list = list.filter((c) => c.segment === segmentFilter);
-      if (journeyFilter !== "all") list = list.filter((c) => (c as any).journey_stage === journeyFilter);
-      if (petFilter !== "all") {
-        list = list.filter((c) => getPetProfile(c.cpf_cnpj) === petFilter);
-      }
-    }
-
-    if (viewMode === "leads" || viewMode === "all") {
-      if (leadOriginFilter !== "all") {
-        list = list.filter((c) => {
-          if (!c.is_provisional && viewMode === "all") return true; // não restringe clientes não-provisórios no "Todos"
-          return getLeadOrigin(c.cpf_cnpj) === leadOriginFilter;
-        });
-      }
-      if (leadContactFilter !== "all") {
-        list = list.filter((c) => {
-          const hasEmail = !!getEmail(c);
-          const hasPhone = !!getPhone(c);
-          switch (leadContactFilter) {
-            case "email": return hasEmail;
-            case "phone": return hasPhone;
-            case "both": return hasEmail && hasPhone;
-            case "none": return !hasEmail && !hasPhone;
-          }
-        });
-      }
-    }
-
-    if (responsavelFilter !== "all") list = list.filter((c) => c.responsavel === responsavelFilter);
-
-    return list;
-  }, [
-    customers, viewMode, search, channelFilter,
-    churnFilter, segmentFilter, journeyFilter, petFilter,
-    leadOriginFilter, leadContactFilter, responsavelFilter,
-    petMap, emailMap, phoneMap, customerChannelMap,
-  ]);
+  // ── Filtros centralizados (search, canal, status, segmento, pet, leads, responsável) ─────
+  const { filters, setters, filtered } = useCustomerFilters({
+    customers,
+    viewMode,
+    getEmail,
+    getPhone,
+    getChannel,
+    getPetProfile,
+  });
+  const {
+    search, channelFilter, statusFilter, segmentFilter, petFilter,
+    responsavelFilter, leadOriginFilter, leadContactFilter, page,
+  } = filters;
+  const { setPage } = setters;
 
   // ── Sort ─────────────────────────────────────────────────────────
   const sorted = useMemo(() => {
