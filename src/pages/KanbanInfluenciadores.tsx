@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Database, Search, X, MessageSquare, Send } from "lucide-react";
+import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Database, Search, X, MessageSquare, Send, CalendarDays, Download, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
@@ -91,6 +91,26 @@ const COLUMNS: { key: InfluencerStatus; title: string; color: string; dot: strin
 const NICHO_OPTIONS = ["Pets", "Nutrição Animal", "Veterinária", "Lifestyle", "Família", "Fitness", "Outro"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+function startOfWeek(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+
+function startOfMonth(): Date {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
 function normalizeInstagram(v: string): string {
   return (v || "").trim().replace(/^@/, "").toLowerCase();
 }
@@ -258,6 +278,12 @@ function InfluencerCard({
           })}
         </div>
       )}
+
+      {/* Data do primeiro contato */}
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-0.5 border-t border-dashed border-gray-100 mt-1">
+        <CalendarDays className="h-3 w-3 shrink-0" />
+        <span>1º contato: {formatDate(influencer.created_at)}</span>
+      </div>
     </div>
   );
 }
@@ -551,7 +577,7 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
     editMutation.mutate({ id: editingId, observacao: editObservacao });
   };
 
-  const formatDate = (iso: string) => {
+  const formatDateTime = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }) +
       " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -618,7 +644,7 @@ function ContactLogSection({ influencerId }: { influencerId: string }) {
                   </Badge>
                   <div className="flex items-center gap-1">
                     <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                      {formatDate(log.created_at)}
+                      {formatDateTime(log.created_at)}
                     </span>
                     {!isEditing && (
                       <button
@@ -1391,6 +1417,50 @@ export default function KanbanInfluenciadores() {
     return map;
   }, [influencers]);
 
+  // ── Stats para o painel de resumo ──────────────────────────────────────────
+  const stats = useMemo(() => {
+    const week = startOfWeek();
+    const month = startOfMonth();
+    let novosNaSemana = 0;
+    let novosNoMes = 0;
+    for (const i of rawInfluencers) {
+      const d = new Date(i.created_at);
+      if (d >= week) novosNaSemana++;
+      if (d >= month) novosNoMes++;
+    }
+    const ativos = rawInfluencers.filter(
+      (i) => i.status !== "inativo"
+    ).length;
+    return { total: rawInfluencers.length, ativos, novosNaSemana, novosNoMes };
+  }, [rawInfluencers]);
+
+  // ── Export XLSX ────────────────────────────────────────────────────────────
+  const handleExportXLSX = useCallback(() => {
+    const colLabel: Record<InfluencerStatus, string> = {
+      prospeccao: "Prospecção", reativacao: "Reativação", em_contato: "Em Contato",
+      seeding_enviado: "Seeding Enviado", postou: "Postou", parceiro: "Parceiro", inativo: "Inativo",
+    };
+    const rows = rawInfluencers.map((i) => ({
+      Nome: i.nome,
+      Instagram: i.instagram ? `@${i.instagram}` : "",
+      TikTok: i.tiktok ? `@${i.tiktok}` : "",
+      WhatsApp: i.whatsapp,
+      Email: i.email,
+      Nicho: i.nicho,
+      Seguidores: i.seguidores ? Number(i.seguidores) : "",
+      Status: colLabel[i.status] ?? i.status,
+      "Na Base": i.na_base ? "Sim" : "Não",
+      Responsáveis: (responsaveisMap.get(i.id) ?? []).join(", "),
+      "1º Contato": formatDate(i.created_at),
+      "Data Completa": i.created_at ? new Date(i.created_at).toLocaleDateString("pt-BR") : "",
+      Observações: i.observacoes,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Influenciadores");
+    XLSX.writeFile(wb, `influenciadores_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }, [rawInfluencers, responsaveisMap]);
+
   // Use rawInfluencers so the DragOverlay works even with an active search/filter
   const activeInfluencer = rawInfluencers.find((i) => i.id === activeId);
 
@@ -1439,11 +1509,49 @@ export default function KanbanInfluenciadores() {
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
             <Upload className="h-4 w-4" /> Importar
           </Button>
+          <Button variant="outline" onClick={handleExportXLSX} className="gap-1.5" disabled={rawInfluencers.length === 0}>
+            <Download className="h-4 w-4" /> Exportar
+          </Button>
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Novo Influenciador
           </Button>
         </div>
       </div>
+
+      {/* Painel de resumo — primeiro contato e métricas do pipeline */}
+      {!isLoading && rawInfluencers.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="rounded-lg border bg-card p-3 space-y-0.5">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total no pipeline</p>
+            <p className="text-2xl font-semibold">{stats.total}</p>
+            <p className="text-[11px] text-muted-foreground">{stats.ativos} ativos</p>
+          </div>
+          <div className="rounded-lg border bg-card p-3 space-y-0.5">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+              <CalendarDays className="h-3 w-3" /> Esta semana
+            </p>
+            <p className="text-2xl font-semibold text-violet-700">{stats.novosNaSemana}</p>
+            <p className="text-[11px] text-muted-foreground">novos 1ºs contatos</p>
+          </div>
+          <div className="rounded-lg border bg-card p-3 space-y-0.5">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+              <TrendingUp className="h-3 w-3" /> Este mês
+            </p>
+            <p className="text-2xl font-semibold text-blue-700">{stats.novosNoMes}</p>
+            <p className="text-[11px] text-muted-foreground">novos 1ºs contatos</p>
+          </div>
+          <div className="rounded-lg border bg-card p-3 space-y-1">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Por etapa</p>
+            <div className="flex flex-wrap gap-1">
+              {COLUMNS.filter((c) => byStatus[c.key].length > 0).map((c) => (
+                <span key={c.key} className={cn("text-[10px] px-1.5 py-0.5 rounded-full border font-medium", c.color)}>
+                  {c.title.split(" ")[0]} {byStatus[c.key].length}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {search && (
         <div className="text-xs text-muted-foreground">
