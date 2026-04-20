@@ -125,11 +125,12 @@ export function useCustomerFilters<C extends Record<string, any>>({
       });
     }
 
-    // 3. Canal — em "leads" forçamos B2C (regra de negócio)
-    const effectiveChannel: SegmentFilter =
-      viewMode === "leads" ? "b2c" : channelFilter;
-    if (effectiveChannel !== "all") {
-      list = list.filter((c) => getChannel(c.cpf_cnpj) === effectiveChannel);
+    // 3. Canal — NÃO aplica em "leads".
+    //    Lead do Shopify é B2C por definição (origem Comida de Dragão), mas ainda
+    //    não tem pedidos em salesData, então getChannel() retorna null pra todos.
+    //    Filtrar por "b2c" nessa aba zerava a lista inteira.
+    if (viewMode !== "leads" && channelFilter !== "all") {
+      list = list.filter((c) => getChannel(c.cpf_cnpj) === channelFilter);
     }
 
     // 4. Status unificado + segmento + pet (visão Clientes/Todos)
