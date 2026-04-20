@@ -41,7 +41,7 @@ interface ImportSummary {
   created_new: number;
   errors: number;
   error_details: Array<{ row: number; shopify_id: string; error: string }>;
-  phones_overwritten: number;
+  phones_added: number;
   emails_added: number;
   skipped_no_contact: number;
 }
@@ -219,33 +219,27 @@ async function applyRow(
     }
   }
 
-  // Telefone: sobrescreve sem SELECT prévio (usa phoneIndex em memória)
+  // Telefone: só insere se ainda não existe — nunca sobrescreve telefone existente.
+  // A planilha fiscal (NF) é a fonte de verdade para telefone; o Shopify pode trazer
+  // o telefone do destinatário da entrega, que difere do cadastro fiscal.
   if (phoneNorm && phoneNorm.length >= 10) {
     const alreadyMappedTo = idx.phoneIndex.get(phoneNorm);
     if (alreadyMappedTo === customerId) {
-      // já tem esse telefone, nada a fazer
-    } else {
-      // Verifica se o customer já tem ALGUM telefone no índice (busca reversa cara, então usamos heurística:
-      // tentamos update direto; se não afetou linha, inserimos)
-      const { data: updated, error: updErr } = await db
-        .from("customer_identifier")
-        .update({ value: phoneNorm, is_primary: true })
-        .eq("customer_id", customerId)
-        .eq("type", "phone")
-        .select("id");
-
-      if (!updErr && updated && updated.length > 0) {
-        counters.phones_overwritten += 1;
-      } else {
-        await db.from("customer_identifier").insert({
-          customer_id: customerId,
-          type: "phone",
-          value: phoneNorm,
-          is_primary: true,
-        });
+      // já tem exatamente esse número, nada a fazer
+    } else if (!alreadyMappedTo) {
+      // Telefone ainda não existe em nenhum customer — insere
+      const { error: phoneErr } = await db.from("customer_identifier").insert({
+        customer_id: customerId,
+        type: "phone",
+        value: phoneNorm,
+        is_primary: true,
+      });
+      if (!phoneErr) {
+        idx.phoneIndex.set(phoneNorm, customerId);
       }
-      idx.phoneIndex.set(phoneNorm, customerId);
     }
+    // Se alreadyMappedTo !== customerId && alreadyMappedTo !== undefined:
+    // o número já pertence a outro customer — não toca nada.
   }
 }
 
@@ -312,7 +306,7 @@ serve(async (req: Request) => {
       created_new: 0,
       errors: 0,
       error_details: [],
-      phones_overwritten: 0,
+      phones_added: 0,
       emails_added: 0,
       skipped_no_contact: 0,
     };
