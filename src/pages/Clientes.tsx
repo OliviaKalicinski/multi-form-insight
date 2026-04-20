@@ -482,6 +482,23 @@ export default function Clientes() {
                 ? `Clientes com compra • ${filtered.length} de ${totalCounts.customers}`
                 : `Base completa • ${filtered.length} de ${totalCounts.all}`}
           </p>
+          {contactStats.total > 0 && (
+            <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                <Mail className="h-3 w-3" />
+                {contactStats.withEmail} com email ({contactStats.pctEmail}%)
+              </span>
+              <span aria-hidden>·</span>
+              <span className="inline-flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {contactStats.withPhone} com telefone ({contactStats.pctPhone}%)
+              </span>
+              <span aria-hidden>·</span>
+              <span className={contactStats.none > 0 ? "text-amber-600 font-medium" : ""}>
+                ⚠ {contactStats.none} sem contato ({contactStats.pctNone}%)
+              </span>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <Button
