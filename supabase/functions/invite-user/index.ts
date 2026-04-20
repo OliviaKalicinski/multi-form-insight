@@ -40,8 +40,9 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Get current user
-    const { data: { user: currentUser }, error: userError } = await userClient.auth.getUser();
+    // Get current user by validating the JWT from the header directly
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: currentUser }, error: userError } = await userClient.auth.getUser(token);
     
     if (userError || !currentUser) {
       console.error("User verification failed:", userError);
