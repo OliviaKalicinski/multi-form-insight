@@ -140,18 +140,48 @@ export default function Clientes() {
   const [emailMap, setEmailMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
+    // Supabase/PostgREST retorna no máximo 1000 linhas por query por padrão.
+    // Como customer_identifier cresce muito além disso, precisamos paginar
+    // via .range() até esgotar o resultado — se não, o frontend só enxerga
+    // os primeiros 1000 emails e 1000 phones e acaba mostrando "sem contato"
+    // para muitos clientes que na verdade têm contato salvo no banco.
+    const fetchAllIdentifiers = async (
+      type: "phone" | "email",
+    ): Promise<{ customer_id: string; value: string }[]> => {
+      const pageSize = 1000;
+      let all: { customer_id: string; value: string }[] = [];
+      let from = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("customer_identifier")
+          .select("customer_id, value")
+          .eq("type", type)
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          all = all.concat(data);
+          if (data.length < pageSize) hasMore = false;
+          from += pageSize;
+        }
+      }
+      return all;
+    };
+
     const fetchContacts = async () => {
-      const [phonesRes, emailsRes] = await Promise.all([
-        supabase.from("customer_identifier").select("customer_id, value").eq("type", "phone"),
-        supabase.from("customer_identifier").select("customer_id, value").eq("type", "email"),
+      const [phones, emails] = await Promise.all([
+        fetchAllIdentifiers("phone"),
+        fetchAllIdentifiers("email"),
       ]);
 
       const idToPhone = new Map<string, string>();
-      for (const row of phonesRes.data ?? []) {
+      for (const row of phones) {
         if (!idToPhone.has(row.customer_id)) idToPhone.set(row.customer_id, row.value);
       }
       const idToEmail = new Map<string, string>();
-      for (const row of emailsRes.data ?? []) {
+      for (const row of emails) {
         if (!idToEmail.has(row.customer_id)) idToEmail.set(row.customer_id, row.value);
       }
 
