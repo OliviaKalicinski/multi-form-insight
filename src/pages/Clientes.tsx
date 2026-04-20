@@ -105,24 +105,9 @@ export default function Clientes() {
   // View mode — separa clientes com compra dos leads/provisórios
   const [viewMode, setViewMode] = useState<ViewMode>("customers");
 
-  // Filtros comuns
-  const [search, setSearch] = useState("");
-  const [channelFilter, setChannelFilter] = useState<SegmentFilter>("all");
-
-  // Filtros da visão Clientes
-  const [churnFilter, setChurnFilter] = useState("all");
-  const [segmentFilter, setSegmentFilter] = useState("all");
-  const [journeyFilter, setJourneyFilter] = useState("all");
-  const [responsavelFilter, setResponsavelFilter] = useState("all");
-  const [petFilter, setPetFilter] = useState("all");
-
-  // Filtros da visão Leads
-  const [leadOriginFilter, setLeadOriginFilter] = useState<LeadOrigin>("all");
-  const [leadContactFilter, setLeadContactFilter] = useState<LeadContact>("all");
-
   const [sortKey, setSortKey] = useState<SortKey>("total_revenue");
   const [sortAsc, setSortAsc] = useState(false);
-  const [page, setPage] = useState(0);
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
   // ── Mapas auxiliares ─────────────────────────────────────────────
