@@ -1,36 +1,36 @@
 
 
-## Resetar senha de todos os usuários para `123456` + corrigir erros pendentes
+## Corrigir timeout do import-shopify-customers (504 IDLE_TIMEOUT)
 
-### Parte 1: Reset de senha em massa (NOVO)
+### Diagnóstico
+A planilha tem **6.044 linhas**, divididas em lotes de 500. Cada chamada da edge function:
+1. Recarrega TODOS os índices do banco (customers + identifiers) — ~5–10s por chamada.
+2. Processa 500 linhas, cada uma com 3–4 queries individuais (insert customer, select phones, insert/update identifier).
 
-Criar uma nova Edge Function `reset-all-passwords` que:
-- Verifica se quem está chamando é **admin** (via `user_roles`)
-- Lista todos os usuários do Auth com `admin.listUsers({ perPage: 1000 })`
-- Para cada usuário, chama `admin.updateUserById(id, { password: "123456" })`
-- Retorna o total de usuários atualizados e eventuais falhas
+Resultado: cada lote ultrapassa o limite de 150s da edge function → **504 IDLE_TIMEOUT**. Por isso a importação trava.
 
-Adicionar um botão **"Resetar senhas para 123456"** na página `Settings.tsx` (visível apenas para admins), com:
-- Diálogo de confirmação (`AlertDialog`) explicando que é uma ação irreversível e que todos os usuários precisarão fazer login com `123456`
-- Toast de sucesso mostrando quantos foram atualizados
+### Solução
 
-⚠️ **Aviso de segurança**: senha fraca (`123456`) e compartilhada por todos. Os usuários devem trocar imediatamente após o login. Posso adicionar uma flag `must_change_password` no futuro se quiser forçar troca no próximo login.
+**1. Reduzir BATCH_SIZE de 500 para 150** (`src/pages/ImportarClientesShopify.tsx`)
+- Lotes menores cabem dentro dos 150s. ~40 lotes em vez de 12, mas cada um termina rápido.
+- Atualizar a estimativa de tempo exibida ao usuário.
 
-### Parte 2: Corrigir erros de build em `KanbanInfluenciadores.tsx`
+**2. Remover queries redundantes dentro do loop** (`supabase/functions/import-shopify-customers/index.ts`)
+- O bloco que faz `SELECT existingPhones` por linha é o maior gargalo. Substituir por consulta ao índice `phoneIndex` em memória (já carregado) — se o cliente já está mapeado a algum telefone no índice, atualizar via `update ... eq("customer_id", id).eq("type", "phone")` direto, sem o select prévio.
+- Mover `update shopify_customer_id` para só executar quando realmente mudou (já carregado no índice).
 
-Trocar os 3 casts diretos por `as unknown as`:
-- Linha 356: `as unknown as { id: string; responsavel_nome: string }[]`
-- Linha 503: `as unknown as ContactLog[]`
-- Linha 994: `as unknown as { influencer_id: string; responsavel_nome: string }[]`
+**3. Pular linhas sem `Customer ID` E sem email/telefone mais cedo** (frontend)
+- Olhando o CSV: várias linhas têm 0 contatos (`shopify-forms-…` test customers). Filtrar antes de mandar reduz o volume real.
 
-### Parte 3: Corrigir convite de usuário (já planejado anteriormente)
+**4. Adicionar log por lote no frontend**
+- Mostrar no console qual lote está rodando + tempo decorrido, pra facilitar debug futuro.
 
-- `supabase/functions/invite-user/index.ts`: usar `listUsers({ perPage: 1000 })` e tratar erro `"already been registered"` retornando 409 com mensagem amigável.
+### Arquivos modificados
+- `src/pages/ImportarClientesShopify.tsx` — `BATCH_SIZE = 150`, filtro adicional de linhas sem contato, log por lote
+- `supabase/functions/import-shopify-customers/index.ts` — eliminar `SELECT existingPhones` por linha usando `phoneIndex`, evitar `update` desnecessário de `shopify_customer_id`
 
-### Arquivos modificados/criados
-- **NOVO** `supabase/functions/reset-all-passwords/index.ts`
-- **NOVO** entrada em `supabase/config.toml` (não necessária — usa defaults)
-- `src/pages/Settings.tsx` (botão + diálogo de confirmação)
-- `src/pages/KanbanInfluenciadores.tsx` (3 casts)
-- `supabase/functions/invite-user/index.ts` (paginação + tratamento de duplicata)
+### Resultado esperado
+- Cada lote roda em 30–60s (bem abaixo dos 150s).
+- Importação completa em ~15–25 minutos para os 6k clientes (rodando lotes em série, como já está).
+- Zero erros de timeout.
 
