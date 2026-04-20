@@ -1418,28 +1418,51 @@ export default function KanbanInfluenciadores() {
     return map;
   }, [influencers]);
 
-  // ── Dados semanais para o gráfico (retrato de cada semana) ───────────────
+  // ── Dados semanais para o gráfico ─────────────────────────────────────────
+  // Janela dinâmica: começa na semana do influenciador mais antigo, vai até hoje.
+  // Cap de 16 semanas para legibilidade.
+  // Cada barra mostra quantos ENTRARAM no kanban naquela semana,
+  // coloridos pelo status atual (prospecção ainda = não contatados ainda;
+  // qualquer status além = entramos em contato em algum momento).
   const weeklyChartData = useMemo(() => {
-    const NUM_WEEKS = 12;
-    const now = new Date();
+    if (rawInfluencers.length === 0) return [];
 
     // Segunda-feira da semana atual
+    const now = new Date();
     const thisMonday = new Date(now);
     thisMonday.setHours(0, 0, 0, 0);
     const dn = thisMonday.getDay();
     thisMonday.setDate(thisMonday.getDate() - (dn === 0 ? 6 : dn - 1));
 
-    // Gera os últimos NUM_WEEKS slots semanais
+    // Segunda-feira da semana do influenciador mais antigo
+    const oldestDate = rawInfluencers.reduce(
+      (min, i) => (new Date(i.created_at) < min ? new Date(i.created_at) : min),
+      new Date(rawInfluencers[0].created_at)
+    );
+    const firstMonday = new Date(oldestDate);
+    firstMonday.setHours(0, 0, 0, 0);
+    const d0 = firstMonday.getDay();
+    firstMonday.setDate(firstMonday.getDate() - (d0 === 0 ? 6 : d0 - 1));
+
+    // Número de semanas entre a mais antiga e hoje (cap 16)
+    const totalWeeks = Math.round(
+      (thisMonday.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)
+    ) + 1;
+    const NUM_WEEKS = Math.min(totalWeeks, 16);
+    const startMonday = new Date(thisMonday);
+    startMonday.setDate(thisMonday.getDate() - (NUM_WEEKS - 1) * 7);
+
+    // Gera os slots
     const weeks: { label: string; weekStart: Date; prospeccao: number; em_contato: number }[] = [];
-    for (let w = NUM_WEEKS - 1; w >= 0; w--) {
-      const weekStart = new Date(thisMonday);
-      weekStart.setDate(thisMonday.getDate() - w * 7);
+    for (let w = 0; w < NUM_WEEKS; w++) {
+      const weekStart = new Date(startMonday);
+      weekStart.setDate(startMonday.getDate() + w * 7);
       const dd = String(weekStart.getDate()).padStart(2, "0");
       const mm = String(weekStart.getMonth() + 1).padStart(2, "0");
       weeks.push({ label: `${dd}/${mm}`, weekStart, prospeccao: 0, em_contato: 0 });
     }
 
-    // Distribui cada influenciador na semana em que entrou no kanban
+    // Distribui cada influenciador pela semana em que entrou no kanban
     for (const inf of rawInfluencers) {
       const created = new Date(inf.created_at);
       for (const slot of weeks) {
@@ -1453,7 +1476,11 @@ export default function KanbanInfluenciadores() {
       }
     }
 
-    return weeks.map(({ label, prospeccao, em_contato }) => ({ label, prospeccao, em_contato }));
+    // Remove semanas sem nenhum dado no início da janela
+    const firstNonEmpty = weeks.findIndex((w) => w.prospeccao > 0 || w.em_contato > 0);
+    const trimmed = firstNonEmpty > 0 ? weeks.slice(firstNonEmpty) : weeks;
+
+    return trimmed.map(({ label, prospeccao, em_contato }) => ({ label, prospeccao, em_contato }));
   }, [rawInfluencers]);
 
   // ── Export XLSX ────────────────────────────────────────────────────────────
@@ -1545,11 +1572,10 @@ export default function KanbanInfluenciadores() {
         <div className="rounded-lg border bg-card p-4 space-y-2">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm font-semibold">Prospecção vs Contato — por semana</p>
-            <span className="text-[11px] text-muted-foreground ml-1">(últimas 12 semanas)</span>
+            <p className="text-sm font-semibold">Entradas por semana no pipeline</p>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Quantos entraram no kanban por semana — separados entre os que ficaram em prospecção e os que avançamos para contato.
+            Quantos influenciadores entraram no kanban a cada semana. <strong>Roxo</strong> = ainda em prospecção (não contatados). <strong>Azul</strong> = já avançaram para contato ou além.
           </p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={weeklyChartData} barCategoryGap="30%" barGap={4}>
