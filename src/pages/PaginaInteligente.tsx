@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { format, subDays, differenceInDays, startOfDay } from "date-fns";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -130,6 +131,7 @@ function FunnelBar({ label, value, total, color }: { label: string; value: numbe
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default function PaginaInteligente() {
+  const navigate = useNavigate();
   const { salesData, adsData, dateRange, followersData, marketingData } = useDashboard();
 
   // GA4 state
@@ -398,8 +400,18 @@ export default function PaginaInteligente() {
   }, [marketingData, followersData, dateRange]);
 
   // ─── Alerts list ───────────────────────────────────────────────────────────
+  // Cada alerta pode ter `route` — quando preenchido, clicar no link do alerta
+  // navega até a página indicada. O componente Alert recebe onAction, e a gente
+  // monta o onAction aqui via navigate() pra não vazar o useNavigate pra dentro
+  // do render da lista (mantém o useMemo estável).
   const alerts = useMemo(() => {
-    const list: { severity: "danger" | "warn" | "good" | "info"; title: string; desc: string; action?: string }[] = [];
+    const list: {
+      severity: "danger" | "warn" | "good" | "info";
+      title: string;
+      desc: string;
+      action?: string;
+      route?: string;
+    }[] = [];
 
     if (roasBelowTargetDays >= 2) {
       list.push({
@@ -407,12 +419,15 @@ export default function PaginaInteligente() {
         title: `ROAS abaixo de ${ROAS_TARGET} há ${roasBelowTargetDays} dias consecutivos`,
         desc: `ROAS atual: ${adsStats.roas.toFixed(2)}. Não aumentar budget agora. Avaliar criativos e público.`,
         action: "Ver Anúncios",
+        route: "/ads",
       });
     } else if (adsStats.roas >= ROAS_TARGET && adsStats.spend > 0) {
       list.push({
         severity: "good",
         title: `ROAS ${adsStats.roas.toFixed(2)} — acima da meta`,
         desc: `Meta Ads está performando. Budget pode ser aumentado com segurança.`,
+        action: "Ver Anúncios",
+        route: "/ads",
       });
     }
 
@@ -422,6 +437,7 @@ export default function PaginaInteligente() {
         title: `Funil vaza em "${funnelDrop.label}" (${funnelDrop.drop.toFixed(0)}% perdem aqui)`,
         desc: "Maior gargalo de conversão do site no período. Priorizar otimização nessa etapa.",
         action: "Ver Site e Conversão",
+        route: "/site-conversao",
       });
     }
 
@@ -430,6 +446,8 @@ export default function PaginaInteligente() {
         severity: "info",
         title: `${fmtN(remarketingBase)} pessoas viram o Original mas não compraram`,
         desc: "Público quente disponível para campanha de remarketing no Meta Ads.",
+        action: "Ver Público",
+        route: "/publico",
       });
     }
 
@@ -438,6 +456,8 @@ export default function PaginaInteligente() {
         severity: "good",
         title: `"${bestSource.sm}" é o canal mais eficiente: ${fmtR(bestSource.revPerSession)}/visita`,
         desc: `Conversão de ${fmtPct(bestSource.conv)} — melhor do período. Merece atenção e investimento.`,
+        action: "Ver Site e Conversão",
+        route: "/site-conversao",
       });
     }
 
@@ -447,6 +467,7 @@ export default function PaginaInteligente() {
         title: `${churnStats.churn1x} clientes compraram uma vez e não voltaram`,
         desc: `Ciclo médio de recompra: ${churnStats.avgCycle} dias. Esses clientes passaram ${CHURN_MULTIPLIER}x o ciclo sem retornar.`,
         action: "Ver Comportamento",
+        route: "/comportamento-cliente",
       });
     }
 
@@ -538,7 +559,14 @@ export default function PaginaInteligente() {
             <CardContent className="space-y-2">
               {alerts.length === 0 && <p className="text-sm text-muted-foreground">Nenhum alerta ativo no período.</p>}
               {alerts.map((a, i) => (
-                <Alert key={i} {...a} />
+                <Alert
+                  key={i}
+                  severity={a.severity}
+                  title={a.title}
+                  desc={a.desc}
+                  action={a.action}
+                  onAction={a.route ? () => navigate(a.route!) : undefined}
+                />
               ))}
             </CardContent>
           </Card>
