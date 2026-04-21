@@ -238,13 +238,33 @@ function InfluencerCard({
           {influencer.instagram && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Instagram className="h-3 w-3" />
-              <span>@{normalizeInstagram(influencer.instagram)}</span>
+              <a
+                href={`https://instagram.com/${normalizeInstagram(influencer.instagram)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                className="hover:underline hover:text-pink-600 transition-colors"
+              >
+                @{normalizeInstagram(influencer.instagram)}
+              </a>
             </div>
           )}
           {influencer.tiktok && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span className="h-3 w-3 text-[10px] font-bold leading-3 text-center">TT</span>
-              <span>@{influencer.tiktok.replace(/^@/, "")}</span>
+              <a
+                href={`https://tiktok.com/@${influencer.tiktok.replace(/^@/, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                className="hover:underline hover:text-foreground transition-colors"
+              >
+                @{influencer.tiktok.replace(/^@/, "")}
+              </a>
             </div>
           )}
         </div>
@@ -1440,6 +1460,13 @@ export default function KanbanInfluenciadores() {
       seeding_enviado: [], postou: [], parceiro: [], inativo: [],
     };
     for (const i of influencers) map[i.status]?.push(i);
+    // Na coluna Prospecção: quem tem Instagram primeiro, só TikTok depois
+    map.prospeccao.sort((a, b) => {
+      const aHasInsta = !!a.instagram;
+      const bHasInsta = !!b.instagram;
+      if (aHasInsta === bHasInsta) return 0;
+      return aHasInsta ? -1 : 1;
+    });
     return map;
   }, [influencers]);
 
