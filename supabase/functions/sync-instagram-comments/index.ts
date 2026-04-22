@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const IG_ACCOUNT_ID = "17841470017662704";
 const BRAND_USERNAME = "comidadedragao";
-const META_API = "https://graph.facebook.com/v19.0";
+const META_API = "https://graph.facebook.com/v20.0";
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 
 const corsHeaders = {
@@ -133,6 +133,10 @@ Deno.serve(async (req) => {
     const fetchAll = body.fetch_all ?? false;
     const fullSync = body.full_sync ?? false; // ignora delta, puxa tudo do zero
     const limit = body.limit ?? 50;
+    // Hard limit: nº máximo de classificações Anthropic por execução.
+    // Evita timeout do Supabase Edge Functions (150s) em primeira sincronização ou backlog.
+    // Comentários além desse limite ficam pra próxima execução da cron.
+    const maxCommentsPerRun = body.max_comments ?? 50;
 
     // Delta sync: busca timestamp do post mais recente já sincronizado
     let sinceTsUnix: number | null = null;
@@ -174,13 +178,17 @@ Deno.serve(async (req) => {
     console.log(`Encontrados ${posts.length} posts (fetch_all=${fetchAll}, full_sync=${fullSync}, since=${sinceTsUnix ?? "none"})`);
 
     let totalComments = 0, classified = 0, skipped = 0, errors = 0;
+    let limitReached = false;
+
+    // ── FASE 1: Coletar TODOS os comentários de TODOS os posts (sem processar ainda) ──
+    // Isso permite fazer bulk SELECT no banco uma única vez abaixo.
+    type PendingComment = { comment: any; post: any };
+    const pending: PendingComment[] = [];
 
     for (const post of posts) {
-      // 2. Busca comentários de cada post
       let allComments: any[];
       try {
         if (fetchAll) {
-          // Pagina comentários também
           allComments = await metaGetAll(`${post.id}/comments`, META_TOKEN, {
             fields: "id,text,username,timestamp,replies{id,text,username,timestamp}",
             limit: "100",
@@ -197,72 +205,107 @@ Deno.serve(async (req) => {
         errors++;
         continue;
       }
-
       for (const comment of allComments) {
-        totalComments++;
+        pending.push({ comment, post });
+      }
+    }
 
-        // Verifica se já existe no banco
-        const { data: existing } = await (supabase as any)
+    totalComments = pending.length;
+    console.log(`Total de comentários coletados: ${totalComments}`);
+
+    // ── FASE 2: Bulk SELECT dos IDs já existentes (1 query pra todos) ──
+    const allIds = pending.map((p) => p.comment.id);
+    const existingMap = new Map<string, any>();
+    if (allIds.length > 0) {
+      // Supabase .in() suporta até 1000 itens por query — chunked por segurança
+      const CHUNK = 500;
+      for (let i = 0; i < allIds.length; i += CHUNK) {
+        const chunkIds = allIds.slice(i, i + CHUNK);
+        const { data: existingRows, error: selErr } = await (supabase as any)
           .from("instagram_comments")
           .select("id, respondido, resposta_texto, classified_at")
-          .eq("id", comment.id)
-          .single();
-
-        // Detecta se a marca já respondeu este comentário (roda SEMPRE, mesmo se já classificado)
-        let respondido = existing?.respondido ?? false;
-        let respostaTexto = existing?.resposta_texto ?? "";
-        const replies = comment.replies?.data ?? [];
-        for (const reply of replies) {
-          if (reply.username === BRAND_USERNAME) {
-            respondido = true;
-            respostaTexto = reply.text ?? "";
-            break;
-          }
-        }
-
-        // Se já classificado, só atualiza respondido/resposta_texto se mudou
-        if (existing?.classified_at) {
-          if (respondido !== (existing.respondido ?? false) || respostaTexto !== (existing.resposta_texto ?? "")) {
-            await (supabase as any).from("instagram_comments")
-              .update({ respondido, resposta_texto: respostaTexto })
-              .eq("id", comment.id);
-          }
-          skipped++;
+          .in("id", chunkIds);
+        if (selErr) {
+          console.error(`Erro no bulk SELECT: ${selErr.message}`);
+          errors++;
           continue;
         }
-
-        // Classifica com Claude (só comentários novos) — com delay para evitar rate limit
-        let classification = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
-        let classifiedAt: string | null = null;
-        try {
-          await sleep(CLASSIFY_DELAY_MS);
-          classification = await classifyComment(comment.text, ANTHROPIC_KEY);
-          classifiedAt = new Date().toISOString();
-          classified++;
-        } catch (e: any) {
-          console.error(`Erro ao classificar: ${e.message}`);
-          errors++;
+        for (const row of existingRows ?? []) {
+          existingMap.set(row.id, row);
         }
-
-        // Salva no banco
-        const row: any = {
-          id: comment.id,
-          media_id: post.id,
-          media_caption: post.caption?.slice(0, 500) ?? "",
-          media_url: post.media_url ?? "",
-          media_permalink: post.permalink ?? "",
-          media_timestamp: post.timestamp,
-          username: comment.username,
-          text: comment.text,
-          timestamp: comment.timestamp,
-          respondido,
-          resposta_texto: respostaTexto,
-          ...classification,
-        };
-        if (classifiedAt) row.classified_at = classifiedAt;
-
-        await (supabase as any).from("instagram_comments").upsert(row, { onConflict: "id" });
       }
+    }
+    console.log(`Já classificados no banco: ${existingMap.size} / ${totalComments}`);
+
+    // ── FASE 3: Processa comentários respeitando hard limit ──
+    for (const { comment, post } of pending) {
+      const existing = existingMap.get(comment.id);
+
+      // Detecta se a marca já respondeu este comentário
+      let respondido = existing?.respondido ?? false;
+      let respostaTexto = existing?.resposta_texto ?? "";
+      const replies = comment.replies?.data ?? [];
+      for (const reply of replies) {
+        if (reply.username === BRAND_USERNAME) {
+          respondido = true;
+          respostaTexto = reply.text ?? "";
+          break;
+        }
+      }
+
+      // Se já classificado, só atualiza respondido/resposta_texto se mudou
+      if (existing?.classified_at) {
+        if (respondido !== (existing.respondido ?? false) || respostaTexto !== (existing.resposta_texto ?? "")) {
+          await (supabase as any).from("instagram_comments")
+            .update({ respondido, resposta_texto: respostaTexto })
+            .eq("id", comment.id);
+        }
+        skipped++;
+        continue;
+      }
+
+      // HARD LIMIT: se já classificou N novos nessa run, para aqui.
+      // Comentários restantes ficam pra próxima execução da cron.
+      if (classified >= maxCommentsPerRun) {
+        limitReached = true;
+        continue; // não quebra — segue contando skipped pra ter visibilidade do backlog
+      }
+
+      // Classifica com Claude (só comentários novos) — com delay para evitar rate limit
+      let classification = { sentimento: "neutro", categoria: "outro", risco: "baixo", risco_motivo: "" };
+      let classifiedAt: string | null = null;
+      try {
+        await sleep(CLASSIFY_DELAY_MS);
+        classification = await classifyComment(comment.text, ANTHROPIC_KEY);
+        classifiedAt = new Date().toISOString();
+        classified++;
+      } catch (e: any) {
+        console.error(`Erro ao classificar: ${e.message}`);
+        errors++;
+      }
+
+      // Salva no banco
+      const row: any = {
+        id: comment.id,
+        media_id: post.id,
+        media_caption: post.caption?.slice(0, 500) ?? "",
+        media_url: post.media_url ?? "",
+        media_permalink: post.permalink ?? "",
+        media_timestamp: post.timestamp,
+        username: comment.username,
+        text: comment.text,
+        timestamp: comment.timestamp,
+        respondido,
+        resposta_texto: respostaTexto,
+        ...classification,
+      };
+      if (classifiedAt) row.classified_at = classifiedAt;
+
+      await (supabase as any).from("instagram_comments").upsert(row, { onConflict: "id" });
+    }
+
+    if (limitReached) {
+      console.warn(`⚠️ Hard limit ${maxCommentsPerRun} atingido. Backlog fica pra próxima execução da cron.`);
     }
 
     return new Response(JSON.stringify({
@@ -272,6 +315,8 @@ Deno.serve(async (req) => {
       classified,
       skipped,
       errors,
+      limit_reached: limitReached,
+      backlog: limitReached ? (totalComments - existingMap.size - classified) : 0,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err: any) {

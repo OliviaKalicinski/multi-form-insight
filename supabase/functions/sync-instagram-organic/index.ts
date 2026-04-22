@@ -101,11 +101,25 @@ serve(async (req) => {
     ]);
 
     // ── Total de seguidores atual (snapshot de hoje) ──
+    // Fix resiliência: Meta API pode retornar { error: {...} } sem followers_count.
+    // Antes: `followersCount = profileJson.followers_count || 0` mascarava erro de token/scope
+    // como "0 seguidores" e quebrava o dashboard silenciosamente. Agora logamos explicitamente.
     const profileRes = await fetch(
       `https://graph.facebook.com/v20.0/${IG_ACCOUNT_ID}?fields=followers_count&access_token=${META_TOKEN}`
     );
     const profileJson = await profileRes.json();
-    const followersCount = profileJson.followers_count || 0;
+    let followersCount = 0;
+    if (profileJson.error) {
+      console.error(
+        `[META] Erro ao buscar followers_count: ${profileJson.error.message} (code ${profileJson.error.code})`
+      );
+      // Não throw — seguimos com 0 pra não bloquear insights que já funcionaram.
+      // Mas agora fica visível nos logs em vez de silent.
+    } else if (typeof profileJson.followers_count === "number") {
+      followersCount = profileJson.followers_count;
+    } else {
+      console.warn(`[META] Resposta inesperada em followers_count:`, JSON.stringify(profileJson));
+    }
     console.log(`Seguidores hoje: ${followersCount}`);
 
     const byDate: Record<string, Record<string, number>> = {};
