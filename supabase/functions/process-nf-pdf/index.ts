@@ -57,6 +57,7 @@ const PRODUCT_PATTERNS: [RegExp, string][] = [
   [/farinha.*bsf.*integral/i, "LF_FARINHA_BSF_INTEGRAL"],
   // "Desengordurada" = nome oficial. Aceita grafia legada "desidratada" e consolida no mesmo SKU.
   [/farinha.*bsf.*(desengordurada|desidratada)/i, "LF_FARINHA_BSF_DESENGORDURADA"],
+  [/larva.*desid/i, "LF_LARVA_DESIDRATADA"],
   [/larva.*natura/i, "LF_LARVA_IN_NATURA"],
   [/[oó]leo.*bsf/i, "LF_OLEO_BSF"],
   [/frass/i, "LF_FRASS"],

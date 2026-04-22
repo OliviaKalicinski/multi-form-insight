@@ -6,11 +6,11 @@ export const FRIENDLY_TO_ID: Record<string, string> = Object.fromEntries(
 );
 
 // Integrity assertion
-if (Object.keys(FRIENDLY_TO_ID).length !== 31) {
+if (Object.keys(FRIENDLY_TO_ID).length !== 32) {
   console.error(
     '[FISCAL] Catálogo incompleto:',
     Object.keys(FRIENDLY_TO_ID).length,
-    'de 31'
+    'de 32'
   );
 }
 
@@ -132,6 +132,9 @@ export const standardizeProductName = (name: string, price: number): string => {
   }
   if (/farinha.*bsf/i.test(desc)) {
     return 'Farinha BSF Integral (kg)';
+  }
+  if (/larva.*desid/i.test(desc)) {
+    return 'Larva Desidratada de BSF (kg)';
   }
   if (/larva.*natura/i.test(desc)) {
     return 'Larva in Natura de BSF (kg)';
