@@ -55,8 +55,8 @@ const PRODUCT_PATTERNS: [RegExp, string][] = [
   [/caneca/i, "CD_CANECA"],
   [/adesivo/i, "CD_ADESIVO"],
   [/farinha.*bsf.*integral/i, "LF_FARINHA_BSF_INTEGRAL"],
-  [/farinha.*bsf.*desengordurada/i, "LF_FARINHA_BSF_DESENGORDURADA"],
-  [/farinha.*bsf.*desidratada/i, "LF_FARINHA_BSF_DESIDRATADA"],
+  // "Desengordurada" = nome oficial. Aceita grafia legada "desidratada" e consolida no mesmo SKU.
+  [/farinha.*bsf.*(desengordurada|desidratada)/i, "LF_FARINHA_BSF_DESENGORDURADA"],
   [/larva.*natura/i, "LF_LARVA_IN_NATURA"],
   [/[oó]leo.*bsf/i, "LF_OLEO_BSF"],
   [/frass/i, "LF_FRASS"],

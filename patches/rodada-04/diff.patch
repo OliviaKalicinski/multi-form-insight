@@ -1,0 +1,329 @@
+diff --git a/src/components/AppSidebar.tsx b/src/components/AppSidebar.tsx
+index 09b2a48..5fbab51 100644
+--- a/src/components/AppSidebar.tsx
++++ b/src/components/AppSidebar.tsx
+@@ -92,7 +92,7 @@ const navSections: NavSection[] = [
+     icon: Truck,
+     items: [
+       { title: "Distribuidores", url: "/distribuidores", icon: Package },
+-      { title: "Let's Fly", url: "/lets-fly", icon: Truck },
++      { title: "Lets Fly", url: "/lets-fly", icon: Truck },
+       { title: "Site e Conversão", url: "/site-conversao", icon: BarChart2 },
+     ],
+   },
+diff --git a/src/components/GlobalFilter.tsx b/src/components/GlobalFilter.tsx
+index efd7c25..6eefbc2 100644
+--- a/src/components/GlobalFilter.tsx
++++ b/src/components/GlobalFilter.tsx
+@@ -61,7 +61,7 @@ const SEGMENT_OPTIONS: SegmentOption[] = [
+   {
+     value: "b2b",
+     label: "B2B",
+-    sublabel: "Let's Fly",
++    sublabel: "Lets Fly",
+     icon: Building2,
+     color: SEGMENT_COLORS.b2b,
+   },
+diff --git a/src/data/operationalProducts.ts b/src/data/operationalProducts.ts
+index 0fc0aa9..9e8bbdb 100644
+--- a/src/data/operationalProducts.ts
++++ b/src/data/operationalProducts.ts
+@@ -43,7 +43,6 @@ export const operationalProducts: OperationalProduct[] = [
+   // ── Lets Fly — Insumos (6) ──
+   { id: "LF_FARINHA_BSF_INTEGRAL",       nome: "Farinha BSF Integral (kg)",       unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+   { id: "LF_FARINHA_BSF_DESENGORDURADA", nome: "Farinha BSF Desengordurada (kg)", unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+-  { id: "LF_FARINHA_BSF_DESIDRATADA",    nome: "Farinha BSF Desidratada (kg)",    unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+   { id: "LF_LARVA_IN_NATURA",            nome: "Larva in Natura de BSF (kg)",     unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+   { id: "LF_OLEO_BSF",                   nome: "Óleo de BSF (kg)",               unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+   { id: "LF_FRASS",                      nome: "Frass (kg)",                      unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
+diff --git a/src/pages/LetsFly.tsx b/src/pages/LetsFly.tsx
+index 482c010..8178641 100644
+--- a/src/pages/LetsFly.tsx
++++ b/src/pages/LetsFly.tsx
+@@ -200,7 +200,7 @@ export default function LetsFly() {
+   return (
+     <div className="container mx-auto px-6 py-8 space-y-6">
+       <div>
+-        <h1 className="text-3xl font-bold">🚀 B2B — Let's Fly</h1>
++        <h1 className="text-3xl font-bold">🚀 B2B — Lets Fly</h1>
+         <p className="text-muted-foreground">Canal de venda direta para empresas</p>
+       </div>
+ 
+diff --git a/src/pages/OrcamentosAprovacao.tsx b/src/pages/OrcamentosAprovacao.tsx
+index 18a9f81..8585a1c 100644
+--- a/src/pages/OrcamentosAprovacao.tsx
++++ b/src/pages/OrcamentosAprovacao.tsx
+@@ -268,6 +268,8 @@ export default function OrcamentosAprovacao() {
+   const queryClient = useQueryClient();
+   const fileInputRef     = useRef<HTMLInputElement>(null);
+   const formFileInputRef = useRef<HTMLInputElement>(null);
++  const cardFileInputRef = useRef<HTMLInputElement>(null);
++  const cardUploadBudgetIdRef = useRef<string | null>(null);
+ 
+   const [tab, setTab]               = useState<"all" | "pending" | "approved" | "rejected">("all");
+   const [formOpen, setFormOpen]     = useState(false);
+@@ -324,6 +326,21 @@ export default function OrcamentosAprovacao() {
+     },
+   });
+ 
++  // Contagem de anexos por budget_id — usada para exibir badge no card.
++  const { data: attachmentCounts = {} } = useQuery<Record<string, number>>({
++    queryKey: ["budget-attachment-counts"],
++    queryFn: async () => {
++      const { data, error } = await (supabase as any).from("budget_attachments")
++        .select("budget_id");
++      if (error) throw error;
++      const counts: Record<string, number> = {};
++      for (const row of (data || []) as Array<{ budget_id: string }>) {
++        counts[row.budget_id] = (counts[row.budget_id] || 0) + 1;
++      }
++      return counts;
++    },
++  });
++
+   // Auto-select first category when form opens and no category is set
+   useEffect(() => {
+     if (formOpen && !editingId && categories.length > 0 && !form.calendar_category_id) {
+@@ -397,6 +414,7 @@ export default function OrcamentosAprovacao() {
+       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
+       queryClient.invalidateQueries({ queryKey: ["marketing-calendar"] });
+       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
++      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
+       setFormError(null);
+       closeForm();
+     },
+@@ -404,6 +422,7 @@ export default function OrcamentosAprovacao() {
+       setFormError(err.message || "Erro ao salvar orçamento.");
+       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
+       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
++      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
+     },
+   });
+ 
+@@ -487,6 +506,7 @@ export default function OrcamentosAprovacao() {
+       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
+       queryClient.invalidateQueries({ queryKey: ["marketing-calendar"] });
+       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
++      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
+       setFormError(null);
+       closeForm();
+     },
+@@ -494,6 +514,7 @@ export default function OrcamentosAprovacao() {
+       setFormError(err.message || "Erro ao salvar alterações.");
+       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
+       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
++      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
+     },
+   });
+ 
+@@ -545,6 +566,7 @@ export default function OrcamentosAprovacao() {
+     onSuccess: () => {
+       setUploadError(null);
+       queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] });
++      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
+     },
+     onError: (err: Error) => setUploadError(err.message || "Erro ao enviar arquivo."),
+   });
+@@ -555,7 +577,10 @@ export default function OrcamentosAprovacao() {
+       const { error } = await (supabase as any).from("budget_attachments").delete().eq("id", id);
+       if (error) throw error;
+     },
+-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] }),
++    onSuccess: () => {
++      queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] });
++      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
++    },
+   });
+ 
+   // ── Handlers ───────────────────────────────────────────────────────────────
+@@ -601,6 +626,24 @@ export default function OrcamentosAprovacao() {
+     e.target.value = "";
+   };
+ 
++  // Upload direto pelo card (sem abrir o Sheet). Reutiliza o uploadMutation
++  // mas com budgetId vindo do ref armazenado no click do card.
++  const handleCardFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
++    const files = Array.from(e.target.files || []);
++    const budgetId = cardUploadBudgetIdRef.current;
++    e.target.value = "";
++    cardUploadBudgetIdRef.current = null;
++    if (!budgetId || files.length === 0) return;
++    files.forEach((file) => uploadMutation.mutate({ budgetId, file }));
++  };
++
++  const triggerCardUpload = (e: React.MouseEvent, budgetId: string) => {
++    e.stopPropagation();
++    setUploadError(null);
++    cardUploadBudgetIdRef.current = budgetId;
++    cardFileInputRef.current?.click();
++  };
++
+   const removePendingFile = (index: number) => {
+     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+   };
+@@ -742,12 +785,41 @@ export default function OrcamentosAprovacao() {
+                   {b.needs_operations && <DeptChip label="Operações"  status={b.operations_status} />}
+                   {b.needs_marketing  && <DeptChip label="Marketing"  status={b.marketing_status} />}
+                 </div>
++
++                {/* Anexar orçamento do fornecedor — upload direto pelo card */}
++                <div className="flex items-center justify-between pt-2 border-t border-border/40">
++                  <span className="text-[11px] text-muted-foreground flex items-center gap-1">
++                    <Paperclip className="h-3 w-3" />
++                    {attachmentCounts[b.id]
++                      ? `${attachmentCounts[b.id]} anexo${attachmentCounts[b.id] > 1 ? "s" : ""}`
++                      : "Sem anexos"}
++                  </span>
++                  <Button
++                    variant="ghost"
++                    size="sm"
++                    className="h-7 px-2 text-xs"
++                    onClick={(e) => triggerCardUpload(e, b.id)}
++                    disabled={uploadMutation.isPending}
++                  >
++                    <Paperclip className="h-3 w-3 mr-1" />
++                    Anexar orçamento
++                  </Button>
++                </div>
+               </div>
+             );
+           })}
+         </div>
+       )}
+ 
++      {/* Hidden input compartilhado pelos cards — budgetId vem do ref */}
++      <input
++        ref={cardFileInputRef}
++        type="file"
++        multiple
++        className="hidden"
++        onChange={handleCardFileChange}
++      />
++
+       {/* ── Detail Sheet ──────────────────────────────────────────────────────── */}
+       <Sheet open={!!detailId} onOpenChange={(o) => !o && setDetailId(null)}>
+         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+diff --git a/src/pages/PaginaInteligente.tsx b/src/pages/PaginaInteligente.tsx
+index 5300dd2..b1c89d1 100644
+--- a/src/pages/PaginaInteligente.tsx
++++ b/src/pages/PaginaInteligente.tsx
+@@ -828,7 +828,7 @@ export default function PaginaInteligente() {
+                       badgeOk: adsStats.roas >= ROAS_TARGET,
+                     },
+                     {
+-                      label: "B2B (Let's Fly)",
++                      label: "B2B (Lets Fly)",
+                       revenue: channelRevenue.b2b,
+                       sessions: null,
+                       tx: null,
+diff --git a/src/pages/ReclamacaoNova.tsx b/src/pages/ReclamacaoNova.tsx
+index ad6b208..62b2f5e 100644
+--- a/src/pages/ReclamacaoNova.tsx
++++ b/src/pages/ReclamacaoNova.tsx
+@@ -123,7 +123,7 @@ export default function ReclamacaoNova() {
+       const { data, error } = await supabase
+         .from("sales_data")
+         .select("id, numero_pedido, numero_nota, data_venda, forma_envio, natureza_operacao, status, produtos")
+-        .eq("cliente_email", selectedCustomer.cpf_cnpj)
++        .eq("cpf_cnpj", selectedCustomer.cpf_cnpj)
+         .order("data_venda", { ascending: false })
+         .limit(50);
+       if (error) throw error;
+diff --git a/src/pages/VisaoExecutivaV2.tsx b/src/pages/VisaoExecutivaV2.tsx
+index 5f6ed1c..60f83c1 100644
+--- a/src/pages/VisaoExecutivaV2.tsx
++++ b/src/pages/VisaoExecutivaV2.tsx
+@@ -704,7 +704,7 @@ const VisaoExecutivaV2 = () => {
+               unit: "Pedidos",
+             },
+             {
+-              label: "B2B · Let's Fly",
++              label: "B2B · Lets Fly",
+               pct: consolidated.b2bPct,
+               color: "#fdba74",
+               receita: b2b.receitaTotal,
+diff --git a/src/utils/invoiceParser.ts b/src/utils/invoiceParser.ts
+index 934f4c1..2553b5f 100644
+--- a/src/utils/invoiceParser.ts
++++ b/src/utils/invoiceParser.ts
+@@ -239,11 +239,32 @@ const parseDate = (dateStr: string): Date => {
+   return new Date(dateStr);
+ };
+ 
+-/** Determina segmentação automática baseada em Serie e unidades dos itens */
++/**
++ * Whitelist de clientes que SEMPRE são B2B, independente de unidade na NF.
++ * Motivo: parceiros institucionais/industriais podem comprar em embalagens que
++ * não são kg/L (ex.: amostras, ensaios P&D), mas comercialmente são B2B.
++ * Matching é case-insensitive e por substring da razão social na NF.
++ * Adicionar CNPJ também quando estiver disponível para match mais preciso.
++ */
++const B2B_ALWAYS_PATTERNS: RegExp[] = [
++  /buzz\s*fly/i,       // BUZZ FLY P&D EM ALIMENTOS
++  /fiotec/i,           // FIOTEC
++];
++
++const isAlwaysB2B = (nomeCliente: string): boolean => {
++  const nome = (nomeCliente || "").trim();
++  if (!nome) return false;
++  return B2B_ALWAYS_PATTERNS.some((p) => p.test(nome));
++};
++
++/** Determina segmentação automática baseada em Serie, unidades dos itens e nome do cliente */
+ const determineSegment = (
+   serie: string,
+-  units: string[]
++  units: string[],
++  nomeCliente: string
+ ): "b2c" | "b2b2c" | "b2b" => {
++  // Whitelist override: cliente institucional sempre B2B
++  if (isAlwaysB2B(nomeCliente)) return "b2b";
+   if (serie === "2") return "b2c";
+   if (serie === "1") {
+     const hasWeightUnit = units.some((u) => {
+@@ -345,8 +366,8 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
+       };
+     });
+ 
+-    // Segmentação automática
+-    const segmentoCliente = determineSegment(serie, units);
++    // Segmentação automática (considera whitelist por razão social)
++    const segmentoCliente = determineSegment(serie, units, first["Nome Cliente"] || "");
+ 
+     // Extrair numero_pedido das observações
+     const numeroPedido = extractNumeroPedido(first["Observacoes"], numeroNota);
+diff --git a/src/utils/productNormalizer.ts b/src/utils/productNormalizer.ts
+index 213591a..6c27860 100644
+--- a/src/utils/productNormalizer.ts
++++ b/src/utils/productNormalizer.ts
+@@ -125,12 +125,11 @@ export const standardizeProductName = (name: string, price: number): string => {
+   }
+ 
+   // ── Lets Fly Insumos (ordem: específico → genérico) ──
+-  if (/farinha.*bsf.*desengordurada/i.test(desc)) {
++  // "Desengordurada" = nome oficial. Aceita também a grafia legada "desidratada"
++  // (ex.: NFs antigas) e consolida no mesmo SKU.
++  if (/farinha.*bsf.*(desengordurada|desidratada)/i.test(desc)) {
+     return 'Farinha BSF Desengordurada (kg)';
+   }
+-  if (/farinha.*bsf.*desidratada/i.test(desc)) {
+-    return 'Farinha BSF Desidratada (kg)';
+-  }
+   if (/farinha.*bsf/i.test(desc)) {
+     return 'Farinha BSF Integral (kg)';
+   }
+diff --git a/supabase/functions/process-nf-pdf/index.ts b/supabase/functions/process-nf-pdf/index.ts
+index 1b53a48..1192a1d 100644
+--- a/supabase/functions/process-nf-pdf/index.ts
++++ b/supabase/functions/process-nf-pdf/index.ts
+@@ -55,8 +55,8 @@ const PRODUCT_PATTERNS: [RegExp, string][] = [
+   [/caneca/i, "CD_CANECA"],
+   [/adesivo/i, "CD_ADESIVO"],
+   [/farinha.*bsf.*integral/i, "LF_FARINHA_BSF_INTEGRAL"],
+-  [/farinha.*bsf.*desengordurada/i, "LF_FARINHA_BSF_DESENGORDURADA"],
+-  [/farinha.*bsf.*desidratada/i, "LF_FARINHA_BSF_DESIDRATADA"],
++  // "Desengordurada" = nome oficial. Aceita grafia legada "desidratada" e consolida no mesmo SKU.
++  [/farinha.*bsf.*(desengordurada|desidratada)/i, "LF_FARINHA_BSF_DESENGORDURADA"],
+   [/larva.*natura/i, "LF_LARVA_IN_NATURA"],
+   [/[oó]leo.*bsf/i, "LF_OLEO_BSF"],
+   [/frass/i, "LF_FRASS"],

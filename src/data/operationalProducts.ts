@@ -43,7 +43,6 @@ export const operationalProducts: OperationalProduct[] = [
   // ── Lets Fly — Insumos (6) ──
   { id: "LF_FARINHA_BSF_INTEGRAL",       nome: "Farinha BSF Integral (kg)",       unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
   { id: "LF_FARINHA_BSF_DESENGORDURADA", nome: "Farinha BSF Desengordurada (kg)", unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
-  { id: "LF_FARINHA_BSF_DESIDRATADA",    nome: "Farinha BSF Desidratada (kg)",    unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
   { id: "LF_LARVA_IN_NATURA",            nome: "Larva in Natura de BSF (kg)",     unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
   { id: "LF_OLEO_BSF",                   nome: "Óleo de BSF (kg)",               unidade: "kg", marca: "Lets Fly", categoria: "insumo" },
   { id: "LF_FRASS",                      nome: "Frass (kg)",                      unidade: "kg", marca: "Lets Fly", categoria: "insumo" },

@@ -200,7 +200,7 @@ export default function LetsFly() {
   return (
     <div className="container mx-auto px-6 py-8 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">🚀 B2B — Let's Fly</h1>
+        <h1 className="text-3xl font-bold">🚀 B2B — Lets Fly</h1>
         <p className="text-muted-foreground">Canal de venda direta para empresas</p>
       </div>
 

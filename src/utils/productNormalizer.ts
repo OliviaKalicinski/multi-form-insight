@@ -125,11 +125,10 @@ export const standardizeProductName = (name: string, price: number): string => {
   }
 
   // ── Lets Fly Insumos (ordem: específico → genérico) ──
-  if (/farinha.*bsf.*desengordurada/i.test(desc)) {
+  // "Desengordurada" = nome oficial. Aceita também a grafia legada "desidratada"
+  // (ex.: NFs antigas) e consolida no mesmo SKU.
+  if (/farinha.*bsf.*(desengordurada|desidratada)/i.test(desc)) {
     return 'Farinha BSF Desengordurada (kg)';
-  }
-  if (/farinha.*bsf.*desidratada/i.test(desc)) {
-    return 'Farinha BSF Desidratada (kg)';
   }
   if (/farinha.*bsf/i.test(desc)) {
     return 'Farinha BSF Integral (kg)';

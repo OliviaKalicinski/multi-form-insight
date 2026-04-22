@@ -268,6 +268,8 @@ export default function OrcamentosAprovacao() {
   const queryClient = useQueryClient();
   const fileInputRef     = useRef<HTMLInputElement>(null);
   const formFileInputRef = useRef<HTMLInputElement>(null);
+  const cardFileInputRef = useRef<HTMLInputElement>(null);
+  const cardUploadBudgetIdRef = useRef<string | null>(null);
 
   const [tab, setTab]               = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [formOpen, setFormOpen]     = useState(false);
@@ -321,6 +323,21 @@ export default function OrcamentosAprovacao() {
         .select("*").eq("budget_id", detailId).order("created_at", { ascending: true });
       if (error) throw error;
       return data || [];
+    },
+  });
+
+  // Contagem de anexos por budget_id — usada para exibir badge no card.
+  const { data: attachmentCounts = {} } = useQuery<Record<string, number>>({
+    queryKey: ["budget-attachment-counts"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("budget_attachments")
+        .select("budget_id");
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      for (const row of (data || []) as Array<{ budget_id: string }>) {
+        counts[row.budget_id] = (counts[row.budget_id] || 0) + 1;
+      }
+      return counts;
     },
   });
 
@@ -397,6 +414,7 @@ export default function OrcamentosAprovacao() {
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
+      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
       setFormError(null);
       closeForm();
     },
@@ -404,6 +422,7 @@ export default function OrcamentosAprovacao() {
       setFormError(err.message || "Erro ao salvar orçamento.");
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
+      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
     },
   });
 
@@ -487,6 +506,7 @@ export default function OrcamentosAprovacao() {
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
+      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
       setFormError(null);
       closeForm();
     },
@@ -494,6 +514,7 @@ export default function OrcamentosAprovacao() {
       setFormError(err.message || "Erro ao salvar alterações.");
       queryClient.invalidateQueries({ queryKey: ["budget-requests"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-calendar-all"] });
+      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
     },
   });
 
@@ -545,6 +566,7 @@ export default function OrcamentosAprovacao() {
     onSuccess: () => {
       setUploadError(null);
       queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] });
+      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
     },
     onError: (err: Error) => setUploadError(err.message || "Erro ao enviar arquivo."),
   });
@@ -555,7 +577,10 @@ export default function OrcamentosAprovacao() {
       const { error } = await (supabase as any).from("budget_attachments").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budget-attachments", detailId] });
+      queryClient.invalidateQueries({ queryKey: ["budget-attachment-counts"] });
+    },
   });
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -599,6 +624,24 @@ export default function OrcamentosAprovacao() {
     if (files.length === 0) return;
     setPendingFiles((prev) => [...prev, ...files]);
     e.target.value = "";
+  };
+
+  // Upload direto pelo card (sem abrir o Sheet). Reutiliza o uploadMutation
+  // mas com budgetId vindo do ref armazenado no click do card.
+  const handleCardFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const budgetId = cardUploadBudgetIdRef.current;
+    e.target.value = "";
+    cardUploadBudgetIdRef.current = null;
+    if (!budgetId || files.length === 0) return;
+    files.forEach((file) => uploadMutation.mutate({ budgetId, file }));
+  };
+
+  const triggerCardUpload = (e: React.MouseEvent, budgetId: string) => {
+    e.stopPropagation();
+    setUploadError(null);
+    cardUploadBudgetIdRef.current = budgetId;
+    cardFileInputRef.current?.click();
   };
 
   const removePendingFile = (index: number) => {
@@ -742,11 +785,40 @@ export default function OrcamentosAprovacao() {
                   {b.needs_operations && <DeptChip label="Operações"  status={b.operations_status} />}
                   {b.needs_marketing  && <DeptChip label="Marketing"  status={b.marketing_status} />}
                 </div>
+
+                {/* Anexar orçamento do fornecedor — upload direto pelo card */}
+                <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Paperclip className="h-3 w-3" />
+                    {attachmentCounts[b.id]
+                      ? `${attachmentCounts[b.id]} anexo${attachmentCounts[b.id] > 1 ? "s" : ""}`
+                      : "Sem anexos"}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={(e) => triggerCardUpload(e, b.id)}
+                    disabled={uploadMutation.isPending}
+                  >
+                    <Paperclip className="h-3 w-3 mr-1" />
+                    Anexar orçamento
+                  </Button>
+                </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* Hidden input compartilhado pelos cards — budgetId vem do ref */}
+      <input
+        ref={cardFileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleCardFileChange}
+      />
 
       {/* ── Detail Sheet ──────────────────────────────────────────────────────── */}
       <Sheet open={!!detailId} onOpenChange={(o) => !o && setDetailId(null)}>

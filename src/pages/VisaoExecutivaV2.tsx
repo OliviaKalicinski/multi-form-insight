@@ -704,7 +704,7 @@ const VisaoExecutivaV2 = () => {
               unit: "Pedidos",
             },
             {
-              label: "B2B · Let's Fly",
+              label: "B2B · Lets Fly",
               pct: consolidated.b2bPct,
               color: "#fdba74",
               receita: b2b.receitaTotal,

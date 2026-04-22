@@ -828,7 +828,7 @@ export default function PaginaInteligente() {
                       badgeOk: adsStats.roas >= ROAS_TARGET,
                     },
                     {
-                      label: "B2B (Let's Fly)",
+                      label: "B2B (Lets Fly)",
                       revenue: channelRevenue.b2b,
                       sessions: null,
                       tx: null,

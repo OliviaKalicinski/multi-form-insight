@@ -92,7 +92,7 @@ const navSections: NavSection[] = [
     icon: Truck,
     items: [
       { title: "Distribuidores", url: "/distribuidores", icon: Package },
-      { title: "Let's Fly", url: "/lets-fly", icon: Truck },
+      { title: "Lets Fly", url: "/lets-fly", icon: Truck },
       { title: "Site e Conversão", url: "/site-conversao", icon: BarChart2 },
     ],
   },

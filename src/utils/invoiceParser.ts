@@ -239,11 +239,32 @@ const parseDate = (dateStr: string): Date => {
   return new Date(dateStr);
 };
 
-/** Determina segmentação automática baseada em Serie e unidades dos itens */
+/**
+ * Whitelist de clientes que SEMPRE são B2B, independente de unidade na NF.
+ * Motivo: parceiros institucionais/industriais podem comprar em embalagens que
+ * não são kg/L (ex.: amostras, ensaios P&D), mas comercialmente são B2B.
+ * Matching é case-insensitive e por substring da razão social na NF.
+ * Adicionar CNPJ também quando estiver disponível para match mais preciso.
+ */
+const B2B_ALWAYS_PATTERNS: RegExp[] = [
+  /buzz\s*fly/i,       // BUZZ FLY P&D EM ALIMENTOS
+  /fiotec/i,           // FIOTEC
+];
+
+const isAlwaysB2B = (nomeCliente: string): boolean => {
+  const nome = (nomeCliente || "").trim();
+  if (!nome) return false;
+  return B2B_ALWAYS_PATTERNS.some((p) => p.test(nome));
+};
+
+/** Determina segmentação automática baseada em Serie, unidades dos itens e nome do cliente */
 const determineSegment = (
   serie: string,
-  units: string[]
+  units: string[],
+  nomeCliente: string
 ): "b2c" | "b2b2c" | "b2b" => {
+  // Whitelist override: cliente institucional sempre B2B
+  if (isAlwaysB2B(nomeCliente)) return "b2b";
   if (serie === "2") return "b2c";
   if (serie === "1") {
     const hasWeightUnit = units.some((u) => {
@@ -345,8 +366,8 @@ export const processInvoiceData = (rawData: any[]): InvoiceProcessingResult => {
       };
     });
 
-    // Segmentação automática
-    const segmentoCliente = determineSegment(serie, units);
+    // Segmentação automática (considera whitelist por razão social)
+    const segmentoCliente = determineSegment(serie, units, first["Nome Cliente"] || "");
 
     // Extrair numero_pedido das observações
     const numeroPedido = extractNumeroPedido(first["Observacoes"], numeroNota);

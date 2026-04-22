@@ -123,7 +123,7 @@ export default function ReclamacaoNova() {
       const { data, error } = await supabase
         .from("sales_data")
         .select("id, numero_pedido, numero_nota, data_venda, forma_envio, natureza_operacao, status, produtos")
-        .eq("cliente_email", selectedCustomer.cpf_cnpj)
+        .eq("cpf_cnpj", selectedCustomer.cpf_cnpj)
         .order("data_venda", { ascending: false })
         .limit(50);
       if (error) throw error;

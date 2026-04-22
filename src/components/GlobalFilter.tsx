@@ -61,7 +61,7 @@ const SEGMENT_OPTIONS: SegmentOption[] = [
   {
     value: "b2b",
     label: "B2B",
-    sublabel: "Let's Fly",
+    sublabel: "Lets Fly",
     icon: Building2,
     color: SEGMENT_COLORS.b2b,
   },
