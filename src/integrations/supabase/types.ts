@@ -1026,6 +1026,44 @@ export type Database = {
         }
         Relationships: []
       }
+      kanban_status_history: {
+        Row: {
+          id: string
+          influencer_id: string
+          old_status: string | null
+          new_status: string
+          changed_at: string
+          changed_by: string | null
+          source: string
+        }
+        Insert: {
+          id?: string
+          influencer_id: string
+          old_status?: string | null
+          new_status: string
+          changed_at?: string
+          changed_by?: string | null
+          source?: string
+        }
+        Update: {
+          id?: string
+          influencer_id?: string
+          old_status?: string | null
+          new_status?: string
+          changed_at?: string
+          changed_by?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kanban_status_history_influencer_id_fkey"
+            columns: ["influencer_id"]
+            isOneToOne: false
+            referencedRelation: "influencer_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       influencer_contact_log: {
         Row: {
           created_at: string | null

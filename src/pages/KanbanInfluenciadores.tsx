@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { DndContext, DragOverlay, DragStartEvent, DragEndEvent, closestCenter } from "@dnd-kit/core";
+import { DndContext, DragOverlay, DragStartEvent, DragEndEvent, closestCenter, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Database, Search, X, MessageSquare, Send, CalendarDays, Download } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
@@ -20,6 +20,7 @@ type InfluencerStatus =
   | "prospeccao"
   | "reativacao"
   | "em_contato"
+  | "registrado_inflows"
   | "seeding_enviado"
   | "postou"
   | "parceiro"
@@ -82,13 +83,14 @@ function rowToInfluencer(row: Record<string, unknown>): Influencer {
 
 // ─── Columns ─────────────────────────────────────────────────────────────────
 const COLUMNS: { key: InfluencerStatus; title: string; color: string; dot: string }[] = [
-  { key: "prospeccao",      title: "Prospecção",       color: "bg-violet-500/10 text-violet-700 border-violet-200",    dot: "bg-violet-500" },
-  { key: "reativacao",      title: "Reativação",       color: "bg-rose-500/10 text-rose-700 border-rose-200",          dot: "bg-rose-500" },
-  { key: "em_contato",      title: "Em Contato",       color: "bg-blue-500/10 text-blue-700 border-blue-200",          dot: "bg-blue-500" },
-  { key: "seeding_enviado", title: "Seeding Enviado",  color: "bg-amber-500/10 text-amber-700 border-amber-200",       dot: "bg-amber-500" },
-  { key: "postou",          title: "Postou",           color: "bg-purple-500/10 text-purple-700 border-purple-200",    dot: "bg-purple-500" },
-  { key: "parceiro",        title: "Parceiro",         color: "bg-emerald-500/10 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
-  { key: "inativo",         title: "Inativo",          color: "bg-gray-500/10 text-gray-500 border-gray-200",          dot: "bg-gray-400" },
+  { key: "prospeccao",         title: "Prospecção",         color: "bg-violet-500/10 text-violet-700 border-violet-200",    dot: "bg-violet-500" },
+  { key: "reativacao",         title: "Reativação",         color: "bg-rose-500/10 text-rose-700 border-rose-200",          dot: "bg-rose-500" },
+  { key: "em_contato",         title: "Em Contato",         color: "bg-blue-500/10 text-blue-700 border-blue-200",          dot: "bg-blue-500" },
+  { key: "registrado_inflows", title: "Registrado Inflows", color: "bg-sky-500/10 text-sky-700 border-sky-200",             dot: "bg-sky-500" },
+  { key: "seeding_enviado",    title: "Seeding Enviado",    color: "bg-amber-500/10 text-amber-700 border-amber-200",       dot: "bg-amber-500" },
+  { key: "postou",             title: "Postou",             color: "bg-purple-500/10 text-purple-700 border-purple-200",    dot: "bg-purple-500" },
+  { key: "parceiro",           title: "Parceiro",           color: "bg-emerald-500/10 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
+  { key: "inativo",            title: "Inativo",            color: "bg-gray-500/10 text-gray-500 border-gray-200",          dot: "bg-gray-400" },
 ];
 
 const NICHO_OPTIONS = ["Pets", "Nutrição Animal", "Veterinária", "Lifestyle", "Família", "Fitness", "Outro"];
@@ -114,12 +116,27 @@ function startOfMonth(): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
+// ─── Trimestre corrente ─────────────────────────────────────────────────────
+// Retorna início (inclusivo) e fim (inclusivo, 23:59:59) do trimestre atual.
+// Q1 = Jan-Mar, Q2 = Abr-Jun, Q3 = Jul-Set, Q4 = Out-Dez.
+function currentQuarterRange(): { start: Date; end: Date; label: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-indexed
+  const qStartMonth = Math.floor(month / 3) * 3;
+  const start = new Date(year, qStartMonth, 1, 0, 0, 0, 0);
+  const end = new Date(year, qStartMonth + 3, 0, 23, 59, 59, 999);
+  const monthNames = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+  const label = `${monthNames[qStartMonth]}–${monthNames[qStartMonth + 2]}/${year}`;
+  return { start, end, label };
+}
+
 function normalizeInstagram(v: string): string {
   return (v || "").trim().replace(/^@/, "").toLowerCase();
 }
 
 const VALID_STATUSES: InfluencerStatus[] = [
-  "prospeccao", "reativacao", "em_contato",
+  "prospeccao", "reativacao", "em_contato", "registrado_inflows",
   "seeding_enviado", "postou", "parceiro", "inativo",
 ];
 
@@ -141,6 +158,10 @@ function parseStatusFromSheet(raw: string): InfluencerStatus | null {
     prospeccao: "prospeccao",
     contato: "em_contato",
     em_contato: "em_contato",
+    inflows: "registrado_inflows",
+    registrado: "registrado_inflows",
+    registrado_inflows: "registrado_inflows",
+    registrado_no_inflows: "registrado_inflows",
     seeding: "seeding_enviado",
     seeding_enviado: "seeding_enviado",
     postou: "postou",
@@ -234,18 +255,22 @@ function InfluencerCard({
       )}
 
       {(influencer.instagram || influencer.tiktok) && (
-        <div className="space-y-0.5">
+        <div
+          className="space-y-0.5"
+          // Permite selecionar e clicar nos @ sem iniciar drag.
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {influencer.instagram && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Instagram className="h-3 w-3" />
+              <Instagram className="h-3 w-3 shrink-0" />
               <a
                 href={`https://instagram.com/${normalizeInstagram(influencer.instagram)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
-                className="hover:underline hover:text-pink-600 transition-colors"
+                className="cursor-pointer select-text hover:underline hover:text-pink-600 text-foreground/80 transition-colors"
+                title={`Abrir @${normalizeInstagram(influencer.instagram)} no Instagram`}
               >
                 @{normalizeInstagram(influencer.instagram)}
               </a>
@@ -253,15 +278,14 @@ function InfluencerCard({
           )}
           {influencer.tiktok && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span className="h-3 w-3 text-[10px] font-bold leading-3 text-center">TT</span>
+              <span className="h-3 w-3 text-[10px] font-bold leading-3 text-center shrink-0">TT</span>
               <a
                 href={`https://tiktok.com/@${influencer.tiktok.replace(/^@/, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
-                className="hover:underline hover:text-foreground transition-colors"
+                className="cursor-pointer select-text hover:underline hover:text-foreground text-foreground/80 transition-colors"
+                title={`Abrir @${influencer.tiktok.replace(/^@/, "")} no TikTok`}
               >
                 @{influencer.tiktok.replace(/^@/, "")}
               </a>
@@ -1054,6 +1078,31 @@ export default function KanbanInfluenciadores() {
     },
   });
 
+  // ── Histórico de transições REAIS para "parceiro" (trimestre atual) ───────
+  // Ignora backfill (source='backfill') para não inflar a semana atual com
+  // históricos. Só source='trigger' conta — ou seja, transições reais
+  // capturadas pela trigger desde o deploy da migration 20260422180000.
+  const quarterRange = useMemo(() => currentQuarterRange(), []);
+  const { data: statusHistory = [] } = useQuery({
+    queryKey: ["kanban_status_history_parceiro", quarterRange.start.toISOString(), quarterRange.end.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("kanban_status_history" as any)
+        .select("new_status, changed_at, source")
+        .eq("new_status", "parceiro")
+        .eq("source", "trigger")
+        .gte("changed_at", quarterRange.start.toISOString())
+        .lte("changed_at", quarterRange.end.toISOString());
+      // Se a tabela ainda não existir (migration não aplicada), falha silenciosa:
+      // o gráfico mostra só baseline sintético em vez de quebrar a página.
+      if (error) {
+        console.warn("[kanban_status_history] query falhou:", error.message);
+        return [] as { new_status: string; changed_at: string; source: string }[];
+      }
+      return (data ?? []) as { new_status: string; changed_at: string; source: string }[];
+    },
+  });
+
   // ── Responsáveis por influenciador (para badges nos cards + filtro) ──
   const { data: responsavelIndex = [] } = useQuery({
     queryKey: ["influencer_responsavel_index"],
@@ -1234,6 +1283,12 @@ export default function KanbanInfluenciadores() {
     if (!confirm("Remover este influenciador do Kanban?")) return;
     deleteMutation.mutate(id);
   };
+
+  // Sensors: exige 6px de movimento antes de ativar drag — evita que cliques
+  // curtos em links (@instagram, @tiktok) ou botões sejam interpretados como drag.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
 
   const handleDragStart = (e: DragStartEvent) => setActiveId(e.active.id as string);
 
@@ -1456,7 +1511,7 @@ export default function KanbanInfluenciadores() {
   // ── Grouped by status ──────────────────────────────────────────────────────────
   const byStatus = useMemo(() => {
     const map: Record<InfluencerStatus, Influencer[]> = {
-      prospeccao: [], reativacao: [], em_contato: [],
+      prospeccao: [], reativacao: [], em_contato: [], registrado_inflows: [],
       seeding_enviado: [], postou: [], parceiro: [], inativo: [],
     };
     for (const i of influencers) map[i.status]?.push(i);
@@ -1470,79 +1525,102 @@ export default function KanbanInfluenciadores() {
     return map;
   }, [influencers]);
 
-  // ── Dados semanais para o gráfico ─────────────────────────────────────────
-  // Janela dinâmica: começa na semana do influenciador mais antigo, vai até hoje.
-  // Cap de 16 semanas para legibilidade.
-  // Cada barra mostra quantos ENTRARAM no kanban naquela semana,
-  // coloridos pelo status atual (prospecção ainda = não contatados ainda;
-  // qualquer status além = entramos em contato em algum momento).
+  // ── Dados semanais do gráfico (trimestre atual) ───────────────────────────
+  // Desenho:
+  //   - Semanas completas do passado (Mon–Sun totalmente anteriores à semana
+  //     atual): baseline sintético = total_parceiros_atual / K_past.
+  //     É uma referência uniforme, não o crescimento real de cada semana.
+  //   - Semana atual + futuras: contagem REAL de transições source='trigger'
+  //     para "parceiro" capturadas pelo histórico.
+  // Isso mostra "qual foi a média histórica" vs "ritmo real daqui pra frente".
   const weeklyChartData = useMemo(() => {
-    if (rawInfluencers.length === 0) return [];
+    const { start: quarterStart, end: quarterEnd } = quarterRange;
 
-    // Segunda-feira da semana atual
-    const now = new Date();
-    const thisMonday = new Date(now);
-    thisMonday.setHours(0, 0, 0, 0);
-    const dn = thisMonday.getDay();
-    thisMonday.setDate(thisMonday.getDate() - (dn === 0 ? 6 : dn - 1));
+    const mondayOf = (date: Date) => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      const dow = d.getDay();
+      d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+      return d;
+    };
 
-    // Segunda-feira da semana do influenciador mais antigo
-    const oldestDate = rawInfluencers.reduce(
-      (min, i) => (new Date(i.created_at) < min ? new Date(i.created_at) : min),
-      new Date(rawInfluencers[0].created_at)
+    const firstMonday = mondayOf(quarterStart);
+    const lastMonday = mondayOf(quarterEnd);
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const numWeeks = Math.min(
+      16,
+      Math.max(1, Math.round((lastMonday.getTime() - firstMonday.getTime()) / weekMs) + 1),
     );
-    const firstMonday = new Date(oldestDate);
-    firstMonday.setHours(0, 0, 0, 0);
-    const d0 = firstMonday.getDay();
-    firstMonday.setDate(firstMonday.getDate() - (d0 === 0 ? 6 : d0 - 1));
 
-    // Número de semanas entre a mais antiga e hoje (cap 16)
-    const totalWeeks = Math.round(
-      (thisMonday.getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)
-    ) + 1;
-    const NUM_WEEKS = Math.min(totalWeeks, 16);
-    const startMonday = new Date(thisMonday);
-    startMonday.setDate(thisMonday.getDate() - (NUM_WEEKS - 1) * 7);
+    // Segunda-feira da semana atual (divisor entre passado sintético e real).
+    const currentMonday = mondayOf(new Date());
 
-    // Gera os slots
-    const weeks: { label: string; weekStart: Date; prospeccao: number; em_contato: number }[] = [];
-    for (let w = 0; w < NUM_WEEKS; w++) {
-      const weekStart = new Date(startMonday);
-      weekStart.setDate(startMonday.getDate() + w * 7);
-      const dd = String(weekStart.getDate()).padStart(2, "0");
-      const mm = String(weekStart.getMonth() + 1).padStart(2, "0");
-      weeks.push({ label: `${dd}/${mm}`, weekStart, prospeccao: 0, em_contato: 0 });
+    // Total atual de parceiros (base que vai ser distribuída uniformemente
+    // nas semanas passadas completas dentro do trimestre).
+    const totalParceiros = rawInfluencers.filter((i) => i.status === "parceiro").length;
+
+    type Slot = {
+      label: string;
+      weekStart: Date;
+      isPast: boolean;   // semana completa antes da semana atual
+      parceiro: number;  // valor final (sintético no passado, real no resto)
+    };
+    const weeks: Slot[] = [];
+    for (let w = 0; w < numWeeks; w++) {
+      const ws = new Date(firstMonday);
+      ws.setDate(firstMonday.getDate() + w * 7);
+      const dd = String(ws.getDate()).padStart(2, "0");
+      const mm = String(ws.getMonth() + 1).padStart(2, "0");
+      weeks.push({
+        label: `${dd}/${mm}`,
+        weekStart: ws,
+        isPast: ws.getTime() < currentMonday.getTime(),
+        parceiro: 0,
+      });
     }
 
-    // Distribui cada influenciador pela semana em que entrou no kanban (created_at).
-    // Dentro dessa semana, separa por status atual:
-    // - se tem data_primeiro_contato preenchida → conta como "em_contato" (azul)
-    // - se ainda está em prospeccao sem contato → conta como "prospeccao" (roxo)
-    for (const inf of rawInfluencers) {
-      const created = new Date(inf.created_at);
+    // Baseline sintético nas semanas passadas completas.
+    const pastCount = weeks.filter((s) => s.isPast).length;
+    if (pastCount > 0 && totalParceiros > 0) {
+      // Distribuição uniforme; último decimal vai na semana mais recente
+      // para a soma bater exatamente com totalParceiros.
+      const base = Math.floor(totalParceiros / pastCount);
+      const remainder = totalParceiros - base * pastCount;
+      let assigned = 0;
+      for (const slot of weeks) {
+        if (!slot.isPast) continue;
+        slot.parceiro = base;
+        assigned += 1;
+        if (assigned > pastCount - remainder) slot.parceiro += 1;
+      }
+    }
+
+    // Contagem real da semana atual em diante (source='trigger' já filtrado
+    // na query; mesmo assim checa se a linha não cai em semana passada).
+    for (const row of statusHistory) {
+      const changed = new Date(row.changed_at);
+      if (isNaN(changed.getTime())) continue;
+      if (changed < quarterStart || changed > quarterEnd) continue;
       for (const slot of weeks) {
         const slotEnd = new Date(slot.weekStart);
         slotEnd.setDate(slot.weekStart.getDate() + 7);
-        if (created >= slot.weekStart && created < slotEnd) {
-          const foiContatado = !!inf.data_primeiro_contato || inf.status !== "prospeccao";
-          if (foiContatado) slot.em_contato += 1;
-          else slot.prospeccao += 1;
+        if (changed >= slot.weekStart && changed < slotEnd) {
+          if (!slot.isPast) slot.parceiro += 1;
           break;
         }
       }
     }
 
-    // Remove semanas sem nenhum dado no início da janela
-    const firstNonEmpty = weeks.findIndex((w) => w.prospeccao > 0 || w.em_contato > 0);
-    const trimmed = firstNonEmpty > 0 ? weeks.slice(firstNonEmpty) : weeks;
-
-    return trimmed.map(({ label, prospeccao, em_contato }) => ({ label, prospeccao, em_contato }));
-  }, [rawInfluencers]);
+    return weeks
+      .map(({ label, parceiro, isPast }) => ({ label, parceiro, isPast }))
+      .reverse();
+  }, [statusHistory, quarterRange, rawInfluencers]);
 
   // ── Export XLSX ────────────────────────────────────────────────────────────
   const handleExportXLSX = useCallback(() => {
     const colLabel: Record<InfluencerStatus, string> = {
       prospeccao: "Prospecção", reativacao: "Reativação", em_contato: "Em Contato",
+      registrado_inflows: "Registrado Inflows",
       seeding_enviado: "Seeding Enviado", postou: "Postou", parceiro: "Parceiro", inativo: "Inativo",
     };
     const rows = rawInfluencers.map((i) => ({
@@ -1572,7 +1650,7 @@ export default function KanbanInfluenciadores() {
   const activeInfluencer = rawInfluencers.find((i) => i.id === activeId);
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4 min-w-0 overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -1625,50 +1703,76 @@ export default function KanbanInfluenciadores() {
         </div>
       </div>
 
-      {/* Gráfico semanal — Prospecção vs Em Contato */}
-      {!isLoading && rawInfluencers.length > 0 && (
-        <div className="rounded-lg border bg-card p-4 space-y-2">
+      {/* Gráfico trimestral — Ritmo semanal de crescimento da base de parceiros */}
+      {/* Largura alinhada com as 4 primeiras colunas do kanban:
+         4 × w-64 (256px) + 3 × gap-4 (16px) = 1072px */}
+      {!isLoading && weeklyChartData.length > 0 && (
+        <div className="rounded-lg border bg-card p-4 space-y-2 w-full max-w-[1072px] overflow-hidden">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm font-semibold">Entradas por semana no pipeline</p>
+            <p className="text-sm font-semibold">Ritmo semanal — crescimento da base de parceiros</p>
+            <Badge variant="outline" className="text-[10px] ml-auto">
+              Trimestre {quarterRange.label}
+            </Badge>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Cada barra = total que entrou no kanban naquela semana. <strong className="text-blue-600">Azul</strong> = já avançamos para contato. <strong className="text-violet-600">Roxo</strong> = ainda só em prospecção.
+            Semanas passadas mostram a <strong>média histórica</strong> (base atual distribuída uniformemente). A partir da semana atual, cada barra é o <strong>número real</strong> de novos parceiros naquela semana, capturado pelo histórico de transições.
           </p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={weeklyChartData} barCategoryGap="10%" barGap={2}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+          <ResponsiveContainer
+            width="100%"
+            height={Math.max(220, weeklyChartData.length * 28 + 60)}
+          >
+            <BarChart
+              data={weeklyChartData}
+              layout="vertical"
+              barCategoryGap="20%"
+              margin={{ top: 8, right: 24, bottom: 8, left: 8 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
               <XAxis
-                dataKey="label"
+                type="number"
+                allowDecimals={false}
                 tick={{ fontSize: 11, fill: "#888" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                allowDecimals={false}
+                type="category"
+                dataKey="label"
                 tick={{ fontSize: 11, fill: "#888" }}
                 axisLine={false}
                 tickLine={false}
-                width={28}
+                width={56}
+                interval={0}
               />
               <Tooltip
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
-                formatter={(value: number, name: string) => [
+                formatter={(value: number, _name: string, item: any) => [
                   value,
-                  name === "prospeccao" ? "Só prospecção" : "Entramos em contato",
+                  item?.payload?.isPast ? "Média histórica (sintético)" : "Novos parceiros (real)",
                 ]}
                 labelFormatter={(label) => `Semana de ${label}`}
               />
-              <Legend
-                formatter={(value) =>
-                  value === "prospeccao" ? "Só prospecção" : "Entramos em contato"
-                }
-                wrapperStyle={{ fontSize: 12 }}
-              />
-              <Bar dataKey="em_contato" stackId="a" fill="#3b82f6" name="em_contato" />
-              <Bar dataKey="prospeccao" stackId="a" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="prospeccao" />
+              <Bar dataKey="parceiro" name="parceiro" radius={[0, 4, 4, 0]}>
+                {weeklyChartData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.isPast ? "#d1d5db" : "#10b981"}
+                  />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-3 h-3 rounded-sm bg-gray-300" />
+              Média histórica
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-3 h-3 rounded-sm bg-emerald-500" />
+              Novos parceiros (real)
+            </span>
+          </div>
         </div>
       )}
 
@@ -1685,7 +1789,7 @@ export default function KanbanInfluenciadores() {
 
       {/* Board */}
       {!isLoading && (
-        <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {COLUMNS.map((col) => (
               <KanbanCol

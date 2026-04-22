@@ -96,7 +96,7 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 text-4xl">🐉</div>
-          <CardTitle className="text-2xl">Comida de Dragão</CardTitle>
+          <CardTitle className="text-2xl">Lets Fly</CardTitle>
           <CardDescription>Dashboard de Marketing</CardDescription>
         </CardHeader>
         
