@@ -23,6 +23,7 @@ export type Database = {
           alcance: number | null
           anuncio: string | null
           campaign_id: string | null
+          campaign_objective: string | null
           campanha: string | null
           cliques: number | null
           cliques_link: number | null
@@ -82,6 +83,7 @@ export type Database = {
           alcance?: number | null
           anuncio?: string | null
           campaign_id?: string | null
+          campaign_objective?: string | null
           campanha?: string | null
           cliques?: number | null
           cliques_link?: number | null
@@ -141,6 +143,7 @@ export type Database = {
           alcance?: number | null
           anuncio?: string | null
           campaign_id?: string | null
+          campaign_objective?: string | null
           campanha?: string | null
           cliques?: number | null
           cliques_link?: number | null
