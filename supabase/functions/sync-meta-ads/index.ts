@@ -299,7 +299,13 @@ serve(async (req) => {
 
     let since: string;
     let until: string;
-    let chunkDays = 7;
+    // R10: default reduzido de 7 → 2. Conta Meta do Bruno (41 campanhas, 728 ads
+    // ativos, 30+ fields, time_increment=1) estoura limite interno da Graph API
+    // e retorna erro 99 ("An unknown error occurred") quando chunk tem 7 dias.
+    // Com chunk_days=2, cada request processa ~4x menos linhas e passa limpo.
+    // Trade-off: sync de 7 dias leva ~90s (4 chunks) em vez de ~35s (1 chunk).
+    // Pode ser sobrescrito via body.chunk_days se for uma conta menor.
+    let chunkDays = 2;
 
     try {
       const body = await req.json();
