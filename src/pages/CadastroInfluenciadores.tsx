@@ -505,13 +505,38 @@ export default function CadastroInfluenciadores() {
   // Mutation: Import CSV
   // IMPORTANTE: exclui o campo `coupon` do upsert para nunca sobrescrever
   // vínculos que o usuário já salvou manualmente ou via auto-link.
+  //
+  // R13-3: garante que NOVOS registros entrem com kanban_status='prospeccao'
+  // pra aparecerem no kanban (que filtra .not(kanban_status, is, null)).
+  // Registros já existentes NÃO têm kanban_status no payload — preserva o
+  // valor atual no DB (status intermediário ou 'arquivado' via NULL).
   const importMutation = useMutation({
     mutationFn: async (influencers: Influencer[]) => {
       const rows = influencers.map((inf) => {
         const { coupon, ...rowWithoutCoupon } = influencerToDBRow(inf);
         return rowWithoutCoupon;
       });
-      const { error } = await (supabase.from("influencer_registry") as any).upsert(rows, {
+
+      // R13-3: identifica emails JÁ existentes pra não sobrescrever kanban_status.
+      const emails = rows.map((r) => r.email).filter(Boolean);
+      let existingEmails = new Set<string>();
+      if (emails.length > 0) {
+        const { data: existing } = await supabase
+          .from("influencer_registry")
+          .select("email")
+          .in("email", emails);
+        existingEmails = new Set(
+          (existing || []).map((e: { email: string }) => e.email),
+        );
+      }
+
+      const enriched = rows.map((row) =>
+        existingEmails.has(row.email)
+          ? row // existente: preserva kanban_status atual do DB
+          : { ...row, kanban_status: "prospeccao" }, // novo: força default
+      );
+
+      const { error } = await (supabase.from("influencer_registry") as any).upsert(enriched, {
         onConflict: "email",
       });
       if (error) throw error;

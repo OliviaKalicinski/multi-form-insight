@@ -1165,6 +1165,12 @@ export default function KanbanInfluenciadores() {
   }, [rawInfluencers, search, filteredByResponsavel]);
 
   // ── Upsert mutation (create or update) ─────────────────────────────────────
+  // R13-2: quando isNew=true, usar UPSERT em vez de INSERT puro.
+  // Motivo: rawInfluencers filtra kanban_status != null, então o check
+  // `alreadyExists` não enxerga registros com kanban_status NULL (cadastrados
+  // via CSV antes ou arquivados). INSERT batia em constraint unique de
+  // instagram/email e falhava silenciosamente. UPSERT promove o registro
+  // latente ao status escolhido no formulário.
   const upsertMutation = useMutation({
     mutationFn: async (payload: {
       instagram: string;
@@ -1173,7 +1179,10 @@ export default function KanbanInfluenciadores() {
     }) => {
       const { instagram, data, isNew } = payload;
       if (isNew) {
-        const { error } = await supabase.from("influencer_registry").insert([data] as any);
+        const { error } = await (supabase.from("influencer_registry") as any).upsert(
+          [data],
+          { onConflict: "instagram", ignoreDuplicates: false },
+        );
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -1316,20 +1325,38 @@ export default function KanbanInfluenciadores() {
     return "instagram"; // default
   };
 
-  /** Normaliza contagens como "12.5k" → 12500, "1M" → 1000000, "394.8k" → 394800 */
+  /**
+   * R13-1: normaliza contagens de seguidores com suporte a formatos BR e US.
+   *
+   * Com sufixo (k/m/mil): ponto É decimal ("12.5k" = 12500, "1.5m" = 1500000).
+   * Sem sufixo: INTEIROS puros — ponto e vírgula são separadores de milhar
+   *   ("1.000" = 1000 BR, "1,000" = 1000 US, "1.234.567" = 1234567).
+   *
+   * Bug anterior: parseInt("1.000") retornava 1. Dados históricos foram
+   * salvos com ordem de grandeza errada (ex.: "1.000" virou 1 no banco).
+   * Precisa re-importar CSV após deploy pra corrigir dados existentes.
+   */
   const parseFollowerCount = (raw: string): number | null => {
     if (!raw) return null;
-    const cleaned = raw.trim().replace(/,/g, "").toLowerCase();
-    const match = cleaned.match(/^([\d.]+)\s*(k|m|mil)?$/);
-    if (!match) {
-      const asNum = parseInt(cleaned, 10);
-      return isNaN(asNum) ? null : asNum;
+    const cleaned = raw.trim().toLowerCase();
+    if (!cleaned) return null;
+
+    // Com sufixo k/m/mil: ponto é decimal. Ex.: "12.5k" = 12500.
+    const suffixMatch = cleaned.match(/^([\d.,]+)\s*(k|m|mil)$/);
+    if (suffixMatch) {
+      // Normaliza vírgula BR para ponto decimal antes de parseFloat.
+      const num = parseFloat(suffixMatch[1].replace(",", "."));
+      if (!isFinite(num)) return null;
+      const mult = suffixMatch[2] === "m" ? 1_000_000 : 1_000;
+      return Math.round(num * mult);
     }
-    const num = parseFloat(match[1]);
-    const suffix = match[2];
-    if (suffix === "k" || suffix === "mil") return Math.round(num * 1000);
-    if (suffix === "m") return Math.round(num * 1_000_000);
-    return Math.round(num);
+
+    // Sem sufixo: inteiro puro. Remove TODOS separadores (. e ,) — não há
+    // casas decimais em contagem de seguidores.
+    const digits = cleaned.replace(/[.,\s]/g, "");
+    if (!/^\d+$/.test(digits)) return null;
+    const n = parseInt(digits, 10);
+    return isFinite(n) ? n : null;
   };
 
   /** Mapeia uma row CSV de prospecção para o payload interno */
