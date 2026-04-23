@@ -47,6 +47,38 @@ function chunkDateRange(since: string, until: string, chunkDays: number) {
   return chunks;
 }
 
+// ─── Busca objective de todas as campanhas da conta (R07-2) ────────────────
+// Retorna Map<campaign_id, objective> para enriquecer os inserts de insights.
+// Sem isso, o parser cai num fallback por métrica e classifica qualquer ad
+// que teve AtC/compra como OUTCOME_SALES, cooptando campanhas Engagement/Traffic.
+async function fetchCampaignObjectives(
+  metaToken: string,
+  metaAccount: string,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  let nextUrl: string | null =
+    `https://graph.facebook.com/v20.0/${metaAccount}/campaigns?` +
+    `fields=id,objective&limit=500&access_token=${metaToken}`;
+
+  let pages = 0;
+  while (nextUrl && pages < 20) {
+    const res = await fetch(nextUrl);
+    if (!res.ok) {
+      const err = await res.json();
+      console.error(`Erro ao buscar campaign objectives: ${JSON.stringify(err)}`);
+      return map;
+    }
+    const json = await res.json();
+    for (const c of json.data || []) {
+      if (c.id && c.objective) map.set(c.id, c.objective);
+    }
+    nextUrl = json.paging?.next || null;
+    pages++;
+  }
+  console.log(`Campaign objectives carregados: ${map.size} campanhas`);
+  return map;
+}
+
 // ─── Busca effective_status de todos os anúncios da conta ───────────────────
 async function syncEffectiveStatus(supabase: any, metaToken: string, metaAccount: string): Promise<number> {
   // Meta API: /act_ACCOUNT/ads retorna effective_status por ad_id
@@ -97,6 +129,7 @@ async function syncChunk(
   metaAccount: string,
   since: string,
   until: string,
+  campaignObjectives: Map<string, string>,
 ): Promise<number> {
   const fields = [
     "ad_id",
@@ -180,6 +213,10 @@ async function syncChunk(
       campanha: insight.campaign_name,
       conjunto: insight.adset_name,
       anuncio: insight.ad_name,
+      // R07-2: objetivo da campanha (OUTCOME_SALES, OUTCOME_ENGAGEMENT, etc.)
+      // vem de fetchCampaignObjectives(). Se não encontrado, null (parser
+      // faz fallback por métrica).
+      campaign_objective: campaignObjectives.get(insight.campaign_id) || null,
       impressoes: parseInt(insight.impressions) || 0,
       alcance: parseInt(insight.reach) || 0,
       cliques: parseInt(insight.clicks) || 0,
@@ -280,13 +317,23 @@ serve(async (req) => {
 
     console.log(`Sync: ${since} → ${until} | ${chunks.length} chunks de ${chunkDays} dias`);
 
+    // R07-2: busca objectives UMA vez antes dos chunks (não muda por data).
+    const campaignObjectives = await fetchCampaignObjectives(META_TOKEN, META_ACCOUNT);
+
     let totalSynced = 0;
     const chunkResults: any[] = [];
 
     for (const chunk of chunks) {
       console.log(`Chunk: ${chunk.since} → ${chunk.until}`);
       try {
-        const count = await syncChunk(supabase, META_TOKEN, META_ACCOUNT, chunk.since, chunk.until);
+        const count = await syncChunk(
+          supabase,
+          META_TOKEN,
+          META_ACCOUNT,
+          chunk.since,
+          chunk.until,
+          campaignObjectives,
+        );
         totalSynced += count;
         chunkResults.push({ ...chunk, synced: count, ok: true });
       } catch (err: any) {

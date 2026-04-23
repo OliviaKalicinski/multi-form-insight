@@ -488,6 +488,9 @@ export const useDataPersistence = () => {
         _campaign_id: row.campaign_id || "",
         _adset_id: row.adset_id || "",
         _source: row.source || "csv",
+        // R07-2: objetivo da campanha vindo da Graph API (fonte da verdade
+        // sobre classificação Sales/Engagement/Traffic/Awareness/Leads).
+        campaign_objective: row.campaign_objective || null,
       }));
 
       // Transform followers data — usa novos_seguidores diários (planilha + API)

@@ -100,6 +100,10 @@ export interface AdsData {
   adset_id?: string;
   roas_api?: number | null;
   effective_status?: string; // 'ACTIVE' | 'PAUSED' | 'DELETED' | 'ARCHIVED' | 'WITH_ISSUES'
+  // R07-2: objetivo da campanha vindo do sync-meta-ads (fonte da verdade
+  // vs inferência por métrica). Usado por getAdObjective para classificar
+  // o ad antes do fallback.
+  campaign_objective?: string | null;
 }
 
 export interface AdsMonthSummary {

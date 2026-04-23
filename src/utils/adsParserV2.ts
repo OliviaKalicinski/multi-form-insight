@@ -238,36 +238,43 @@ export const extractAvailableMonths = (data: AdsData[]): string[] => {
 };
 
 /**
- * Extrai o objetivo de um anúncio
- * Prioriza o campo "Objetivo" explícito, com fallback de inferência por métricas
+ * Extrai o objetivo de um anúncio.
+ * Ordem de prioridade (R07-2):
+ *   1. campaign_objective do banco — fonte da verdade, vinda da Graph API
+ *   2. "Objetivo" do CSV — uploads manuais do Ads Manager
+ *   3. Fallback por métrica — cooptava ads non-Sales como Sales quando tinham
+ *      AtC/compra atribuída. Mantido para dados antigos sem o campo 1/2.
  */
 export const getAdObjective = (ad: AdsData): string => {
-  const objetivo = ad["Objetivo"] || "";
+  // 1. Fonte da verdade: banco via /campaigns endpoint (sync-meta-ads R07-2).
+  const fromDb = ad.campaign_objective || "";
+  if (fromDb) {
+    if (fromDb.includes("OUTCOME_SALES")) return "OUTCOME_SALES";
+    if (fromDb.includes("OUTCOME_ENGAGEMENT")) return "OUTCOME_ENGAGEMENT";
+    if (fromDb.includes("OUTCOME_TRAFFIC")) return "OUTCOME_TRAFFIC";
+    if (fromDb.includes("OUTCOME_AWARENESS")) return "OUTCOME_AWARENESS";
+    if (fromDb.includes("OUTCOME_LEADS")) return "OUTCOME_LEADS";
+    if (fromDb.includes("OUTCOME_APP_PROMOTION")) return "OUTCOME_APP_PROMOTION";
+  }
 
-  // 1. Se já tem objetivo explícito, usar
+  // 2. CSV manual: campo "Objetivo" do export do Ads Manager.
+  const objetivo = ad["Objetivo"] || "";
   if (objetivo.includes("OUTCOME_SALES")) return "OUTCOME_SALES";
   if (objetivo.includes("OUTCOME_ENGAGEMENT")) return "OUTCOME_ENGAGEMENT";
   if (objetivo.includes("OUTCOME_TRAFFIC")) return "OUTCOME_TRAFFIC";
   if (objetivo.includes("OUTCOME_AWARENESS")) return "OUTCOME_AWARENESS";
   if (objetivo.includes("OUTCOME_LEADS")) return "OUTCOME_LEADS";
 
-  // 2. FALLBACK: Inferir baseado nas métricas disponíveis
-  // Se tem compras, receita ou adições ao carrinho → é Sales
+  // 3. Fallback por métrica — só roda se os dois primeiros falharem.
+  // Após re-sync pós-R07-2, registros novos sempre terão fromDb populado.
   const compras = parseFloat(ad["Compras"] || "0");
   const receita = parseFloat(ad["Valor de conversão da compra"] || "0");
   const adicoesCarrinho = parseFloat(ad["Adições ao carrinho"] || "0");
+  if (compras > 0 || receita > 0 || adicoesCarrinho > 0) return "OUTCOME_SALES";
 
-  if (compras > 0 || receita > 0 || adicoesCarrinho > 0) {
-    return "OUTCOME_SALES";
-  }
-
-  // Se tem engajamentos ou resultados (sem sales) → é Engagement
   const engajamentos = parseFloat(ad["Engajamentos com o post"] || "0");
   const resultados = parseFloat(ad["Resultados"] || "0");
-
-  if (engajamentos > 0 || resultados > 0) {
-    return "OUTCOME_ENGAGEMENT";
-  }
+  if (engajamentos > 0 || resultados > 0) return "OUTCOME_ENGAGEMENT";
 
   return "UNKNOWN";
 };
