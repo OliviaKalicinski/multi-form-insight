@@ -79,9 +79,10 @@ const CustomTooltip = ({ active, payload, axisLabel }: any) => {
   );
 };
 
-export const AdClassificationChart = ({ adsData, objective = 'OUTCOME_SALES' }: AdClassificationChartProps) => {
+export const AdClassificationChart = ({ adsData, objective = 'VENDAS' }: AdClassificationChartProps) => {
   const axisInfo = useMemo(() => getEfficiencyAxisInfo(objective), [objective]);
-  const isSales = objective === 'OUTCOME_SALES' || !objective;
+  // R08: binário. Retrocompat com valores OUTCOME_SALES pré-R08.
+  const isSales = objective === 'VENDAS' || objective === 'OUTCOME_SALES' || !objective;
 
   const points = useMemo(() => {
     const grouped = new Map<string, { ctrSum: number; roasSum: number; cprSum: number; cpcSum: number; investSum: number; resultsSum: number; clicksSum: number; count: number }>();
@@ -128,7 +129,7 @@ export const AdClassificationChart = ({ adsData, objective = 'OUTCOME_SALES' }: 
     const medianCpc = calcMedian(rawEntries.map(e => e.cpc).filter(v => v > 0));
 
     const result: ScatterPoint[] = rawEntries.map(e => {
-      const efficiencyValue = isSales ? e.roas : (objective === 'OUTCOME_ENGAGEMENT' ? e.cpr : e.cpc);
+      const efficiencyValue = isSales ? e.roas : ((objective === 'OUTROS' || objective === 'OUTCOME_ENGAGEMENT') ? e.cpr : e.cpc);
       return {
         adName: e.adName,
         ctr: e.ctr,
@@ -142,7 +143,7 @@ export const AdClassificationChart = ({ adsData, objective = 'OUTCOME_SALES' }: 
   }, [adsData, objective, isSales]);
 
   const { points: scatterPoints, medianCpr, medianCpc } = points;
-  const referenceY = isSales ? ROAS_REFERENCE : (objective === 'OUTCOME_ENGAGEMENT' ? medianCpr : medianCpc);
+  const referenceY = isSales ? ROAS_REFERENCE : ((objective === 'OUTROS' || objective === 'OUTCOME_ENGAGEMENT') ? medianCpr : medianCpc);
 
   const byRole = useMemo(() => {
     const map = new Map<FunnelRole, ScatterPoint[]>();

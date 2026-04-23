@@ -174,7 +174,8 @@ export const getRoleMeta = (role: FunnelRole): RoleMeta => ROLE_META[role];
 // CLASSIFICACAO POR OBJETIVO
 // ============================================
 
-export type AdObjectiveType = 'OUTCOME_SALES' | 'OUTCOME_ENGAGEMENT' | 'OUTCOME_TRAFFIC' | string;
+// R08: binário "VENDAS" | "OUTROS". Mantém legacy OUTCOME_* pra retrocompat.
+export type AdObjectiveType = 'VENDAS' | 'OUTROS' | 'OUTCOME_SALES' | 'OUTCOME_ENGAGEMENT' | 'OUTCOME_TRAFFIC' | string;
 
 /**
  * Para Engagement/Traffic, a referencia do eixo Y eh a mediana do grupo.
@@ -185,16 +186,19 @@ export const classifyByObjective = (
   ctr: number,
   opts: { roas?: number; cpr?: number; cpc?: number; medianCpr?: number; medianCpc?: number },
 ): FunnelRole => {
-  if (objective === 'OUTCOME_SALES' || !objective) {
+  // R08: VENDAS (ou legacy OUTCOME_SALES) → ROAS-based classification.
+  if (objective === 'VENDAS' || objective === 'OUTCOME_SALES' || !objective) {
     return classifyFunnelRole(ctr, opts.roas ?? 0);
   }
 
   const highCtr = ctr >= CTR_REFERENCE;
 
-  if (objective === 'OUTCOME_ENGAGEMENT') {
+  // R08: OUTROS agrupa Engagement/Traffic/Awareness/Leads.
+  // Usa CPR (custo por resultado) como eixo de eficiência — mais genérico
+  // que CPC e coerente com a UI consolidada.
+  if (objective === 'OUTROS' || objective === 'OUTCOME_ENGAGEMENT') {
     const median = opts.medianCpr ?? 0;
     const cpr = opts.cpr ?? Infinity;
-    // "Bom resultado" = CPR abaixo ou igual à mediana (quanto menor, melhor)
     const goodResult = median > 0 && cpr <= median;
     if (highCtr && goodResult) return 'conversor';
     if (highCtr && !goodResult) return 'isca_atencao';
@@ -202,6 +206,7 @@ export const classifyByObjective = (
     return 'ineficiente';
   }
 
+  // Legacy pré-R08: Traffic usava CPC como referência.
   if (objective === 'OUTCOME_TRAFFIC') {
     const median = opts.medianCpc ?? 0;
     const cpc = opts.cpc ?? Infinity;
@@ -230,7 +235,12 @@ export const calcMedian = (values: number[]): number => {
  * Retorna label e unidade do eixo Y conforme o objetivo ativo.
  */
 export const getEfficiencyAxisInfo = (objective: AdObjectiveType): { label: string; unit: string; key: string } => {
+  // R08: OUTROS agrupa Engagement/Traffic/Awareness/Leads → usa CPR
+  // (custo por resultado) como eixo comum, mais genérico que CPC.
+  if (objective === 'OUTROS') return { label: 'CPR (R$)', unit: '', key: 'cpr' };
+  // Legacy pré-R08:
   if (objective === 'OUTCOME_ENGAGEMENT') return { label: 'CPR (R$)', unit: '', key: 'cpr' };
   if (objective === 'OUTCOME_TRAFFIC') return { label: 'CPC (R$)', unit: '', key: 'cpc' };
+  // VENDAS (R08) + OUTCOME_SALES (legacy) + default → ROAS.
   return { label: 'ROAS (x)', unit: 'x', key: 'roas' };
 };

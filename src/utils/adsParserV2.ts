@@ -238,66 +238,65 @@ export const extractAvailableMonths = (data: AdsData[]): string[] => {
 };
 
 /**
- * Extrai o objetivo de um anúncio.
- * Ordem de prioridade (R07-2):
+ * R08: classificação binária VENDAS | OUTROS.
+ * Decisão operacional: interessa saber o que vende vs o que não vende.
+ * Sub-objetivos (Engagement/Traffic/Awareness/Leads) são todos "OUTROS".
+ *
+ * Ordem de prioridade:
  *   1. campaign_objective do banco — fonte da verdade, vinda da Graph API
  *   2. "Objetivo" do CSV — uploads manuais do Ads Manager
- *   3. Fallback por métrica — cooptava ads non-Sales como Sales quando tinham
- *      AtC/compra atribuída. Mantido para dados antigos sem o campo 1/2.
+ *   3. Fallback por métrica — para dados antigos ou CSVs sem o campo.
  */
-export const getAdObjective = (ad: AdsData): string => {
+export const getAdObjective = (ad: AdsData): "VENDAS" | "OUTROS" | "UNKNOWN" => {
   // 1. Fonte da verdade: banco via /campaigns endpoint (sync-meta-ads R07-2).
   const fromDb = ad.campaign_objective || "";
   if (fromDb) {
-    if (fromDb.includes("OUTCOME_SALES")) return "OUTCOME_SALES";
-    if (fromDb.includes("OUTCOME_ENGAGEMENT")) return "OUTCOME_ENGAGEMENT";
-    if (fromDb.includes("OUTCOME_TRAFFIC")) return "OUTCOME_TRAFFIC";
-    if (fromDb.includes("OUTCOME_AWARENESS")) return "OUTCOME_AWARENESS";
-    if (fromDb.includes("OUTCOME_LEADS")) return "OUTCOME_LEADS";
-    if (fromDb.includes("OUTCOME_APP_PROMOTION")) return "OUTCOME_APP_PROMOTION";
+    return fromDb.includes("OUTCOME_SALES") ? "VENDAS" : "OUTROS";
   }
 
   // 2. CSV manual: campo "Objetivo" do export do Ads Manager.
   const objetivo = ad["Objetivo"] || "";
-  if (objetivo.includes("OUTCOME_SALES")) return "OUTCOME_SALES";
-  if (objetivo.includes("OUTCOME_ENGAGEMENT")) return "OUTCOME_ENGAGEMENT";
-  if (objetivo.includes("OUTCOME_TRAFFIC")) return "OUTCOME_TRAFFIC";
-  if (objetivo.includes("OUTCOME_AWARENESS")) return "OUTCOME_AWARENESS";
-  if (objetivo.includes("OUTCOME_LEADS")) return "OUTCOME_LEADS";
+  if (objetivo) {
+    return objetivo.includes("OUTCOME_SALES") ? "VENDAS" : "OUTROS";
+  }
 
   // 3. Fallback por métrica — só roda se os dois primeiros falharem.
-  // Após re-sync pós-R07-2, registros novos sempre terão fromDb populado.
+  // ATENÇÃO: esse fallback classifica como VENDAS qualquer ad com AtC/compra,
+  // mesmo que a campanha original seja Engagement/Traffic. Inevitável sem
+  // campaign_objective. Para dados pós-R07-2, esse branch raramente roda.
   const compras = parseFloat(ad["Compras"] || "0");
   const receita = parseFloat(ad["Valor de conversão da compra"] || "0");
   const adicoesCarrinho = parseFloat(ad["Adições ao carrinho"] || "0");
-  if (compras > 0 || receita > 0 || adicoesCarrinho > 0) return "OUTCOME_SALES";
+  if (compras > 0 || receita > 0 || adicoesCarrinho > 0) return "VENDAS";
 
   const engajamentos = parseFloat(ad["Engajamentos com o post"] || "0");
   const resultados = parseFloat(ad["Resultados"] || "0");
-  if (engajamentos > 0 || resultados > 0) return "OUTCOME_ENGAGEMENT";
+  if (engajamentos > 0 || resultados > 0) return "OUTROS";
 
   return "UNKNOWN";
 };
 
 /**
- * Filtra anúncios por objetivo
- * @param data Array de anúncios
- * @param objective Objetivo desejado (OUTCOME_SALES, OUTCOME_ENGAGEMENT, etc)
- * @returns Apenas anúncios com o objetivo especificado
+ * Filtra anúncios pela dicotomia VENDAS/OUTROS.
  */
-export const filterAdsByObjective = (data: AdsData[], objective: string): AdsData[] => {
+export const filterAdsByObjective = (
+  data: AdsData[],
+  objective: "VENDAS" | "OUTROS",
+): AdsData[] => {
   return data.filter((ad) => getAdObjective(ad) === objective);
 };
 
 /**
- * Determina o objetivo principal baseado na hierarquia: Sales > Engagement > outros
- * @returns O objetivo principal ou "ALL" se não houver distinção
+ * Determina o objetivo principal para auto-detection dos tabs.
+ * Se há mix de Vendas+Outros, retorna "ALL" (aba Auto usa todos).
  */
-export const determinePrimaryObjective = (data: AdsData[]): "OUTCOME_SALES" | "OUTCOME_ENGAGEMENT" | "ALL" => {
-  const hasSales = data.some((ad) => getAdObjective(ad) === "OUTCOME_SALES");
-  const hasEngagement = data.some((ad) => getAdObjective(ad) === "OUTCOME_ENGAGEMENT");
-
-  if (hasSales) return "OUTCOME_SALES";
-  if (hasEngagement) return "OUTCOME_ENGAGEMENT";
+export const determinePrimaryObjective = (
+  data: AdsData[],
+): "VENDAS" | "OUTROS" | "ALL" => {
+  const hasVendas = data.some((ad) => getAdObjective(ad) === "VENDAS");
+  const hasOutros = data.some((ad) => getAdObjective(ad) === "OUTROS");
+  if (hasVendas && hasOutros) return "ALL";
+  if (hasVendas) return "VENDAS";
+  if (hasOutros) return "OUTROS";
   return "ALL";
 };

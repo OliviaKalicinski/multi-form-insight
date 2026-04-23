@@ -49,7 +49,9 @@ const getAdScore = (ad: AdsData, isSales: boolean) => {
 };
 
 export const AdPerformanceRanking = ({ ads, objective }: Props) => {
-  const isSales = objective === "OUTCOME_SALES" || !objective;
+  // R08: classificação binária — "VENDAS" ou "OUTROS". Retrocompatível com
+  // valor "OUTCOME_SALES" pré-R08 e com objective vazio (trata como vendas).
+  const isSales = objective === "VENDAS" || objective === "OUTCOME_SALES" || !objective;
 
   const ranked = useMemo(() => {
     // Agrupa linhas diárias pelo ad_id (ou nome do anúncio como fallback)

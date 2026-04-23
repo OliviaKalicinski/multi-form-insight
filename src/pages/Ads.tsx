@@ -178,68 +178,53 @@ const Ads = () => {
     return filterAdsByDateRange(adsData, dateRange.start, dateRange.end);
   }, [adsData, dateRange]);
 
-  // ===== FASE 5: effectiveObjective replaces primaryObjective =====
+  // ===== R08: classificação binária VENDAS/OUTROS =====
   const detectedObjective = useMemo(() => {
     return determinePrimaryObjective(currentMonthAdsData);
   }, [currentMonthAdsData]);
 
   const effectiveObjective = useMemo(() => {
     if (manualObjective === "auto") return detectedObjective;
-    // Validate manual selection has data
     if (hasObjective(currentMonthAdsData, manualObjective)) return manualObjective;
     return detectedObjective;
   }, [manualObjective, detectedObjective, currentMonthAdsData]);
 
-  // Available objectives for toggle
+  // Available objectives for toggle (R08: só VENDAS e OUTROS).
   const availableObjectives = useMemo(
     () => ({
-      sales: hasObjective(currentMonthAdsData, "OUTCOME_SALES"),
-      engagement: hasObjective(currentMonthAdsData, "OUTCOME_ENGAGEMENT"),
-      traffic: hasObjective(currentMonthAdsData, "OUTCOME_TRAFFIC"),
+      vendas: hasObjective(currentMonthAdsData, "VENDAS"),
+      outros: hasObjective(currentMonthAdsData, "OUTROS"),
     }),
     [currentMonthAdsData],
   );
 
-  // ===== ACTIVE ADS DATA: Filtered by effective objective =====
+  // ===== ACTIVE ADS DATA: filtrado por VENDAS/OUTROS =====
   const activeAdsData = useMemo(() => {
-    if (effectiveObjective === "OUTCOME_SALES") {
-      return filterAdsByObjective(currentMonthAdsData, "OUTCOME_SALES");
+    if (effectiveObjective === "VENDAS") {
+      return filterAdsByObjective(currentMonthAdsData, "VENDAS");
     }
-    if (effectiveObjective === "OUTCOME_ENGAGEMENT") {
-      return filterAdsByObjective(currentMonthAdsData, "OUTCOME_ENGAGEMENT");
-    }
-    if (effectiveObjective === "OUTCOME_TRAFFIC") {
-      return filterAdsByObjective(currentMonthAdsData, "OUTCOME_TRAFFIC");
+    if (effectiveObjective === "OUTROS") {
+      return filterAdsByObjective(currentMonthAdsData, "OUTROS");
     }
     return currentMonthAdsData;
   }, [currentMonthAdsData, effectiveObjective]);
 
-  // ===== Objective Detection for Current Data =====
+  // ===== Sumário da classificação binária =====
   const objectivesSummary = useMemo(() => {
-    const salesCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_SALES").length;
-    const engagementCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_ENGAGEMENT").length;
-    const trafficCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_TRAFFIC").length;
-    const awarenessCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_AWARENESS").length;
-    const leadsCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTCOME_LEADS").length;
+    const vendasCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "VENDAS").length;
+    const outrosCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "OUTROS").length;
     const unknownCount = currentMonthAdsData.filter((ad) => getAdObjective(ad) === "UNKNOWN").length;
 
     return {
-      hasSales: salesCount > 0,
-      hasEngagement: engagementCount > 0,
-      hasTraffic: trafficCount > 0,
-      hasAwareness: awarenessCount > 0,
-      hasLeads: leadsCount > 0,
-      salesCount,
-      engagementCount,
-      trafficCount,
-      awarenessCount,
-      leadsCount,
+      hasVendas: vendasCount > 0,
+      hasOutros: outrosCount > 0,
+      vendasCount,
+      outrosCount,
       unknownCount,
       total: currentMonthAdsData.length,
-      // Flags that sync with activeAdsData (now using effectiveObjective)
       primaryObjective: effectiveObjective,
-      isSalesView: effectiveObjective === "OUTCOME_SALES",
-      isEngagementView: effectiveObjective === "OUTCOME_ENGAGEMENT",
+      isVendasView: effectiveObjective === "VENDAS",
+      isOutrosView: effectiveObjective === "OUTROS",
     };
   }, [currentMonthAdsData, effectiveObjective]);
 
@@ -248,28 +233,23 @@ const Ads = () => {
     return calculateAdsMetrics(activeAdsData);
   }, [activeAdsData]);
 
-  // Métricas consolidadas de TODOS os objetivos (bate com o total que Meta Ads Manager mostra)
-  const allObjectivesMetrics = useMemo(() => {
-    return calculateAdsMetrics(currentMonthAdsData);
+  // Investimento total de TODOS os objetivos (para card "Investido (total)").
+  const totalInvestment = useMemo(() => {
+    return calculateAdsMetrics(currentMonthAdsData).investimentoTotal;
   }, [currentMonthAdsData]);
 
-  const totalInvestmentAllObjectives = allObjectivesMetrics.investimentoTotal;
-
-  // ===== FASE 1: Semantic aliases =====
-  const totalInvestment = totalInvestmentAllObjectives;
+  // ===== Semantic aliases =====
   const objectiveInvestment = metrics.investimentoTotal;
   const revenueBenchmarkMultiplier = 3;
   const grossMediaResult = metrics.valorConversaoTotal - totalInvestment;
 
-  // R06-1: DOIS ROAS semanticamente corretos (não mais o híbrido diluído).
-  // - roasSales: receita Sales ÷ investimento Sales. Performance real das campanhas de venda.
-  // - roasTotal: receita total ÷ investimento total. Bate com Meta Ads Manager.
+  // R08: ROAS único e honesto — receita Vendas ÷ investimento Vendas.
+  // Removida a lógica R06-1 do roasTotal: mesmo somando todos os ads, a
+  // receita total = receita Vendas (purchase_value não é atribuído a non-Sales
+  // no banco). O card ROAS Total foi removido porque não reconciliava com Meta.
   const roasSales = objectiveInvestment > 0 ? metrics.valorConversaoTotal / objectiveInvestment : 0;
-  const roasTotal =
-    totalInvestment > 0 ? allObjectivesMetrics.valorConversaoTotal / totalInvestment : 0;
 
-  // Backward compat: código antigo usa correctedRoas em trends, progress, status.
-  // Mantém para não quebrar cadeia, mas aponta para roasSales (leitura operacional correta).
+  // Alias para código legado que usa correctedRoas em trends/progress/status.
   const correctedRoas = roasSales;
 
   // Calculate trends vs comparison period
@@ -277,12 +257,10 @@ const Ads = () => {
     if (!comparisonDateRange) return null;
 
     let previousData = filterAdsByDateRange(adsData, comparisonDateRange.start, comparisonDateRange.end);
-    if (effectiveObjective === "OUTCOME_SALES") {
-      previousData = filterAdsByObjective(previousData, "OUTCOME_SALES");
-    } else if (effectiveObjective === "OUTCOME_ENGAGEMENT") {
-      previousData = filterAdsByObjective(previousData, "OUTCOME_ENGAGEMENT");
-    } else if (effectiveObjective === "OUTCOME_TRAFFIC") {
-      previousData = filterAdsByObjective(previousData, "OUTCOME_TRAFFIC");
+    if (effectiveObjective === "VENDAS") {
+      previousData = filterAdsByObjective(previousData, "VENDAS");
+    } else if (effectiveObjective === "OUTROS") {
+      previousData = filterAdsByObjective(previousData, "OUTROS");
     }
 
     const previousMetrics = calculateAdsMetrics(previousData);
@@ -405,14 +383,11 @@ const Ads = () => {
     minimo: roasMinimo,
   });
 
-  // Build objectives label for header
+  // Build objectives label for header (R08: binário Vendas/Outros).
   const objectivesLabel = useMemo(() => {
     const labels: string[] = [];
-    if (objectivesSummary.hasSales) labels.push("Sales");
-    if (objectivesSummary.hasEngagement) labels.push("Engagement");
-    if (objectivesSummary.hasTraffic) labels.push("Traffic");
-    if (objectivesSummary.hasAwareness) labels.push("Awareness");
-    if (objectivesSummary.hasLeads) labels.push("Leads");
+    if (objectivesSummary.hasVendas) labels.push(`Vendas (${objectivesSummary.vendasCount})`);
+    if (objectivesSummary.hasOutros) labels.push(`Outros (${objectivesSummary.outrosCount})`);
     return labels.length > 0 ? labels.join(" • ") : "Não identificado";
   }, [objectivesSummary]);
 
@@ -444,30 +419,21 @@ const Ads = () => {
                 className="text-xs px-2.5 py-1 h-7 data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md"
               >
                 Auto{" "}
-                {manualObjective === "auto" && detectedObjective !== "ALL"
-                  ? `(${detectedObjective.replace("OUTCOME_", "")})`
-                  : ""}
+                {manualObjective === "auto" && detectedObjective !== "ALL" ? `(${detectedObjective})` : ""}
               </ToggleGroupItem>
               <ToggleGroupItem
-                value="OUTCOME_SALES"
-                disabled={!availableObjectives.sales}
+                value="VENDAS"
+                disabled={!availableObjectives.vendas}
                 className="text-xs px-2.5 py-1 h-7 data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md disabled:opacity-40"
               >
-                Sales
+                Vendas
               </ToggleGroupItem>
               <ToggleGroupItem
-                value="OUTCOME_ENGAGEMENT"
-                disabled={!availableObjectives.engagement}
+                value="OUTROS"
+                disabled={!availableObjectives.outros}
                 className="text-xs px-2.5 py-1 h-7 data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md disabled:opacity-40"
               >
-                Engagement
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="OUTCOME_TRAFFIC"
-                disabled={!availableObjectives.traffic}
-                className="text-xs px-2.5 py-1 h-7 data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md disabled:opacity-40"
-              >
-                Traffic
+                Outros
               </ToggleGroupItem>
             </ToggleGroup>
           )}
@@ -541,8 +507,8 @@ const Ads = () => {
                 />
               </div>
 
-              {/* Engagement Comparison Cards (if engagement campaigns exist) */}
-              {objectivesSummary.hasEngagement && (
+              {/* Métricas de Engajamento (R08: mostra quando há ads OUTROS) */}
+              {objectivesSummary.hasOutros && (
                 <>
                   <h3 className="text-lg font-semibold text-foreground mt-4">📣 Métricas de Engajamento</h3>
                   <div className="grid gap-4 md:grid-cols-3">
@@ -573,23 +539,26 @@ const Ads = () => {
             </>
           ) : (
             <>
-              {/* ===== ADAPTIVE UI BASED ON OBJECTIVE ===== */}
-              {objectivesSummary.isSalesView ? (
-                // ===== SALES VIEW =====
+              {/* ===== ADAPTIVE UI (R08: binário Vendas/Outros) ===== */}
+              {objectivesSummary.isVendasView ? (
+                // ===== VENDAS VIEW =====
                 <>
-                  {/* ===== BLOCO 1: DECISÃO — ROAS dual + satélites =====
-                       R06-1: DOIS cards de ROAS para evitar leitura diluída.
-                       - ROAS Sales: métrica operacional (decisão sobre verba de venda).
-                       - ROAS Total: número-espelho do Meta Ads Manager (reconciliação).
+                  {/* ===== BLOCO 1: DECISÃO — ROAS único + 4 satélites =====
+                       R08: removido o card ROAS Total (dual card da R06-1).
+                       Motivo: mesmo somando todos os ads do banco, a receita
+                       total = receita Sales (não há receita purchase atribuída
+                       a campanhas non-Sales no Meta). O card criava expectativa
+                       de reconciliação que não acontece. Mantemos só ROAS Sales,
+                       que É o número operacional verdadeiro.
                   */}
-                  <section className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                    {/* Card principal — ROAS Sales (hero) */}
+                  <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Card principal — ROAS Vendas (hero) */}
                     <KPITooltip metricKey="roas">
                       <Card className="lg:col-span-1 border relative">
                         <CardContent className="p-5">
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-muted-foreground">ROAS Sales</span>
+                              <span className="text-sm font-medium text-muted-foreground">ROAS Vendas</span>
                               <div className="flex items-center gap-1.5">
                                 <span className={cn("w-2 h-2 rounded-full", decisionalStatus.dot)} />
                                 <span className={cn("text-xs font-semibold", decisionalStatus.color)}>
@@ -607,7 +576,7 @@ const Ads = () => {
                                 {formatCurrency(objectiveInvestment)} investido
                               </p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">
-                                Só campanhas Sales · performance operacional
+                                Só campanhas Vendas · performance operacional
                               </p>
                             </div>
 
@@ -645,56 +614,16 @@ const Ads = () => {
                       </Card>
                     </KPITooltip>
 
-                    {/* Card secundário — ROAS Total (reconciliação com Meta) */}
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Card className="lg:col-span-1 border relative cursor-help">
-                            <CardContent className="p-5">
-                              <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm font-medium text-muted-foreground">ROAS Total</span>
-                                  <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                                </div>
-
-                                <div>
-                                  <p className="text-5xl font-bold tracking-tight text-foreground">
-                                    {formatRoas(roasTotal)}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {formatCurrency(allObjectivesMetrics.valorConversaoTotal)} receita ·{" "}
-                                    {formatCurrency(totalInvestment)} investido
-                                  </p>
-                                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                                    Todos objetivos · bate com Meta Ads Manager
-                                  </p>
-                                </div>
-
-                                <div className="text-xs text-muted-foreground">
-                                  Inclui receita atribuída por ads de Engagement, Traffic e Awareness.
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="max-w-xs">
-                          <p className="text-xs">
-                            <strong>ROAS Total</strong> = receita de todas as campanhas ÷ investimento total.
-                            É o número que aparece no Meta Ads Manager quando você soma Valor de Conversão e
-                            Valor Usado de todas as campanhas do período. Útil para reconciliação. Para
-                            decisões de verba Sales, use o ROAS Sales ao lado.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
                     {/* Satélites — 2x2 grid */}
                     <div className="lg:col-span-2 grid grid-cols-2 gap-3">
-                      {/* Investimento */}
+                      {/* Investimento total (todos os objetivos) */}
                       <Card className="border">
                         <CardContent className="p-4">
                           <p className="text-xs text-muted-foreground mb-1">Investido (total)</p>
                           <p className="text-2xl font-bold">{formatCurrency(totalInvestment)}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Vendas + Outros
+                          </p>
                           {trends && (
                             <p
                               className={cn(
@@ -714,33 +643,16 @@ const Ads = () => {
                         </CardContent>
                       </Card>
 
-                      {/* Receita atribuída — R06-5: label explícito "Sales" */}
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Card className="border cursor-help">
-                              <CardContent className="p-4">
-                                <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                                  Receita atribuída (Sales)
-                                  <Info className="h-3 w-3 text-muted-foreground" />
-                                </p>
-                                <p className="text-2xl font-bold">{formatCurrency(metrics.valorConversaoTotal)}</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  só Sales · via pixel Meta
-                                </p>
-                              </CardContent>
-                            </Card>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-xs">
-                            <p className="text-xs">
-                              Receita atribuída pelo pixel Meta apenas a campanhas com objetivo Sales.
-                              O Meta Ads Manager pode mostrar um valor maior na coluna "Valor de conversão"
-                              porque também atribui compras a campanhas de Engagement, Traffic e Awareness.
-                              Para ver o total consolidado, veja o card ROAS Total acima.
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      {/* Receita atribuída (só Vendas) */}
+                      <Card className="border">
+                        <CardContent className="p-4">
+                          <p className="text-xs text-muted-foreground mb-1">Receita atribuída</p>
+                          <p className="text-2xl font-bold">{formatCurrency(metrics.valorConversaoTotal)}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            só Vendas · via pixel Meta
+                          </p>
+                        </CardContent>
+                      </Card>
 
                       {/* Resultado bruto */}
                       <Card className="border">
@@ -755,7 +667,9 @@ const Ads = () => {
                             {grossMediaResult >= 0 ? "+" : ""}
                             {formatCurrency(grossMediaResult)}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">Sales − investimento total</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            receita Vendas − investimento total
+                          </p>
                         </CardContent>
                       </Card>
 
@@ -764,7 +678,7 @@ const Ads = () => {
                         <CardContent className="p-4">
                           <p className="text-xs text-muted-foreground mb-1">Conversões</p>
                           <p className="text-2xl font-bold">{formatNumber(metrics.comprasTotal)}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
                             CPA: {formatCurrency(metrics.custoPorCompra)}
                           </p>
                         </CardContent>

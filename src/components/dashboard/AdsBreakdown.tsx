@@ -156,7 +156,7 @@ const getAdMetrics = (ad: AdsData) => {
   return { ctr, roas, clicks, cpr, cpc, results };
 };
 
-export const AdsBreakdown = ({ ads, selectedMonth, objective = "OUTCOME_SALES" }: AdsBreakdownProps) => {
+export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBreakdownProps) => {
   const [sortColumn, setSortColumn] = useState<SortColumn>("investment");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [filterClassification, setFilterClassification] = useState<string>("all");
@@ -176,7 +176,8 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "OUTCOME_SALES" }
   };
 
   const axisInfo = useMemo(() => getEfficiencyAxisInfo(objective), [objective]);
-  const isSales = objective === "OUTCOME_SALES" || !objective;
+  // R08: binário. Retrocompat com valores legados pré-R08.
+  const isSales = objective === "VENDAS" || objective === "OUTCOME_SALES" || !objective;
 
   const { medianCpr, medianCpc } = useMemo(() => {
     const all = ads.filter((a) => parseValue(a["Valor usado (BRL)"]) >= 10).map(getAdMetrics);
@@ -240,8 +241,8 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "OUTCOME_SALES" }
           case "roas": {
             const mA = getAdMetrics(a),
               mB = getAdMetrics(b);
-            vA = isSales ? mA.roas : objective === "OUTCOME_ENGAGEMENT" ? mA.cpr : mA.cpc;
-            vB = isSales ? mB.roas : objective === "OUTCOME_ENGAGEMENT" ? mB.cpr : mB.cpc;
+            vA = isSales ? mA.roas : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT") ? mA.cpr : mA.cpc;
+            vB = isSales ? mB.roas : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT") ? mB.cpr : mB.cpc;
             if (!isSales) {
               const tmp = vA;
               vA = vB;
@@ -532,7 +533,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "OUTCOME_SALES" }
                 const adMetrics = getAdMetrics(ad);
                 const { ctr, roas, clicks, cpr, cpc } = adMetrics;
                 const classification = classifyAd(adMetrics, investment);
-                const effValue = isSales ? roas : objective === "OUTCOME_ENGAGEMENT" ? cpr : cpc;
+                const effValue = isSales ? roas : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT") ? cpr : cpc;
                 const effDisplay = isSales
                   ? roas > 0
                     ? `${roas.toFixed(2)}x`
@@ -542,7 +543,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "OUTCOME_SALES" }
                     : "-";
                 const effGood = isSales
                   ? roas >= ROAS_REFERENCE
-                  : objective === "OUTCOME_ENGAGEMENT"
+                  : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT")
                     ? medianCpr > 0 && cpr <= medianCpr && cpr > 0
                     : medianCpc > 0 && cpc <= medianCpc && cpc > 0;
                 const countValue = isSales ? purchases : results;
