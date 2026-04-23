@@ -133,6 +133,16 @@ async function syncChunk(
   metaUrl.searchParams.set("time_increment", "1");
   metaUrl.searchParams.set("time_range", JSON.stringify({ since, until }));
   metaUrl.searchParams.set("limit", "300");
+  // R07-1: atribuição unificada — garante que purchase_value seja coletado para
+  // TODOS os objetivos (Engagement/Traffic/Awareness também), não só Sales.
+  // Sem isso, o Meta Ads Manager mostra receita atribuída que a API omite,
+  // causando divergência no ROAS Total (1,41x dashboard vs 1,92x Meta).
+  metaUrl.searchParams.set("use_unified_attribution_setting", "true");
+  // Janelas explícitas como fallback caso unified_setting não esteja ativo no BM.
+  // 7d_click + 1d_view é o padrão do Ads Manager desde iOS 14 (2021).
+  metaUrl.searchParams.set("action_attribution_windows", JSON.stringify(["7d_click", "1d_view"]));
+  // Relatar ações pelo momento da conversão (não do clique) — alinha com Ads Manager.
+  metaUrl.searchParams.set("action_report_time", "conversion");
   metaUrl.searchParams.set("access_token", metaToken);
 
   const allInsights: any[] = [];
