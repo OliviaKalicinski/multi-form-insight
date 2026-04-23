@@ -2204,19 +2204,10 @@ export type Database = {
       }
     }
     Functions: {
-      bulk_update_effective_status:
-        | {
-            Args: { updates: Json }
-            Returns: {
-              error: true
-            } & "Could not choose the best candidate function between: public.bulk_update_effective_status(updates => jsonb), public.bulk_update_effective_status(updates => _jsonb). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-          }
-        | {
-            Args: { updates: Json[] }
-            Returns: {
-              error: true
-            } & "Could not choose the best candidate function between: public.bulk_update_effective_status(updates => jsonb), public.bulk_update_effective_status(updates => _jsonb). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-          }
+      bulk_update_effective_status: {
+        Args: { updates: Json }
+        Returns: undefined
+      }
       expire_old_decisions: { Args: never; Returns: number }
       find_customer_by_identifier: {
         Args: { p_value: string }
