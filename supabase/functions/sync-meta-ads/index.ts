@@ -166,16 +166,17 @@ async function syncChunk(
   metaUrl.searchParams.set("time_increment", "1");
   metaUrl.searchParams.set("time_range", JSON.stringify({ since, until }));
   metaUrl.searchParams.set("limit", "300");
-  // R07-1: atribuição unificada — garante que purchase_value seja coletado para
-  // TODOS os objetivos (Engagement/Traffic/Awareness também), não só Sales.
-  // Sem isso, o Meta Ads Manager mostra receita atribuída que a API omite,
-  // causando divergência no ROAS Total (1,41x dashboard vs 1,92x Meta).
-  metaUrl.searchParams.set("use_unified_attribution_setting", "true");
-  // Janelas explícitas como fallback caso unified_setting não esteja ativo no BM.
-  // 7d_click + 1d_view é o padrão do Ads Manager desde iOS 14 (2021).
-  metaUrl.searchParams.set("action_attribution_windows", JSON.stringify(["7d_click", "1d_view"]));
-  // Relatar ações pelo momento da conversão (não do clique) — alinha com Ads Manager.
-  metaUrl.searchParams.set("action_report_time", "conversion");
+  // R09-1: parâmetros de atribuição da R07 REMOVIDOS. Eram:
+  //   use_unified_attribution_setting=true
+  //   action_attribution_windows=['7d_click','1d_view']
+  //   action_report_time=conversion
+  // Motivo: causavam Meta API erro 99 ("An unknown error occurred") em conta
+  // com mix de objetivos (Sales + Engagement + Traffic). O objetivo original
+  // da R07 (reconciliar ROAS Total com Meta Ads Manager) era inválido — o gap
+  // não vem de atribuição, vem de outros event types (AtC value, etc.) que o
+  // pixel Meta atribui à coluna "Valor de conversão" agregada. Isso fica
+  // fora do escopo do ROAS operacional. Com a R08 o card ROAS Total foi
+  // removido, então esses parâmetros perderam razão de existir.
   metaUrl.searchParams.set("access_token", metaToken);
 
   const allInsights: any[] = [];
