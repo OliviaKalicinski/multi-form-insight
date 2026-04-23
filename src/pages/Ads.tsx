@@ -233,21 +233,28 @@ const Ads = () => {
     return calculateAdsMetrics(activeAdsData);
   }, [activeAdsData]);
 
-  // Investimento total de TODOS os objetivos (para card "Investido (total)").
-  const totalInvestment = useMemo(() => {
-    return calculateAdsMetrics(currentMonthAdsData).investimentoTotal;
+  // Métricas consolidadas de TODOS os objetivos (Vendas + Outros).
+  // Usadas no card ROAS Total e no "Investido (total)".
+  const allObjectivesMetrics = useMemo(() => {
+    return calculateAdsMetrics(currentMonthAdsData);
   }, [currentMonthAdsData]);
+
+  const totalInvestment = allObjectivesMetrics.investimentoTotal;
 
   // ===== Semantic aliases =====
   const objectiveInvestment = metrics.investimentoTotal;
   const revenueBenchmarkMultiplier = 3;
   const grossMediaResult = metrics.valorConversaoTotal - totalInvestment;
 
-  // R08: ROAS único e honesto — receita Vendas ÷ investimento Vendas.
-  // Removida a lógica R06-1 do roasTotal: mesmo somando todos os ads, a
-  // receita total = receita Vendas (purchase_value não é atribuído a non-Sales
-  // no banco). O card ROAS Total foi removido porque não reconciliava com Meta.
+  // R08/R11: dois ROAS com leituras distintas.
+  // - roasSales: receita Vendas ÷ investimento Vendas. Decisão operacional
+  //   sobre verba de campanha de conversão.
+  // - roasTotal: receita Vendas ÷ investimento TOTAL (Vendas + Outros).
+  //   Eficiência global do Meta Ads — revela o "custo" de Awareness/Traffic
+  //   que não gera purchase atribuído direto mas é investimento intencional.
   const roasSales = objectiveInvestment > 0 ? metrics.valorConversaoTotal / objectiveInvestment : 0;
+  const roasTotal =
+    totalInvestment > 0 ? allObjectivesMetrics.valorConversaoTotal / totalInvestment : 0;
 
   // Alias para código legado que usa correctedRoas em trends/progress/status.
   const correctedRoas = roasSales;
@@ -543,15 +550,15 @@ const Ads = () => {
               {objectivesSummary.isVendasView ? (
                 // ===== VENDAS VIEW =====
                 <>
-                  {/* ===== BLOCO 1: DECISÃO — ROAS único + 4 satélites =====
-                       R08: removido o card ROAS Total (dual card da R06-1).
-                       Motivo: mesmo somando todos os ads do banco, a receita
-                       total = receita Sales (não há receita purchase atribuída
-                       a campanhas non-Sales no Meta). O card criava expectativa
-                       de reconciliação que não acontece. Mantemos só ROAS Sales,
-                       que É o número operacional verdadeiro.
+                  {/* ===== BLOCO 1: DECISÃO — dual ROAS + 4 satélites =====
+                       R11: reincluído ROAS Total (eficiência global) ao lado
+                       do ROAS Vendas (operacional). Framing diferente da
+                       R06-1: aqui não prometemos reconciliar com Meta Ads
+                       Manager (isso nunca bate — Meta agrega event types).
+                       ROAS Total serve pra enxergar o "custo" do investimento
+                       em Awareness/Traffic intencional sobre o retorno direto.
                   */}
-                  <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <section className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                     {/* Card principal — ROAS Vendas (hero) */}
                     <KPITooltip metricKey="roas">
                       <Card className="lg:col-span-1 border relative">
@@ -613,6 +620,52 @@ const Ads = () => {
                         </CardContent>
                       </Card>
                     </KPITooltip>
+
+                    {/* Card secundário — ROAS Total (eficiência global) */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Card className="lg:col-span-1 border relative cursor-help">
+                            <CardContent className="p-5">
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-muted-foreground">ROAS Total</span>
+                                  <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                                </div>
+
+                                <div>
+                                  <p className="text-5xl font-bold tracking-tight text-foreground">
+                                    {formatRoas(roasTotal)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {formatCurrency(allObjectivesMetrics.valorConversaoTotal)} receita ·{" "}
+                                    {formatCurrency(totalInvestment)} investido
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    Todo investimento · eficiência global
+                                  </p>
+                                </div>
+
+                                <div className="text-xs text-muted-foreground">
+                                  Inclui o custo de Awareness/Traffic no denominador.
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          <p className="text-xs">
+                            <strong>ROAS Total</strong> = receita atribuída ÷ investimento total
+                            (Vendas + Outros). Mostra a eficiência global do investimento em
+                            Meta Ads. Fica abaixo do ROAS Vendas porque inclui verba de topo
+                            de funil (Awareness/Traffic) que não gera purchase direto. Útil
+                            pra avaliar se o mix de objetivos faz sentido. Não bate com o
+                            Meta Ads Manager — a coluna "Valor de conversão" de lá agrega
+                            eventos que o pixel não envia como purchase (AtC value, etc.).
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
 
                     {/* Satélites — 2x2 grid */}
                     <div className="lg:col-span-2 grid grid-cols-2 gap-3">
