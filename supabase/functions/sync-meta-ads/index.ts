@@ -159,7 +159,9 @@ async function syncChunk(
     const purchases = getActionValue(actions, "purchase");
     const purchaseValue = getActionMoneyValue(actionValues, "purchase");
     const spend = parseFloat(insight.spend) || 0;
-    const roas = spend > 0 && purchaseValue > 0 ? purchaseValue / spend : null;
+    // R06-3: sempre retornar número quando spend > 0 (0 em vez de null).
+    // Antes: spend > 0 mas 0 compras → null quebrava agregações downstream.
+    const roas = spend > 0 ? purchaseValue / spend : 0;
     return {
       ad_id: insight.ad_id,
       campaign_id: insight.campaign_id,

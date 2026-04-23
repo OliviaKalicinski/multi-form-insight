@@ -3,20 +3,20 @@ import { AdsData } from "@/types/marketing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Medal } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { parseAdsValue } from "@/utils/adsCalculator";
 
 interface Props {
   ads: AdsData[];
   objective: string;
 }
 
+// R06-2: BUG CRÍTICO corrigido.
+// Antes o parser local tratava "1.234,56" como "1.234.56" → parseFloat retornava 1.234
+// (perda de R$ 230+ em valores acima de R$ 1.000). Delegando para parseAdsValue (BR/US correto).
 const parseValue = (v: string | number | undefined | null): number => {
-  if (!v) return 0;
+  if (v === undefined || v === null) return 0;
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  const cleaned = String(v)
-    .replace(/[^\d.,-]/g, "")
-    .replace(",", ".");
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : 0;
+  return parseAdsValue(String(v));
 };
 
 const fmt = (n: number) =>
@@ -115,7 +115,12 @@ export const AdPerformanceRanking = ({ ads, objective }: Props) => {
     scored.sort((a, b) => b.score - a.score);
 
     const top = scored.slice(0, 3);
-    const bottom = scored.length > 3 ? scored.slice(-3).reverse() : [];
+    // R06-4: bottom exige spend mínimo (R$ 200) para evitar recomendar "Revisar/Pausar"
+    // em criativos de teste recém-lançados com verba baixa (ex: R$ 51).
+    // Threshold superior ao filtro inicial (R$ 50) para garantir amostra estatisticamente relevante.
+    const BOTTOM_SPEND_THRESHOLD = 200;
+    const bottomPool = scored.filter((a) => a.spend >= BOTTOM_SPEND_THRESHOLD);
+    const bottom = bottomPool.length > 3 ? bottomPool.slice(-3).reverse() : [];
     const totalSpend = scored.reduce((s, a) => s + a.spend, 0);
     const topSpend = top.reduce((s, a) => s + a.spend, 0);
     const topSpendPct = totalSpend > 0 ? (topSpend / totalSpend) * 100 : 0;

@@ -36,6 +36,7 @@ import {
   type FunnelRole,
   type AdObjectiveType,
 } from "@/utils/adFormatClassifier";
+import { parseAdsValue } from "@/utils/adsCalculator";
 
 interface AdsBreakdownProps {
   ads: AdsData[];
@@ -48,25 +49,12 @@ const formatCurrency = (value: number) =>
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(value);
 
+// R06-2: parser consolidado em adsCalculator.parseAdsValue (evita 4 implementações diferentes).
+// Aceita number direto; delega strings ao parser BR/US robusto.
 const parseValue = (value: string | number | undefined | null): number => {
   if (value === undefined || value === null) return 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  const s = String(value).trim();
-  if (s === "" || s === "-" || s.toLowerCase() === "n/a") return 0;
-  let cleaned = s.replace(/[^\d.,-]/g, "");
-  const hasComma = cleaned.includes(",");
-  const hasDot = cleaned.includes(".");
-  if (hasComma && hasDot) {
-    if (cleaned.lastIndexOf(".") > cleaned.lastIndexOf(",")) {
-      cleaned = cleaned.replace(/,/g, "");
-    } else {
-      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
-    }
-  } else if (hasComma) {
-    cleaned = cleaned.replace(",", ".");
-  }
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : 0;
+  return parseAdsValue(String(value));
 };
 
 type SortColumn =

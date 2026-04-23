@@ -248,10 +248,12 @@ const Ads = () => {
     return calculateAdsMetrics(activeAdsData);
   }, [activeAdsData]);
 
-  // Investimento total de TODOS os objetivos (não filtrado)
-  const totalInvestmentAllObjectives = useMemo(() => {
-    return calculateAdsMetrics(currentMonthAdsData).investimentoTotal;
+  // Métricas consolidadas de TODOS os objetivos (bate com o total que Meta Ads Manager mostra)
+  const allObjectivesMetrics = useMemo(() => {
+    return calculateAdsMetrics(currentMonthAdsData);
   }, [currentMonthAdsData]);
+
+  const totalInvestmentAllObjectives = allObjectivesMetrics.investimentoTotal;
 
   // ===== FASE 1: Semantic aliases =====
   const totalInvestment = totalInvestmentAllObjectives;
@@ -259,8 +261,16 @@ const Ads = () => {
   const revenueBenchmarkMultiplier = 3;
   const grossMediaResult = metrics.valorConversaoTotal - totalInvestment;
 
-  // ROAS corrigido: receita de vendas / investimento total (todos objetivos)
-  const correctedRoas = totalInvestment > 0 ? metrics.valorConversaoTotal / totalInvestment : 0;
+  // R06-1: DOIS ROAS semanticamente corretos (não mais o híbrido diluído).
+  // - roasSales: receita Sales ÷ investimento Sales. Performance real das campanhas de venda.
+  // - roasTotal: receita total ÷ investimento total. Bate com Meta Ads Manager.
+  const roasSales = objectiveInvestment > 0 ? metrics.valorConversaoTotal / objectiveInvestment : 0;
+  const roasTotal =
+    totalInvestment > 0 ? allObjectivesMetrics.valorConversaoTotal / totalInvestment : 0;
+
+  // Backward compat: código antigo usa correctedRoas em trends, progress, status.
+  // Mantém para não quebrar cadeia, mas aponta para roasSales (leitura operacional correta).
+  const correctedRoas = roasSales;
 
   // Calculate trends vs comparison period
   const trends = useMemo(() => {
@@ -567,15 +577,19 @@ const Ads = () => {
               {objectivesSummary.isSalesView ? (
                 // ===== SALES VIEW =====
                 <>
-                  {/* ===== BLOCO 1: DECISÃO — 1 card principal + satélites ===== */}
-                  <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    {/* Card principal — ROAS */}
+                  {/* ===== BLOCO 1: DECISÃO — ROAS dual + satélites =====
+                       R06-1: DOIS cards de ROAS para evitar leitura diluída.
+                       - ROAS Sales: métrica operacional (decisão sobre verba de venda).
+                       - ROAS Total: número-espelho do Meta Ads Manager (reconciliação).
+                  */}
+                  <section className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    {/* Card principal — ROAS Sales (hero) */}
                     <KPITooltip metricKey="roas">
                       <Card className="lg:col-span-1 border relative">
                         <CardContent className="p-5">
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-muted-foreground">ROAS</span>
+                              <span className="text-sm font-medium text-muted-foreground">ROAS Sales</span>
                               <div className="flex items-center gap-1.5">
                                 <span className={cn("w-2 h-2 rounded-full", decisionalStatus.dot)} />
                                 <span className={cn("text-xs font-semibold", decisionalStatus.color)}>
@@ -586,11 +600,14 @@ const Ads = () => {
 
                             <div>
                               <p className={cn("text-5xl font-bold tracking-tight", roasStatusInfo.color)}>
-                                {formatRoas(correctedRoas)}
+                                {formatRoas(roasSales)}
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
                                 {formatCurrency(metrics.valorConversaoTotal)} receita ·{" "}
-                                {formatCurrency(totalInvestment)} investido
+                                {formatCurrency(objectiveInvestment)} investido
+                              </p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                Só campanhas Sales · performance operacional
                               </p>
                             </div>
 
@@ -628,12 +645,55 @@ const Ads = () => {
                       </Card>
                     </KPITooltip>
 
+                    {/* Card secundário — ROAS Total (reconciliação com Meta) */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Card className="lg:col-span-1 border relative cursor-help">
+                            <CardContent className="p-5">
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-muted-foreground">ROAS Total</span>
+                                  <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                                </div>
+
+                                <div>
+                                  <p className="text-5xl font-bold tracking-tight text-foreground">
+                                    {formatRoas(roasTotal)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {formatCurrency(allObjectivesMetrics.valorConversaoTotal)} receita ·{" "}
+                                    {formatCurrency(totalInvestment)} investido
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    Todos objetivos · bate com Meta Ads Manager
+                                  </p>
+                                </div>
+
+                                <div className="text-xs text-muted-foreground">
+                                  Inclui receita atribuída por ads de Engagement, Traffic e Awareness.
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          <p className="text-xs">
+                            <strong>ROAS Total</strong> = receita de todas as campanhas ÷ investimento total.
+                            É o número que aparece no Meta Ads Manager quando você soma Valor de Conversão e
+                            Valor Usado de todas as campanhas do período. Útil para reconciliação. Para
+                            decisões de verba Sales, use o ROAS Sales ao lado.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
                     {/* Satélites — 2x2 grid */}
                     <div className="lg:col-span-2 grid grid-cols-2 gap-3">
                       {/* Investimento */}
                       <Card className="border">
                         <CardContent className="p-4">
-                          <p className="text-xs text-muted-foreground mb-1">Investido</p>
+                          <p className="text-xs text-muted-foreground mb-1">Investido (total)</p>
                           <p className="text-2xl font-bold">{formatCurrency(totalInvestment)}</p>
                           {trends && (
                             <p
@@ -654,14 +714,33 @@ const Ads = () => {
                         </CardContent>
                       </Card>
 
-                      {/* Receita atribuída */}
-                      <Card className="border">
-                        <CardContent className="p-4">
-                          <p className="text-xs text-muted-foreground mb-1">Receita atribuída</p>
-                          <p className="text-2xl font-bold">{formatCurrency(metrics.valorConversaoTotal)}</p>
-                          <p className="text-xs text-muted-foreground mt-1">via pixel Meta</p>
-                        </CardContent>
-                      </Card>
+                      {/* Receita atribuída — R06-5: label explícito "Sales" */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Card className="border cursor-help">
+                              <CardContent className="p-4">
+                                <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                                  Receita atribuída (Sales)
+                                  <Info className="h-3 w-3 text-muted-foreground" />
+                                </p>
+                                <p className="text-2xl font-bold">{formatCurrency(metrics.valorConversaoTotal)}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  só Sales · via pixel Meta
+                                </p>
+                              </CardContent>
+                            </Card>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <p className="text-xs">
+                              Receita atribuída pelo pixel Meta apenas a campanhas com objetivo Sales.
+                              O Meta Ads Manager pode mostrar um valor maior na coluna "Valor de conversão"
+                              porque também atribui compras a campanhas de Engagement, Traffic e Awareness.
+                              Para ver o total consolidado, veja o card ROAS Total acima.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
 
                       {/* Resultado bruto */}
                       <Card className="border">
@@ -676,7 +755,7 @@ const Ads = () => {
                             {grossMediaResult >= 0 ? "+" : ""}
                             {formatCurrency(grossMediaResult)}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">receita − investimento</p>
+                          <p className="text-xs text-muted-foreground mt-1">Sales − investimento total</p>
                         </CardContent>
                       </Card>
 

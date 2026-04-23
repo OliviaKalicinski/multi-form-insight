@@ -6,28 +6,17 @@ import {
   Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { TrendingUp } from "lucide-react";
+import { parseAdsValue } from "@/utils/adsCalculator";
 
 interface AdsTrendChartProps {
   ads: AdsData[];
 }
 
+// R06-2: parser consolidado em adsCalculator.parseAdsValue.
 const parseValue = (value: string | number | undefined | null): number => {
   if (value === undefined || value === null) return 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  const s = String(value).trim();
-  if (!s || s === "-") return 0;
-  let cleaned = s.replace(/[^\d.,-]/g, "");
-  const hasComma = cleaned.includes(",");
-  const hasDot = cleaned.includes(".");
-  if (hasComma && hasDot) {
-    cleaned = cleaned.lastIndexOf(".") > cleaned.lastIndexOf(",")
-      ? cleaned.replace(/,/g, "")
-      : cleaned.replace(/\./g, "").replace(",", ".");
-  } else if (hasComma) {
-    cleaned = cleaned.replace(",", ".");
-  }
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : 0;
+  return parseAdsValue(String(value));
 };
 
 const formatDate = (date: string): string => {
