@@ -198,12 +198,32 @@ export const filterAdsByMonth = (data: AdsData[], month: string): AdsData[] => {
 };
 
 /**
+ * R12: converte Date para string YYYY-MM-DD no timezone LOCAL (não UTC).
+ *
+ * Antes usávamos `.toISOString().split("T")[0]`, que converte pra UTC antes
+ * de extrair a data. No fuso de Brasília (UTC-3), isso causa off-by-one:
+ *   new Date("2026-04-21T23:59:00-03:00").toISOString() →
+ *     "2026-04-22T02:59:00.000Z" → "2026-04-22" (ERRADO)
+ * Resultado: range "15-21/04" incluía dia 22 completo porque o end virava
+ * "2026-04-22" e o filtro `dateField <= endStr` deixava passar tudo.
+ *
+ * Usando getFullYear/Month/Date preservamos a data local do usuário.
+ */
+const toLocalDateStr = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+/**
  * Filtra anúncios por intervalo de datas.
- * Como dados de ads têm granularidade mensal, inclui meses que se sobrepõem ao intervalo.
+ * Dados da Meta API têm granularidade diária (YYYY-MM-DD).
+ * Dados de CSV legado podem ter granularidade mensal (YYYY-MM).
  */
 export const filterAdsByDateRange = (data: AdsData[], start: Date, end: Date): AdsData[] => {
-  const startStr = start.toISOString().split("T")[0]; // YYYY-MM-DD
-  const endStr = end.toISOString().split("T")[0];
+  const startStr = toLocalDateStr(start); // R12: timezone local, não UTC.
+  const endStr = toLocalDateStr(end);
   const startMonth = startStr.substring(0, 7); // YYYY-MM
   const endMonth = endStr.substring(0, 7);
 
