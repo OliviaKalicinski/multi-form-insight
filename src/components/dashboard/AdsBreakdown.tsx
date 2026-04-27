@@ -496,64 +496,66 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
           <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow className="bg-muted/30">
-                <TableHead className="w-[28%]">Anúncio / Conjunto</TableHead>
-                <TableHead className="text-right w-[9%]">
+                {/* R16: ajuste de larguras + label "Impr." em vez de "Impressões"
+                     pra evitar overflow visual de conteúdo nas colunas estreitas. */}
+                <TableHead className="w-[24%]">Anúncio / Conjunto</TableHead>
+                <TableHead className="text-right w-[9%] overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap gap-1"
                     onClick={() => handleSort("investment")}
                   >
                     <DollarSign className="h-3.5 w-3.5" />
                     Invest.{getSortIcon("investment")}
                   </Button>
                 </TableHead>
-                <TableHead className="text-right w-[8%]">
+                <TableHead className="text-right w-[8%] overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap gap-1"
                     onClick={() => handleSort("impressions")}
                   >
-                    Impressões{getSortIcon("impressions")}
+                    Impr.{getSortIcon("impressions")}
                   </Button>
                 </TableHead>
-                <TableHead className="text-right w-[7%]">
+                <TableHead className="text-right w-[8%] overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap gap-1"
                     onClick={() => handleSort("clicks")}
                   >
                     <MousePointer className="h-3.5 w-3.5" />
                     Cliques{getSortIcon("clicks")}
                   </Button>
                 </TableHead>
-                <TableHead className="text-right w-[7%]">
+                <TableHead className="text-right w-[7%] overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap gap-1"
                     onClick={() => handleSort("ctr")}
                   >
                     CTR{getSortIcon("ctr")}
                   </Button>
                 </TableHead>
-                <TableHead className="text-right w-[7%]">
+                <TableHead className="text-right w-[7%] overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap gap-1"
                     onClick={() => handleSort("cpc")}
                   >
                     CPC{getSortIcon("cpc")}
                   </Button>
                 </TableHead>
-                <TableHead className="text-right w-[7%]">
+                <TableHead className="text-right w-[8%] overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap gap-1"
                     onClick={() => handleSort("purchases")}
                   >
                     <ShoppingCart className="h-3.5 w-3.5" />
@@ -561,22 +563,22 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
                     {getSortIcon("purchases")}
                   </Button>
                 </TableHead>
-                <TableHead className="text-right w-[7%]">
+                <TableHead className="text-right w-[7%] overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap gap-1"
                     onClick={() => handleSort("roas")}
                   >
                     {showRoas ? "ROAS" : axisInfo.key.toUpperCase()}
                     {getSortIcon("roas")}
                   </Button>
                 </TableHead>
-                <TableHead className="text-center w-[12%]">
+                <TableHead className="text-center w-[14%] overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
+                    className="h-auto p-0 hover:bg-transparent whitespace-nowrap gap-1"
                     onClick={() => handleSort("classification")}
                   >
                     Classificação{getSortIcon("classification")}
