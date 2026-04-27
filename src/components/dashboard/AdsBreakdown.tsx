@@ -178,6 +178,16 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
   const axisInfo = useMemo(() => getEfficiencyAxisInfo(objective), [objective]);
   // R08: binário. Retrocompat com valores legados pré-R08.
   const isSales = objective === "VENDAS" || objective === "OUTCOME_SALES" || !objective;
+  // R15: na aba "Auto" (objective="ALL", mix Vendas+Outros) e em qualquer view
+  // que não seja explicitamente Outros/Engagement/Traffic, exibimos ROAS na
+  // coluna de eficiência. Antes a aba Auto mostrava header "ROAS" mas valor
+  // em CPC (formatCurrency) — header e display estavam desencontrados.
+  const showRoas =
+    isSales ||
+    objective === "ALL" ||
+    (objective !== "OUTROS" &&
+      objective !== "OUTCOME_ENGAGEMENT" &&
+      objective !== "OUTCOME_TRAFFIC");
 
   // R14: agregar linhas por ad_id (fallback nome+conjunto). Cada linha em
   // `ads` representa ad_id × dia, então o mesmo anúncio aparecia N vezes
@@ -302,9 +312,11 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
           case "roas": {
             const mA = getAdMetrics(a),
               mB = getAdMetrics(b);
-            vA = isSales ? mA.roas : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT") ? mA.cpr : mA.cpc;
-            vB = isSales ? mB.roas : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT") ? mB.cpr : mB.cpc;
-            if (!isSales) {
+            // R15: usa showRoas pra cobrir aba Auto (ALL).
+            vA = showRoas ? mA.roas : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT") ? mA.cpr : mA.cpc;
+            vB = showRoas ? mB.roas : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT") ? mB.cpr : mB.cpc;
+            if (!showRoas) {
+              // ROAS: maior é melhor. CPR/CPC: menor é melhor → inverte direção.
               const tmp = vA;
               vA = vB;
               vB = tmp;
@@ -489,7 +501,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
                     onClick={() => handleSort("investment")}
                   >
                     <DollarSign className="h-3.5 w-3.5" />
@@ -500,7 +512,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
                     onClick={() => handleSort("impressions")}
                   >
                     Impressões{getSortIcon("impressions")}
@@ -510,7 +522,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
                     onClick={() => handleSort("clicks")}
                   >
                     <MousePointer className="h-3.5 w-3.5" />
@@ -521,7 +533,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
                     onClick={() => handleSort("ctr")}
                   >
                     CTR{getSortIcon("ctr")}
@@ -531,7 +543,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
                     onClick={() => handleSort("cpc")}
                   >
                     CPC{getSortIcon("cpc")}
@@ -541,7 +553,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
                     onClick={() => handleSort("purchases")}
                   >
                     <ShoppingCart className="h-3.5 w-3.5" />
@@ -553,10 +565,10 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto p-0 hover:bg-transparent w-full justify-end"
+                    className="h-auto p-0 hover:bg-transparent w-full justify-end whitespace-nowrap"
                     onClick={() => handleSort("roas")}
                   >
-                    {isSales ? "ROAS" : axisInfo.key.toUpperCase()}
+                    {showRoas ? "ROAS" : axisInfo.key.toUpperCase()}
                     {getSortIcon("roas")}
                   </Button>
                 </TableHead>
@@ -595,15 +607,16 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
                 const adMetrics = getAdMetrics(ad);
                 const { ctr, roas, clicks, cpr, cpc } = adMetrics;
                 const classification = classifyAd(adMetrics, investment);
-                const effValue = isSales ? roas : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT") ? cpr : cpc;
-                const effDisplay = isSales
+                // R15: usa `showRoas` em vez de `isSales` para incluir a aba Auto (ALL).
+                const effValue = showRoas ? roas : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT") ? cpr : cpc;
+                const effDisplay = showRoas
                   ? roas > 0
                     ? `${roas.toFixed(2)}x`
-                    : "-"
+                    : "—"
                   : effValue > 0
                     ? formatCurrency(effValue)
-                    : "-";
-                const effGood = isSales
+                    : "—";
+                const effGood = showRoas
                   ? roas >= ROAS_REFERENCE
                   : (objective === "OUTROS" || objective === "OUTCOME_ENGAGEMENT")
                     ? medianCpr > 0 && cpr <= medianCpr && cpr > 0
