@@ -218,9 +218,11 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
 
   if (aggregated.length === 0) return null;
 
-  // Pontos do scatter — só ads Vendas (que tem ROAS real).
-  // Ads non-Sales aparecem apenas na listagem.
-  const scatterData = aggregated.filter((a) => a.isVendas);
+  // R19b: scatter mostra TODOS os ads (Vendas + Outros).
+  // Ads Outros caem em ROAS=0 (sem atribuição purchase) — visualmente
+  // indica "esse dinheiro está aqui sem retorno direto rastreável".
+  // Diferenciados por fill transparente (anel colorido em vez de bolha sólida).
+  const scatterData = aggregated;
 
   // Y-axis dinâmico: até max(roas máximo, 6) pra dar espaço acima da linha 3x.
   const maxRoas = Math.max(...scatterData.map((a) => a.roas), 6);
@@ -261,7 +263,8 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
         {scatterData.length > 0 && (
           <div>
             <p className="text-[11px] text-muted-foreground mb-2">
-              Cada ponto é um anúncio Vendas. Tamanho = investimento. Linhas tracejadas = thresholds (CTR 1,5% · ROAS 3x).
+              Cada ponto é um anúncio. Tamanho = investimento. Bolhas sólidas = Vendas (ROAS real).
+              Anéis = Outros (sem atribuição purchase, ROAS=0). Linhas tracejadas = thresholds (CTR 1,5% · ROAS 3x).
             </p>
             <ResponsiveContainer width="100%" height={280}>
               <ScatterChart margin={{ top: 10, right: 20, bottom: 30, left: 20 }}>
@@ -293,15 +296,19 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
                     if (!active || !payload?.length) return null;
                     const d = payload[0].payload as AggregatedAd;
                     return (
-                      <div className="bg-background border rounded-md p-2 shadow-sm text-xs">
+                      <div className="bg-background border rounded-md p-2 shadow-sm text-xs max-w-[260px]">
                         <p className="font-semibold leading-tight">{d.name}</p>
                         {d.conjunto && <p className="text-[10px] text-muted-foreground">{d.conjunto}</p>}
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {d.isVendas ? "Vendas (ROAS real)" : "Outros (sem atribuição purchase)"}
+                        </p>
                         <div className="mt-1.5 space-y-0.5">
                           <p>
                             <span className="text-muted-foreground">CTR:</span> {d.ctr.toFixed(2)}%
                           </p>
                           <p>
-                            <span className="text-muted-foreground">ROAS:</span> {d.roas.toFixed(2)}x
+                            <span className="text-muted-foreground">ROAS:</span>{" "}
+                            {d.roas > 0 ? `${d.roas.toFixed(2)}x` : "—"}
                           </p>
                           <p>
                             <span className="text-muted-foreground">Gasto:</span> {fmt(d.spend)}
@@ -319,7 +326,14 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
                 />
                 <Scatter data={scatterData}>
                   {scatterData.map((entry, i) => (
-                    <Cell key={i} fill={QUADRANT_HEX[entry.quadrant]} fillOpacity={0.7} />
+                    <Cell
+                      key={i}
+                      fill={QUADRANT_HEX[entry.quadrant]}
+                      // Vendas: bolha sólida. Outros: anel (fill quase transparente, stroke colorido).
+                      fillOpacity={entry.isVendas ? 0.7 : 0.1}
+                      stroke={QUADRANT_HEX[entry.quadrant]}
+                      strokeWidth={entry.isVendas ? 0 : 2}
+                    />
                   ))}
                 </Scatter>
               </ScatterChart>
