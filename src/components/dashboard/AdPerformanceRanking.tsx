@@ -116,13 +116,16 @@ export const AdPerformanceRanking = ({ ads, objective }: Props) => {
 
     scored.sort((a, b) => b.score - a.score);
 
-    const top = scored.slice(0, 3);
+    // R17: seleção continua por score (top 3 melhores / bottom 3 piores em
+    // performance), mas dentro de cada grupo ordena por spend desc — usuário
+    // vê primeiro os anúncios que mais consomem orçamento.
+    const top = scored.slice(0, 3).sort((a, b) => b.spend - a.spend);
     // R06-4: bottom exige spend mínimo (R$ 200) para evitar recomendar "Revisar/Pausar"
     // em criativos de teste recém-lançados com verba baixa (ex: R$ 51).
-    // Threshold superior ao filtro inicial (R$ 50) para garantir amostra estatisticamente relevante.
     const BOTTOM_SPEND_THRESHOLD = 200;
     const bottomPool = scored.filter((a) => a.spend >= BOTTOM_SPEND_THRESHOLD);
-    const bottom = bottomPool.length > 3 ? bottomPool.slice(-3).reverse() : [];
+    const bottom =
+      bottomPool.length > 3 ? bottomPool.slice(-3).reverse().sort((a, b) => b.spend - a.spend) : [];
     const totalSpend = scored.reduce((s, a) => s + a.spend, 0);
     const topSpend = top.reduce((s, a) => s + a.spend, 0);
     const topSpendPct = totalSpend > 0 ? (topSpend / totalSpend) * 100 : 0;
@@ -158,26 +161,34 @@ export const AdPerformanceRanking = ({ ads, objective }: Props) => {
           {ad.conjunto && <p className="text-[10px] text-muted-foreground truncate">{ad.conjunto}</p>}
         </div>
 
-        {/* Métricas */}
+        {/* Métricas: R17 — CTR e ROAS sempre visíveis (independente do objetivo) + gasto */}
         <div className="flex items-center gap-4 shrink-0 text-right">
-          {isSales && (
-            <div>
-              <p className={cn("text-xs font-semibold", isTop ? "text-emerald-700" : "text-red-500")}>
-                {ad.roas > 0 ? `${ad.roas.toFixed(2)}x` : "—"}
-              </p>
-              <p className="text-[10px] text-muted-foreground">ROAS</p>
-            </div>
-          )}
+          <div>
+            <p
+              className={cn(
+                "text-xs font-medium",
+                ad.ctr >= 1.5 ? "text-emerald-700" : "text-muted-foreground",
+              )}
+            >
+              {ad.ctr > 0 ? `${ad.ctr.toFixed(2)}%` : "—"}
+            </p>
+            <p className="text-[10px] text-muted-foreground">CTR</p>
+          </div>
+          <div>
+            <p
+              className={cn(
+                "text-xs font-semibold",
+                ad.roas >= 3 ? "text-emerald-700" : ad.roas > 0 ? "text-red-500" : "text-muted-foreground",
+              )}
+            >
+              {ad.roas > 0 ? `${ad.roas.toFixed(2)}x` : "—"}
+            </p>
+            <p className="text-[10px] text-muted-foreground">ROAS</p>
+          </div>
           <div>
             <p className="text-xs font-medium">{fmt(ad.spend)}</p>
             <p className="text-[10px] text-muted-foreground">gasto</p>
           </div>
-          {isSales && ad.revenue > 0 && (
-            <div>
-              <p className="text-xs font-medium">{fmt(ad.revenue)}</p>
-              <p className="text-[10px] text-muted-foreground">receita</p>
-            </div>
-          )}
         </div>
       </div>
     );

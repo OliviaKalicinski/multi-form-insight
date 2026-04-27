@@ -235,6 +235,33 @@ async function syncChunk(
       view_content: getActionValue(actions, "view_content"),
       leads: getActionValue(actions, "lead"),
       roas,
+      // R18: campos que o frontend lê mas o sync nunca populava.
+      // Aba "Outros" (Engagement/Traffic/Awareness) ficava com Resultados,
+      // Engajamentos, Custo/Resultado, CPE todos zerados.
+      engajamentos: getActionValue(actions, "post_engagement"),
+      visitas_perfil:
+        getActionValue(actions, "onsite_conversion.profile_visit") ||
+        getActionValue(actions, "page_engagement"),
+      visualizacoes:
+        getActionValue(actions, "video_view") ||
+        getActionValue(actions, "video_play"),
+      visualizacoes_pagina: getActionValue(actions, "landing_page_view"),
+      // resultados: depende do objetivo da campanha. Mapeamento conforme
+      // optimization_goal típico de cada outcome.
+      resultados: (() => {
+        const obj = campaignObjectives.get(insight.campaign_id) || "";
+        if (obj.includes("OUTCOME_SALES")) return purchases;
+        if (obj.includes("OUTCOME_LEADS")) return getActionValue(actions, "lead");
+        if (obj.includes("OUTCOME_TRAFFIC"))
+          return (
+            getActionValue(actions, "link_click") ||
+            getActionValue(actions, "landing_page_view") ||
+            parseInt(insight.clicks) || 0
+          );
+        if (obj.includes("OUTCOME_AWARENESS")) return parseInt(insight.reach) || 0;
+        // OUTCOME_ENGAGEMENT (default): post_engagement total.
+        return getActionValue(actions, "post_engagement");
+      })(),
       source: "api",
       quality_ranking: insight.quality_ranking ?? null,
       engagement_rate_ranking: insight.engagement_rate_ranking ?? null,
