@@ -546,10 +546,13 @@ const Ads = () => {
             </>
           ) : (
             <>
-              {/* ===== ADAPTIVE UI (R08: binário Vendas/Outros) ===== */}
-              {objectivesSummary.isVendasView ? (
-                // ===== VENDAS VIEW =====
-                <>
+              {/* R21: layout consistente — ambos blocos (Vendas + Engagement)
+                   sempre visíveis, independente do objetivo predominante do
+                   período. Cards sem dados mostram "—" ou 0. Antes a UI mudava
+                   por completo entre períodos com objetivos diferentes,
+                   prejudicando comparação visual e reinterpretando o layout. */}
+              {/* ===== BLOCO VENDAS ===== */}
+              <>
                   {/* ===== BLOCO 1: DECISÃO — dual ROAS + 4 satélites =====
                        R11: reincluído ROAS Total (eficiência global) ao lado
                        do ROAS Vendas (operacional). Framing diferente da
@@ -865,9 +868,9 @@ const Ads = () => {
                     </Card>
                   </div>
                 </>
-              ) : (
-                // ===== ENGAGEMENT VIEW =====
-                <>
+
+              {/* ===== BLOCO ENGAGEMENT ===== */}
+              <>
                   {/* ===== ROW 1: Engagement Card (40%) + Satellite Cards (60%) ===== */}
                   <div className="grid gap-4 lg:grid-cols-5">
                     {/* Main Engagement Card - Compact */}
@@ -1085,7 +1088,6 @@ const Ads = () => {
                     </Card>
                   </div>
                 </>
-              )}
 
               {/* ===== ROW 6: Performance Ranking (Top/Bottom performers) ===== */}
               <AdStrategicMatrix ads={activeAdsData} objective={effectiveObjective} />
