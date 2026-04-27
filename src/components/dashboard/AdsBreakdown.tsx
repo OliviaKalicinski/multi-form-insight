@@ -179,26 +179,87 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
   // R08: binário. Retrocompat com valores legados pré-R08.
   const isSales = objective === "VENDAS" || objective === "OUTCOME_SALES" || !objective;
 
+  // R14: agregar linhas por ad_id (fallback nome+conjunto). Cada linha em
+  // `ads` representa ad_id × dia, então o mesmo anúncio aparecia N vezes
+  // (uma por dia ativo). Soma campos aditivos e zera campos calculados pra
+  // forçar getAdMetrics a recalcular CTR/ROAS/CPC/CPR a partir dos totais.
+  const aggregatedAds = useMemo<AdsData[]>(() => {
+    const buckets = new Map<string, AdsData>();
+    const sumField = (a: string | undefined, b: string | undefined) =>
+      String(parseValue(a) + parseValue(b));
+
+    for (const ad of ads) {
+      const key =
+        (ad as any).ad_id ||
+        `${ad["Nome do anúncio"] || ""}::${ad["Nome do conjunto de anúncios"] || ""}`;
+
+      const existing = buckets.get(key);
+      if (!existing) {
+        buckets.set(key, {
+          ...ad,
+          // Normaliza para string numérica simples (parseValue idempotente).
+          "Valor usado (BRL)": String(parseValue(ad["Valor usado (BRL)"])),
+          Impressões: String(parseValue(ad["Impressões"])),
+          "Cliques (todos)": String(parseValue(ad["Cliques (todos)"])),
+          "Cliques no link": String(parseValue(ad["Cliques no link"])),
+          Compras: String(parseValue(ad["Compras"])),
+          "Valor de conversão da compra": String(parseValue(ad["Valor de conversão da compra"])),
+          Resultados: String(parseValue(ad["Resultados"])),
+          "Adições ao carrinho": String(parseValue(ad["Adições ao carrinho"])),
+          Alcance: String(parseValue(ad["Alcance"])),
+          // Zera campos calculados — getAdMetrics recalcula a partir dos somados.
+          "CTR (todos)": "",
+          "ROAS de resultados": "",
+          "CPC (custo por clique no link)": "",
+          "CPM (custo por 1.000 impressões)": "",
+        });
+        continue;
+      }
+
+      existing["Valor usado (BRL)"] = sumField(existing["Valor usado (BRL)"], ad["Valor usado (BRL)"]);
+      existing["Impressões"] = sumField(existing["Impressões"], ad["Impressões"]);
+      existing["Cliques (todos)"] = sumField(existing["Cliques (todos)"], ad["Cliques (todos)"]);
+      existing["Cliques no link"] = sumField(existing["Cliques no link"], ad["Cliques no link"]);
+      existing.Compras = sumField(existing.Compras, ad.Compras);
+      existing["Valor de conversão da compra"] = sumField(
+        existing["Valor de conversão da compra"],
+        ad["Valor de conversão da compra"],
+      );
+      existing.Resultados = sumField(existing.Resultados, ad.Resultados);
+      existing["Adições ao carrinho"] = sumField(existing["Adições ao carrinho"], ad["Adições ao carrinho"]);
+      existing.Alcance = sumField(existing.Alcance, ad.Alcance);
+
+      // effective_status: prioriza valor não-vazio (qualquer linha tem o status atual).
+      if (!(existing as any).effective_status && (ad as any).effective_status) {
+        (existing as any).effective_status = (ad as any).effective_status;
+      }
+    }
+    return Array.from(buckets.values());
+  }, [ads]);
+
   const { medianCpr, medianCpc } = useMemo(() => {
-    const all = ads.filter((a) => parseValue(a["Valor usado (BRL)"]) >= 10).map(getAdMetrics);
+    const all = aggregatedAds.filter((a) => parseValue(a["Valor usado (BRL)"]) >= 10).map(getAdMetrics);
     return {
       medianCpr: calcMedian(all.map((m) => m.cpr).filter((v) => v > 0)),
       medianCpc: calcMedian(all.map((m) => m.cpc).filter((v) => v > 0)),
     };
-  }, [ads]);
+  }, [aggregatedAds]);
 
   const classifyAd = (m: ReturnType<typeof getAdMetrics>, investment: number): FunnelRole | null => {
     if (investment < 10) return null;
     return classifyByObjective(objective, m.ctr, { roas: m.roas, cpr: m.cpr, cpc: m.cpc, medianCpr, medianCpc });
   };
 
-  // Contagem para o toggle
-  const activeCount = useMemo(() => ads.filter(isActiveAd).length, [ads]);
-  const hasStatusData = useMemo(() => ads.some((a) => (a as any).effective_status), [ads]);
+  // Contagem para o toggle (em cima dos ads agregados — 1 entrada por anúncio único).
+  const activeCount = useMemo(() => aggregatedAds.filter(isActiveAd).length, [aggregatedAds]);
+  const hasStatusData = useMemo(
+    () => aggregatedAds.some((a) => (a as any).effective_status),
+    [aggregatedAds],
+  );
 
   // Agrupar por campanha (para separadores visuais)
   const processedAds = useMemo(() => {
-    let filtered = [...ads];
+    let filtered = [...aggregatedAds];
 
     if (onlyActive) filtered = filtered.filter(isActiveAd);
     if (filterClassification !== "all") {
@@ -265,7 +326,7 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
     }
 
     return filtered;
-  }, [ads, sortColumn, sortDirection, filterClassification, onlyActive]);
+  }, [aggregatedAds, sortColumn, sortDirection, filterClassification, onlyActive]);
 
   // Agrupar por campanha para cabeçalhos de grupo
   const groupedRows = useMemo(() => {
@@ -300,8 +361,9 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
             </CardTitle>
             <CardDescription className="mt-1">
               {processedAds.length}
-              {processedAds.length !== ads.length && ` de ${ads.length}`} anúncios
-              {onlyActive && activeCount < ads.length && ` · ${ads.length - activeCount} pausados/arquivados ocultos`}
+              {processedAds.length !== aggregatedAds.length && ` de ${aggregatedAds.length}`} anúncios
+              {onlyActive && activeCount < aggregatedAds.length &&
+                ` · ${aggregatedAds.length - activeCount} pausados/arquivados ocultos`}
             </CardDescription>
           </div>
 
