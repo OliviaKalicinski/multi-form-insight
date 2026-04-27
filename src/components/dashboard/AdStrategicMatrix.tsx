@@ -12,7 +12,7 @@ import {
   Cell,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Medal, TrendingUp, AlertTriangle, Wrench, Palette } from "lucide-react";
+import { Medal, TrendingUp, AlertTriangle, Wrench, Palette, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdsData } from "@/types/marketing";
 import { parseAdsValue } from "@/utils/adsCalculator";
@@ -30,7 +30,7 @@ const MIN_SPEND = 50; // Filtro inicial (estatística mínima).
 const MIN_SPEND_PAUSE = 200; // Spend mínimo pra recomendar pausa.
 const MAX_PER_QUADRANT = 5;
 
-type Quadrant = "ESCALAR" | "OTIMIZAR" | "REFINAR" | "REVISAR";
+type Quadrant = "ESCALAR" | "OTIMIZAR" | "REFINAR" | "REVISAR" | "PAUSAR";
 
 const QUADRANT_META: Record<
   Quadrant,
@@ -67,14 +67,25 @@ const QUADRANT_META: Record<
     advice: "Tráfego qualificado mas escasso. Reforçar copy, headline, hook, gancho visual.",
   },
   REVISAR: {
-    label: "Revisar / Pausar",
+    label: "Revisar",
     emoji: "⛔",
     icon: AlertTriangle,
     color: "red",
     bg: "bg-red-50/40",
     border: "border-red-200",
     text: "text-red-600",
-    advice: "Subperformance dupla. Pausar, repensar oferta + público, testar nova hipótese.",
+    advice: "Subperformance, mas ainda com chance de salvar. Repensar oferta + público antes de pausar.",
+  },
+  // R20: novo quadrante "Pausar Já" — ROAS calculado mas < 1x (perde dinheiro real).
+  PAUSAR: {
+    label: "Pausar Já",
+    emoji: "🛑",
+    icon: Ban,
+    color: "red",
+    bg: "bg-red-100/70",
+    border: "border-red-400",
+    text: "text-red-700",
+    advice: "Cada R$ investido retorna menos de R$ 1. Cortar agora — o ad está sangrando dinheiro.",
   },
 };
 
@@ -84,6 +95,7 @@ const QUADRANT_HEX: Record<Quadrant, string> = {
   OTIMIZAR: "#f59e0b",
   REFINAR: "#3b82f6",
   REVISAR: "#ef4444",
+  PAUSAR: "#dc2626", // red-600 (mais forte que REVISAR red-500)
 };
 
 const fmt = (n: number) =>
@@ -109,16 +121,34 @@ interface AggregatedAd {
   quadrant: Quadrant;
 }
 
+/**
+ * R20: regra de classificação atualizada.
+ *
+ * 1. PAUSAR JÁ se ROAS calculado mas < 1x (perde dinheiro real, qualquer
+ *    objetivo — Vendas com baixa conversão OU Outros com purchase
+ *    atribuído ineficiente).
+ * 2. Tem ROAS válido (> 0) → matriz pura CTR × ROAS. Receita real é o que
+ *    importa, independente do objetivo da campanha. Antes só Vendas usava
+ *    matriz pura — Outros com purchase atribuído pelo pixel agora também.
+ * 3. ROAS = 0 → regra C original. CTR alto = Refinar; senão = Revisar.
+ */
 function classifyQuadrant(ad: { ctr: number; roas: number; isVendas: boolean }): Quadrant {
   const ctrHigh = ad.ctr >= CTR_HIGH;
-  if (ad.isVendas) {
+  const hasRoas = ad.roas > 0;
+
+  // (1) Sangrando dinheiro — pausar antes de qualquer outra análise.
+  if (hasRoas && ad.roas < 1) return "PAUSAR";
+
+  // (2) Tem ROAS positivo (≥ 1x) — matriz pura.
+  if (hasRoas) {
     const roasHigh = ad.roas >= ROAS_HIGH;
     if (ctrHigh && roasHigh) return "ESCALAR";
     if (ctrHigh && !roasHigh) return "OTIMIZAR";
     if (!ctrHigh && roasHigh) return "REFINAR";
-    return "REVISAR";
+    return "REVISAR"; // CTR baixo + ROAS entre 1x e meta.
   }
-  // Opção C: ads non-Sales (sem ROAS válido). CTR alto = Refinar; senão = Revisar.
+
+  // (3) ROAS = 0 — regra C.
   return ctrHigh ? "REFINAR" : "REVISAR";
 }
 
@@ -190,13 +220,15 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
       OTIMIZAR: [],
       REFINAR: [],
       REVISAR: [],
+      PAUSAR: [],
     };
     for (const a of aggregated) byQuadrant[a.quadrant].push(a);
     for (const q of Object.keys(byQuadrant) as Quadrant[]) {
       byQuadrant[q].sort((x, y) => y.spend - x.spend);
     }
-    // Bottom (REVISAR) exige spend mínimo maior pra evitar pausar criativo de teste.
+    // Quadrantes vermelhos exigem spend mínimo pra evitar pausar criativo de teste.
     byQuadrant.REVISAR = byQuadrant.REVISAR.filter((a) => a.spend >= MIN_SPEND_PAUSE);
+    byQuadrant.PAUSAR = byQuadrant.PAUSAR.filter((a) => a.spend >= MIN_SPEND_PAUSE);
 
     // 3. Totais agregados.
     const totalSpend = aggregated.reduce((s, a) => s + a.spend, 0);
@@ -241,7 +273,7 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
             </p>
           </div>
           <div className="flex items-center gap-3 text-[11px] flex-wrap">
-            {(["ESCALAR", "OTIMIZAR", "REFINAR", "REVISAR"] as Quadrant[]).map((q) => (
+            {(["ESCALAR", "OTIMIZAR", "REFINAR", "REVISAR", "PAUSAR"] as Quadrant[]).map((q) => (
               <div key={q} className="flex items-center gap-1.5">
                 <span
                   className="inline-block w-2 h-2 rounded-full"
@@ -263,8 +295,9 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
         {scatterData.length > 0 && (
           <div>
             <p className="text-[11px] text-muted-foreground mb-2">
-              Cada ponto é um anúncio. Tamanho = investimento. Bolhas sólidas = Vendas (ROAS real).
-              Anéis = Outros (sem atribuição purchase, ROAS=0). Linhas tracejadas = thresholds (CTR 1,5% · ROAS 3x).
+              Cada ponto é um anúncio. Tamanho = investimento.
+              Bolhas sólidas = ROAS atribuído (≥ 0,01x). Anéis = sem atribuição purchase (ROAS=0).
+              Linhas tracejadas = thresholds (CTR 1,5% · ROAS 3x). ROAS &lt; 1x → quadrante "Pausar Já".
             </p>
             <ResponsiveContainer width="100%" height={280}>
               <ScatterChart margin={{ top: 10, right: 20, bottom: 30, left: 20 }}>
@@ -295,13 +328,18 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
                   content={({ active, payload }: any) => {
                     if (!active || !payload?.length) return null;
                     const d = payload[0].payload as AggregatedAd;
+                    // R20: tooltip preciso conforme objetivo + presença de ROAS.
+                    const hasRoas = d.roas > 0;
+                    const tipoLabel = d.isVendas
+                      ? "Vendas (ROAS real)"
+                      : hasRoas
+                        ? "Outros — purchase atribuído ao pixel"
+                        : "Outros — sem atribuição purchase";
                     return (
                       <div className="bg-background border rounded-md p-2 shadow-sm text-xs max-w-[260px]">
                         <p className="font-semibold leading-tight">{d.name}</p>
                         {d.conjunto && <p className="text-[10px] text-muted-foreground">{d.conjunto}</p>}
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {d.isVendas ? "Vendas (ROAS real)" : "Outros (sem atribuição purchase)"}
-                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{tipoLabel}</p>
                         <div className="mt-1.5 space-y-0.5">
                           <p>
                             <span className="text-muted-foreground">CTR:</span> {d.ctr.toFixed(2)}%
@@ -325,25 +363,29 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
                   }}
                 />
                 <Scatter data={scatterData}>
-                  {scatterData.map((entry, i) => (
-                    <Cell
-                      key={i}
-                      fill={QUADRANT_HEX[entry.quadrant]}
-                      // Vendas: bolha sólida. Outros: anel (fill quase transparente, stroke colorido).
-                      fillOpacity={entry.isVendas ? 0.7 : 0.1}
-                      stroke={QUADRANT_HEX[entry.quadrant]}
-                      strokeWidth={entry.isVendas ? 0 : 2}
-                    />
-                  ))}
+                  {scatterData.map((entry, i) => {
+                    // R20: bolha sólida quando há ROAS atribuído (independente do
+                    // objetivo da campanha). Anel quando ROAS = 0.
+                    const hasRoas = entry.roas > 0;
+                    return (
+                      <Cell
+                        key={i}
+                        fill={QUADRANT_HEX[entry.quadrant]}
+                        fillOpacity={hasRoas ? 0.7 : 0.1}
+                        stroke={QUADRANT_HEX[entry.quadrant]}
+                        strokeWidth={hasRoas ? 0 : 2}
+                      />
+                    );
+                  })}
                 </Scatter>
               </ScatterChart>
             </ResponsiveContainer>
           </div>
         )}
 
-        {/* LISTAGENS por quadrante */}
+        {/* LISTAGENS por quadrante (R20: PAUSAR aparece logo após REVISAR — mais urgente) */}
         <div className="space-y-3">
-          {(["ESCALAR", "OTIMIZAR", "REFINAR", "REVISAR"] as Quadrant[]).map((q) => {
+          {(["ESCALAR", "OTIMIZAR", "REFINAR", "REVISAR", "PAUSAR"] as Quadrant[]).map((q) => {
             const items = byQuadrant[q].slice(0, MAX_PER_QUADRANT);
             if (items.length === 0) return null;
             const meta = QUADRANT_META[q];
