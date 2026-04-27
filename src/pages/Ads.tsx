@@ -29,7 +29,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { ComparisonMetricCard } from "@/components/dashboard/ComparisonMetricCard";
 import { StatusMetricCard, getStatusFromBenchmark } from "@/components/dashboard/StatusMetricCard";
 import { AdsBreakdown } from "@/components/dashboard/AdsBreakdown";
-import { AdPerformanceRanking } from "@/components/dashboard/AdPerformanceRanking";
+import { AdStrategicMatrix } from "@/components/dashboard/AdStrategicMatrix";
 import { AdsTrendChart } from "@/components/dashboard/AdsTrendChart";
 import { MetaTokenAlert } from "@/components/dashboard/MetaTokenAlert";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
@@ -1088,7 +1088,7 @@ const Ads = () => {
               )}
 
               {/* ===== ROW 6: Performance Ranking (Top/Bottom performers) ===== */}
-              <AdPerformanceRanking ads={activeAdsData} objective={effectiveObjective} />
+              <AdStrategicMatrix ads={activeAdsData} objective={effectiveObjective} />
 
               {/* ===== ROW 7: Breakdown by Ad (uses activeAdsData for objective-filtered view) ===== */}
               <AdsBreakdown
