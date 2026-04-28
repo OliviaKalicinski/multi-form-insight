@@ -10,6 +10,7 @@ import {
 } from "@/types/marketing";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, parse } from "date-fns";
+import { detectChannelFromRow } from "@/utils/channelDetector";
 
 interface DataStats {
   salesCount: number;
@@ -404,7 +405,10 @@ export const useDataPersistence = () => {
         numeroPedido: row.numero_pedido || "",
         nomeCliente: row.cliente_nome || "",
         cpfCnpj: row.cpf_cnpj || row.cliente_email || "",
-        ecommerce: row.canal || "",
+        // R26: classifica em "Vendas Online" / "Vendas Diretas" / "Brindes/Remessas"
+        // quando o banco não tem `canal` populado (caso do Comida de Dragão).
+        // Quando vier de upload CSV antigo com `canal` real (ex: Shopify), preserva.
+        ecommerce: row.canal || detectChannelFromRow(row),
         valorTotal: Number(row.valor_total),
         totalItens: row.produtos?.length || 0,
         produtos: row.produtos || [],
