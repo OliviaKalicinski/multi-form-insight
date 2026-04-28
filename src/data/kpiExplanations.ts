@@ -102,18 +102,23 @@ export const kpiExplanations: Record<string, KPIExplanation> = {
   },
   roas_bruto: {
     formula: "Receita Total (com frete) ÷ Investimento em Ads",
-    description: "Retorno bruto incluindo frete. Mostra quanto cada R$ investido gerou em receita total bruta.",
-    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Inclui frete na receita", "Valor mais alto que ROAS Real"]
+    description: "Retorno bruto incluindo frete. Mostra quanto cada R$ investido gerou em receita total — receita CONTÁBIL.",
+    rules: ["Meta: 3x", "≥3x = Meta batida", "2.4x a 3x = Atenção", "<2.4x = Abaixo", "Inclui frete na receita"]
   },
   roas_real: {
-    formula: "Receita Total (ex-frete) ÷ Investimento em Ads",
-    description: "Retorno real baseado no dinheiro que entrou no caixa, excluindo frete. Mostra o retorno efetivo do investimento em anúncios.",
-    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Baseado em vendas reais", "Exclui frete"]
+    formula: "Receita ex-frete ÷ Investimento em Ads",
+    description: "Retorno baseado no dinheiro que entra no caixa, excluindo frete. É a métrica operacional preferencial.",
+    rules: ["Meta: 3x", "≥3x = Meta batida", "2.4x a 3x = Atenção", "<2.4x = Abaixo", "Exclui frete (caixa real)"]
   },
   roas_meta: {
-    formula: "Valor de Conversão (Meta) ÷ Investimento em Ads",
-    description: "ROAS reportado pelo Meta Ads. O valor de conversão já exclui frete (capturado pelo pixel no evento Purchase).",
-    rules: ["≥4x = Excelente", "3x a 4x = Bom", "<3x = Atenção", "Valor do carrinho (produtos)", "Atribuição Meta"]
+    formula: "Valor de Conversão (pixel Meta) ÷ Investimento em Ads",
+    description: "ROAS reportado pelo Meta Ads via pixel. Mostra atribuição reconhecida pela plataforma — pode subestimar (pixel não captura tudo).",
+    rules: ["Meta: 1.2x", "≥1.2x = Meta batida", "0.96x a 1.2x = Atenção", "<0.96x = Abaixo", "Atribuição limitada do pixel"]
+  },
+  roas_venda: {
+    formula: "Valor de Conversão (pixel Meta) ÷ Investimento em Ads de Vendas",
+    description: "Eficiência apenas de campanhas com objetivo Vendas (Sales). Mede performance pura, sem diluir com Awareness/Traffic.",
+    rules: ["Meta: 2.5x", "≥2.5x = Meta batida", "2x a 2.5x = Atenção", "<2x = Abaixo", "Numerador e denominador filtrados por OUTCOME_SALES"]
   },
   cac: {
     formula: "Investimento Total em Ads ÷ Número de Novos Clientes",

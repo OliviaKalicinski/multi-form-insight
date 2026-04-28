@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreditCard } from "lucide-react";
 import { OrderValueDistribution, ProcessedOrder } from "@/types/marketing";
-import { getOrderValueDistribution } from "@/utils/financialMetrics";
+import { getOrderValueDistribution, filterRealOrders } from "@/utils/financialMetrics";
 import { cn } from "@/lib/utils";
 
 interface TicketDistributionCompactProps {
@@ -25,15 +25,17 @@ export const TicketDistributionCompact = ({
   averageTicket,
   rawOrders,
 }: TicketDistributionCompactProps) => {
-  // R27: filtra fora pedidos de amostra exclusiva. Pedidos com produto +
-  // amostra junto continuam considerados (têm valor de venda real).
-  // Ticket Médio aqui é "ticket real" — receita ex-frete dividida pelo
-  // número de pedidos que efetivamente venderam produto.
+  // R28: filtro pedidos só-amostra usando `filterRealOrders` (canônico em
+  // samplesAnalyzer — detecta amostras por keywords nos produtos E faixa de
+  // preço R$0,01–R$1,00). Antes filtrava só por `ecommerce !== "Brindes/Remessas"`
+  // que não pega amostras vendidas como produto comum (ex.: ticket R$ 1,00 com
+  // produto chamado "Amostra"). Resultado: 271 pedidos de R$ 0-50 incluíam
+  // muito ruído de amostra, distorcendo Ticket Médio pra R$ 29.
   const { displayData, ticketMedio } = useMemo(() => {
     if (!rawOrders) {
       return { displayData: data, ticketMedio: averageTicket };
     }
-    const realOrders = rawOrders.filter((o) => o.ecommerce !== "Brindes/Remessas");
+    const realOrders = filterRealOrders(rawOrders);
     const newDistribution = getOrderValueDistribution(realOrders);
     const receitaExFrete = realOrders.reduce(
       (sum, o) => sum + (o.valorTotal - (o.valorFrete || 0)),

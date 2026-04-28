@@ -200,7 +200,10 @@ export default function PerformanceFinanceira() {
     return ((currentRevenue - prevRevenue) / prevRevenue) * 100;
   }, [cdSalesData, dateRange, periodOrders]);
 
-  // Metas
+  // Metas — R28: pedidos usa `totalPedidosReais` (exclui só-amostra) e
+  // bloco "Margem" foi trocado por "ROAS Real" e "ROAS Venda" (mais
+  // operacionais — Bruno definiu 28/04). Margem atual depende de custo
+  // mapeado ainda inacabado; volta a ser monitorada quando target for revisado.
   const goalsData = useMemo(() => {
     if (!financialMetrics) return [];
     return [
@@ -212,7 +215,7 @@ export default function PerformanceFinanceira() {
       },
       {
         label: "Pedidos",
-        current: financialMetrics.totalPedidos,
+        current: financialMetrics.totalPedidosReais,
         goal: financialGoals.pedidos,
         format: "number" as const,
       },
@@ -223,13 +226,19 @@ export default function PerformanceFinanceira() {
         format: "currency" as const,
       },
       {
-        label: "Margem",
-        current: (1 - financialGoals.custoFixo) * 100,
-        goal: financialGoals.margem,
-        format: "percent" as const,
+        label: "ROAS Real",
+        current: roasMetrics?.roasReal || 0,
+        goal: ROAS_GOALS.real,
+        format: "multiplier" as const,
+      },
+      {
+        label: "ROAS Venda",
+        current: roasMetrics?.roasVenda || 0,
+        goal: ROAS_GOALS.venda,
+        format: "multiplier" as const,
       },
     ];
-  }, [financialMetrics, financialGoals]);
+  }, [financialMetrics, financialGoals, roasMetrics]);
 
   // Breakdown por canal + produtos
   const platformWithProducts = useMemo(() => {
@@ -437,7 +446,7 @@ export default function PerformanceFinanceira() {
                 benchmark={{ value: ROAS_GOALS.venda, label: `Meta: ${ROAS_GOALS.venda.toFixed(1)}x` }}
                 interpretation="Valor Meta ÷ Ads Vendas"
                 size="compact"
-                tooltipKey="roas_meta"
+                tooltipKey="roas_venda"
               />
             </div>
           </CardContent>

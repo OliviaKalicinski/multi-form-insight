@@ -15,7 +15,7 @@ interface GoalItem {
   label: string;
   current: number;
   goal: number;
-  format: 'currency' | 'number' | 'percent';
+  format: 'currency' | 'number' | 'percent' | 'multiplier';
 }
 
 interface GoalsProgressCardProps {
@@ -37,6 +37,9 @@ const formatValue = (value: number, format: 'currency' | 'number' | 'percent') =
       }).format(value);
     case 'percent':
       return `${value.toFixed(0)}%`;
+    case 'multiplier':
+      // R28: ROAS exibido como "2.33x" pra distinguir de % e dinheiro.
+      return `${value.toFixed(2)}x`;
     case 'number':
     default:
       return value.toLocaleString('pt-BR');
