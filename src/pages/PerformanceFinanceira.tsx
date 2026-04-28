@@ -32,7 +32,7 @@ import {
 } from "@/utils/financialMetrics";
 import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { getOfficialRevenue, getRevenueOrders, getComiDaDragaoOrders } from "@/utils/revenue";
-import { filterAdsByDateRange } from "@/utils/adsParserV2";
+import { filterAdsByDateRange, filterAdsByObjective } from "@/utils/adsParserV2";
 import { calculateAdsMetrics } from "@/utils/adsCalculator";
 // benchmarksPetFood migrado → sectorBenchmarks (useAppSettings)
 import { format } from "date-fns";
@@ -140,6 +140,15 @@ export default function PerformanceFinanceira() {
     const adsMetrics = filteredAds.length > 0 ? calculateAdsMetrics(filteredAds) : null;
     const investimentoAds = adsMetrics?.investimentoTotal || 0;
     const valorConversaoMeta = adsMetrics?.valorConversaoTotal || 0;
+
+    // R24: ROAS Venda — só ads de campanhas Vendas (OUTCOME_SALES).
+    // Numerador e denominador filtrados → mostra eficiência pura das
+    // campanhas de conversão direta, separada do mix com Outros.
+    const vendasAds = filterAdsByObjective(filteredAds, "VENDAS");
+    const vendasMetrics = vendasAds.length > 0 ? calculateAdsMetrics(vendasAds) : null;
+    const investimentoVendas = vendasMetrics?.investimentoTotal || 0;
+    const valorConversaoVendas = vendasMetrics?.valorConversaoTotal || 0;
+
     const revenueOrders = getRevenueOrders(periodOrders);
     const faturamentoTotal = revenueOrders.reduce((s, o) => s + getOfficialRevenue(o), 0);
     const freteTotal = revenueOrders.reduce((s, o) => s + (o.valorFrete || 0), 0);
@@ -148,10 +157,31 @@ export default function PerformanceFinanceira() {
       roasBruto: investimentoAds > 0 ? faturamentoTotal / investimentoAds : 0,
       roasReal: investimentoAds > 0 ? faturamentoExFrete / investimentoAds : 0,
       roasMeta: investimentoAds > 0 ? valorConversaoMeta / investimentoAds : 0,
+      roasVenda: investimentoVendas > 0 ? valorConversaoVendas / investimentoVendas : 0,
       investimentoAds,
+      investimentoVendas,
       hasAdsData: filteredAds.length > 0,
     };
   }, [cdSalesData, adsData, periodOrders, dateRange]);
+
+  // R24: crescimento dinâmico — período atual vs período anterior do MESMO TAMANHO.
+  // Antes só calculava quando havia mês explicitamente selecionado (yyyy-MM),
+  // ficando 0 em "7 dias", "30 dias", "12 meses", "Mês atual" → bug visível.
+  const growthRateDynamic = useMemo<number | null>(() => {
+    if (!dateRange) return null;
+    const oneDay = 1000 * 60 * 60 * 24;
+    const rangeDays = Math.max(1, Math.round((dateRange.end.getTime() - dateRange.start.getTime()) / oneDay) + 1);
+    const prevEnd = new Date(dateRange.start);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevStart.getDate() - rangeDays + 1);
+
+    const prevOrders = filterOrdersByDateRange(cdSalesData, prevStart, prevEnd);
+    const prevRevenue = getRevenueOrders(prevOrders).reduce((s, o) => s + getOfficialRevenue(o), 0);
+    const currentRevenue = getRevenueOrders(periodOrders).reduce((s, o) => s + getOfficialRevenue(o), 0);
+    if (prevRevenue <= 0) return null;
+    return ((currentRevenue - prevRevenue) / prevRevenue) * 100;
+  }, [cdSalesData, dateRange, periodOrders]);
 
   // Metas
   const goalsData = useMemo(() => {
@@ -299,22 +329,28 @@ export default function PerformanceFinanceira() {
             />
             <StatusMetricCard
               title="Crescimento"
-              value={`${(financialMetrics.growthRate || 0) >= 0 ? "+" : ""}${(financialMetrics.growthRate || 0).toFixed(1)}%`}
+              value={
+                growthRateDynamic === null
+                  ? "—"
+                  : `${growthRateDynamic >= 0 ? "+" : ""}${growthRateDynamic.toFixed(1)}%`
+              }
               icon={
-                financialMetrics.growthRate >= 0 ? (
+                (growthRateDynamic ?? 0) >= 0 ? (
                   <TrendingUp className="h-3 w-3" />
                 ) : (
                   <TrendingDown className="h-3 w-3" />
                 )
               }
               status={
-                (financialMetrics.growthRate || 0) > 10
-                  ? "success"
-                  : (financialMetrics.growthRate || 0) < -10
-                    ? "danger"
-                    : (financialMetrics.growthRate || 0) < 0
-                      ? "warning"
-                      : "neutral"
+                growthRateDynamic === null
+                  ? "neutral"
+                  : growthRateDynamic > 10
+                    ? "success"
+                    : growthRateDynamic < -10
+                      ? "danger"
+                      : growthRateDynamic < 0
+                        ? "warning"
+                        : "neutral"
               }
               size="compact"
               tooltipKey="crescimento"
@@ -331,10 +367,13 @@ export default function PerformanceFinanceira() {
               <Target className="h-4 w-4" />
               📈 ROAS - Retorno sobre Investimento em Ads
             </CardTitle>
-            <CardDescription>Comparação de 3 métricas de ROAS: bruto, real e Meta (já ex-frete)</CardDescription>
+            <CardDescription>
+              4 métricas de ROAS: bruto e real (caixa real), Meta (atribuído pelo pixel) e Venda
+              (eficiência só de campanhas Vendas).
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <StatusMetricCard
                 title="ROAS Bruto"
                 value={`${roasMetrics.roasBruto.toFixed(2)}x`}
@@ -389,6 +428,31 @@ export default function PerformanceFinanceira() {
                   label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x`,
                 }}
                 interpretation="Valor Meta ÷ Ads (ex-frete)"
+                size="compact"
+                tooltipKey="roas_meta"
+              />
+              {/* R24: ROAS Venda — eficiência apenas de campanhas Vendas
+                   (numerador e denominador filtrados por OUTCOME_SALES). */}
+              <StatusMetricCard
+                title="ROAS Venda"
+                value={
+                  roasMetrics.investimentoVendas > 0 ? `${roasMetrics.roasVenda.toFixed(2)}x` : "—"
+                }
+                icon={<Target className="h-3 w-3" />}
+                status={
+                  roasMetrics.investimentoVendas <= 0
+                    ? "neutral"
+                    : roasMetrics.roasVenda >= (sectorBenchmarks.roasExcelente || 4)
+                      ? "success"
+                      : roasMetrics.roasVenda >= (sectorBenchmarks.roasMedio || 3)
+                        ? "warning"
+                        : "danger"
+                }
+                benchmark={{
+                  value: sectorBenchmarks.roasMedio || 3.0,
+                  label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x`,
+                }}
+                interpretation="Valor Meta ÷ Ads Vendas"
                 size="compact"
                 tooltipKey="roas_meta"
               />
