@@ -199,8 +199,12 @@ export const AdsBreakdown = ({ ads, selectedMonth, objective = "VENDAS" }: AdsBr
       String(parseValue(a) + parseValue(b));
 
     for (const ad of ads) {
+      // R22: ad_id real do banco está em _ad_id (mapeamento do useDataPersistence).
+      // Lendo `ad.ad_id` direto vinha undefined → caía no fallback nome+conjunto,
+      // gerando agregações inconsistentes vs. AdStrategicMatrix.
+      const adId = (ad as any)._ad_id || (ad as any).ad_id;
       const key =
-        (ad as any).ad_id ||
+        adId ||
         `${ad["Nome do anúncio"] || ""}::${ad["Nome do conjunto de anúncios"] || ""}`;
 
       const existing = buckets.get(key);

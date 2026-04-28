@@ -168,7 +168,15 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
       }
     >();
     for (const ad of ads) {
-      const key = (ad as any).ad_id || `${ad["Nome do anúncio"] || ""}::${ad.conjunto || ""}`;
+      // R22: useDataPersistence mapeia row.ad_id do banco para _ad_id
+      // (com underscore) no AdsData. Antes lendo `(ad as any).ad_id` direto
+      // dava undefined → caía no fallback nome+conjunto. E pior: `ad.conjunto`
+      // também não é mapeado (só `ad["Nome do conjunto de anúncios"]` é).
+      // Resultado: 2 ads com mesmo nome em conjuntos diferentes viravam
+      // 1 bucket único (key `nome::undefined`), gerando soma incorreta.
+      const adId = (ad as any)._ad_id || (ad as any).ad_id;
+      const conjunto = ad["Nome do conjunto de anúncios"] || (ad as any).conjunto || "";
+      const key = adId || `${ad["Nome do anúncio"] || ""}::${conjunto}`;
       const spend = parseValue(ad["Valor usado (BRL)"]);
       const revenue = parseValue(ad["Valor de conversão da compra"]);
       const clicks = parseValue(ad["Cliques (todos)"]) || parseValue(ad["Cliques no link"]);
@@ -181,7 +189,7 @@ export const AdStrategicMatrix = ({ ads }: Props) => {
           clicks: 0,
           impressions: 0,
           name: ad["Nome do anúncio"] || "—",
-          conjunto: ad.conjunto || ad["Nome do conjunto de anúncios"] || "",
+          conjunto,
           isVendas,
         });
       }
