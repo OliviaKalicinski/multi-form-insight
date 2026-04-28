@@ -18,6 +18,9 @@ interface RevenueHeroCardProps {
   monthInfo?: IncompleteMonthInfo;
   comparison?: EqualIntervalComparison;
   projection?: ProjectionData | null;
+  // R30: slot pra encaixar os cards menores (Pedidos, Ticket, Itens, etc.)
+  // dentro do hero, aproveitando espaço vertical vazio embaixo do breakdown.
+  children?: React.ReactNode;
 }
 
 const formatCurrency = (value: number) =>
@@ -44,6 +47,7 @@ export const RevenueHeroCard = ({
   monthInfo,
   comparison,
   projection,
+  children,
 }: RevenueHeroCardProps) => {
   // Check if goal is defined (not 0 or undefined)
   const hasGoalDefined = revenueGoal !== undefined && revenueGoal > 0;
@@ -196,6 +200,9 @@ export const RevenueHeroCard = ({
               </div>
             </KPITooltip>
           </div>
+
+          {/* R30: cards menores embarcados no hero (espaço antes vazio). */}
+          {children && <div className="pt-3 border-t border-border/50">{children}</div>}
         </div>
       </CardContent>
     </Card>

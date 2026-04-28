@@ -296,9 +296,9 @@ export default function PerformanceFinanceira() {
       )}
 
       {/* ===== BLOCO 1: HERO METRICS =====
-           R29: Receita vs Meta + Status das Metas lado a lado no topo.
-           Cards menores (Pedidos, Ticket, Itens, Receita Líq, Crescimento)
-           movidos pra row separada abaixo, em grid de 6 colunas. */}
+           R30: 6 cards menores embarcados DENTRO do RevenueHeroCard
+           (aproveita espaço vertical antes vazio). Status das Metas
+           continua ao lado direito. */}
       {!comparisonMode && financialMetrics && (
         <div className="grid gap-4 lg:grid-cols-2">
           <RevenueHeroCard
@@ -308,82 +308,82 @@ export default function PerformanceFinanceira() {
             variation={variations?.revenue}
             revenueGoal={financialGoals.receita}
             costPercentage={financialGoals.custoFixo}
-          />
+          >
+            <div className="grid grid-cols-3 gap-2">
+              <StatusMetricCard
+                title="Pedidos"
+                value={financialMetrics.totalPedidosReais.toLocaleString("pt-BR")}
+                icon={<ShoppingCart className="h-3 w-3" />}
+                trend={variations?.orders}
+                size="compact"
+                tooltipKey="pedidos"
+              />
+              <StatusMetricCard
+                title="Ticket Médio"
+                value={formatCurrency(financialMetrics.ticketMedioReal)}
+                icon={<Receipt className="h-3 w-3" />}
+                trend={variations?.ticket}
+                status={getStatusFromBenchmark(
+                  financialMetrics.ticketMedioReal,
+                  sectorBenchmarks.ticketMedio,
+                )}
+                size="compact"
+                tooltipKey="ticket_medio_real"
+              />
+              <StatusMetricCard
+                title="Ticket Real"
+                value={formatCurrency(financialMetrics.ticketMedioReal)}
+                icon={<TrendingUp className="h-3 w-3" />}
+                status="neutral"
+                size="compact"
+                tooltipKey="ticket_medio_real"
+              />
+              <StatusMetricCard
+                title="Itens/Pedido"
+                value={`${financialMetrics.produtoMedio.toFixed(1)}`}
+                icon={<Package className="h-3 w-3" />}
+                size="compact"
+                tooltipKey="itens_pedido"
+              />
+              <StatusMetricCard
+                title="Receita Líq."
+                value={formatCurrency(financialMetrics.faturamentoLiquido)}
+                icon={<DollarSign className="h-3 w-3" />}
+                status="neutral"
+                size="compact"
+                tooltipKey="receita_liquida"
+              />
+              <StatusMetricCard
+                title="Crescimento"
+                value={
+                  growthRateDynamic === null
+                    ? "—"
+                    : `${growthRateDynamic >= 0 ? "+" : ""}${growthRateDynamic.toFixed(1)}%`
+                }
+                icon={
+                  (growthRateDynamic ?? 0) >= 0 ? (
+                    <TrendingUp className="h-3 w-3" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3" />
+                  )
+                }
+                status={
+                  growthRateDynamic === null
+                    ? "neutral"
+                    : growthRateDynamic > 10
+                      ? "success"
+                      : growthRateDynamic < -10
+                        ? "danger"
+                        : growthRateDynamic < 0
+                          ? "warning"
+                          : "neutral"
+                }
+                size="compact"
+                tooltipKey="crescimento"
+              />
+            </div>
+          </RevenueHeroCard>
           <GoalsProgressCard goals={goalsData} />
-        </div>
-      )}
-
-      {/* ===== BLOCO 2: CARDS MENORES (rearranjados na R29) ===== */}
-      {!comparisonMode && financialMetrics && (
-        <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <StatusMetricCard
-            title="Pedidos"
-            value={financialMetrics.totalPedidosReais.toLocaleString("pt-BR")}
-            icon={<ShoppingCart className="h-3 w-3" />}
-            trend={variations?.orders}
-            size="compact"
-            tooltipKey="pedidos"
-          />
-          <StatusMetricCard
-            title="Ticket Médio"
-            value={formatCurrency(financialMetrics.ticketMedioReal)}
-            icon={<Receipt className="h-3 w-3" />}
-            trend={variations?.ticket}
-            status={getStatusFromBenchmark(financialMetrics.ticketMedioReal, sectorBenchmarks.ticketMedio)}
-            size="compact"
-            tooltipKey="ticket_medio_real"
-          />
-          <StatusMetricCard
-            title="Ticket Real"
-            value={formatCurrency(financialMetrics.ticketMedioReal)}
-            icon={<TrendingUp className="h-3 w-3" />}
-            status="neutral"
-            size="compact"
-            tooltipKey="ticket_medio_real"
-          />
-          <StatusMetricCard
-            title="Itens/Pedido"
-            value={`${financialMetrics.produtoMedio.toFixed(1)}`}
-            icon={<Package className="h-3 w-3" />}
-            size="compact"
-            tooltipKey="itens_pedido"
-          />
-          <StatusMetricCard
-            title="Receita Líq."
-            value={formatCurrency(financialMetrics.faturamentoLiquido)}
-            icon={<DollarSign className="h-3 w-3" />}
-            status="neutral"
-            size="compact"
-            tooltipKey="receita_liquida"
-          />
-            <StatusMetricCard
-              title="Crescimento"
-              value={
-                growthRateDynamic === null
-                  ? "—"
-                  : `${growthRateDynamic >= 0 ? "+" : ""}${growthRateDynamic.toFixed(1)}%`
-              }
-              icon={
-                (growthRateDynamic ?? 0) >= 0 ? (
-                  <TrendingUp className="h-3 w-3" />
-                ) : (
-                  <TrendingDown className="h-3 w-3" />
-                )
-              }
-              status={
-                growthRateDynamic === null
-                  ? "neutral"
-                  : growthRateDynamic > 10
-                    ? "success"
-                    : growthRateDynamic < -10
-                      ? "danger"
-                      : growthRateDynamic < 0
-                        ? "warning"
-                        : "neutral"
-              }
-              size="compact"
-              tooltipKey="crescimento"
-            />
         </div>
       )}
 
