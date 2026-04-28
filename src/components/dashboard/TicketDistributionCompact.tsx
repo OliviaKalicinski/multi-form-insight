@@ -1,16 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { CreditCard, FlaskConical } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { OrderValueDistribution, ProcessedOrder } from "@/types/marketing";
-import { filterRealOrders, getOrderValueDistribution } from "@/utils/financialMetrics";
+import { getOrderValueDistribution } from "@/utils/financialMetrics";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip as UITooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface TicketDistributionCompactProps {
   data: OrderValueDistribution[];
@@ -27,70 +20,45 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0
   }).format(value);
 
-export const TicketDistributionCompact = ({ 
-  data, 
+export const TicketDistributionCompact = ({
+  data,
   averageTicket,
-  medianTicket,
-  rawOrders
+  rawOrders,
 }: TicketDistributionCompactProps) => {
-  const [includeSamples, setIncludeSamples] = useState(true);
-
-  // Recalcular dados quando toggle está desativado
-  const { displayData, displayAvgTicket } = useMemo(() => {
-    if (includeSamples || !rawOrders) {
-      return { displayData: data, displayAvgTicket: averageTicket };
+  // R27: filtra fora pedidos de amostra exclusiva. Pedidos com produto +
+  // amostra junto continuam considerados (têm valor de venda real).
+  // Ticket Médio aqui é "ticket real" — receita ex-frete dividida pelo
+  // número de pedidos que efetivamente venderam produto.
+  const { displayData, ticketMedio } = useMemo(() => {
+    if (!rawOrders) {
+      return { displayData: data, ticketMedio: averageTicket };
     }
-    
-    // Filtrar pedidos e recalcular distribuição
-    const realOrders = filterRealOrders(rawOrders);
+    const realOrders = rawOrders.filter((o) => o.ecommerce !== "Brindes/Remessas");
     const newDistribution = getOrderValueDistribution(realOrders);
-    const totalRevenue = realOrders.reduce((sum, o) => sum + o.valorTotal, 0);
-    const newAvgTicket = realOrders.length > 0 ? totalRevenue / realOrders.length : 0;
-    
-    return { displayData: newDistribution, displayAvgTicket: newAvgTicket };
-  }, [data, averageTicket, rawOrders, includeSamples]);
+    const receitaExFrete = realOrders.reduce(
+      (sum, o) => sum + (o.valorTotal - (o.valorFrete || 0)),
+      0,
+    );
+    const newAvg = realOrders.length > 0 ? receitaExFrete / realOrders.length : 0;
+    return { displayData: newDistribution, ticketMedio: newAvg };
+  }, [data, averageTicket, rawOrders]);
 
-  const maxPercentage = Math.max(...displayData.map(d => d.percentage));
-  
+  const maxPercentage = Math.max(...displayData.map((d) => d.percentage));
+
   // Identificar faixa ideal (R$ 100-200)
-  const idealRange = displayData.find(d => d.range.includes('101-200'));
+  const idealRange = displayData.find((d) => d.range.includes("101-200"));
   const idealPercentage = idealRange?.percentage || 0;
-
-  const canToggle = !!rawOrders;
 
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <CreditCard className="h-4 w-4 text-primary" />
-            Distribuição de Ticket
-          </CardTitle>
-          
-          {canToggle && (
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={includeSamples ? "default" : "outline"}
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setIncludeSamples(!includeSamples)}
-                  >
-                    <FlaskConical className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{includeSamples ? "Incluindo amostras" : "Apenas produtos reais"}</p>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-          )}
-        </div>
-        
-        {!includeSamples && canToggle && (
-          <p className="text-xs text-amber-600 mt-1">Sem amostras</p>
-        )}
+        <CardTitle className="flex items-center gap-2 text-base">
+          <CreditCard className="h-4 w-4 text-primary" />
+          Distribuição de Ticket
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          Vendas reais · amostras exclusivas excluídas
+        </p>
       </CardHeader>
       <CardContent className="pt-0">
         {/* Histogram bars */}
@@ -127,18 +95,11 @@ export const TicketDistributionCompact = ({
           })}
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 pt-3 mt-3 border-t">
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">Média</p>
-            <p className="text-sm font-semibold">{formatCurrency(displayAvgTicket)}</p>
-          </div>
-          {medianTicket && includeSamples && (
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Mediana</p>
-              <p className="text-sm font-semibold">{formatCurrency(medianTicket)}</p>
-            </div>
-          )}
+        {/* Stats — R27: "Ticket Médio" (receita ex-frete ÷ pedidos reais),
+             alinhado ao card "Ticket Real" no header da página. */}
+        <div className="pt-3 mt-3 border-t text-center">
+          <p className="text-xs text-muted-foreground">Ticket Médio</p>
+          <p className="text-sm font-semibold">{formatCurrency(ticketMedio)}</p>
         </div>
 
         {/* Insight */}

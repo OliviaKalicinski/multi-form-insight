@@ -1,21 +1,19 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Store, FlaskConical } from "lucide-react";
+import { Store } from "lucide-react";
 import { PlatformPerformance, ProcessedOrder } from "@/types/marketing";
-import { filterRealOrders, getPlatformPerformance } from "@/utils/financialMetrics";
-import {
-  Tooltip as UITooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface ChannelDonutChartProps {
   data: PlatformPerformance[];
   rawOrders?: ProcessedOrder[];
 }
+
+// R27: bucket de pedidos só-amostra (Brindes/Remessas) sai SEMPRE do cálculo
+// de "Receita por Canal". A pizza foca em vendas reais (Online + Diretas).
+// Pedidos com produto + amostra junto continuam contabilizados no canal
+// correspondente (não viram bucket separado).
+const EXCLUDED_BUCKETS = new Set(["Brindes/Remessas"]);
 
 const COLORS = [
   'hsl(var(--chart-1))',
@@ -33,17 +31,17 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0
   }).format(value);
 
-export const ChannelDonutChart = ({ data, rawOrders }: ChannelDonutChartProps) => {
-  const [includeSamples, setIncludeSamples] = useState(true);
-
-  // Recalcular dados quando toggle está desativado
+export const ChannelDonutChart = ({ data }: ChannelDonutChartProps) => {
+  // R27: filtra fora pedidos de amostra exclusiva (não são receita real).
+  // Recalcula market share dos buckets restantes pra somar 100% de novo.
   const displayData = useMemo(() => {
-    if (includeSamples || !rawOrders) return data;
-    
-    // Filtrar pedidos e recalcular performance por plataforma
-    const realOrders = filterRealOrders(rawOrders);
-    return getPlatformPerformance(realOrders);
-  }, [data, rawOrders, includeSamples]);
+    const filtered = data.filter((item) => !EXCLUDED_BUCKETS.has(item.platform));
+    const totalRevenue = filtered.reduce((sum, item) => sum + item.revenue, 0);
+    return filtered.map((item) => ({
+      ...item,
+      marketShare: totalRevenue > 0 ? (item.revenue / totalRevenue) * 100 : 0,
+    }));
+  }, [data]);
 
   const totalRevenue = displayData.reduce((sum, item) => sum + item.revenue, 0);
 
@@ -54,41 +52,16 @@ export const ChannelDonutChart = ({ data, rawOrders }: ChannelDonutChartProps) =
     color: COLORS[index % COLORS.length],
   }));
 
-  const canToggle = !!rawOrders;
-
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Store className="h-4 w-4 text-primary" />
-            Receita por Canal
-          </CardTitle>
-          
-          {canToggle && (
-            <TooltipProvider>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={includeSamples ? "default" : "outline"}
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setIncludeSamples(!includeSamples)}
-                  >
-                    <FlaskConical className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{includeSamples ? "Incluindo amostras" : "Apenas produtos reais"}</p>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
-          )}
-        </div>
-        
-        {!includeSamples && canToggle && (
-          <p className="text-xs text-amber-600 mt-1">Sem amostras</p>
-        )}
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Store className="h-4 w-4 text-primary" />
+          Receita por Canal
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          Vendas reais · amostras exclusivas excluídas
+        </p>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="flex flex-col items-center">

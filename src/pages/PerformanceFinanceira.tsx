@@ -41,6 +41,23 @@ import { cn } from "@/lib/utils";
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
+// R27: metas customizadas por tipo de ROAS, conforme definição operacional
+// do Bruno (28/04/26). Antes todos os 4 cards usavam o mesmo threshold genérico
+// `sectorBenchmarks.roasMedio` (3x), o que distorcia a leitura: ROAS Meta tem
+// natureza diferente (atribuição pixel ≤ 1) e Venda mede só Sales (mais alto).
+const ROAS_GOALS = {
+  bruto: 3.0,
+  real: 3.0,
+  venda: 2.5,
+  meta: 1.2,
+};
+// Status: success ≥ goal, warning ≥ 80% goal, danger < 80%.
+const roasStatus = (value: number, goal: number): "success" | "warning" | "danger" => {
+  if (value >= goal) return "success";
+  if (value >= goal * 0.8) return "warning";
+  return "danger";
+};
+
 export default function PerformanceFinanceira() {
   const { salesData, adsData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
 
@@ -378,17 +395,8 @@ export default function PerformanceFinanceira() {
                 title="ROAS Bruto"
                 value={`${roasMetrics.roasBruto.toFixed(2)}x`}
                 icon={<DollarSign className="h-3 w-3" />}
-                status={
-                  roasMetrics.roasBruto >= (sectorBenchmarks.roasExcelente || 4)
-                    ? "success"
-                    : roasMetrics.roasBruto >= (sectorBenchmarks.roasMedio || 3)
-                      ? "warning"
-                      : "danger"
-                }
-                benchmark={{
-                  value: sectorBenchmarks.roasMedio || 3.0,
-                  label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x`,
-                }}
+                status={roasStatus(roasMetrics.roasBruto, ROAS_GOALS.bruto)}
+                benchmark={{ value: ROAS_GOALS.bruto, label: `Meta: ${ROAS_GOALS.bruto.toFixed(1)}x` }}
                 interpretation="Receita Total ÷ Ads"
                 size="compact"
                 tooltipKey="roas_bruto"
@@ -397,17 +405,8 @@ export default function PerformanceFinanceira() {
                 title="ROAS Real"
                 value={`${roasMetrics.roasReal.toFixed(2)}x`}
                 icon={<DollarSign className="h-3 w-3" />}
-                status={
-                  roasMetrics.roasReal >= (sectorBenchmarks.roasExcelente || 4)
-                    ? "success"
-                    : roasMetrics.roasReal >= (sectorBenchmarks.roasMedio || 3)
-                      ? "warning"
-                      : "danger"
-                }
-                benchmark={{
-                  value: sectorBenchmarks.roasMedio || 3.0,
-                  label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x`,
-                }}
+                status={roasStatus(roasMetrics.roasReal, ROAS_GOALS.real)}
+                benchmark={{ value: ROAS_GOALS.real, label: `Meta: ${ROAS_GOALS.real.toFixed(1)}x` }}
                 interpretation="Receita ex-frete ÷ Ads"
                 size="compact"
                 tooltipKey="roas_real"
@@ -416,17 +415,8 @@ export default function PerformanceFinanceira() {
                 title="ROAS Meta"
                 value={`${roasMetrics.roasMeta.toFixed(2)}x`}
                 icon={<Target className="h-3 w-3" />}
-                status={
-                  roasMetrics.roasMeta >= (sectorBenchmarks.roasExcelente || 4)
-                    ? "success"
-                    : roasMetrics.roasMeta >= (sectorBenchmarks.roasMedio || 3)
-                      ? "warning"
-                      : "danger"
-                }
-                benchmark={{
-                  value: sectorBenchmarks.roasMedio || 3.0,
-                  label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x`,
-                }}
+                status={roasStatus(roasMetrics.roasMeta, ROAS_GOALS.meta)}
+                benchmark={{ value: ROAS_GOALS.meta, label: `Meta: ${ROAS_GOALS.meta.toFixed(1)}x` }}
                 interpretation="Valor Meta ÷ Ads (ex-frete)"
                 size="compact"
                 tooltipKey="roas_meta"
@@ -442,16 +432,9 @@ export default function PerformanceFinanceira() {
                 status={
                   roasMetrics.investimentoVendas <= 0
                     ? "neutral"
-                    : roasMetrics.roasVenda >= (sectorBenchmarks.roasExcelente || 4)
-                      ? "success"
-                      : roasMetrics.roasVenda >= (sectorBenchmarks.roasMedio || 3)
-                        ? "warning"
-                        : "danger"
+                    : roasStatus(roasMetrics.roasVenda, ROAS_GOALS.venda)
                 }
-                benchmark={{
-                  value: sectorBenchmarks.roasMedio || 3.0,
-                  label: `Meta: ${(sectorBenchmarks.roasMedio || 3.0).toFixed(1)}x`,
-                }}
+                benchmark={{ value: ROAS_GOALS.venda, label: `Meta: ${ROAS_GOALS.venda.toFixed(1)}x` }}
                 interpretation="Valor Meta ÷ Ads Vendas"
                 size="compact"
                 tooltipKey="roas_meta"

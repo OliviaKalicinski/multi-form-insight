@@ -88,6 +88,10 @@ export const TopProductsCompact = ({ data, limit = 8 }: TopProductsCompactProps)
                   <span className="text-xs truncate flex-1" title={item.product}>
                     {compactProductName(item.product)}
                   </span>
+                  {/* R27: % do total ao lado da receita pra leitura rápida de share. */}
+                  <span className="text-[10px] text-muted-foreground tabular-nums w-9 text-right">
+                    {item.percentage.toFixed(0)}%
+                  </span>
                   <span className="text-xs font-medium text-right">
                     {formatCurrency(item.revenue)}
                   </span>
