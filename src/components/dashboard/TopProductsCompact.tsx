@@ -39,6 +39,32 @@ const getBarColor = (index: number) => {
   return "bg-primary";
 };
 
+// R25: abreviador de nomes de produtos para uso interno do dashboard.
+// Remove prefixos de marca comuns que ocupam metade do espaço visual sem
+// agregar informação (já está claro pelo contexto do dashboard que é
+// Comida de Dragão). Mantém detalhes que distinguem os produtos.
+const PRODUCT_PREFIXES = [
+  /^Comida de Dragão\s*[-–]\s*/i,
+  /^Mordida de Dragão\s*[-–]\s*/i,
+  /^Kit Comida de Dragão\s*[-–]?\s*/i,
+  /^Suplemento\s+/i,
+];
+
+const compactProductName = (raw: string, maxChars = 32): string => {
+  let name = raw.trim();
+  for (const re of PRODUCT_PREFIXES) {
+    if (re.test(name)) {
+      name = name.replace(re, "");
+      break;
+    }
+  }
+  // Remove parênteses vazios e dupla espaço.
+  name = name.replace(/\(\s*\)/g, "").replace(/\s{2,}/g, " ").trim();
+  if (name.length === 0) name = raw; // fallback se prefixo era a única coisa
+  if (name.length > maxChars) name = name.substring(0, maxChars - 1).trimEnd() + "…";
+  return name;
+};
+
 export const TopProductsCompact = ({ data, limit = 8 }: TopProductsCompactProps) => {
   const topProducts = data.slice(0, limit);
   const maxRevenue = topProducts[0]?.revenue || 1;
@@ -60,7 +86,7 @@ export const TopProductsCompact = ({ data, limit = 8 }: TopProductsCompactProps)
                 <div className="flex items-center gap-2">
                   {getRankIcon(index)}
                   <span className="text-xs truncate flex-1" title={item.product}>
-                    {item.product.length > 22 ? item.product.substring(0, 22) + '...' : item.product}
+                    {compactProductName(item.product)}
                   </span>
                   <span className="text-xs font-medium text-right">
                     {formatCurrency(item.revenue)}
