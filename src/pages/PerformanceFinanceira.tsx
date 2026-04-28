@@ -25,11 +25,7 @@ import { ChannelDonutChart } from "@/components/dashboard/ChannelDonutChart";
 import { TopProductsCompact } from "@/components/dashboard/TopProductsCompact";
 import { TicketDistributionCompact } from "@/components/dashboard/TicketDistributionCompact";
 import { SeasonalityChart } from "@/components/dashboard/SeasonalityChart";
-import {
-  calculateFinancialMetrics,
-  analyzeSeasonality,
-  getPlatformPerformanceWithProducts,
-} from "@/utils/financialMetrics";
+import { calculateFinancialMetrics, analyzeSeasonality } from "@/utils/financialMetrics";
 import { filterOrdersByDateRange } from "@/utils/salesCalculator";
 import { getOfficialRevenue, getRevenueOrders, getComiDaDragaoOrders } from "@/utils/revenue";
 import { filterAdsByDateRange, filterAdsByObjective } from "@/utils/adsParserV2";
@@ -240,10 +236,8 @@ export default function PerformanceFinanceira() {
     ];
   }, [financialMetrics, financialGoals, roasMetrics]);
 
-  // Breakdown por canal + produtos
-  const platformWithProducts = useMemo(() => {
-    return getPlatformPerformanceWithProducts(periodOrders, 5);
-  }, [periodOrders]);
+  // R29: removido `platformWithProducts` — Demonstrativo Financeiro agora não
+  // mostra breakdown de canal (existe na pizza ChannelDonutChart).
 
   if (cdSalesData.length === 0) {
     return (
@@ -301,7 +295,10 @@ export default function PerformanceFinanceira() {
         </Card>
       )}
 
-      {/* ===== BLOCO 1: HERO METRICS ===== */}
+      {/* ===== BLOCO 1: HERO METRICS =====
+           R29: Receita vs Meta + Status das Metas lado a lado no topo.
+           Cards menores (Pedidos, Ticket, Itens, Receita Líq, Crescimento)
+           movidos pra row separada abaixo, em grid de 6 colunas. */}
       {!comparisonMode && financialMetrics && (
         <div className="grid gap-4 lg:grid-cols-2">
           <RevenueHeroCard
@@ -312,47 +309,53 @@ export default function PerformanceFinanceira() {
             revenueGoal={financialGoals.receita}
             costPercentage={financialGoals.custoFixo}
           />
+          <GoalsProgressCard goals={goalsData} />
+        </div>
+      )}
 
-          <div className="grid grid-cols-3 gap-2">
-            <StatusMetricCard
-              title="Pedidos"
-              value={financialMetrics.totalPedidos.toLocaleString("pt-BR")}
-              icon={<ShoppingCart className="h-3 w-3" />}
-              trend={variations?.orders}
-              size="compact"
-              tooltipKey="pedidos"
-            />
-            <StatusMetricCard
-              title="Ticket Médio"
-              value={formatCurrency(financialMetrics.ticketMedio)}
-              icon={<Receipt className="h-3 w-3" />}
-              size="compact"
-              tooltipKey="ticket_medio"
-            />
-            <StatusMetricCard
-              title="Ticket Real"
-              value={formatCurrency(financialMetrics.ticketMedioReal)}
-              icon={<TrendingUp className="h-3 w-3" />}
-              trend={variations?.ticket}
-              status={getStatusFromBenchmark(financialMetrics.ticketMedioReal, sectorBenchmarks.ticketMedio)}
-              size="compact"
-              tooltipKey="ticket_medio_real"
-            />
-            <StatusMetricCard
-              title="Itens/Pedido"
-              value={`${financialMetrics.produtoMedio.toFixed(1)}`}
-              icon={<Package className="h-3 w-3" />}
-              size="compact"
-              tooltipKey="itens_pedido"
-            />
-            <StatusMetricCard
-              title="Receita Líq."
-              value={formatCurrency(financialMetrics.faturamentoLiquido)}
-              icon={<DollarSign className="h-3 w-3" />}
-              status="neutral"
-              size="compact"
-              tooltipKey="receita_liquida"
-            />
+      {/* ===== BLOCO 2: CARDS MENORES (rearranjados na R29) ===== */}
+      {!comparisonMode && financialMetrics && (
+        <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          <StatusMetricCard
+            title="Pedidos"
+            value={financialMetrics.totalPedidosReais.toLocaleString("pt-BR")}
+            icon={<ShoppingCart className="h-3 w-3" />}
+            trend={variations?.orders}
+            size="compact"
+            tooltipKey="pedidos"
+          />
+          <StatusMetricCard
+            title="Ticket Médio"
+            value={formatCurrency(financialMetrics.ticketMedioReal)}
+            icon={<Receipt className="h-3 w-3" />}
+            trend={variations?.ticket}
+            status={getStatusFromBenchmark(financialMetrics.ticketMedioReal, sectorBenchmarks.ticketMedio)}
+            size="compact"
+            tooltipKey="ticket_medio_real"
+          />
+          <StatusMetricCard
+            title="Ticket Real"
+            value={formatCurrency(financialMetrics.ticketMedioReal)}
+            icon={<TrendingUp className="h-3 w-3" />}
+            status="neutral"
+            size="compact"
+            tooltipKey="ticket_medio_real"
+          />
+          <StatusMetricCard
+            title="Itens/Pedido"
+            value={`${financialMetrics.produtoMedio.toFixed(1)}`}
+            icon={<Package className="h-3 w-3" />}
+            size="compact"
+            tooltipKey="itens_pedido"
+          />
+          <StatusMetricCard
+            title="Receita Líq."
+            value={formatCurrency(financialMetrics.faturamentoLiquido)}
+            icon={<DollarSign className="h-3 w-3" />}
+            status="neutral"
+            size="compact"
+            tooltipKey="receita_liquida"
+          />
             <StatusMetricCard
               title="Crescimento"
               value={
@@ -381,7 +384,6 @@ export default function PerformanceFinanceira() {
               size="compact"
               tooltipKey="crescimento"
             />
-          </div>
         </div>
       )}
 
@@ -583,16 +585,14 @@ export default function PerformanceFinanceira() {
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <GoalsProgressCard goals={goalsData} />
-            <FinancialBreakdownCard
-              grossRevenue={financialMetrics.faturamentoBruto}
-              shippingCost={financialMetrics.freteTotal}
-              costPercentage={financialGoals.custoFixo}
-              platformBreakdown={platformWithProducts}
-              maxProductsPerChannel={5}
-            />
-          </div>
+          {/* R29: Goals movido pro topo (lado a lado com Receita vs Meta).
+               Demonstrativo Financeiro fica sozinho aqui — sem platform
+               breakdown (já tem na pizza ChannelDonutChart). */}
+          <FinancialBreakdownCard
+            grossRevenue={financialMetrics.faturamentoBruto}
+            shippingCost={financialMetrics.freteTotal}
+            costPercentage={financialGoals.custoFixo}
+          />
         </div>
       )}
     </div>

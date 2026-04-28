@@ -25,25 +25,16 @@ export const TicketDistributionCompact = ({
   averageTicket,
   rawOrders,
 }: TicketDistributionCompactProps) => {
-  // R28: filtro pedidos só-amostra usando `filterRealOrders` (canônico em
-  // samplesAnalyzer — detecta amostras por keywords nos produtos E faixa de
-  // preço R$0,01–R$1,00). Antes filtrava só por `ecommerce !== "Brindes/Remessas"`
-  // que não pega amostras vendidas como produto comum (ex.: ticket R$ 1,00 com
-  // produto chamado "Amostra"). Resultado: 271 pedidos de R$ 0-50 incluíam
-  // muito ruído de amostra, distorcendo Ticket Médio pra R$ 29.
-  const { displayData, ticketMedio } = useMemo(() => {
-    if (!rawOrders) {
-      return { displayData: data, ticketMedio: averageTicket };
-    }
-    const realOrders = filterRealOrders(rawOrders);
-    const newDistribution = getOrderValueDistribution(realOrders);
-    const receitaExFrete = realOrders.reduce(
-      (sum, o) => sum + (o.valorTotal - (o.valorFrete || 0)),
-      0,
-    );
-    const newAvg = realOrders.length > 0 ? receitaExFrete / realOrders.length : 0;
-    return { displayData: newDistribution, ticketMedio: newAvg };
-  }, [data, averageTicket, rawOrders]);
+  // R28+R29: filtro pedidos só-amostra via `filterRealOrders` pra distribuição
+  // estatística. Mas pra "Ticket Médio" usa o `averageTicket` prop direto —
+  // que vem de financialMetrics.ticketMedioReal (fonte canônica, exibida
+  // também no header como "Ticket Real"). Antes recalculava ex-frete localmente
+  // gerando R$ 85 enquanto header mostrava R$ 112,55. Agora os dois batem.
+  const displayData = useMemo(() => {
+    if (!rawOrders) return data;
+    return getOrderValueDistribution(filterRealOrders(rawOrders));
+  }, [data, rawOrders]);
+  const ticketMedio = averageTicket;
 
   const maxPercentage = Math.max(...displayData.map((d) => d.percentage));
 
