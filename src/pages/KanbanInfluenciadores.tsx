@@ -1563,7 +1563,7 @@ export default function KanbanInfluenciadores() {
   const byStatus = useMemo(() => {
     const map: Record<InfluencerStatus, Influencer[]> = {
       prospeccao: [], reativacao: [], em_contato: [], registrado_inflows: [],
-      seeding_enviado: [], postou: [], parceiro: [], inativo: [],
+      seeding_enviado: [], postou: [], eventos: [], parceiro: [], inativo: [],
     };
     for (const i of influencers) map[i.status]?.push(i);
     // Na coluna Prospecção: quem tem Instagram primeiro, só TikTok depois
@@ -1672,7 +1672,7 @@ export default function KanbanInfluenciadores() {
     const colLabel: Record<InfluencerStatus, string> = {
       prospeccao: "Prospecção", reativacao: "Reativação", em_contato: "Em Contato",
       registrado_inflows: "Registrado Inflows",
-      seeding_enviado: "Seeding Enviado", postou: "Postou", parceiro: "Parceiro", inativo: "Inativo",
+      seeding_enviado: "Seeding Enviado", postou: "Postou", eventos: "Eventos", parceiro: "Parceiro", inativo: "Inativo",
     };
     const rows = rawInfluencers.map((i) => ({
       Nome: i.nome,
