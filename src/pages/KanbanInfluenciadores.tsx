@@ -1768,54 +1768,8 @@ export default function KanbanInfluenciadores() {
         </div>
       </div>
 
-      {/* R32: gráfico de evolução de creators movido pra DEPOIS do kanban
-           (feedback Bruno 30/04 — atrapalhava operacionalmente entre header
-            e board). Render dele agora vive logo depois do </DndContext> abaixo. */}
-
-      {search && (
-        <div className="text-xs text-muted-foreground">
-          {influencers.length} resultado{influencers.length !== 1 ? "s" : ""} para
-          {" "}<strong>"{search}"</strong>
-        </div>
-      )}
-
-      {isLoading && (
-        <div className="text-sm text-muted-foreground py-8 text-center">Carregando...</div>
-      )}
-
-      {/* Board */}
-      {!isLoading && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {COLUMNS.map((col) => (
-              <KanbanCol
-                key={col.key}
-                col={col}
-                influencers={byStatus[col.key]}
-                onEdit={(i) => setEditing(i)}
-                onDelete={handleDelete}
-                responsaveisMap={responsaveisMap}
-              />
-            ))}
-          </div>
-          <DragOverlay>
-            {activeInfluencer && (
-              <div className="bg-white border rounded-lg p-3 shadow-lg w-64 opacity-90">
-                <div className="font-medium text-sm">{activeInfluencer.nome}</div>
-                {activeInfluencer.instagram && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                    <Instagram className="h-3 w-3" />
-                    @{normalizeInstagram(activeInfluencer.instagram)}
-                  </div>
-                )}
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
-      )}
-
-      {/* R32: gráfico de evolução movido pra cá (depois do kanban). Antes vinha
-           entre o header e o board, comprimindo o espaço operacional. */}
+      {/* R32-rev: gráfico de evolução de creators de volta ACIMA do kanban
+           (decisão Bruno 02/05 — embaixo ficou ruim, prefere no topo). */}
       {!isLoading && weeklyChartData.length > 0 && (
         <div className="rounded-lg border bg-card p-4 space-y-2 w-full max-w-[1072px] overflow-hidden">
           <div className="flex items-center gap-2">
@@ -1884,6 +1838,48 @@ export default function KanbanInfluenciadores() {
             </span>
           </div>
         </div>
+      )}
+
+      {search && (
+        <div className="text-xs text-muted-foreground">
+          {influencers.length} resultado{influencers.length !== 1 ? "s" : ""} para
+          {" "}<strong>"{search}"</strong>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="text-sm text-muted-foreground py-8 text-center">Carregando...</div>
+      )}
+
+      {/* Board */}
+      {!isLoading && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {COLUMNS.map((col) => (
+              <KanbanCol
+                key={col.key}
+                col={col}
+                influencers={byStatus[col.key]}
+                onEdit={(i) => setEditing(i)}
+                onDelete={handleDelete}
+                responsaveisMap={responsaveisMap}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeInfluencer && (
+              <div className="bg-white border rounded-lg p-3 shadow-lg w-64 opacity-90">
+                <div className="font-medium text-sm">{activeInfluencer.nome}</div>
+                {activeInfluencer.instagram && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                    <Instagram className="h-3 w-3" />
+                    @{normalizeInstagram(activeInfluencer.instagram)}
+                  </div>
+                )}
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* Dialogs */}
