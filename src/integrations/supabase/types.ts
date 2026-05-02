@@ -2106,6 +2106,18 @@ export type Database = {
       }
     }
     Views: {
+      customer_duplicate_groups: {
+        Row: {
+          group_key: string | null
+          group_size: number | null
+          members: Json | null
+          primary_id: string | null
+          primary_nome: string | null
+          total_orders_in_group: number | null
+          total_revenue_in_group: number | null
+        }
+        Relationships: []
+      }
       customer_full: {
         Row: {
           average_days_between_purchases: number | null
@@ -2204,6 +2216,13 @@ export type Database = {
       }
     }
     Functions: {
+      auto_merge_cpf_dups: {
+        Args: { p_limit?: number }
+        Returns: {
+          groups_processed: number
+          secondaries_merged: number
+        }[]
+      }
       bulk_update_effective_status: {
         Args: { updates: Json }
         Returns: undefined
