@@ -23,6 +23,7 @@ import VisaoExecutivaV2 from "./pages/VisaoExecutivaV2";
 import Clientes from "./pages/Clientes";
 import ClientePerfil from "./pages/ClientePerfil";
 import ImportarClientesShopify from "./pages/ImportarClientesShopify";
+import ClientesDuplicatas from "./pages/ClientesDuplicatas";
 import Reclamacoes from "./pages/Reclamacoes";
 import Atendimentos from "./pages/Atendimentos";
 import ReclamacaoNova from "./pages/ReclamacaoNova";
@@ -222,6 +223,19 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <ImportarClientesShopify />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* R31-B: rota estática deve vir ANTES de /clientes/:cpfCnpj
+              senão "duplicatas" é capturado como cpfCnpj. */}
+          <Route
+            path="/clientes/duplicatas"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ClientesDuplicatas />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }

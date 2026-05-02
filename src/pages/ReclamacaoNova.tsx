@@ -46,6 +46,11 @@ interface CustomerOption {
   id: string;
   nome: string | null;
   cpf_cnpj: string;
+  // R31-B: contagem de pedidos exibida no autocomplete pra ajudar
+  // a desambiguar duplicatas (ex: 2 "Maitê Romão" — uma com 0 pedidos,
+  // outra com 4). Lê de customer.total_orders_revenue (já populado).
+  total_orders_revenue: number | null;
+  total_orders_all: number | null;
 }
 
 interface OrderRow {
@@ -107,7 +112,7 @@ export default function ReclamacaoNova() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customer")
-        .select("id, nome, cpf_cnpj")
+        .select("id, nome, cpf_cnpj, total_orders_revenue, total_orders_all")
         .eq("is_active", true)
         .limit(5000);
       if (error) throw error;
@@ -144,12 +149,17 @@ export default function ReclamacaoNova() {
   }, [selectedOrder]);
 
   // Customer search filtering
+  // R31-B: ordena por número de pedidos (desc) — assim quando há
+  // homônimos/duplicatas, o cliente "real" (com pedidos NF) aparece
+  // antes do lead Shopify provisório (sem pedidos).
   const filteredCustomers = useMemo(() => {
     if (!customerSearch || customerSearch.length < 2) return [];
     const q = customerSearch.toLowerCase();
-    return allCustomers
-      .filter((c) => (c.nome ?? "").toLowerCase().includes(q) || c.cpf_cnpj.toLowerCase().includes(q))
-      .slice(0, 20);
+    const matches = allCustomers.filter(
+      (c) => (c.nome ?? "").toLowerCase().includes(q) || c.cpf_cnpj.toLowerCase().includes(q),
+    );
+    matches.sort((a, b) => (b.total_orders_revenue ?? 0) - (a.total_orders_revenue ?? 0));
+    return matches.slice(0, 20);
   }, [allCustomers, customerSearch]);
 
   // --- Handlers ---
@@ -267,15 +277,28 @@ export default function ReclamacaoNova() {
         </CardHeader>
         <CardContent>
           {selectedCustomer ? (
-            <div className="flex items-center gap-2 p-3 rounded-md border bg-muted/50">
-              <Badge variant="secondary" className="text-xs">
-                Selecionado
-              </Badge>
-              <span className="text-sm font-medium">{selectedCustomer.nome ?? "—"}</span>
-              <span className="text-xs text-muted-foreground ml-1">{formatCpfCnpj(selectedCustomer.cpf_cnpj)}</span>
-              <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={handleClearCustomer}>
-                <X className="h-3.5 w-3.5" />
-              </Button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 p-3 rounded-md border bg-muted/50">
+                <Badge variant="secondary" className="text-xs">
+                  Selecionado
+                </Badge>
+                <span className="text-sm font-medium">{selectedCustomer.nome ?? "—"}</span>
+                <span className="text-xs text-muted-foreground ml-1">{formatCpfCnpj(selectedCustomer.cpf_cnpj)}</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={handleClearCustomer}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {/* R31-B: warning quando cliente selecionado não tem pedidos —
+                   típico de lead Shopify duplicado. Mostra link pra trocar. */}
+              {(selectedCustomer.total_orders_revenue ?? 0) === 0 && (
+                <div className="flex items-start gap-2 text-xs px-3 py-2 rounded-md border border-amber-300 bg-amber-50 text-amber-800">
+                  <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <div>
+                    Este cliente não tem pedidos registrados. Pode ser uma duplicata —
+                    procure outro cliente com o mesmo nome que tenha pedidos antes de continuar.
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -289,18 +312,38 @@ export default function ReclamacaoNova() {
                 />
               </div>
               {filteredCustomers.length > 0 && (
-                <div className="border rounded-md max-h-[200px] overflow-y-auto divide-y">
-                  {filteredCustomers.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm flex justify-between items-center"
-                      onClick={() => handleSelectCustomer(c)}
-                    >
-                      <span className="font-medium">{c.nome ?? "—"}</span>
-                      <span className="text-xs text-muted-foreground">{formatCpfCnpj(c.cpf_cnpj)}</span>
-                    </button>
-                  ))}
+                <div className="border rounded-md max-h-[260px] overflow-y-auto divide-y">
+                  {filteredCustomers.map((c) => {
+                    // R31-B: badge "sem pedidos" alerta visualmente quando
+                    // o cliente é provisório/lead Shopify e provavelmente
+                    // existe duplicata com pedidos reais. Ver feedback
+                    // Beatriz 22/04 (Maitê Romão).
+                    const orders = c.total_orders_revenue ?? 0;
+                    const hasOrders = orders > 0;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm flex justify-between items-center gap-2"
+                        onClick={() => handleSelectCustomer(c)}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-medium truncate">{c.nome ?? "—"}</span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {formatCpfCnpj(c.cpf_cnpj)}
+                          </span>
+                        </div>
+                        <Badge
+                          variant={hasOrders ? "secondary" : "outline"}
+                          className={`text-[10px] shrink-0 ${
+                            hasOrders ? "" : "border-amber-400 text-amber-700"
+                          }`}
+                        >
+                          {hasOrders ? `${orders} pedido${orders > 1 ? "s" : ""}` : "sem pedidos"}
+                        </Badge>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -12,6 +12,9 @@ interface Customer {
   id: string | null;
   nome: string | null;
   cpf_cnpj: string | null;
+  // R31-B: opcional pra desambiguar duplicatas (mostra "(N pedidos)").
+  // Atendimentos passa `customers` do useCustomersOperational onde já vem.
+  total_orders_revenue?: number | null;
 }
 
 interface Props {
@@ -33,12 +36,17 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
   const [resultado, setResultado] = useState("");
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
+  // R31-B: ordena por número de pedidos (desc) — quando há homônimos
+  // (lead Shopify sem pedidos vs cliente NF com pedidos), o que tem
+  // pedidos aparece antes pra evitar Beatriz selecionar a duplicata vazia.
   const filteredCustomers = useMemo(() => {
     if (!customerSearch || customerSearch.length < 2) return [];
     const q = customerSearch.toLowerCase();
-    return customers
-      .filter(c => c.id && ((c.nome ?? '').toLowerCase().includes(q) || (c.cpf_cnpj ?? '').toLowerCase().includes(q)))
-      .slice(0, 10);
+    const matches = customers.filter(
+      c => c.id && ((c.nome ?? '').toLowerCase().includes(q) || (c.cpf_cnpj ?? '').toLowerCase().includes(q)),
+    );
+    matches.sort((a, b) => (b.total_orders_revenue ?? 0) - (a.total_orders_revenue ?? 0));
+    return matches.slice(0, 10);
   }, [customers, customerSearch]);
 
   // Detecta se o que o usuário digitou é um CPF/CNPJ (só dígitos)
@@ -101,21 +109,38 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
                 />
                 {customerSearch.length >= 2 && (
                   <div className="border rounded-md max-h-48 overflow-y-auto">
-                    {filteredCustomers.map(c => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
-                        onClick={() => {
-                          setSelectedCustomerId(c.id!);
-                          setSelectedCustomerName(c.nome ?? c.cpf_cnpj ?? '');
-                          setCustomerSearch("");
-                        }}
-                      >
-                        <span className="font-medium">{c.nome ?? '—'}</span>
-                        <span className="text-muted-foreground ml-2 text-xs">{c.cpf_cnpj}</span>
-                      </button>
-                    ))}
+                    {filteredCustomers.map(c => {
+                      // R31-B: contagem de pedidos no autocomplete +
+                      // badge "sem pedidos" pra alertar duplicata.
+                      const orders = c.total_orders_revenue ?? 0;
+                      const hasOrders = orders > 0;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center justify-between gap-2"
+                          onClick={() => {
+                            setSelectedCustomerId(c.id!);
+                            setSelectedCustomerName(c.nome ?? c.cpf_cnpj ?? '');
+                            setCustomerSearch("");
+                          }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="font-medium">{c.nome ?? '—'}</span>
+                            <span className="text-muted-foreground ml-2 text-xs">{c.cpf_cnpj}</span>
+                          </div>
+                          <span
+                            className={`text-[10px] shrink-0 px-1.5 py-0.5 rounded-full border ${
+                              hasOrders
+                                ? "bg-secondary text-secondary-foreground border-transparent"
+                                : "border-amber-400 text-amber-700 bg-amber-50"
+                            }`}
+                          >
+                            {hasOrders ? `${orders} ped.` : "sem pedidos"}
+                          </span>
+                        </button>
+                      );
+                    })}
                     <button
                       type="button"
                       className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors border-t flex items-center gap-2 text-primary"

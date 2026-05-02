@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowUpDown, ExternalLink, Download, Plus, Upload as UploadIcon, Mail, Phone } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Download, Plus, Upload as UploadIcon, Mail, Phone, Users as UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import { isOnlySampleOrder } from "@/utils/samplesAnalyzer";
 import { BuyerPetProfile, PET_PROFILE_LABELS, PET_PROFILE_COLORS, PET_PROFILE_ORDER } from "@/data/operationalProducts";
@@ -543,6 +543,17 @@ export default function Clientes() {
           >
             <UploadIcon className="h-4 w-4" />
             Importar Shopify
+          </Button>
+          {/* R31-B: acesso à página de duplicatas (clientes com mesmo nome
+               criados pelo importer Shopify + NF). */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/clientes/duplicatas")}
+            className="flex items-center gap-2"
+          >
+            <UsersIcon className="h-4 w-4" />
+            Duplicatas
           </Button>
           <Button
             variant="outline"
