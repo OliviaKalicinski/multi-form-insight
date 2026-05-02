@@ -107,18 +107,30 @@ export default function ReclamacaoNova() {
   const [acaoOrientacao, setAcaoOrientacao] = useState("");
 
   // --- Queries ---
+  // R31-D: busca server-side com ilike + order por # pedidos.
+  // Antes era um SELECT massivo com .limit(5000) e filtro no front, o que
+  // (1) truncava clientes além dos 5000 primeiros (base >6k já estoura) e
+  // (2) misturava ordem aleatória, fazendo o cliente real ficar atrás de
+  // leads Shopify zerados. Agora cada keystroke ≥2 letras dispara busca
+  // server-side limitada a 50 hits, ordenada pelo cliente com mais pedidos.
   const { data: allCustomers = [] } = useQuery({
-    queryKey: ["customers-autocomplete"],
+    queryKey: ["customer-search", customerSearch],
     queryFn: async () => {
+      const q = customerSearch.trim();
+      if (q.length < 2) return [];
+      const pattern = `%${q}%`;
       const { data, error } = await supabase
         .from("customer")
         .select("id, nome, cpf_cnpj, total_orders_revenue, total_orders_all")
         .eq("is_active", true)
-        .limit(5000);
+        .or(`nome.ilike.${pattern},cpf_cnpj.ilike.${pattern}`)
+        .order("total_orders_revenue", { ascending: false, nullsFirst: false })
+        .limit(50);
       if (error) throw error;
-      return data as CustomerOption[];
+      return (data ?? []) as CustomerOption[];
     },
-    staleTime: 10 * 60 * 1000,
+    enabled: customerSearch.trim().length >= 2,
+    staleTime: 30 * 1000,
   });
 
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
@@ -148,19 +160,10 @@ export default function ReclamacaoNova() {
     return extractProducts(selectedOrder.produtos);
   }, [selectedOrder]);
 
-  // Customer search filtering
-  // R31-B: ordena por número de pedidos (desc) — assim quando há
-  // homônimos/duplicatas, o cliente "real" (com pedidos NF) aparece
-  // antes do lead Shopify provisório (sem pedidos).
-  const filteredCustomers = useMemo(() => {
-    if (!customerSearch || customerSearch.length < 2) return [];
-    const q = customerSearch.toLowerCase();
-    const matches = allCustomers.filter(
-      (c) => (c.nome ?? "").toLowerCase().includes(q) || c.cpf_cnpj.toLowerCase().includes(q),
-    );
-    matches.sort((a, b) => (b.total_orders_revenue ?? 0) - (a.total_orders_revenue ?? 0));
-    return matches.slice(0, 20);
-  }, [allCustomers, customerSearch]);
+  // R31-D: query agora já vem ordenada e filtrada do server, basta limitar
+  // a render a 20 itens. (B1: order por # pedidos = cliente real antes do
+  // lead Shopify duplicado.)
+  const filteredCustomers = useMemo(() => allCustomers.slice(0, 20), [allCustomers]);
 
   // --- Handlers ---
   const handleSelectCustomer = (c: CustomerOption) => {
