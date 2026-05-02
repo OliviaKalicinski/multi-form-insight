@@ -23,6 +23,7 @@ type InfluencerStatus =
   | "registrado_inflows"
   | "seeding_enviado"
   | "postou"
+  | "eventos"
   | "parceiro"
   | "inativo";
 
@@ -89,6 +90,11 @@ const COLUMNS: { key: InfluencerStatus; title: string; color: string; dot: strin
   { key: "registrado_inflows", title: "Registrado Inflows", color: "bg-sky-500/10 text-sky-700 border-sky-200",             dot: "bg-sky-500" },
   { key: "seeding_enviado",    title: "Seeding Enviado",    color: "bg-amber-500/10 text-amber-700 border-amber-200",       dot: "bg-amber-500" },
   { key: "postou",             title: "Postou",             color: "bg-purple-500/10 text-purple-700 border-purple-200",    dot: "bg-purple-500" },
+  // R32: nova coluna "Eventos" — entre Postou e Parceiro. Posição assumida
+  // (engajamento alta antes de virar parceiro consolidado). Ajustar se a
+  // Beatriz preferir outro local. Cor cyan escolhida pra contrastar com
+  // postou (purple) e parceiro (emerald) sem repetir tom.
+  { key: "eventos",            title: "Eventos",            color: "bg-cyan-500/10 text-cyan-700 border-cyan-200",          dot: "bg-cyan-500" },
   { key: "parceiro",           title: "Parceiro",           color: "bg-emerald-500/10 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
   { key: "inativo",            title: "Inativo",            color: "bg-gray-500/10 text-gray-500 border-gray-200",          dot: "bg-gray-400" },
 ];
@@ -137,7 +143,7 @@ function normalizeInstagram(v: string): string {
 
 const VALID_STATUSES: InfluencerStatus[] = [
   "prospeccao", "reativacao", "em_contato", "registrado_inflows",
-  "seeding_enviado", "postou", "parceiro", "inativo",
+  "seeding_enviado", "postou", "eventos", "parceiro", "inativo",
 ];
 
 // Accepts a raw value from the spreadsheet and returns a valid InfluencerStatus
@@ -165,6 +171,8 @@ function parseStatusFromSheet(raw: string): InfluencerStatus | null {
     seeding: "seeding_enviado",
     seeding_enviado: "seeding_enviado",
     postou: "postou",
+    evento: "eventos",
+    eventos: "eventos",
     parceiro: "parceiro",
     inativo: "inativo",
     reativacao: "reativacao",
@@ -1062,6 +1070,10 @@ export default function KanbanInfluenciadores() {
   const [importResultOpen, setImportResultOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filterResponsavel, setFilterResponsavel] = useState<string>("");
+  // R32: filtro adicional por Nicho (já existia opção de Responsável + busca).
+  // Beatriz pediu "opção de filtro no Kanban" (21/04). Nicho é o único campo
+  // categórico relevante além dos 2 que já filtram.
+  const [filterNicho, setFilterNicho] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Load from Supabase ──────────────────────────────────────────────────────
@@ -1138,13 +1150,25 @@ export default function KanbanInfluenciadores() {
     return new Set(responsavelIndex.filter((r: any) => r.responsavel_nome === filterResponsavel).map((r: any) => r.influencer_id));
   }, [responsavelIndex, filterResponsavel]);
 
-  // Filter by search query (matches nome, instagram, email, whatsapp) + responsável.
+  // R32: opções de nicho derivadas da base atual (não só do constante
+  // NICHO_OPTIONS), pra cobrir nichos custom que entraram via planilha.
+  const nichoOptions = useMemo(() => {
+    const s = new Set(rawInfluencers.map((i) => (i.nicho || "").trim()).filter(Boolean));
+    return Array.from(s).sort();
+  }, [rawInfluencers]);
+
+  // Filter by search query (matches nome, instagram, email, whatsapp) + responsável + nicho.
   const influencers = useMemo(() => {
     let list = rawInfluencers;
 
     // Filtro por responsável
     if (filteredByResponsavel) {
       list = list.filter((i) => filteredByResponsavel.has(i.id));
+    }
+
+    // R32: filtro por nicho
+    if (filterNicho) {
+      list = list.filter((i) => (i.nicho || "").trim() === filterNicho);
     }
 
     // Filtro por busca textual
@@ -1717,6 +1741,20 @@ export default function KanbanInfluenciadores() {
               </SelectContent>
             </Select>
           )}
+          {/* R32: filtro por Nicho */}
+          {nichoOptions.length > 0 && (
+            <Select value={filterNicho} onValueChange={(v) => setFilterNicho(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-40 h-9">
+                <SelectValue placeholder="Nicho" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos os nichos</SelectItem>
+                {nichoOptions.map((n) => (
+                  <SelectItem key={n} value={n}>{n}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
             <Upload className="h-4 w-4" /> Importar
@@ -1730,9 +1768,54 @@ export default function KanbanInfluenciadores() {
         </div>
       </div>
 
-      {/* Gráfico trimestral — Ritmo semanal de crescimento da base de parceiros */}
-      {/* Largura alinhada com as 4 primeiras colunas do kanban:
-         4 × w-64 (256px) + 3 × gap-4 (16px) = 1072px */}
+      {/* R32: gráfico de evolução de creators movido pra DEPOIS do kanban
+           (feedback Bruno 30/04 — atrapalhava operacionalmente entre header
+            e board). Render dele agora vive logo depois do </DndContext> abaixo. */}
+
+      {search && (
+        <div className="text-xs text-muted-foreground">
+          {influencers.length} resultado{influencers.length !== 1 ? "s" : ""} para
+          {" "}<strong>"{search}"</strong>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="text-sm text-muted-foreground py-8 text-center">Carregando...</div>
+      )}
+
+      {/* Board */}
+      {!isLoading && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {COLUMNS.map((col) => (
+              <KanbanCol
+                key={col.key}
+                col={col}
+                influencers={byStatus[col.key]}
+                onEdit={(i) => setEditing(i)}
+                onDelete={handleDelete}
+                responsaveisMap={responsaveisMap}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeInfluencer && (
+              <div className="bg-white border rounded-lg p-3 shadow-lg w-64 opacity-90">
+                <div className="font-medium text-sm">{activeInfluencer.nome}</div>
+                {activeInfluencer.instagram && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                    <Instagram className="h-3 w-3" />
+                    @{normalizeInstagram(activeInfluencer.instagram)}
+                  </div>
+                )}
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
+
+      {/* R32: gráfico de evolução movido pra cá (depois do kanban). Antes vinha
+           entre o header e o board, comprimindo o espaço operacional. */}
       {!isLoading && weeklyChartData.length > 0 && (
         <div className="rounded-lg border bg-card p-4 space-y-2 w-full max-w-[1072px] overflow-hidden">
           <div className="flex items-center gap-2">
@@ -1801,48 +1884,6 @@ export default function KanbanInfluenciadores() {
             </span>
           </div>
         </div>
-      )}
-
-      {search && (
-        <div className="text-xs text-muted-foreground">
-          {influencers.length} resultado{influencers.length !== 1 ? "s" : ""} para
-          {" "}<strong>"{search}"</strong>
-        </div>
-      )}
-
-      {isLoading && (
-        <div className="text-sm text-muted-foreground py-8 text-center">Carregando...</div>
-      )}
-
-      {/* Board */}
-      {!isLoading && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {COLUMNS.map((col) => (
-              <KanbanCol
-                key={col.key}
-                col={col}
-                influencers={byStatus[col.key]}
-                onEdit={(i) => setEditing(i)}
-                onDelete={handleDelete}
-                responsaveisMap={responsaveisMap}
-              />
-            ))}
-          </div>
-          <DragOverlay>
-            {activeInfluencer && (
-              <div className="bg-white border rounded-lg p-3 shadow-lg w-64 opacity-90">
-                <div className="font-medium text-sm">{activeInfluencer.nome}</div>
-                {activeInfluencer.instagram && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                    <Instagram className="h-3 w-3" />
-                    @{normalizeInstagram(activeInfluencer.instagram)}
-                  </div>
-                )}
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
       )}
 
       {/* Dialogs */}
