@@ -103,8 +103,12 @@ export default function Clientes() {
   const { customers, isLoading } = useCustomersOperational();
   const { salesData } = useDashboard();
 
-  // View mode — separa clientes com compra dos leads/provisórios
-  const [viewMode, setViewMode] = useState<ViewMode>("customers");
+  // View mode — separa clientes com compra dos leads/provisórios.
+  // R31-A: default "all" pra cliente recém-cadastrado (sem 1ª compra ainda,
+  // ergo `is_provisional=true`) aparecer imediatamente. Antes era "customers"
+  // e o cliente novo sumia silenciosamente na aba Leads — feedback
+  // "Novos clientes não estão na lista" (09/04/2026).
+  const [viewMode, setViewMode] = useState<ViewMode>("all");
 
   const [sortKey, setSortKey] = useState<SortKey>("total_revenue");
   const [sortAsc, setSortAsc] = useState(false);
@@ -560,7 +564,14 @@ export default function Clientes() {
       <NewCustomerDialog
         open={newCustomerOpen}
         onOpenChange={setNewCustomerOpen}
-        onCreated={(c) => navigate(`/clientes/${encodeURIComponent(c.cpf_cnpj)}`)}
+        onCreated={(c) => {
+          // R31-A: garante que o cliente recém-criado vai estar visível
+          // quando o usuário voltar pra lista (cliente novo é provisório
+          // até a 1ª compra; ficaria escondido se o viewMode estivesse
+          // em "customers").
+          setViewMode("all");
+          navigate(`/clientes/${encodeURIComponent(c.cpf_cnpj)}`);
+        }}
       />
 
       {/* Tabs de visão — Clientes / Leads / Todos */}
