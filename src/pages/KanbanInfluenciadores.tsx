@@ -14,7 +14,6 @@ import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCirc
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
-import { PartnerGrowthChart } from "@/components/influenciadores/PartnerGrowthChart";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type InfluencerStatus =
@@ -1769,9 +1768,9 @@ export default function KanbanInfluenciadores() {
         </div>
       </div>
 
-      {/* R32: gráfico de evolução agora vive no componente compartilhado
-           PartnerGrowthChart, também usado em /visao-executiva-v2. */}
-      {!isLoading && <PartnerGrowthChart />}
+      {/* R33: gráfico de evolução de creators removido daqui (decisão Bruno
+           02/05 — Kanban é 100% operacional). Vive agora só em
+           /visao-executiva-v2 via PartnerGrowthChart. */}
 
       {search && (
         <div className="text-xs text-muted-foreground">
