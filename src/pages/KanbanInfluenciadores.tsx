@@ -14,6 +14,7 @@ import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCirc
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
+import { PartnerGrowthChart } from "@/components/influenciadores/PartnerGrowthChart";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type InfluencerStatus =
@@ -1768,77 +1769,9 @@ export default function KanbanInfluenciadores() {
         </div>
       </div>
 
-      {/* R32-rev: gráfico de evolução de creators de volta ACIMA do kanban
-           (decisão Bruno 02/05 — embaixo ficou ruim, prefere no topo). */}
-      {!isLoading && weeklyChartData.length > 0 && (
-        <div className="rounded-lg border bg-card p-4 space-y-2 w-full max-w-[1072px] overflow-hidden">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm font-semibold">Ritmo semanal — crescimento da base de parceiros</p>
-            <Badge variant="outline" className="text-[10px] ml-auto">
-              Trimestre {quarterRange.label}
-            </Badge>
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            Semanas passadas mostram a <strong>média histórica</strong> (base atual distribuída uniformemente). A partir da semana atual, cada barra é o <strong>número real</strong> de novos parceiros naquela semana, capturado pelo histórico de transições.
-          </p>
-          <ResponsiveContainer
-            width="100%"
-            height={Math.max(220, weeklyChartData.length * 28 + 60)}
-          >
-            <BarChart
-              data={weeklyChartData}
-              layout="vertical"
-              barCategoryGap="20%"
-              margin={{ top: 8, right: 24, bottom: 8, left: 8 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
-              <XAxis
-                type="number"
-                allowDecimals={false}
-                tick={{ fontSize: 11, fill: "#888" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                type="category"
-                dataKey="label"
-                tick={{ fontSize: 11, fill: "#888" }}
-                axisLine={false}
-                tickLine={false}
-                width={56}
-                interval={0}
-              />
-              <Tooltip
-                contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
-                formatter={(value: number, _name: string, item: any) => [
-                  value,
-                  item?.payload?.isPast ? "Média histórica (sintético)" : "Novos parceiros (real)",
-                ]}
-                labelFormatter={(label) => `Semana de ${label}`}
-              />
-              <Bar dataKey="parceiro" name="parceiro" radius={[0, 4, 4, 0]}>
-                {weeklyChartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.isPast ? "#d1d5db" : "#10b981"}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-3 h-3 rounded-sm bg-gray-300" />
-              Média histórica
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-3 h-3 rounded-sm bg-emerald-500" />
-              Novos parceiros (real)
-            </span>
-          </div>
-        </div>
-      )}
+      {/* R32: gráfico de evolução agora vive no componente compartilhado
+           PartnerGrowthChart, também usado em /visao-executiva-v2. */}
+      {!isLoading && <PartnerGrowthChart />}
 
       {search && (
         <div className="text-xs text-muted-foreground">

@@ -14,6 +14,7 @@ import { breakdownOrders } from "@/utils/orderBreakdown";
 import { classifyProductsByAnimal } from "@/utils/petProfile";
 import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
+import { PartnerGrowthChart } from "@/components/influenciadores/PartnerGrowthChart";
 import {
   format,
   startOfMonth,
@@ -1153,6 +1154,21 @@ const VisaoExecutivaV2 = () => {
           </>
         )}
       </SegmentSection>
+
+      {/* R32: quadro de controle da evolução de creators (decisão Bruno 02/05).
+           Antes vivia só em /influenciadores/kanban; agora compartilhado
+           via componente PartnerGrowthChart. */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Handshake className="h-4 w-4" />
+            Influenciadores — evolução de parceiros
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PartnerGrowthChart />
+        </CardContent>
+      </Card>
     </div>
   );
 };
