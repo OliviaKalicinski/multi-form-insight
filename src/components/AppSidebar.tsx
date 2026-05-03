@@ -68,7 +68,9 @@ const navSections: NavSection[] = [
     items: [
       { title: "Inteligência", url: "/inteligencia", icon: Brain },
       { title: "Fotografia Operacional", url: "/visao-executiva-v2", icon: LayoutDashboard },
-      { title: "Visão Executiva", url: "/dashboard", icon: LayoutDashboard },
+      // R35: "Visão Executiva" (/dashboard) removida do menu — KPIs estratégicos
+      // (CAC, LTV, LTV/CAC, 4 ROAS, evolução temporal) consolidados dentro de
+      // "Fotografia Operacional → Mundo Online (B2C)". Rota mantida pra debug.
       { title: "Kanban", url: "/kanban-operacional", icon: ClipboardList },
       { title: "Conciliação NF", url: "/kanban-conciliacao", icon: ClipboardList },
       { title: "Operações", url: "/operacoes", icon: Truck },

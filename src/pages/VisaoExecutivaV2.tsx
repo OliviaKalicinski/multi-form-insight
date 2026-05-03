@@ -15,6 +15,10 @@ import { classifyProductsByAnimal } from "@/utils/petProfile";
 import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
 import { PartnerGrowthChart } from "@/components/influenciadores/PartnerGrowthChart";
+import { RoasTrendChart } from "@/components/dashboard/RoasTrendChart";
+import { calculateExecutiveMetrics } from "@/utils/executiveMetricsCalculator";
+import { calculateAdsMetrics } from "@/utils/adsCalculator";
+import { filterAdsByObjective, filterAdsByDateRange } from "@/utils/adsParserV2";
 import {
   format,
   startOfMonth,
@@ -37,6 +41,9 @@ import {
   Globe,
   DollarSign,
   ShoppingCart,
+  Users,
+  Zap,
+  Target,
 } from "lucide-react";
 import {
   PieChart,
@@ -320,7 +327,7 @@ const SegmentSection = ({
 };
 
 const VisaoExecutivaV2 = () => {
-  const { salesData, isLoadingData } = useDashboard();
+  const { salesData, adsData, isLoadingData } = useDashboard();
   const [period, setPeriod] = useState<LocalPeriod | null>(null);
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -513,6 +520,45 @@ const VisaoExecutivaV2 = () => {
       amostrasMensais,
     };
   }, [filteredOrders, salesData, estadoSampleData, estadoProductData, sampleOrderIds, productOrderIds]);
+
+  // R35: KPIs estratégicos do B2C (CAC, LTV, LTV/CAC) — antes ficavam só
+  // na "Visão Executiva" (rota /dashboard, agora removida do menu).
+  // Usa calculateExecutiveMetrics que já consolidou as fórmulas (churn,
+  // novos clientes, CAC = investimento / novos, LTV = ticket × frequência).
+  const b2cExecutive = useMemo(() => {
+    if (!period || filteredOrders.length === 0 && adsData.length === 0) return null;
+    const adsForPeriod = period
+      ? filterAdsByDateRange(adsData, period.start, period.end)
+      : adsData;
+    return calculateExecutiveMetrics(filteredOrders, adsForPeriod, "all", "b2c");
+  }, [filteredOrders, adsData, period]);
+
+  // R35: 4 ROAS do B2C — Bruto, Real, Meta, Venda. Mesmas fórmulas
+  // de PerformanceFinanceira pra consistência.
+  const b2cRoas = useMemo(() => {
+    if (!period) return null;
+    const adsForPeriod = filterAdsByDateRange(adsData, period.start, period.end);
+    if (adsForPeriod.length === 0 && filteredOrders.length === 0) return null;
+    const adsMetrics = adsForPeriod.length > 0 ? calculateAdsMetrics(adsForPeriod) : null;
+    const investimento = adsMetrics?.investimentoTotal || 0;
+    const valorConversaoMeta = adsMetrics?.valorConversaoTotal || 0;
+    const vendasAds = filterAdsByObjective(adsForPeriod, "VENDAS");
+    const vendasMetrics = vendasAds.length > 0 ? calculateAdsMetrics(vendasAds) : null;
+    const investimentoVendas = vendasMetrics?.investimentoTotal || 0;
+    const valorConversaoVendas = vendasMetrics?.valorConversaoTotal || 0;
+    // Receita B2C ex-frete (denominador relevante pra ROAS Real do canal)
+    const b2cOrders = getB2COrders(filteredOrders).filter(isRevenueOrder);
+    const faturamentoTotal = b2cOrders.reduce((s, o) => s + getOfficialRevenue(o), 0);
+    const freteTotal = b2cOrders.reduce((s, o) => s + (o.valorFrete || 0), 0);
+    const faturamentoExFrete = faturamentoTotal - freteTotal;
+    return {
+      roasBruto: investimento > 0 ? faturamentoTotal / investimento : 0,
+      roasReal: investimento > 0 ? faturamentoExFrete / investimento : 0,
+      roasMeta: investimento > 0 ? valorConversaoMeta / investimento : 0,
+      roasVenda: investimentoVendas > 0 ? valorConversaoVendas / investimentoVendas : 0,
+      hasAds: adsForPeriod.length > 0,
+    };
+  }, [filteredOrders, adsData, period]);
 
   const buildOfflineMetrics = (seg: "b2b" | "b2b2c") => {
     const getOrders = seg === "b2b" ? getB2BOrders : getB2B2COrders;
@@ -809,6 +855,75 @@ const VisaoExecutivaV2 = () => {
             accentColor={B2C_COLOR}
           />
         </div>
+
+        {/* R35: KPIs estratégicos do B2C — vieram da antiga Visão Executiva */}
+        {b2cExecutive && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <KPICard
+              icon={Users}
+              label="CAC"
+              value={formatCurrency(b2cExecutive.clientes.cac)}
+              sub="Custo por Aquisição"
+              accentColor={B2C_COLOR}
+            />
+            <KPICard
+              icon={TrendingUp}
+              label="LTV"
+              value={formatCurrency(b2cExecutive.clientes.ltv)}
+              sub="Valor do Cliente"
+              accentColor={B2C_COLOR}
+            />
+            <KPICard
+              icon={Zap}
+              label="LTV/CAC"
+              value={
+                b2cExecutive.clientes.cac > 0
+                  ? `${(b2cExecutive.clientes.ltv / b2cExecutive.clientes.cac).toFixed(2)}x`
+                  : "—"
+              }
+              sub="Mínimo saudável: 3.0x"
+              accentColor={B2C_COLOR}
+            />
+          </div>
+        )}
+
+        {/* R35: 4 ROAS do B2C */}
+        {b2cRoas?.hasAds && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <KPICard
+              icon={DollarSign}
+              label="ROAS Bruto"
+              value={`${b2cRoas.roasBruto.toFixed(2)}x`}
+              sub="Receita total ÷ investimento"
+              accentColor={B2C_COLOR}
+            />
+            <KPICard
+              icon={DollarSign}
+              label="ROAS Real"
+              value={`${b2cRoas.roasReal.toFixed(2)}x`}
+              sub="Receita ex-frete ÷ investimento"
+              accentColor={B2C_COLOR}
+            />
+            <KPICard
+              icon={Target}
+              label="ROAS Meta"
+              value={`${b2cRoas.roasMeta.toFixed(2)}x`}
+              sub="Conversão Meta ÷ investimento"
+              accentColor={B2C_COLOR}
+            />
+            <KPICard
+              icon={Target}
+              label="ROAS Venda"
+              value={`${b2cRoas.roasVenda.toFixed(2)}x`}
+              sub="Só campanhas Vendas"
+              accentColor={B2C_COLOR}
+            />
+          </div>
+        )}
+
+        {/* R35: Evolução dos 4 ROAS no tempo (12 meses) */}
+        <RoasTrendChart salesData={salesData} adsData={adsData} monthsBack={12} />
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Faturamento mensal — últimos 12 meses</CardTitle>
