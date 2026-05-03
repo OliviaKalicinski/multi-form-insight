@@ -15,6 +15,7 @@ import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveCo
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { fixMojibake } from "@/utils/fixMojibake";
+import { toast } from "sonner";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type InfluencerStatus =
@@ -1196,13 +1197,20 @@ export default function KanbanInfluenciadores() {
   // via CSV antes ou arquivados). INSERT batia em constraint unique de
   // instagram/email e falhava silenciosamente. UPSERT promove o registro
   // latente ao status escolhido no formulário.
+  // R36: WHERE agora por `id` (era por `instagram`) e `.select()` pra detectar
+  // zero rows. Antes: edição de nome silenciosamente "salvava" mas o UPDATE
+  // não afetava nenhuma linha porque `editing.instagram` podia divergir do
+  // valor exato no DB (aspas/espaços/case). Agora usa o id (UUID, imutável)
+  // e checa se UPDATE realmente afetou alguma row. Adicionado também
+  // onError pra surfacing de qualquer falha futura.
   const upsertMutation = useMutation({
     mutationFn: async (payload: {
+      id?: string;
       instagram: string;
       data: Record<string, unknown>;
       isNew: boolean;
     }) => {
-      const { instagram, data, isNew } = payload;
+      const { id, instagram, data, isNew } = payload;
       if (isNew) {
         const { error } = await (supabase.from("influencer_registry") as any).upsert(
           [data],
@@ -1210,14 +1218,31 @@ export default function KanbanInfluenciadores() {
         );
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("influencer_registry")
-          .update(data as any)
-          .eq("instagram", instagram);
+        // Match por id (preferido) ou cai pra instagram como fallback de
+        // retrocompatibilidade — handleAdd ainda chama sem id quando o
+        // registro vem só do CSV recém-importado.
+        let query = supabase.from("influencer_registry").update(data as any);
+        if (id) {
+          query = query.eq("id", id);
+        } else {
+          query = query.eq("instagram", instagram);
+        }
+        const { data: result, error } = await query.select();
         if (error) throw error;
+        if (!result || result.length === 0) {
+          throw new Error(
+            "Nenhuma linha foi atualizada. Verifique se o registro existe e se você tem permissão.",
+          );
+        }
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kanban_influenciadores"] }),
+    onError: (err: Error) => {
+      // Mostra na UI ao invés de silenciar. Beatriz reportou (28/04) que
+      // edição de nome "não persistia" — sem onError, qualquer falha era
+      // invisível e a UI mostrava cache antigo.
+      toast.error(`Erro ao salvar: ${err.message}`);
+    },
   });
 
   // ── Status update mutation (drag-and-drop) ──────────────────────────────────
@@ -1305,7 +1330,9 @@ export default function KanbanInfluenciadores() {
 
   const handleEdit = (data: InfluencerFormData) => {
     if (!editing) return;
+    // R36: passa o id pra mutation usar como WHERE (mais seguro que instagram)
     upsertMutation.mutate({
+      id: editing.id,
       instagram: normalizeInstagram(editing.instagram),
       data: formToDbRow(data),
       isNew: false,
