@@ -14,6 +14,7 @@ import { Plus, Instagram, Users, Pencil, Trash2, Upload, CheckCircle2, AlertCirc
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
+import { fixMojibake } from "@/utils/fixMojibake";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type InfluencerStatus =
@@ -1385,7 +1386,8 @@ export default function KanbanInfluenciadores() {
 
   /** Mapeia uma row CSV de prospecção para o payload interno */
   const mapProspectionRow = (row: Record<string, string>, platform: "instagram" | "tiktok"): Record<string, unknown> => {
-    const nome = (row["Creator"] || "").trim();
+    // R34: fixMojibake corrige UTF-8 lido como Latin-1 ("EcolÃ³gico" → "Ecológico")
+    const nome = fixMojibake((row["Creator"] || "").trim());
     const username = (row["Username"] || "").trim().replace(/^@/, "");
     const linkCol = platform === "tiktok" ? (row["TikTok Link"] || "").trim() : (row["Instagram Link"] || "").trim();
     const handle = username || linkCol.replace(/^@/, "");
@@ -1420,7 +1422,9 @@ export default function KanbanInfluenciadores() {
 
   /** Mapeia uma row do formato interno (XLSX da planilha interna) */
   const mapInternalRow = (row: Record<string, string>): Record<string, unknown> => {
-    const nome = (row["name_full_text"] || "").trim();
+    // R34: fixMojibake aplicado em todos os campos texto (nome, endereço,
+    // razão social) pra corrigir mojibake do CSV antes de mandar pro DB.
+    const nome = fixMojibake((row["name_full_text"] || "").trim());
     const igRaw = (row["contact_instagram_text"] || "").trim();
     const igNorm = normalizeInstagram(igRaw);
 
@@ -1434,15 +1438,15 @@ export default function KanbanInfluenciadores() {
         tiktok: (row["contact_tiktok_text"] || "").trim().replace(/^@/, "") || null,
         whatsapp: (row["contact_whatsapp_text"] || "").trim() || null,
         email: (row["email"] || "").trim() || null,
-        address_logradouro: (row["address_logradouro_text"] || "").trim() || null,
+        address_logradouro: fixMojibake((row["address_logradouro_text"] || "").trim()) || null,
         address_numero: (row["address_numero_text"] || "").trim() || null,
-        address_complemento: (row["address_complemento_text"] || "").trim() || null,
-        address_bairro: (row["address_bairro_text"] || "").trim() || null,
+        address_complemento: fixMojibake((row["address_complemento_text"] || "").trim()) || null,
+        address_bairro: fixMojibake((row["address_bairro_text"] || "").trim()) || null,
         address_cep: (row["address_cep_text"] || "").trim() || null,
-        address_cidade: (row["address_cidade_text"] || "").trim() || null,
+        address_cidade: fixMojibake((row["address_cidade_text"] || "").trim()) || null,
         address_estado: (row["address_estado_text"] || "").trim().toUpperCase() || null,
         cnpj: (row["paym_pj_cnpj_text"] || "").trim() || null,
-        razao_social: (row["paym_pj_razao_social_text"] || "").trim() || null,
+        razao_social: fixMojibake((row["paym_pj_razao_social_text"] || "").trim()) || null,
         updated_at: new Date().toISOString(),
       },
     };
