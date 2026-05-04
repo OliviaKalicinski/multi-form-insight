@@ -1188,7 +1188,9 @@ export default function KanbanInfluenciadores() {
       norm(i.email).includes(nq) ||
       norm(i.whatsapp).includes(nq)
     );
-  }, [rawInfluencers, search, filteredByResponsavel]);
+    // R39 (auditoria #1): filterNicho estava faltando — filtro só "passava
+    // a valer" quando outra dep mudava. Adicionado.
+  }, [rawInfluencers, search, filteredByResponsavel, filterNicho]);
 
   // ── Upsert mutation (create or update) ─────────────────────────────────────
   // R13-2: quando isNew=true, usar UPSERT em vez de INSERT puro.

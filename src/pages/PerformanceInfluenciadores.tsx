@@ -434,10 +434,21 @@ export default function PerformanceInfluenciadores() {
   const totalGMV = useMemo(() => stats.reduce((s, r) => s + r.gmv, 0), [stats]);
   const totalCommission = useMemo(() => stats.reduce((s, r) => s + r.commission, 0), [stats]);
   const totalOrders = useMemo(() => stats.reduce((s, r) => s + r.total_orders, 0), [stats]);
-  const totalBonificado = useMemo(
-    () => bonifFiltered.reduce((s, r) => s + (r.valor_total || 0), 0),
-    [bonifFiltered]
-  );
+  // R39 (auditoria #3): totalBonificado agora SOMA APENAS NFs casadas com
+  // alguma influenciadora (via cupom OU email). Antes incluía bonifFiltered
+  // inteira — incluindo NFs órfãs (sem influenciadora associada) — o que
+  // inflava artificialmente o investimento e puxava ROI pra baixo.
+  // Decisão Bruno 04/05 (a): excluir órfãs do total investido.
+  const totalBonificado = useMemo(() => {
+    let total = 0;
+    for (const list of bonifByCoupon.values()) {
+      total += list.reduce((s, r) => s + (r.valor_total || 0), 0);
+    }
+    for (const list of bonifByInfluencer.values()) {
+      total += list.reduce((s, r) => s + (r.valor_total || 0), 0);
+    }
+    return total;
+  }, [bonifByCoupon, bonifByInfluencer]);
   const totalInvestido  = totalCommission + totalBonificado;
   const lucroLiquido    = totalGMV - totalInvestido;
   const roiMedio        = totalInvestido > 0 ? totalGMV / totalInvestido : null;
@@ -445,19 +456,22 @@ export default function PerformanceInfluenciadores() {
   // ── Chart data ────────────────────────────────────────────────────────────
 
   // GMV mensal
+  // R39 (auditoria #2): antes a query vinha desc por data e o sort do gráfico
+  // usava `findIndex` na lista — resultado ficava com mês mais recente PRIMEIRO
+  // no eixo X (cronologia invertida). Tendência de crescimento aparecia como
+  // queda visual. Refatorado pra Map com sortKey numérico (ano*12+mês).
   const gmvByMonth = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { gmv: number; sortKey: number }>();
     for (const row of filteredRows) {
       const key = format(row.date_sale, "MMM/yy", { locale: ptBR });
-      map.set(key, (map.get(key) || 0) + row.order_value);
+      const sortKey = row.date_sale.getFullYear() * 12 + row.date_sale.getMonth();
+      const cur = map.get(key) ?? { gmv: 0, sortKey };
+      cur.gmv += row.order_value;
+      map.set(key, cur);
     }
     return Array.from(map.entries())
-      .sort((a, b) => {
-        const aIdx = filteredRows.findIndex(r => format(r.date_sale, "MMM/yy", { locale: ptBR }) === a[0]);
-        const bIdx = filteredRows.findIndex(r => format(r.date_sale, "MMM/yy", { locale: ptBR }) === b[0]);
-        return aIdx - bIdx;
-      })
-      .map(([month, gmv]) => ({ month, gmv: parseFloat(gmv.toFixed(2)) }));
+      .sort((a, b) => a[1].sortKey - b[1].sortKey)
+      .map(([month, { gmv }]) => ({ month, gmv: parseFloat(gmv.toFixed(2)) }));
   }, [filteredRows]);
 
   // Top 10 por GMV
@@ -557,7 +571,10 @@ export default function PerformanceInfluenciadores() {
       return sortAsc ? an - bn : bn - an;
     });
     return list;
-  }, [stats, search, sortField, sortAsc, bonifByCoupon]);
+    // R39 (auditoria #4): influencerByCoupon estava faltando — busca por
+    // nome/instagram só passava a filtrar quando outra dep mudava se o
+    // cadastro chegasse depois das vendas.
+  }, [stats, search, sortField, sortAsc, bonifByCoupon, influencerByCoupon]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortAsc(!sortAsc);

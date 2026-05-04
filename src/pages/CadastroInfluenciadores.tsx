@@ -802,7 +802,9 @@ export default function CadastroInfluenciadores() {
     });
 
     return list;
-  }, [influencersData, search, sortField, sortAsc]);
+    // R39 (auditoria #4): perfStats faltava — sort por GMV usava valores
+    // antigos/zerados quando salesData chegava depois do cadastro.
+  }, [influencersData, search, sortField, sortAsc, perfStats]);
 
   const linkedCount = influencersData.filter((i) => !!i.coupon).length;
 
