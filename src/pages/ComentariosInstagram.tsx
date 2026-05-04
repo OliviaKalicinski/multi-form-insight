@@ -17,6 +17,7 @@ import {
   ShoppingBag,
   ExternalLink,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -118,6 +119,8 @@ export default function ComentariosInstagram() {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+  // R44: estado da sugestão LLM
+  const [suggestingFor, setSuggestingFor] = useState<string | null>(null);
 
   const fetchComments = async () => {
     setLoading(true);
@@ -186,6 +189,40 @@ export default function ComentariosInstagram() {
 
   const handleSync = () => doSync("delta");
   const handleSyncAll = () => doSync("full");
+
+  // R44: pede sugestão ao Claude (sonnet-4-6) e prefilla a textarea.
+  const handleSuggest = async (comment: Comment) => {
+    setSuggestingFor(comment.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("suggest-comment-reply", {
+        body: {
+          comment: {
+            text: comment.text,
+            username: comment.username,
+            sentimento: comment.sentimento,
+            categoria: comment.categoria,
+            media_caption: comment.media_caption,
+          },
+        },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error ?? "Erro ao gerar sugestão");
+      if (data.skipped) {
+        toast({
+          title: "Sem sugestão",
+          description: data.reason ?? "Comentário não recebeu sugestão.",
+          variant: "default",
+        });
+        return;
+      }
+      setReplyText(data.suggestion);
+      toast({ title: "Sugestão pronta", description: "Revise antes de enviar." });
+    } catch (e: any) {
+      toast({ title: "Erro na sugestão", description: e.message, variant: "destructive" });
+    } finally {
+      setSuggestingFor(null);
+    }
+  };
 
   const handleReply = async (comment: Comment) => {
     if (!replyText.trim()) return;
@@ -475,26 +512,40 @@ export default function ComentariosInstagram() {
                         rows={3}
                         autoFocus
                       />
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex gap-2 justify-between items-center">
+                        {/* R44: sugestão Claude (à esquerda — ação opcional antes de enviar) */}
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setReplyingTo(null);
-                            setReplyText("");
-                          }}
+                          onClick={() => handleSuggest(comment)}
+                          disabled={suggestingFor === comment.id || sendingReply}
+                          className="gap-1 text-xs"
+                          title="Gera resposta com Claude (voz Comida de Dragão). Você revisa antes de enviar."
                         >
-                          Cancelar
+                          <Sparkles className="h-3 w-3" />
+                          {suggestingFor === comment.id ? "Gerando..." : "Sugerir resposta"}
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleReply(comment)}
-                          disabled={sendingReply || !replyText.trim()}
-                          className="gap-1"
-                        >
-                          <Send className="h-3 w-3" />
-                          {sendingReply ? "Enviando..." : "Responder"}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setReplyingTo(null);
+                              setReplyText("");
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleReply(comment)}
+                            disabled={sendingReply || !replyText.trim()}
+                            className="gap-1"
+                          >
+                            <Send className="h-3 w-3" />
+                            {sendingReply ? "Enviando..." : "Responder"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )}

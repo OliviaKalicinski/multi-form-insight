@@ -13,3 +13,6 @@ verify_jwt = false
 
 [functions.import-shopify-customers]
 verify_jwt = false
+
+[functions.suggest-comment-reply]
+verify_jwt = false
