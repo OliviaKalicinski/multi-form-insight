@@ -11,9 +11,14 @@ export const SalesPeaksChart = ({ peaks }: SalesPeaksChartProps) => {
   // Pegar os top 20 dias com mais pedidos
   const topPeaks = peaks.slice(0, 20);
   
-  const average = topPeaks.length > 0 
-    ? topPeaks.reduce((sum, p) => sum + p.orders, 0) / topPeaks.length 
+  const average = peaks.length > 0 
+    ? peaks.reduce((sum, p) => sum + p.orders, 0) / peaks.length 
     : 0;
+  const variance = peaks.length > 0
+    ? peaks.reduce((sum, p) => sum + Math.pow(p.orders - average, 2), 0) / peaks.length
+    : 0;
+  const stdDev = Math.sqrt(variance);
+  const peakThreshold = average + 2 * stdDev;
 
   const formatXAxis = (value: string) => {
     try {
