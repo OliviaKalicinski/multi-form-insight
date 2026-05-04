@@ -510,7 +510,21 @@ export default function ComportamentoCliente() {
   const { churnMetrics, churnRiskCustomers, isLoading: customerLoading } = useCustomerData(sampleOnlyCpfSet);
   const { sectorBenchmarks } = useAppSettings();
 
-  const b2cSalesData = useMemo(() => getB2COrders(salesData), [salesData]);
+  // R42-fix: filtra TODOS os pedidos B2C dos CPFs só-amostra quando o toggle
+  // está ON. Isso propaga pro filteredOrders, journeyAnalysis, behaviorMetrics,
+  // volumeAnalysis, peaksData — toda métrica derivada respeita o filtro.
+  // Mantém CPFs com produto puro OU produto+amostra (Bruno: "quero ver o
+  // comportamento isolado do grupo que compraram produtos ou produtos+amostras").
+  const b2cSalesData = useMemo(() => {
+    let orders = getB2COrders(salesData);
+    if (sampleOnlyCpfSet && sampleOnlyCpfSet.size > 0) {
+      orders = orders.filter((o) => {
+        const cpf = String((o as any).cpfCnpj ?? "").replace(/\D/g, "");
+        return cpf && !sampleOnlyCpfSet.has(cpf);
+      });
+    }
+    return orders;
+  }, [salesData, sampleOnlyCpfSet]);
 
   const [volumeView, setVolumeView] = useState<"daily" | "weekly" | "monthly" | "quarterly">("daily");
 
