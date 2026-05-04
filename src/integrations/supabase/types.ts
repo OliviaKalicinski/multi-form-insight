@@ -456,6 +456,30 @@ export type Database = {
           },
         ]
       }
+      coupon_cleanup_audit_20260504: {
+        Row: {
+          coupon: string | null
+          email: string | null
+          id: string | null
+          instagram: string | null
+          name: string | null
+        }
+        Insert: {
+          coupon?: string | null
+          email?: string | null
+          id?: string | null
+          instagram?: string | null
+          name?: string | null
+        }
+        Update: {
+          coupon?: string | null
+          email?: string | null
+          id?: string | null
+          instagram?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
       customer: {
         Row: {
           average_days_between_purchases: number | null
@@ -687,9 +711,12 @@ export type Database = {
       }
       customer_contact_log: {
         Row: {
+          contato_email: string | null
+          contato_nome: string | null
+          contato_whatsapp: string | null
           created_at: string | null
           created_by: string | null
-          customer_id: string
+          customer_id: string | null
           data_contato: string
           id: string
           motivo: string | null
@@ -699,9 +726,12 @@ export type Database = {
           tipo: string | null
         }
         Insert: {
+          contato_email?: string | null
+          contato_nome?: string | null
+          contato_whatsapp?: string | null
           created_at?: string | null
           created_by?: string | null
-          customer_id: string
+          customer_id?: string | null
           data_contato?: string
           id?: string
           motivo?: string | null
@@ -711,9 +741,12 @@ export type Database = {
           tipo?: string | null
         }
         Update: {
+          contato_email?: string | null
+          contato_nome?: string | null
+          contato_whatsapp?: string | null
           created_at?: string | null
           created_by?: string | null
-          customer_id?: string
+          customer_id?: string | null
           data_contato?: string
           id?: string
           motivo?: string | null
@@ -865,6 +898,120 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           user_notes?: string | null
+        }
+        Relationships: []
+      }
+      financial_monthly: {
+        Row: {
+          caixa_bb: number | null
+          caixa_bb_finep: number | null
+          caixa_bradesco: number | null
+          caixa_cresol: number | null
+          caixa_itau: number | null
+          caixa_letsfly_editais: number | null
+          caixa_letsfly_proprio: number | null
+          caixa_total: number | null
+          caixa_xp: number | null
+          created_at: string | null
+          custos_fixos: number | null
+          custos_operacionais_total: number | null
+          custos_pessoal_op: number | null
+          custos_variaveis: number | null
+          despesas_financeiras: number | null
+          despesas_marketing: number | null
+          despesas_op_adm_total: number | null
+          despesas_pessoal_adm: number | null
+          ebitda: number | null
+          id: string
+          impostos_vendas: number | null
+          is_projecao: boolean | null
+          lucro_antes_impostos: number | null
+          lucro_bruto: number | null
+          lucro_liquido: number | null
+          mes: string
+          notas: string | null
+          receita_b2b: number | null
+          receita_b2b2c: number | null
+          receita_b2c: number | null
+          receita_bruta_total: number | null
+          receita_liquida: number | null
+          receitas_financeiras: number | null
+          resultado_financeiro: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          caixa_bb?: number | null
+          caixa_bb_finep?: number | null
+          caixa_bradesco?: number | null
+          caixa_cresol?: number | null
+          caixa_itau?: number | null
+          caixa_letsfly_editais?: number | null
+          caixa_letsfly_proprio?: number | null
+          caixa_total?: number | null
+          caixa_xp?: number | null
+          created_at?: string | null
+          custos_fixos?: number | null
+          custos_operacionais_total?: number | null
+          custos_pessoal_op?: number | null
+          custos_variaveis?: number | null
+          despesas_financeiras?: number | null
+          despesas_marketing?: number | null
+          despesas_op_adm_total?: number | null
+          despesas_pessoal_adm?: number | null
+          ebitda?: number | null
+          id?: string
+          impostos_vendas?: number | null
+          is_projecao?: boolean | null
+          lucro_antes_impostos?: number | null
+          lucro_bruto?: number | null
+          lucro_liquido?: number | null
+          mes: string
+          notas?: string | null
+          receita_b2b?: number | null
+          receita_b2b2c?: number | null
+          receita_b2c?: number | null
+          receita_bruta_total?: number | null
+          receita_liquida?: number | null
+          receitas_financeiras?: number | null
+          resultado_financeiro?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          caixa_bb?: number | null
+          caixa_bb_finep?: number | null
+          caixa_bradesco?: number | null
+          caixa_cresol?: number | null
+          caixa_itau?: number | null
+          caixa_letsfly_editais?: number | null
+          caixa_letsfly_proprio?: number | null
+          caixa_total?: number | null
+          caixa_xp?: number | null
+          created_at?: string | null
+          custos_fixos?: number | null
+          custos_operacionais_total?: number | null
+          custos_pessoal_op?: number | null
+          custos_variaveis?: number | null
+          despesas_financeiras?: number | null
+          despesas_marketing?: number | null
+          despesas_op_adm_total?: number | null
+          despesas_pessoal_adm?: number | null
+          ebitda?: number | null
+          id?: string
+          impostos_vendas?: number | null
+          is_projecao?: boolean | null
+          lucro_antes_impostos?: number | null
+          lucro_bruto?: number | null
+          lucro_liquido?: number | null
+          mes?: string
+          notas?: string | null
+          receita_b2b?: number | null
+          receita_b2b2c?: number | null
+          receita_b2c?: number | null
+          receita_bruta_total?: number | null
+          receita_liquida?: number | null
+          receitas_financeiras?: number | null
+          resultado_financeiro?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }
