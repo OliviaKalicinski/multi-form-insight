@@ -1,0 +1,92 @@
+id,coupon,date_sale,order_id,order_value,payment_value,products,imported_at
+01d57407-290b-4e1d-b509-dff8938b49a3,AZEITONA,2025-11-15,6738548359471,89.91,26.97,"{""Kit Comida de Dragão - Original® (3X)""}",2026-03-28 00:05:17.365+00
+2d371891-8183-4a1b-b017-e4290db6a0ec,OPAIDOSGOLDENS,2025-11-18,6742101197103,42.25,12.68,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+663d06ad-1c43-4847-abe1-cb52ae3bf46a,MAIKA,2025-11-21,6748450849071,80.7,24.21,"{""Kit Comida de Dragão - Original® (3X)""}",2026-03-28 00:05:17.365+00
+e7cc126a-b660-4167-a706-e007a51366f3,MAIKA,2025-11-21,6748680683823,122.96,36.89,"{""Mordida de Dragão - Legumes"",""Amostra Comida de Dragão"",""Kit Completo Comida de Dragão (3X)""}",2026-03-28 00:05:17.365+00
+73834d31-fe79-479f-9c25-b97b463ad118,MAIKA,2025-11-22,6749832085807,76.12,22.84,"{""Kit Comida de Dragão - Original® (3X)""}",2026-03-28 00:05:17.365+00
+b6e9c3ef-5646-4c68-9035-96d99194887e,BIOMICHELDELGADO,2025-11-24,6754007974191,61.93,18.58,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+9327c505-52e6-47a9-a877-40826ef12ebc,DEDE,2025-11-26,6757676548399,83.71,25.11,"{""Mordida de Dragão - Spirulina"",""Mordida de Dragão - Legumes"",""Amostra para Cães""}",2026-03-28 00:05:17.365+00
+7ff18513-2476-4ba2-a8d8-5ad8677fb81f,DEDE,2025-11-26,6757901009199,78.76,23.63,"{""Kit Completo Comida de Dragão (3X)""}",2026-03-28 00:05:17.365+00
+f043f7a9-ddd1-4ec2-9477-bba5842c9bcf,TIGELASAUDAVEL,2025-11-27,6759238959407,59.25,17.77,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+91aae5ec-f2c4-48c0-b33f-a213d1df6a3e,DEDE,2025-11-27,6757932040495,35.35,10.61,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+30bd7da4-177e-4ee4-b1fe-70aaf120debb,CASALPETFAMILY,2025-11-28,6763275616559,104.03,31.21,"{""Kit Comida de Dragão - Original® (3X)""}",2026-03-28 00:05:17.365+00
+38c393f7-479c-4848-bbc1-550f48dec3ff,BOLT10,2025-12-03,6774510059823,209.35,62.8,"{""Amostra para Gatos"",""Suplemento Integral"",""Kit Comida de Dragão - Original® (3X)"",""Amostra para Cães""}",2026-03-28 00:05:17.365+00
+5adf38df-5591-4e50-b69b-35ad25a20d6e,BOLT10,2025-12-09,6785669497135,120.43,36.13,"{""Amostra para Cães"",""Kit Completo Comida de Dragão (3X)""}",2026-03-28 00:05:17.365+00
+1d0c0273-729d-48b2-982d-1a19d6da2672,IRON,2025-12-10,6787868688687,45.5,13.65,"{""Mordida de Dragão - Legumes""}",2026-03-28 00:05:17.365+00
+c9204958-df89-4239-b99c-5f890859ce9a,TRIBOPET,2025-12-12,6791835386159,209.03,62.71,"{""Amostra para Cães"",""Amostra para Gatos"",""Kit Completo Comida de Dragão (3X)""}",2026-03-28 00:05:17.365+00
+65de9ba9-a13d-481f-b07a-3d7bfa627186,BOLT10,2025-12-15,6796678988079,109.58,32.87,"{""Kit Completo Comida de Dragão"",""Amostra para Cães""}",2026-03-28 00:05:17.365+00
+d75df15e-bb71-4410-8811-b322a93797b7,MAIKA,2025-12-15,6798271512879,84.37,25.31,"{""Comida de Dragão - Original®"",""Amostra para Cães""}",2026-03-28 00:05:17.365+00
+e4e1e2b5-a527-4621-b8b5-b65c52dee78c,MAIKA,2025-12-15,6798421360943,91.62,27.49,"{""Amostra para Cães"",""Kit Comida de Dragão - Original""}",2026-03-28 00:05:17.365+00
+49c92ff3-f411-408c-b87f-a466ecd42a75,MAXEBOB,2025-12-16,6798770897199,79.61,23.88,"{""Kit Completo Comida de Dragão"",""Amostra para Cães""}",2026-03-28 00:05:17.365+00
+60b7a564-1b36-4ac9-b5d1-ff6e82fb1cdb,BOMMENINO,2025-12-16,6798902034735,168.64,50.59,"{""Kit Completo Comida de Dragão"",""Amostra para Cães"",""Amostra para Gatos"",""Suplemento Integral""}",2026-03-28 00:05:17.365+00
+be2d51dc-af2d-47cc-9ac8-500810edf280,BOMMENINO,2025-12-17,6800504979759,114.51,34.35,"{""Suplemento Concentrado"",""Mordida de Dragão - Spirulina""}",2026-03-28 00:05:17.365+00
+cf272db5-e4a4-426b-9429-f0591fd6229b,BOMMENINO,2025-12-17,6801817993519,196.02,58.81,"{""Kit Comida de Dragão - Original"",""Suplemento Concentrado"",""Amostra para Cães"",""Mordida de Dragão - Spirulina""}",2026-03-28 00:05:17.365+00
+916998f4-7435-49e3-91e1-a384b05892d5,ZEDALMEIDA,2025-12-30,6830068302127,59.96,17.99,"{""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+a06d51c7-7cac-49ac-b54c-b165d56be4c7,TUKAN,2025-12-31,6832389783855,291.14,87.34,"{""Kit Comida de Dragão - Original""}",2026-03-28 00:05:17.365+00
+971b7b7a-b5d6-4d23-a5c8-f72b146cb2d5,BOLT10,2026-01-01,6832977117487,191.5,57.45,"{""Kit Comida de Dragão - Original""}",2026-03-28 00:05:17.365+00
+a57cbd68-4639-4cac-9f05-0a8b49c78b15,TUKAN,2026-01-05,6838878470447,205.58,61.67,"{""Suplemento Concentrado"",""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+cdcb7256-44d6-4a9f-bebc-1a57e658fa51,AZEITONA,2026-01-07,6841782272303,61.64,18.49,"{""Comida de Dragão - Original®"",""Amostra para Cães""}",2026-03-28 00:05:17.365+00
+c1b92499-3913-4313-a973-2b8fda2cfb5e,NALA10,2026-01-09,6844697411887,72.62,21.79,"{""Comida de Dragão - Original®"",""Mordida de Dragão - Legumes""}",2026-03-28 00:05:17.365+00
+a777d082-e3c6-4af8-ab5b-d55c41520cd9,NALA10,2026-01-11,6847370363183,369.98,110.99,"{""Suplemento Concentrado"",""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+5d3e35de-02cb-4dad-bcc8-b9bccf995c17,AZEITONA,2026-01-21,6860712214831,46.17,13.85,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+c7053db7-da07-4402-ab96-9ae105e29aae,NALA10,2026-01-25,6867969409327,132.61,39.78,"{""Suplemento para Gatos"",""Amostra para Gatos"",""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+fe9b8dbd-9449-41d5-be63-a54acdc91206,ARYA,2026-01-26,6868080165167,100.76,30.23,"{""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+2fc10bf4-d2f4-4854-943c-70a569f27523,BOLT10,2026-01-27,6869485781295,70.94,21.28,"{""Mordida de Dragão - Spirulina"",""Mordida de Dragão - Legumes""}",2026-03-28 00:05:17.365+00
+90f8381b-83ce-4c91-9538-f64912f3538a,ARYA,2026-01-31,6876013723951,324.62,97.39,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+87477c5f-cc30-47e7-a3ff-ee2bec9249ab,DEDE,2026-02-02,6879750619439,72.82,21.85,"{""Mordida de Dragão - Legumes"",""Mordida de Dragão - Spirulina""}",2026-03-28 00:05:17.365+00
+7723a645-7805-42f0-8e7a-4742f265c83a,BUZZ,2026-02-12,6894551433519,211.08,63.32,"{""Suplemento Concentrado"",""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+6f52182b-d7e2-48b0-8224-7c48d45bedab,BOLT10,2026-02-12,6895306047791,44.26,13.28,"{""Comida de Dragão - Original®"",""Amostra para Gatos""}",2026-03-28 00:05:17.365+00
+7bb79675-eca0-4f19-b862-e852cf67cbad,AZEITONA,2026-02-12,6895191687471,101.57,30.47,"{""Kit Comida de Dragão - Original""}",2026-03-28 00:05:17.365+00
+9f0594a3-8852-4917-8617-c0c3e4774993,SIMBAEPULGA,2026-02-12,6894697283887,44.25,13.28,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+5b7bcbc6-72f8-4036-b5bb-33afb4d64df7,SIMBAEPULGA,2026-02-13,6896736633135,45.36,13.61,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+26fd7678-167f-47a6-9f12-87d692f84388,INTEGRAVET,2026-02-14,6898946638127,44.97,13.49,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+1bb6c8ec-8668-461d-be56-0d0703e1fa20,DEDE,2026-02-20,6907056685359,73.06,21.92,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+38b22c04-b28c-43dc-b5c5-e48fa241ef6d,DEDE,2026-02-20,6906680738095,43.58,13.07,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+e785ee2e-8b4c-483f-8024-c887179d5589,EUTHEODORA,2026-02-22,6909239263535,192.71,57.81,"{""Suplemento Concentrado"",""Mordida de Dragão - Spirulina"",""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+2a36d30f-9b09-4991-9dd5-ff6ed82f6985,VITY,2026-02-27,6916489085231,97.84,29.35,"{""Amostra para Cães"",""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+92abb0a9-ceeb-4d96-bbc1-626bcd532396,ALASKA,2026-03-07,6929238720815,99.93,29.98,"{""Amostra para Cães"",""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+b1ef57c1-f8d9-4b4f-ad7e-432c27f54b1e,REALIXO,2026-03-10,6934395846959,99.25,29.78,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+fc97b7a5-5af6-4275-8b49-24e29569e082,BORA10,2026-03-10,6934486450479,41.75,12.53,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+696b2cf9-6dcf-41ba-ba0f-8b4cba812c3f,BORA10,2026-03-10,6934032974127,49.33,14.8,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+f1db0c85-f7ff-43d4-9183-1ec04b4d8dbb,DEDE,2026-03-12,6937542492463,44.25,13.28,"{""Mordida de Dragão - Spirulina""}",2026-03-28 00:05:17.365+00
+20d98a3d-fd42-4376-bc8a-439b216bb546,CHICA10,2026-03-13,6938920255791,100.51,30.15,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+d773f11c-ab1f-4a0c-9830-fb6561a1e945,DEDE,2026-03-13,6938292650287,98.6,29.58,"{""Kit Comida de Dragão - Original"",""Amostra para Cães""}",2026-03-28 00:05:17.365+00
+888bdccb-21b4-4f72-86eb-dcb250687ba6,EUTHEODORA,2026-03-14,6939209236783,137.17,41.15,"{""Comida de Dragão - Original®"",""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+aef558f5-457e-4342-872c-09500cb0d97a,DUDU,2026-03-15,6941345677615,35.39,10.62,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+b4aefe5e-cc27-4844-9b75-3900c5791686,VITY,2026-03-15,6941384147247,70.86,21.26,"{""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+cfd9ba18-94da-4b7d-aeab-c12516511c8a,TUKAN,2026-03-15,6941724410159,125.9,37.77,"{""Kit Comida de Dragão - Original"",""Amostra para Gatos"",""Amostra para Cães"",""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.365+00
+138c043c-0a89-43e8-a138-73ce3ed56886,DEDE,2026-03-15,6942006640943,37.05,11.11,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.365+00
+76c0f23c-fd2a-40c5-afbc-c8d1f0c6a828,TUKAN,2026-03-15,6942094623023,159.5,47.85,"{""Mordida de Dragão - Legumes"",""Suplemento para Gatos"",""Suplemento Integral"",""Mordida de Dragão - Spirulina"",""Amostra para Gatos""}",2026-03-28 00:05:17.364+00
+89281c1b-2ba4-44aa-9ec8-e9e6dc1ac7e0,MAIKA,2026-03-15,6942056349999,132.25,39.67,"{""Amostra para Gatos"",""Suplemento Integral"",""Kit Comida de Dragão - Original""}",2026-03-28 00:05:17.365+00
+ee0e609b-0003-4caf-88ea-877775c87d52,DEDE,2026-03-16,6942130798895,72.66,21.8,"{""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.364+00
+9aa6779c-1b1b-4b26-85ef-94dbd6ab3bbc,MAIKA,2026-03-16,6942130929967,80.89,24.27,"{""Kit Comida de Dragão - Original""}",2026-03-28 00:05:17.364+00
+5b2ba561-501e-4c7d-87b3-9f0665344c22,VITY,2026-03-16,6942285300015,125.89,37.77,"{""Kit Comida de Dragão - Original"",""Amostra para Cães"",""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.364+00
+bee04382-ee2d-4bae-bdc5-a98af1961a22,TUKAN,2026-03-16,6942923260207,188.82,56.65,"{""Kit Completo Comida de Dragão"",""Kit Comida de Dragão - Original""}",2026-03-28 00:05:17.364+00
+250127fe-e6d4-4ba2-8e77-6db6c940e61a,MAIKA,2026-03-17,6944004964655,125.89,37.77,"{""Amostra para Cães"",""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.364+00
+fdd7d9a0-ad36-43a0-b541-50aabd2f9a80,CAPIXABA10,2026-03-17,6944181616943,176.72,53.02,"{""Suplemento Concentrado""}",2026-03-28 00:05:17.364+00
+d83beaa1-1cba-4791-90c5-b9d30a023d4b,VITY,2026-03-18,6945907802415,121.41,36.42,"{""Comida de Dragão - Original®"",""Suplemento Concentrado""}",2026-03-28 00:05:17.364+00
+0eb8473f-5ea3-4303-ab15-bac8453fd90d,BORA10,2026-03-18,6945324204335,82.09,24.63,"{""Suplemento para Gatos""}",2026-03-28 00:05:17.364+00
+69266373-83fa-4f4f-9401-55aaea72fc09,CAPIXABA10,2026-03-19,6946890383663,69.25,20.78,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.364+00
+ae622ee3-babf-4542-888b-550363d925d5,BOLT10,2026-03-20,6948741218607,53.72,16.12,"{""Amostra para Cães"",""Mordida de Dragão - Legumes"",""Comida de Dragão - Original®""}",2026-03-28 00:05:17.364+00
+3bd36c4f-e94b-4b43-9166-db8bcf287584,VITY,2026-03-20,6948993237295,124.75,37.42,"{""Amostra para Cães"",""Suplemento Integral""}",2026-03-28 00:05:17.364+00
+e9e784b6-dbeb-4ff9-b421-99f06c1be767,EUTHEODORA,2026-03-21,6949894127919,246.43,73.93,"{""Suplemento Integral"",""Mordida de Dragão - Spirulina"",""Mordida de Dragão - Legumes"",""Comida de Dragão - Original®"",""Amostra para Cães""}",2026-03-28 00:05:17.364+00
+5e033301-5ab8-4a1c-bedb-02822b5662ea,MAIKA,2026-03-21,6949508677935,176.73,53.02,"{""Amostra para Cães"",""Suplemento Concentrado""}",2026-03-28 00:05:17.364+00
+3715228f-1ffc-4458-b52f-bbf265d2ccfe,BUZZ,2026-03-21,6949675761967,74.31,22.29,"{""Kit Comida de Dragão - Original""}",2026-03-28 00:05:17.364+00
+4b353454-2661-4f5b-9f34-323a0662ba46,DEDE,2026-03-22,6951837925679,74.37,22.31,"{""Comida de Dragão - Original®""}",2026-03-28 00:05:17.364+00
+30ecc0ec-d9e4-40f1-bebd-a6f494761f92,VITY,2026-03-22,6950666862895,70.87,21.26,"{""Kit Completo Comida de Dragão"",""Amostra para Cães""}",2026-03-28 00:05:17.364+00
+b68571fa-c6a9-4309-a955-13774a8d3885,CEUZINHA,2026-03-22,6951102251311,73.51,22.05,"{""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.364+00
+7533d7aa-8180-4835-8fb1-dc2cfbe4eeda,AZEITONA,2026-03-23,6952011989295,49.36,14.81,"{""Amostra para Gatos"",""Comida de Dragão - Original®""}",2026-03-28 00:05:17.364+00
+91f2d970-f517-4c2c-bdfb-8f53bee6c1d5,BUZZ,2026-03-25,6955706646831,87.7,26.31,"{""Amostra para Gatos"",""Comida de Dragão - Original®""}",2026-03-28 00:05:17.364+00
+fd1e5bac-ef3a-4e69-b9ac-7f2f36110f4b,ARYA,2026-03-26,6957295730991,100.77,30.23,"{""Kit Completo Comida de Dragão""}",2026-03-28 00:05:17.364+00
+ca0cbd1a-647c-4d9b-877c-e9b70b53aa72,TANGA10,2026-04-15,6988533367087,93.21,27.96,"{""Kit Comida de Dragão - Original""}",2026-04-23 00:09:36.247+00
+e0c2c0cc-75c8-489e-9457-1bd7fd909a01,JOCA,2026-04-16,6990030864687,99.41,29.82,"{""Kit Completo Comida de Dragão""}",2026-04-23 00:09:36.247+00
+dba6fe55-419d-4edf-a4d2-f2fddd9344b3,THEOT,2026-04-17,6990722466095,47.55,14.26,"{""Comida de Dragão - Original®""}",2026-04-23 00:09:36.247+00
+e8aaf469-bdff-4b5f-b99b-5371a6d07f13,DONATELA,2026-04-17,6991248326959,45.64,13.69,"{""Comida de Dragão - Original®""}",2026-04-23 00:09:36.247+00
+94991058-1f05-4d0c-827d-56bf1a18dcc8,OICATARINA,2026-04-17,6990839185711,95.84,28.75,"{""Kit Completo Comida de Dragão""}",2026-04-23 00:09:36.247+00
+2e34954f-58f8-4ba9-88a2-391608126913,TURMADOTIAO,2026-04-17,6990729347375,47.89,14.37,"{""Comida de Dragão - Original®""}",2026-04-23 00:09:36.247+00
+f001daaf-95eb-44a3-89a0-34f91149fe0d,RAFAPETSITTER,2026-04-18,6992750477615,131.94,39.58,"{""Mordida de Dragão - Spirulina"",""Kit Comida de Dragão - Original""}",2026-04-23 00:09:36.247+00
+e746d1f9-2af9-4c38-8d18-44e000e94585,DRAEVE,2026-04-18,6992691003695,45.16,13.55,"{""Amostra para Cães"",""Comida de Dragão - Original®"",""Amostra para Gatos""}",2026-04-23 00:09:36.247+00
+0038bbf8-ee8d-4f94-b771-0925a1806c8b,ALOHADOGS,2026-04-20,6995565510959,109.79,32.94,"{""Suplemento Integral""}",2026-04-23 00:09:36.247+00
+85422441-f9e6-4141-b72b-692160bf52e5,VITY,2026-04-20,6994925912367,158.01,47.4,"{""Amostra para Cães"",""Mordida de Dragão - Spirulina"",""Mordida de Dragão - Legumes""}",2026-04-23 00:09:36.247+00
+c635f1d4-a247-41df-858d-5db280fb32bb,TURMADOTIAO,2026-04-21,6996868137263,42.17,12.65,"{""Comida de Dragão - Original®""}",2026-04-23 00:09:36.247+00
+7ce3821a-1cd5-45db-b800-c385f88bd72f,TURMADOTIAO,2026-04-22,6998919053615,116.94,35.08,"{""Suplemento Concentrado""}",2026-04-23 00:09:36.247+00

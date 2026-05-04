@@ -1134,6 +1134,7 @@ export type Database = {
           coupon: string | null
           cpf: string | null
           created_at: string | null
+          data_primeiro_contato: string | null
           email: string | null
           id: string
           instagram: string | null
@@ -1160,6 +1161,7 @@ export type Database = {
           coupon?: string | null
           cpf?: string | null
           created_at?: string | null
+          data_primeiro_contato?: string | null
           email?: string | null
           id?: string
           instagram?: string | null
@@ -1186,6 +1188,7 @@ export type Database = {
           coupon?: string | null
           cpf?: string | null
           created_at?: string | null
+          data_primeiro_contato?: string | null
           email?: string | null
           id?: string
           instagram?: string | null
@@ -2272,6 +2275,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      fix_mojibake: { Args: { input: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
