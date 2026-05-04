@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, Wallet, Clock, DollarSign, Users, Lock } from "lucide-react";
+import { DRETable } from "@/components/financeiro/DRETable";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, ReferenceArea,
@@ -255,58 +256,8 @@ export default function Financeiro() {
         </CardContent>
       </Card>
 
-      {/* Tabela mensal */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Tabela mensal (24 meses)</CardTitle>
-          <p className="text-[11px] text-muted-foreground">
-            Edição inline: aplicar via UI numa próxima rodada. Por enquanto, atualize via Supabase SQL Editor.
-          </p>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b text-[10px] text-muted-foreground uppercase">
-                <th className="text-left py-1 pr-2 sticky left-0 bg-card">Mês</th>
-                <th className="text-right py-1 pr-2">Tipo</th>
-                <th className="text-right py-1 pr-2">Receita Bruta</th>
-                <th className="text-right py-1 pr-2">Receita Líq.</th>
-                <th className="text-right py-1 pr-2">Custos Op</th>
-                <th className="text-right py-1 pr-2">Despesas Adm</th>
-                <th className="text-right py-1 pr-2">EBITDA</th>
-                <th className="text-right py-1 pr-2">Folha (Op+Adm)</th>
-                <th className="text-right py-1 pr-2">Caixa</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((d) => {
-                const folha = d.custos_pessoal_op + d.despesas_pessoal_adm;
-                return (
-                  <tr key={d.id} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="py-1.5 pr-2 sticky left-0 bg-card font-medium">
-                      {monthLabel(d.mes.slice(0, 7))}
-                    </td>
-                    <td className="py-1.5 pr-2 text-right">
-                      <Badge variant={d.is_projecao ? "outline" : "secondary"} className="text-[9px]">
-                        {d.is_projecao ? "proj" : "real"}
-                      </Badge>
-                    </td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{fmtCurrencyCompact(d.receita_bruta_total)}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{fmtCurrencyCompact(d.receita_liquida)}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums text-red-700">{fmtCurrencyCompact(d.custos_operacionais_total)}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums text-orange-700">{fmtCurrencyCompact(d.despesas_op_adm_total)}</td>
-                    <td className={`py-1.5 pr-2 text-right tabular-nums font-semibold ${d.ebitda >= 0 ? "text-green-700" : "text-red-700"}`}>
-                      {fmtCurrencyCompact(d.ebitda)}
-                    </td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums">{fmtCurrencyCompact(folha)}</td>
-                    <td className="py-1.5 pr-2 text-right tabular-nums font-medium">{fmtCurrencyCompact(d.caixa_total)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
+      {/* R41: DRE visual em formato de planilha (substitui tabela compacta) */}
+      <DRETable data={data} />
     </div>
   );
 }
