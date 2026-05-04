@@ -4,8 +4,16 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import { AppSidebar } from "@/components/AppSidebar";
 import { FeedbackBox } from "@/components/dashboard/FeedbackBox";
 import { GlobalFilter } from "@/components/GlobalFilter";
+import { useLocation } from "react-router-dom";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// R41-fix: rotas que têm seu próprio controle de período (ou não dependem
+// do filtro global) — esconder GlobalFilter pra não confundir com seletores
+// locais. Bruno 04/05: pediu pra esconder em /financeiro.
+const ROUTES_WITHOUT_GLOBAL_FILTER = new Set<string>([
+  "/financeiro",
+]);
 
 const formatLastUpdate = (date: Date | null): string => {
   if (!date) return "—";
@@ -16,6 +24,8 @@ const formatLastUpdate = (date: Date | null): string => {
 
 const DashboardLayoutInner = ({ children }: { children: React.ReactNode }) => {
   const { lastDataUpdate } = useDashboard();
+  const location = useLocation();
+  const showGlobalFilter = !ROUTES_WITHOUT_GLOBAL_FILTER.has(location.pathname);
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -34,7 +44,7 @@ const DashboardLayoutInner = ({ children }: { children: React.ReactNode }) => {
               <span>{formatLastUpdate(lastDataUpdate)}</span>
             </div>
           </header>
-          <GlobalFilter />
+          {showGlobalFilter && <GlobalFilter />}
           <main className="flex-1 bg-background">{children}</main>
           <FeedbackBox />
         </SidebarInset>
