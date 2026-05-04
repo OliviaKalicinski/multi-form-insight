@@ -30,10 +30,16 @@ export const SegmentRevenueChart = ({ segments }: SegmentRevenueChartProps) => {
       <ResponsiveContainer width="100%" height={250}>
         <BarChart data={data} layout="vertical" margin={{ left: 20, right: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={true} vertical={false} />
-          <XAxis 
-            type="number" 
+          <XAxis
+            type="number"
             stroke="hsl(var(--muted-foreground))"
-            tickFormatter={(value) => formatCurrency(value)}
+            // R42-fix-2: ticks abreviados (R$ 80.000,00 → R$ 80k) pra caber no frame
+            tickFormatter={(value) => {
+              const abs = Math.abs(value);
+              if (abs >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1)}M`;
+              if (abs >= 1_000) return `R$ ${(value / 1_000).toFixed(0)}k`;
+              return formatCurrency(value);
+            }}
           />
           <YAxis 
             type="category" 

@@ -6,6 +6,7 @@
  */
 
 import type { ProcessedOrder, CustomerSegment } from "@/types/marketing";
+import { isRevenueOrder, getOfficialRevenue } from "./revenue";
 
 export interface BehaviorSummary {
   totalClientes: number;
@@ -38,7 +39,12 @@ const isValidIdentity = (cpf: string | null | undefined): cpf is string =>
 function groupByCustomer(orders: ProcessedOrder[]): CustomerGroup[] {
   const map = new Map<string, CustomerGroup>();
 
-  for (const o of orders) {
+  // R45: filtra fora brindes/bonificações/doações/ajustes/devoluções.
+  // Antes: brinde com valorTotal R$200 inflava receita VIP.
+  // Agora: só pedidos do tipo 'venda' contam pra agregação por cliente.
+  const onlyRevenue = orders.filter(isRevenueOrder);
+
+  for (const o of onlyRevenue) {
     if (!isValidIdentity(o.cpfCnpj)) continue;
     const key = o.cpfCnpj;
     let group = map.get(key);
@@ -47,7 +53,9 @@ function groupByCustomer(orders: ProcessedOrder[]): CustomerGroup[] {
       map.set(key, group);
     }
     group.orders.push(o);
-    group.totalRevenue += o.valorTotal;
+    // R45: usa getOfficialRevenue (totalFaturado da NF, ou valorTotal+frete como fallback).
+    // Coerência fiscal com o resto do sistema (RevenueHeroCard, DRE, etc.).
+    group.totalRevenue += getOfficialRevenue(o);
     group.orderCount++;
   }
 
@@ -115,11 +123,13 @@ export function computeBehaviorMetrics(orders: ProcessedOrder[]): BehaviorMetric
   };
 
   // ── Segmentos ──
+  // R42-fix-2: removido "no período" — info redundante (header da página
+  // já fala que tudo respeita o filtro de datas). Reduz tamanho da legenda.
   const criteriaMap: Record<string, string> = {
-    "Primeira Compra": "1 pedido no período",
-    Recorrente: "2 pedidos no período",
-    Fiel: "3-4 pedidos no período",
-    VIP: "5+ pedidos ou R$500+ no período",
+    "Primeira Compra": "1 pedido",
+    Recorrente: "2 pedidos",
+    Fiel: "3-4 pedidos",
+    VIP: "5+ pedidos ou R$ 500+",
   };
 
   const segMap = new Map<string, { count: number; totalRevenue: number; totalOrders: number }>();
