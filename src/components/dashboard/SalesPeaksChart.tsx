@@ -77,12 +77,15 @@ export const SalesPeaksChart = ({ peaks }: SalesPeaksChartProps) => {
             label={{ value: `Média: ${average.toFixed(1)}`, fill: "hsl(var(--muted-foreground))" }}
           />
           <Bar dataKey="orders" radius={[8, 8, 0, 0]}>
-            {topPeaks.map((entry, index) => (
-              <Cell 
-                key={`cell-${index}`} 
-                fill={entry.isPeak ? "hsl(var(--destructive))" : "hsl(var(--primary))"} 
-              />
-            ))}
+            {topPeaks.map((entry, index) => {
+              const isPeak = entry.orders >= peakThreshold;
+              return (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={isPeak ? "hsl(var(--destructive))" : "hsl(var(--primary))"} 
+                />
+              );
+            })}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
