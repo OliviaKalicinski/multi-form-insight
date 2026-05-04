@@ -1,0 +1,160 @@
+id,customer_id,atendimento_numero,data_contato,canal,atendente,produto,lote,data_fabricacao,local_compra,transportador,nf_produto,natureza_pedido,tipo_reclamacao,descricao,link_reclamacao,acao_orientacao,status,gravidade,custo_estimado,data_fechamento,created_at,updated_at,created_by,order_id
+88237f45-90f6-477f-b3f4-9a01f05dd49c,92b1873f-9b37-4c53-8ddb-a00e4df3ae91,SAC_102025,2025-10-03 00:00:00+00,,Zazá,ORIGINAL 90G,,,SITE COMIDA DE DRAGÃO,Loggi,,QUANTIDADE,,Comprou 2 originais e veio apenas 1,,Enviamos novamente,fechada,,,2025-10-03 00:00:00+00,2026-02-27 14:38:06.641034+00,2026-02-27 14:38:06.641034+00,,
+8c03019c-8a0a-4c28-aa45-4ef13f4391f7,4a6b5bd3-beae-4023-a942-89764fcb48ef,SAC_032025,2025-10-03 00:00:00+00,Instagram,Beatriz,ORIGINAL 90G,,,SITE COMIDA DE DRAGÃO,,,ATENDIMENTO,,"Ela comprou 5 pacotes de original, mas recebeu somente 1",,Enviamos o restante do pedido,fechada,,,2025-10-03 00:00:00+00,2026-02-27 14:38:03.734002+00,2026-02-27 14:38:03.734002+00,,
+635c1763-f3db-428c-8527-f26842866056,2d9992d3-304a-499c-83ad-8616a9673bfc,SAC_012025,2025-10-15 00:00:00+00,E-mail,Bruno Multedo,ÓLEO DE BSF,oleo052025,2025-05-02,LETS FLY,,613,PRODUTO,,24 kg do óleo com impurezas - fora do padrão. Questionamento sobre a filtragem do produto.,,"Descarte do produto - envio de 25,5 kg em substituição.",fechada,,,2025-10-15 00:00:00+00,2026-02-27 14:38:03.036538+00,2026-02-27 14:38:03.036538+00,,
+49f0d958-5965-4a83-8a26-286d9695343d,9fad3757-3da4-40fd-9b64-1737b6fbda2c,SAC_052025,2025-10-28 00:00:00+00,Instagram,Beatriz,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,,,ENTREGA,,"O código de acompanhamento diz que o pedido foi entregue, mas ela relata que não",,Enviamos novamente,fechada,,,2025-10-28 00:00:00+00,2026-02-27 14:38:04.46624+00,2026-02-27 14:38:04.46624+00,,
+a91778a0-05f7-43d0-a331-8a363863ff0b,d9f49c7b-aaf4-4663-ae95-849911a9a73d,SAC_072025,2025-10-29 00:00:00+00,Whatsapp,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Pedido não entregue / Dado como entregue porém não recebido.,,Enviamos novamente,fechada,,,2025-10-29 00:00:00+00,2026-02-27 14:38:05.293499+00,2026-02-27 14:38:05.293499+00,,
+5bfb73d0-470b-44a7-b64a-6690b2257351,c760270d-48d2-4bb5-a017-df0fcdf06d76,SAC_022025,2025-10-29 00:00:00+00,E-mail,Marcelle,FARINHA DESENGORDURADA,FDEG072025,2025-07-30,LETS FLY,,,PRODUTO,,"Uma heterogeneidade dos grânulos, apontando possível falha na trituração.",,Informaram o número do lote e solicitaram a troca. Brunão alinhando.,fechada,,,2025-10-29 00:00:00+00,2026-02-27 14:38:03.498352+00,2026-02-27 14:38:03.498352+00,,
+3c1da5bf-8761-45e5-8122-48234e972d03,5117762b-4984-483c-95df-5a6a46f11f09,SAC_082025,2025-10-31 00:00:00+00,Whatsapp,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Pedido devolvido,,Enviamos novamente,fechada,,,2025-10-31 00:00:00+00,2026-02-27 14:38:05.930118+00,2026-02-27 14:38:05.930118+00,,
+7a697e3b-56a1-4dc6-82e5-8ac9e50ad2c8,fbde3e60-2de1-4bae-b8d5-882ab8867841,SAC_112025,2025-11-01 00:00:00+00,,Zazá,ORIGINAL 90G,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Não recebeu,,Enviamos novamente,aberta,,,,2026-02-27 14:38:07.156422+00,2026-02-27 14:38:07.156422+00,,
+a55b07bf-9c52-4cb8-b6f1-504ee4aa773b,9b6b4522-e5df-4d37-b18e-efbdd7516bfa,SAC_092025,2025-11-01 00:00:00+00,,Bruno Multedo,KIT COMPLETO CD,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Pedido devolvido,,Enviamos novamente,fechada,,,2025-11-01 00:00:00+00,2026-02-27 14:38:06.400638+00,2026-02-27 14:38:06.400638+00,,
+d24f328d-8144-420e-a641-217aa61ac533,ea219a38-2fc0-4b4e-abf0-2b3d04dc8ce2,SAC_172025,2025-11-04 00:00:00+00,,Zazá,,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,,Pedido devolvido,,Enviamos novamente,aberta,,,,2026-02-27 14:38:09.351007+00,2026-02-27 14:38:09.351007+00,,
+e5b4a070-213c-4248-815c-4ac29a48c219,428b4d07-fb2c-49ae-97e8-71cd83692bd9,SAC_042025,2025-11-04 00:00:00+00,Instagram,Zazá,ORIGINAL 90G,,,SITE COMIDA DE DRAGÃO,,,ATENDIMENTO,,"Ela comprou 3 pacotes de original, mas recebeu somente 1",,,fechada,,,2025-11-04 00:00:00+00,2026-02-27 14:38:04.000945+00,2026-02-27 14:38:04.000945+00,,
+fc3a96e7-744a-4f30-83ec-ae70caadad32,c7404e4f-6f10-4810-9ffa-8a37daa1fc3f,SAC_122025,2025-11-10 00:00:00+00,Whatsapp,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Não recebeu,,Enviamos novamente,fechada,,,2025-11-10 00:00:00+00,2026-02-27 14:38:07.623376+00,2026-02-27 14:38:07.623376+00,,
+30e42bc2-4c56-42a9-9480-72c93704796b,5f2edf31-982c-4360-a054-7f0e4de6f875,SAC_162025,2025-11-12 00:00:00+00,,Bruno Multedo,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,,Pedido enviado para outro endereço,,Enviamos novamente,aberta,,,,2026-02-27 14:38:08.988889+00,2026-02-27 14:38:08.988889+00,,
+b52d8deb-badf-4f77-a16d-51c69cd58c6c,c3030d26-4c6e-4110-ac83-1745cdbcef86,SAC_142025,2025-11-12 00:00:00+00,,Bruno Multedo,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,,Não recebeu,,Enviamos novamente,fechada,,,2025-11-12 00:00:00+00,2026-02-27 14:38:08.263295+00,2026-02-27 14:38:08.263295+00,,
+5ad02893-c353-4162-b6bc-3b60933d60bc,b3c5d967-833a-4bef-9e1c-6686c81969e2,SAC_152025,2025-11-12 00:00:00+00,,Bruno Multedo,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Não recebeu,,Enviamos novamente,resolvida,,,2026-03-04 23:34:56.356+00,2026-02-27 14:38:08.622329+00,2026-03-04 23:34:56.356+00,,
+2fd0bb98-b007-4c01-ae86-2c1aaf6351ca,12273e2a-5088-4e3f-8406-a03f19c4a310,SAC_132025,2025-11-12 00:00:00+00,,Bruno Multedo,KIT COMPLETO CD,,,SITE COMIDA DE DRAGÃO,Loggi,,PRODUTO,,Enviamos o produto errado,,Enviamos novamente,fechada,,,2025-11-12 00:00:00+00,2026-02-27 14:38:07.812881+00,2026-02-27 14:38:07.812881+00,,
+f928adcf-c866-4194-a1c9-dbba53de4e6e,35686081-6ded-41c8-b6e0-6ac73e2685c9,SAC_262025,2025-11-13 00:00:00+00,Instagram,Luana May,KIT COMPLETO CD,,,SITE COMIDA DE DRAGÃO,Jadlog,,EMBALAGEM,,Embalagem original chegou aberta,,Enviamos novamente,aberta,,,,2026-02-27 14:38:13.294147+00,2026-02-27 14:38:13.294147+00,,
+af6d45a4-2ac4-47ea-8bba-a057fdc9cace,98c6e933-8699-48ca-b68d-404340ebd87c,SAC_182025,2025-11-14 00:00:00+00,Whatsapp,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Pedido devolvido,,Enviamos novamente,fechada,,,2025-11-14 00:00:00+00,2026-02-27 14:38:09.764489+00,2026-02-27 14:38:09.764489+00,,
+98c69616-56aa-4e18-883b-28eabf519bbf,a0f3ed64-20ee-4909-b889-c5b9ff3fa6b9,SAC_192025,2025-11-14 00:00:00+00,Whatsapp,Zazá,,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Pedido devolvido,,Enviamos novamente,aberta,,,,2026-02-27 14:38:10.310172+00,2026-02-27 14:38:10.310172+00,,
+19b3b1b6-3296-4bb4-bc6b-d856a234af77,f119768b-51d0-49ac-84ff-068fe922d285,SAC_212025,2025-11-14 00:00:00+00,Whatsapp,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Pedido devolvido,,Enviamos novamente,aberta,,,,2026-02-27 14:38:11.160429+00,2026-02-27 14:38:11.160429+00,,
+10633ba6-5b96-4bca-89e9-4a5ab32139be,2b4632d7-27bf-4075-ac3c-d3f0659fa0e1,SAC_202025,2025-11-19 00:00:00+00,Whatsapp,Zazá,,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Demora na entrega/Falta de infos,,Enviamos novamente,aberta,,,,2026-02-27 14:38:10.761722+00,2026-02-27 14:38:10.761722+00,,
+995ec1c0-5ac8-4859-8b9a-592a8132ab35,d83925e1-9eee-40c0-92ce-99851b9a330b,SAC_242025,2025-11-26 00:00:00+00,Whatsapp,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,,Pedido devolvido,,Enviamos novamente,aberta,,,,2026-02-27 14:38:12.459306+00,2026-02-27 14:38:12.459306+00,,
+879452ae-4fcc-4642-9d77-bc5fc4f4ce47,4099499c-db4c-45ad-b55a-385a353b3085,SAC_252025,2025-11-26 00:00:00+00,Whatsapp,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,,Pedido devolvido,,Enviamos novamente,aberta,,,,2026-02-27 14:38:12.90067+00,2026-02-27 14:38:12.90067+00,,
+fed3f411-0b6e-48f8-9cb1-d51ba0d68666,cf8b566e-0576-45f7-abef-eee6a5470b71,SAC_222025,2025-11-26 00:00:00+00,Whatsapp,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,Pedido devolvido,,Enviamos novamente,aberta,,,,2026-02-27 14:38:11.579606+00,2026-02-27 14:38:11.579606+00,,
+8f193891-58bb-4a05-9e7a-857fcceb4dd3,1d43a6ef-7ca1-4212-a91a-a1165d13b0f9,SAC_232025,2025-11-26 00:00:00+00,Whatsapp,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,,Pedido devolvido,,Enviamos novamente,fechada,,,2026-03-26 16:43:29.559+00,2026-02-27 14:38:11.963209+00,2026-03-26 16:43:29.559+00,,
+8c9e8237-7056-41a4-a4f7-f580a4af985a,2c0d0375-256b-4dd6-9ed1-9658cead04bb,SAC_272025,2025-12-03 00:00:00+00,,,KIT COMPLETO CD,2054,2025-11-13,SITE COMIDA DE DRAGÃO,Loggi,,PRODUTO,Animal vomitou 4x após comer Mordida Spirulina e Original,Rejeição alimentar,,,fechada,,,2026-02-27 16:56:21.498+00,2026-02-27 14:38:13.628275+00,2026-02-27 16:56:21.498+00,,
+487bf953-2a27-4aba-b76f-08a4a8b89ffe,cf8b566e-0576-45f7-abef-eee6a5470b71,,2025-12-08 00:00:00+00,Instagram,Beatriz,ORIGINAL 90G,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,Falha no endereço,Falha no endereço,https://rastreio.frenet.com.br/LOG/JM4XU2SE,Enviamos novamente,fechada,,,2025-12-08 00:00:00+00,2026-02-27 14:38:13.795974+00,2026-02-27 14:38:13.795974+00,,
+ca546e84-c45e-494d-8e3b-173508d1920a,446ece35-de3a-4c06-b3b5-da3f49d4a7e3,,2025-12-10 00:00:00+00,Instagram,,SUP. CÃES INTEGRAL,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,,"Produto chegou violado, conteúdo exposto",,Enviamos novamente,fechada,,,2025-12-10 00:00:00+00,2026-02-27 14:38:14.252892+00,2026-02-27 14:38:14.252892+00,,
+addcf07e-ad86-44b7-942b-b18d179dd474,680f33fa-13b5-4dfe-836c-d963160181aa,,2025-12-19 00:00:00+00,,,ORIGINAL 90G,,,,Correios,,,,Sem descrição registrada,,,fechada,,,2025-12-19 00:00:00+00,2026-02-27 14:38:14.570603+00,2026-02-27 14:38:14.570603+00,,
+0f39d18c-226f-44c4-a74f-b327ee3096f6,4d57ad9c-1ebf-406c-9e3a-806858178764,SAC_302025,2026-01-02 00:00:00+00,Whatsapp,Luana May,ORIGINAL 90G,,,SITE COMIDA DE DRAGÃO,Jadlog,,ENTREGA,INSUCESSO NA ENTREGA - ENDEREÇO,INSUCESSO NA ENTREGA - ENDEREÇO,https://rastreio.frenet.com.br/JAD/546099491,Enviamos novamente,fechada,,,2026-01-02 00:00:00+00,2026-02-27 14:38:15.934122+00,2026-02-27 14:38:15.934122+00,,
+5a3374ed-9cf0-43a9-92d6-0d0de625f38f,5c757bf6-53c4-41a3-9e93-97bf9e7cb549,,2026-01-21 00:00:00+00,Whatsapp,Luana May,SUP. CÃES INTEGRAL,,,SITE COMIDA DE DRAGÃO,,,PRODUTO,Produto enviado errado,Produto enviado errado,,Enviamos novamente,fechada,,,2026-01-21 00:00:00+00,2026-02-27 14:38:17.567609+00,2026-02-27 14:38:17.567609+00,,
+bdc63b11-3b0b-4b6a-93a6-56d616c7d116,8f0d9b24-198f-4f3a-96b3-817fc02e1dbb,SAC_292025,2026-01-27 00:00:00+00,Instagram,Luana May,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,Pedido retornou,Pedido retornou - envio do pacote foi interrompido.,https://rastreio.frenet.com.br/LOG/JFBVG3TZ,Enviamos novamente,fechada,,,2026-01-27 00:00:00+00,2026-02-27 14:38:15.520387+00,2026-02-27 14:38:15.520387+00,,
+8a3576c1-9a61-4872-b6ea-73deb15118d4,c3e09ccf-f3cf-4e72-8778-3692f690c852,,2026-02-02 00:00:00+00,,,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Jadlog,,ENTREGA,INSUCESSO NA ENTREGA - ENDEREÇO,INSUCESSO NA ENTREGA - ENDEREÇO,https://rastreio.frenet.com.br/JAD/532131472,Enviamos novamente,fechada,,,2026-02-02 00:00:00+00,2026-02-27 14:38:14.866048+00,2026-02-27 14:38:14.866048+00,,
+b0ec638f-98a0-456e-98de-e8b8e956d30f,6479943d-3145-47e7-91a8-5a2bc42fe16a,,2026-02-02 00:00:00+00,,,KIT DE AMOSTRAS,,,,,,,,Sem descrição registrada,,,fechada,,,2026-02-02 00:00:00+00,2026-02-27 14:38:14.685385+00,2026-02-27 14:38:14.685385+00,,
+05ba46e0-d5ec-4f75-83cf-7337a748cfa9,73316387-a318-4fd9-9e5c-5f0086f8306d,SAC_322025,2026-02-02 00:00:00+00,Whatsapp,Luana May,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,Objeto não entregue - endereço incorreto,Objeto não entregue - endereço incorreto,https://rastreio.frenet.com.br/COR/AB903488595BR,Enviamos novamente,fechada,,,2026-02-02 00:00:00+00,2026-02-27 14:38:16.371925+00,2026-02-27 14:38:16.371925+00,,
+c24ed810-a3f7-4dd5-8d60-1062acf1820a,48420d4e-829f-4ef5-ab33-97217ae1aeb0,,2026-02-03 00:00:00+00,Whatsapp,Luana May,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,Pedido não entregue,Pedido não entregue - Tivemos um incidente interno.,https://rastreio.frenet.com.br/LOG/NBXTG6KE,Enviamos novamente,fechada,,,2026-03-26 16:43:22.047+00,2026-02-27 14:38:15.266557+00,2026-03-26 16:43:22.047+00,,
+dc28fe5b-dbeb-4910-9c1d-c0c13c0507b9,4e73a242-3539-4138-92f6-cdd2bab9213a,SAC_332025,2026-02-06 00:00:00+00,Whatsapp,Luana May,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,Pedido retornou,Pedido retornou - Inconsistências no endereçamento do objeto.,https://rastreio.frenet.com.br/COR/AB899765349BR,Enviamos novamente,resolvida,,,2026-03-26 19:21:54.041+00,2026-02-27 14:38:16.774345+00,2026-03-26 19:21:54.041+00,,
+b5d9d69f-1af3-4933-bb32-6b4ecca74064,7581e511-35f3-4773-8ab4-a55133b44391,SAC_312025,2026-02-06 00:00:00+00,Whatsapp,Luana May,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,Pedido retornou,Pedido retornou,https://rastreio.frenet.com.br/COR/AB899765278BR,Enviamos novamente,fechada,,,2026-02-06 00:00:00+00,2026-02-27 14:38:16.176081+00,2026-02-27 14:38:16.176081+00,,
+51a7de99-52d1-420b-901c-d2750d1414e2,de531354-a97f-4433-a78b-d43dc418063d,SAC_342025,2026-02-06 00:00:00+00,Whatsapp,Luana May,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,Pedido retornou,Pedido retornou - Objeto não entregue - endereço incorreto,https://rastreio.frenet.com.br/COR/AB926012867BR,Enviamos novamente,fechada,,,2026-03-26 16:43:17.824+00,2026-02-27 14:38:16.968017+00,2026-03-26 16:43:17.824+00,,
+0b986f50-36bb-4576-bff5-419647cfabc5,dbb4ee2a-0631-4513-83e9-7b7d617caf11,SAC_352025,2026-02-06 00:00:00+00,Whatsapp,Luana May,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Correios,,ENTREGA,Objeto não entregue - carteiro não atendido,Objeto não entregue - carteiro não atendido,https://rastreio.frenet.com.br/COR/AB945623549BR,Enviamos novamente,fechada,,,2026-02-06 00:00:00+00,2026-02-27 14:38:17.156541+00,2026-02-27 14:38:17.156541+00,,
+03893ebe-f4fc-43b4-82b1-c713b2d96d23,0603d06a-8080-4ce0-8322-f5bd83c06455,SAC_362025,2026-02-06 00:00:00+00,Whatsapp,Luana May,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,Pedido retornou,Pedido retornou - Tivemos um incidente interno.,https://rastreio.frenet.com.br/LOG/NJHG4YZ2,Enviamos novamente,fechada,,,2026-02-06 00:00:00+00,2026-02-27 14:38:17.428553+00,2026-02-27 14:38:17.428553+00,,
+76dd0fe6-0268-4455-b8ed-114b4b5d9fdb,13249838-a4bd-447d-98eb-74697a4a9290,,2026-02-11 00:00:00+00,Whatsapp,Luana May,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,Loggi,,ENTREGA,Pedido não entregue,Pedido dado como entregue e destinatário nega entrega,,Enviamos novamente,fechada,,,2026-03-26 16:43:11.934+00,2026-02-27 14:38:17.699435+00,2026-03-26 16:43:11.934+00,,
+2b4dadcb-253b-4b13-a45e-347bc6867e8f,924a7ee3-0cf2-47d8-b2f0-8180c09f480e,,2026-02-26 12:00:00+00,Instagram,,,,,online,Correio - Sedex,,,Entrega,"Comprou um original e uma amostra de gato, ela colocou o CEP errado e a transportadora entregou errado. 
+n pedido 3644",,"Olivier atualizou o endereço hoje, 27/02 e vai enviar.",resolvida,baixa,,2026-02-27 17:56:54.721+00,2026-02-27 17:54:38.035979+00,2026-02-27 17:56:54.721+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+2c845a48-0ceb-47fd-8476-1a0346ff42dc,4e621644-a007-4dbe-9835-20d4918add66,,2026-02-27 17:59:41.808409+00,whatsapp,Luana e Beatriz,,,,,,,,entrega,Esse cara aqui é perigosoooo! Nos chamou de golpista e continuou com reclamando mesmo depois de atendido.,,,resolvida,media,,2026-03-02 22:27:49.577+00,2026-02-27 17:59:41.808409+00,2026-03-02 22:27:49.577+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+edbd0748-e124-4af7-b2bc-bfb1dae16350,4668ce9b-aa1b-414a-9a1a-5168584ff6ee,,2026-03-02 18:22:21.332802+00,whatsapp,Luana,,,,,,,,outro,cliente notificou que o gato vomitou depois de comer a amostra. número do pedido: 3035,,,fechada,media,,2026-03-02 18:24:31.246+00,2026-03-02 18:22:21.332802+00,2026-03-02 18:24:31.246+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+ed89f4e3-8561-493f-b512-f211764bb186,c85c8cf5-845d-4b75-b8c2-6abc3a203e83,,2026-03-02 18:41:19.125914+00,whatsapp,Luana,,,,,,,,entrega,produto extraviado. Reenviamos as amostras,,,resolvida,media,,2026-03-26 16:43:04.21+00,2026-03-02 18:41:19.125914+00,2026-03-26 16:43:04.21+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+5bca02ed-4eec-459a-b0b9-34f160529cb4,a37fc94f-f90e-4b77-a2a7-6415b9adffbe,,2026-03-10 14:54:10.206573+00,whatsapp,Priscila,Kit de Amostras,,,,,002819,Venda Produção Estabelecimento,entrega,"Cliente com 2 contatos:  
+- pedido de amostras retornou e foi reenviado, cliente entrou em contato para saber o status da entrega.  
+- Cliente entrou em contato novamente para saber quem recebeu seu pedido, porque no rastreio do correio está como entregue. 
+
+- Verificando informação com correio. - Olivier. ",,,resolvida,media,,2026-03-26 16:42:59.794+00,2026-03-10 14:54:10.206573+00,2026-03-26 16:42:59.794+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+bebd20d4-3f1a-45f1-ac67-2472ad816492,787d4678-dc8d-4f67-ba06-2291f5614b32,,2026-03-10 15:11:50.781017+00,whatsapp,Priscila,Kit de Amostras,,,,Correio,003075,Venda Produção Estabelecimento,entrega,"Cliente entrou em contato para informar que seu pacote ficou retido no Correios e ela não pode ir buscar na localização. 
+ 
+Ação - no rastreio do Correios aparece como endereço insuficiente - confirmei o endereço com a cliente e está correto. 
+informei a cliente que iremos tentar contato com Correios para verificar o ocorrido. Mas que normalmente se passar de 7 dias do pacote retido ele irá retornar para a base e fazemos um reenvio do pedido.",,"O pacote não foi retirado no ponto de coleta e foi enviado para o remetente. 
+Informei a cliente que iremos reenviar para ela o pacote. que assim que for postado irá receber uma notificação.",fechada,media,,2026-03-17 13:11:03.158+00,2026-03-10 15:11:50.781017+00,2026-03-17 13:11:03.162+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+0637d8c3-300a-44b5-9796-130a23b234bc,08726b74-d6dd-4b24-885a-02721f5c55a8,,2026-03-10 15:17:59.760475+00,instagram,Priscila,Kit de Amostras,,,,,003137,Venda Produção Estabelecimento,outro,"Cliente entrou em contato para informar que a amostra chegou com o prazo de validade vencida. 
+- Foi verificado internamente que é um erro da embalagem. A validade correta é 6 meses após a fabricação e estava escrito 2 meses após a fabricação.",,- Informei a cliente que foi um erro de digitação.,resolvida,baixa,,2026-03-10 15:18:43.202+00,2026-03-10 15:17:59.760475+00,2026-03-10 15:18:43.204+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+81e6b2c0-7e6f-45d5-99ed-6229005b240f,22974625-693f-4791-b071-5ef12e7279d5,,2026-03-10 15:32:45.098166+00,whatsapp,Priscila,Comida de Dragão - Original (90g),,,,,003114,Venda Produção Estabelecimento,outro,"Cliente retornou o contato para informar que a introdução não deu certo, que deseja o reembolso e enviar de volta as embalagens fechadas. 
+- ofereci um Mordida de Dragão para teste e caso a cachorra goste enviamos outro pacote. Mas a cachorra tem alergia a farinha de trigo e tem na composição do Mordida. 
+-Cliente deseja seguir com o reembolso.  ",,,resolvida,media,,2026-03-26 16:42:55.77+00,2026-03-10 15:32:45.098166+00,2026-03-26 16:42:55.77+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+634061f2-6676-47ce-938d-d5aa4e24687a,647be338-d686-40cf-9372-426e21c8f7f9,,2026-03-18 21:04:09.855418+00,whatsapp,Priscila,,,,,,,,entrega,"pedido ainda não foi entregue, pelo código de rastreio o pacote está parado desde o dia 14 de fev em uma base da transportadora. 
+informei a cliente a situação do envio e irei verificar o procedimento
+
+mensagem enviada pela cliente: 
+
+ola, bom dia
+
+o numero do pedido eh 3620 em 10/02/2026
+meu pedido não chegou
+
+Oi Tarimy! 
+
+Que chato, sinto muito pela demora! 
+
+Sou a Priscila do time Comida de Dragão e posso te ajudar com essa questão!
+
+Localizei aqui o seu pedido #3620 de 10/02 e com o código de rastreio da Loggi QVBOWKZ7 aparece que está em uma base de transporte desde o dia 14.02. 
+
+Vou enviar a informação para a equipe responsável e retorno em breve com uma atualização! 🐉
+
+Muito obrigada pela paciência! 
+ 
+Qualquer coisa, estamos aqui! 
+Priscila | Time Comida de Dragão
+
+ok. aguardo contato priscila. 
+vai ser chato fazer uma reclamação do reclame aqui dizendo que comprei e por mais de um mes não recebi... mas aguardo sua resposta com a confirmação da data de recebimento, ou solicitação de cancelamento e reembolso. 
+
+Minha resposta: 
+Entendo completamente a sua frustração, mais de um mês sem receber é inadmissível e você tem todo o direito de estar insatisfeita.  Obrigada pela paciência até aqui. 
+
+O pacote foi enviado e infelizmente acredito que houve algum erro com a transportadora. Pode confirmar buscando o código de rastreio  QVBOWKZ7, na empresa de transporte Loggi. 
+
+https://app.loggi.com/rastreador
+
+Como foi um erro da transportadora, podemos enviar um outro pacote com a amostra. O que acha?
+
+cliente: 
+ aceito, mas gostaria de ter uma data (e um agrado rsrs) 😁
+achei o produto interessante e realmente gostaria de ver se as minhas meninas gostam! sao duas gatinhas",,Ofereci enviar novamente o pedido e entrei em contato com a Loggi para saber onde está o pacote.,resolvida,media,,2026-03-26 19:21:17.019+00,2026-03-18 21:04:09.855418+00,2026-03-26 19:21:17.026+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+e349d530-3845-4aca-b9c9-27a1204a0f58,79303727-fc58-4f92-9b2f-ca15478069bd,,2026-03-23 13:33:00.977631+00,whatsapp,Priscila,,,,,,,,entrega,"Cliente recebeu uma mensagem da campanha da semana do consumidor e respondeu que não tinha recebido a entrega dele ainda e não poderia comprar mais. 
+
+Solicitei mais detalhes e verifiquei que estava como entregue na portaria pela transportadora LOGGI. desde o dia 27 de janeiro. 
+
+cliente informou que não existe portaria no prédio dele, que é interfone, só ele pode pegar as encomendas. 
+
+Pedi desculpas pelo transtorno e solicitei o reenvio do pacote com um brinde. cliente falou que é veterinário e que já indicou Comida de Dragão para seus clientes. ",,,resolvida,media,,2026-03-26 19:21:26.526+00,2026-03-23 13:33:00.977631+00,2026-03-26 19:21:26.526+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+eba3b9c7-2904-420d-a895-c0b08dc6d25e,340b61a3-f065-4a9a-90fc-530c305503a3,,2026-03-25 18:01:27.209394+00,whatsapp,Priscila,,,,,,,,entrega,"Cliente entrou em contato para informar que fez o pedido do kit de Comida de dragão com 3 pacotes, mas só recebeu 2 pacotes.
+Número do pedido: #3903
+
+** Enviou um vídeo mostrando a caixa com os produtos que recebeu. 
+
+- Foi enviado uma caixa com o produto que estava faltando.",,,resolvida,media,,2026-03-26 19:20:41.305+00,2026-03-25 18:01:27.209394+00,2026-03-26 19:20:41.312+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+b82ab838-3d4e-4ec8-822b-ef05e3e824cd,6fcb0b6a-6e48-464b-9f56-339d9984abcf,,2026-03-30 20:35:46.645738+00,whatsapp,Priscila,Mordida de Dragão - Spirulina (180g),,,,,003414,Venda Produção Estabelecimento,entrega,"Número do pedido #3970
+Envio pela Loggi.
+Cliente entrou em contato para informar que não recebeu o pacote,  que pelo código de rastreio aparece que foi entregue no dia 28/03/26. 
+Pedi para cliente verificar com parentes e vizinhos antes de reenviar o produto. 
+Cliente respondeu que verificou e ninguém recebeu o pedido. 
+Solicitei um novo envio para  cliente.",,,resolvida,media,,2026-03-30 20:35:57.751+00,2026-03-30 20:35:46.645738+00,2026-03-30 20:35:57.754+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+416b7dd7-cdf6-4d47-9b6a-86f1a9046f0e,345d3571-1fcf-4398-a64b-0b94401bdde9,,2026-04-02 17:32:31.271652+00,email,Priscila,Kit de Amostras,,,,,003257,Venda Produção Estabelecimento,entrega,"Pedido n #3851 
+
+Cliente entrou em contato para saber mais informações sobre a entrega. Pelo código de rastreio já tinha sido entregue, mas a portaria do condomínio não recebeu. 
+Confirmei o endereço e informei que vamos enviar as amostras novamente. 
+",,,resolvida,media,,2026-04-16 13:44:54.341+00,2026-04-02 17:32:31.271652+00,2026-04-16 13:44:54.341+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+4277159e-5b6d-41ea-acda-a5cc581d2f08,a96a49bb-fda2-4d9d-8206-a545265f8224,,2026-04-13 13:44:21.915094+00,whatsapp,Priscila ,,,,,,,,outro,Cliente pediu para sair da lista de envio de mensagens automáticas. ,,,resolvida,baixa,,2026-04-16 13:44:51.431+00,2026-04-13 13:44:21.915094+00,2026-04-16 13:44:51.431+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+9f9b1d89-2cce-4b9b-bcd5-6e1767c9659c,87648c42-17af-4a8c-b83b-9c5e4129d8b5,,2026-04-16 13:42:25.921281+00,whatsapp,Priscila ,,,,,,,,entrega,"Cliente fez o pedido no dia 23/02 de amostras e ainda não chegou. 
+Pelo código de rastreio fornecido pela Loggi mostra que foi entregue na portaria no dia 28/02, mas não tem portaria. 
+
+Vamos reenviar as amostras. ",,,resolvida,media,,2026-04-16 13:44:48.987+00,2026-04-16 13:42:25.921281+00,2026-04-16 13:44:48.987+00,42a35af1-f695-4dab-b120-2c14183b2b6f,
+0cc9b1b6-86e6-4e83-85a1-924eab6b50e0,88cafb30-080e-4c1b-9c08-d4197f7c6d81,,2026-05-04 13:42:19.262677+00,whatsapp,Priscila,,,,,,,,entrega,"A transportadora Loggi marcou como entregue e recebido por ela mesma, mas o pacote não foi entregue. 
+Solicitei um novo envio para a cliente. ",,,aberta,media,,,2026-05-04 13:42:19.262677+00,2026-05-04 13:42:19.262677+00,8eb36add-ce4b-4349-a3fe-8950a535fa87,
+eb006cf2-98cf-4d0c-842d-6d31b06811d1,a6591049-0eaa-4e1f-85f3-d277513b4f4d,,2026-05-04 13:55:44.111883+00,whatsapp,Priscila,,,,,,,,entrega,"""É a segunda vez que compro de vcs e é a mesma dor de cabeça em relação a entrega .A demora e qdo chega vem tão amassado que esta quase um pó
+A última vez vcs pediram fotos e tudo mais para mostrar que veio quase tudo esfarelado e mesmo assim parece que nada mudou por causa da demora com certeza vai vir tudo esfarelado de novo"" 
+
+Entrou em contato para saber mais informações dos pedidos  4334 e 4344. Falou que já teve uma experiência ruim e que pela demora vai ter novamente. 
+Rastreei e um dos pedidos estava a caminho. No final do dia ela me informou que estava como entregue no quintal,  que ela fez uma busca e não encontrou. 
+Ficou frustrada porque colocaram como entregue quintal  e com receio do segundo pedido dar erro novamente. 
+
+Informei que na maioria das vezes a entrega é realizada corretamente e que podemos esperar que dessa vez vai chegar direitinho. 
+
+Como solução do pedido que não foi entregue solicitei um novo envio dos produtos e com um Mordida a mais como brinde e pedido de desculpas pelo transtorno.",,,resolvida,media,,2026-05-04 13:55:53.041+00,2026-05-04 13:55:44.111883+00,2026-05-04 13:55:53.049+00,8eb36add-ce4b-4349-a3fe-8950a535fa87,
+907d5dd2-10e2-4e10-9a94-b8e0468e042a,3ec509c7-c853-4e36-8e0a-71c172d1ad06,,2026-05-04 14:04:16.533586+00,whatsapp,Priscila,,,,,,,,outro,"A cachorra não se adaptou a Comida de Dragão e cliente quer devolver um pacote que ainda esta fechado. 
+Perguntei se fez a adaptação, que alguns animais precisam de um tempo, ela informou que fez vários testes, misturou no iogurte entre outros métodos e quer seguir com a devolução. 
+
+Falei que ela poderia dar o pacote fechado para algum amigo sem problemas e que vamos fazer o reembolso para ela. 
+O reembolso foi feito e ela falou que ia dar para uma vizinha.",,,resolvida,media,,2026-05-04 14:04:23.174+00,2026-05-04 14:04:16.533586+00,2026-05-04 14:04:23.179+00,8eb36add-ce4b-4349-a3fe-8950a535fa87,
+16e14822-72b3-48dc-97d0-fe382f11eee1,870dcaa6-9dcd-415c-bdb2-50f532a67537,,2026-05-04 14:11:45.480698+00,whatsapp,Priscila ,,,,,,,,entrega,"Cliente fez uma compra em 17 de março e ainda não chegou, pedido #3925. 
+Verifiquei e o pacote estava parado a muito tempo, parecia que tinha se perdido, entregue pela transportadora Loggi. 
+
+Solicitei um novo envio para a cliente com um Mordida de legumes de brinde. 
+",,,aberta,media,,,2026-05-04 14:11:45.480698+00,2026-05-04 14:11:45.480698+00,8eb36add-ce4b-4349-a3fe-8950a535fa87,
+09506f85-ae3d-4164-8bf7-7b0f68e2cf61,34409bef-0f3e-412b-b400-a8a741520610,,2026-05-04 14:23:41.404111+00,whatsapp,Priscila,,,,,,,,outro,"Cliente pediu para ser retirado da lista de mensagens automáticas.
+Fiz o processo de desinscrito pelo Reportana.",,,resolvida,baixa,,2026-05-04 14:23:52.627+00,2026-05-04 14:23:41.404111+00,2026-05-04 14:23:52.632+00,8eb36add-ce4b-4349-a3fe-8950a535fa87,
+e0bdf18c-e2c5-48f3-ade4-b2fb5cbe59e6,1c55f5d9-f19c-432e-8e0b-b9005f920fc0,,2026-05-04 14:25:31.041425+00,whatsapp,Priscila,,,,,,,,outro,"Cliente pediu para ser retirado da lista de mensagens automáticas.
+Fiz o processo de desinscrito pelo Reportana.",,,resolvida,baixa,,2026-05-04 14:25:37.538+00,2026-05-04 14:25:31.041425+00,2026-05-04 14:25:37.543+00,8eb36add-ce4b-4349-a3fe-8950a535fa87,
+38162d95-e421-42f1-9de4-710615085c82,11166ae3-443c-41ef-b8ef-68b03aa767f0,,,Instagram,,ORIGINAL 90G,,,SITE COMIDA DE DRAGÃO,Loggi,,,,Sem descrição registrada,,,fechada,,,,2026-02-27 14:38:13.91394+00,2026-02-27 14:38:13.91394+00,,
+f04b93d1-969a-441e-9337-0c0fd23c3f27,a7ca16d0-ce05-440c-8d5a-be78d2b57bcc,SAC_062025,,Instagram,Zazá,KIT DE AMOSTRAS,,,SITE COMIDA DE DRAGÃO,,,SITE,,Site diz não possuir pedido recente,,Enviamos novamente,resolvida,,,2026-02-27 14:40:11.871+00,2026-02-27 14:38:04.975283+00,2026-02-27 14:40:11.871+00,,

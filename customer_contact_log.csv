@@ -1,0 +1,216 @@
+id,customer_id,data_contato,tipo,motivo,resumo,responsavel,resultado,created_at,created_by
+88e40214-484f-48d1-8f2e-09309c132d46,5514b1fd-32e4-45ae-b993-46b8cf145450,2026-03-02 17:53:29.288654+00,whatsapp,Troca de produto,Cliente comprou errado no site e pediu para trocar os produtos. Estamos vendo se é possivel. ,Priscila,,2026-03-02 17:53:29.288654+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+fb2d37cc-202c-44c0-9b31-33195c2ae65b,d6978b13-6592-477a-8f80-882f453b3d17,2026-03-02 17:54:13.616002+00,outro,Info Sobre Cliente,Apresentadora do Pequenas Empresas Grandes Negócios,,,2026-03-02 17:54:13.616002+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+d41d7fc0-9eef-4be9-a211-e24aad46fcdf,d1a3ce72-7fa9-41c5-ab2f-2f01131d2ce5,2026-03-02 18:28:21.977826+00,whatsapp,followup amostras,Cliente ainda não experimentou. ,Priscila ,,2026-03-02 18:28:21.977826+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+cfcd506c-602d-4dce-aa92-97fe971d75fb,3a9b4a8d-36e9-43d8-94f6-3dcd2855e3b7,2026-03-03 19:50:29.582451+00,whatsapp,followup amostras ,"entrei em contato com a cliente para saber o motivo de não ter realizado a recompra depois da amostra. 
+- O gato não gostou. Enviei informações sobre transição alimentar. ",Priscila,Pet não comeu ,2026-03-03 19:50:29.582451+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+53ee8032-5f97-496e-a4ba-99e14b781291,eaeabd56-e3ac-4159-a8f9-f664de481cca,2026-03-04 14:40:37.470673+00,whatsapp,follow-up amostras,"pesquisa para saber porque o cliente não fez outra compra após receber amostras. 
+- O gato não aceitou. 
+- Enviei sugestões para adaptação e cupom de desconto CORAGEM. ",Priscila,,2026-03-04 14:40:37.470673+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+dc5301e5-964f-404f-b6eb-e90269ec7f25,f14fa4f0-12fb-41c9-8e78-235b5ea496a3,2026-03-04 14:48:47.046222+00,whatsapp,follow-up amostras,"pesquisa para saber porque o cliente não fez outra compra após receber amostras: 
+- gato não adaptou 
+Enviei sugestões para adaptação, artigo do blog sobre gatos e os benefícios, cupom de desconto CORAGEM. ",Priscila,,2026-03-04 14:48:47.046222+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+f8084efd-bd87-4cae-86bb-863fd3d01a4a,764eade7-a2bb-4eb4-9055-59d89fc53cac,2026-03-04 15:57:59.254279+00,whatsapp,Follow-up amostras,"pesquisa para saber porque o cliente não fez outra compra após receber amostras: 
+Pet gostou muito do petisco
+Enviei mensagem de incentivo e cupom de desconto para uma segunda compra. 
+",Priscila ,,2026-03-04 15:57:59.254279+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+984a45ee-c4a6-483b-ac4b-c997b09e8d90,f1fda75f-b079-4397-b396-723ea17bf087,2026-03-05 14:37:49.190473+00,whatsapp,follow up amostras ,"Objetivo: Entender o motivo da não recompra após envio de amostra.
+
+Resumo da conversa: A cliente que realizou o teste com seu gato, porém o animal não demonstrou interesse pelo alimento. O principal motivo da não recompra foi a rejeição inicial do pet.
+
+Ação: Expliquei que gatos podem precisar de um período de adaptação para aceitar novos alimentos e enviei orientações de introdução gradual do produto. Também foi disponibilizado um cupom de desconto para uma nova compra, incentivando um novo teste com adaptação correta.",Priscila,,2026-03-05 14:37:49.190473+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+4fc33529-3ea7-43a1-865a-1bde240cb3a1,22974625-693f-4791-b071-5ef12e7279d5,2026-03-06 13:00:01.268005+00,whatsapp,cachorro não aceitou ,"A cachorra não aceitou a Original e a cliente comprou 3 pacotes! Perguntou se era possível realizar a troca. 
+Enviei umas dicas para introdução alimentar, com incentivos para tentar. 
+Caso retorne verificar procedimento de troca. ",Priscila,Reembolso,2026-03-06 13:00:01.268005+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+2339e0d9-449e-4634-9b3e-a7d04742e4ff,35bdacfd-61cb-481e-a70c-d09719c3ed3f,2026-03-06 15:02:05.727986+00,whatsapp,followup amostras,"Objetivo: Entender o motivo da não recompra após envio de amostra.
+
+Cliente informou que o gato não gostou e que deu as amostras para uma amiga que tem cachorro e gostou. 
+Enviei mais informações sobre a introdução do alimento, um artigo do blog sobre o valor nutricional para os gatos e cupom CORAGEM para prox compra. indicando o suplemento para gatos. ",Priscila,,2026-03-06 15:02:05.727986+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+5fc8a2d3-6339-4048-b764-5443d9b0412a,524a8a5a-e7e7-4456-8f69-236fcd2ce152,2026-03-06 15:12:17.365889+00,whatsapp,Código de rastreio,"Cliente entrou em contato para saber mais detalhes sobre o envio do pedido que estava atrasado. 
+O pedido já tinha sido recebido pela portaria do prédio mas a cliente não tinha sido notificada. ",Priscila,,2026-03-06 15:12:17.365889+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+39cab4f4-2e24-4275-9664-3fec92cfa2d0,e2cafbdd-f58c-4bc4-9dfa-93daf8a1bd6d,2026-03-11 12:42:34.531189+00,whatsapp,Follow up amostras,"Pesquisa de consumo pós-amostra
+Tipo de interação:
+ Pesquisa de consumo pós-amostra, com objetivo de identificar as principais barreiras que impedem a conversão de leads que receberam amostra em clientes pagantes. 
+Resumo da conversa:
+Foi enviada uma mensagem para cada cliente, perguntando porque adquiriu as amostras e não retornou para uma nova compra. 
+Cliente respondeu que o pet amou o petisco, mas ainda não deu pra realizar a compra. Que achou o preço justo pela qualidade do alimento, levando em consideração que os petiscos mais baratos tem quantidade e qualidade de proteínas inferiores.
+Agradeci por ter respondido a pesquisa e ofereci um cupom de desconto para incentivar a fazer a compra no site. ",Priscila,,2026-03-11 12:42:34.531189+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+8c8aaef3-c4e3-4807-8c8c-956c4bd57dad,c85c8cf5-845d-4b75-b8c2-6abc3a203e83,2026-03-11 12:56:36.015017+00,whatsapp,gato não comeu - amostras,"Cliente entrou em contato para informar que as amostras chegaram e que os gatos não comeram pedindo dicas. 
+Respondi com dicas para adaptação e explicando que as vezes leva um tempo para os gatos acostumarem. 
+",Priscila,,2026-03-11 12:56:36.015017+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+3562bd31-af27-413f-a4cf-2d89df9f2d65,be032643-173a-4bbc-aff1-790cf00a4ebe,2026-03-11 13:25:11.947201+00,whatsapp,gato não comeu - amostras,"Cliente entrou em contato para informar que a gata não quer comer, mas que vai continuar tentando. 
+Respondi com dicas para adaptação da gata e frases motivacionais. ",Priscila,,2026-03-11 13:25:11.947201+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+02c99f65-7694-4531-a359-6e8047af005e,fbcb22e9-1d83-425b-a3f5-7adf8133e861,2026-03-12 13:12:27.903692+00,whatsapp,parceria ,"Cliente entrou em contato informando que dará uma festa de aniversario para cachorrinhos com 100 convidados cachorros. E gostaria de uma parceria com  a Comida de Dragão, para fornecer os petiscos da festa. 
+Enviei o telefone da Luana para a cliente entrar em contato. ",Priscila,,2026-03-12 13:12:27.903692+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+40d943f4-722d-4014-948a-3e484cff322a,fdea9410-1561-4eb3-ac93-8f85f0bf0d29,2026-03-13 14:06:47.551548+00,whatsapp,Follow up amostras ,"Tipo de interação:
+ Pesquisa de consumo pós-amostra, com objetivo de identificar as principais barreiras que impedem a conversão de leads que receberam amostra em clientes pagantes. 
+
+Resumo da conversa:
+Foi enviada uma mensagem para cada cliente, informando que percebemos que tinha adquirido as amostras mas não retornou para uma nova compra. 
+
+-Cliente respondeu que ficou com nojo mas o pet amou o petisco. 
+E que achou o valor caro em relação aos outros petiscos naturais que ela ja compra. 
+
+- enviei um artigo do blog que fala sobre o bloqueio que as pessoas têm com a bsf, que é benéfico para o cachorro. e importante que gostou. expliquei a diferença do Comida de Dragão para outros petiscos. Valorizando o valor do produto. 
+Informei sobre a campanha da semana do consumidor, para a cliente aproveitar a promoção. 
+
+",Priscila,,2026-03-13 14:06:47.551548+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+10c3116a-879e-4086-918d-bc6d96d70179,ed05ea54-79b5-44d5-be37-bd1c19ae0909,2026-03-13 14:53:22.28178+00,whatsapp,follow up amostras,"Tipo de interação:
+ Pesquisa de consumo pós-amostra, com objetivo de identificar as principais barreiras que impedem a conversão de leads que receberam amostra em clientes pagantes. 
+
+Resumo da conversa:
+Foi enviada uma mensagem para cada cliente, informando que percebemos que tinha adquirido as amostras mas não retornou para uma nova compra. 
+
+-Cliente respondeu que os gatos não gostaram.
+- Informei que a adaptação dos gatos pode demorar um tempo e perguntei como foi com o cachorro. 
+Enviei dicas para a adaptação com o alimento, artigo do blog que cita os benefícios da Comida de Dragão para gatos  e  um cupom de desconto. ",Priscila,,2026-03-13 14:53:22.28178+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+4a184e48-83a9-491e-a8da-0ca0b4b68415,582296bf-7746-440e-a066-ed24f96649be,2026-03-17 14:16:13.39502+00,whatsapp,follow up amostras,"Tipo de interação:
+ Pesquisa de consumo pós-amostra, com objetivo de identificar as principais barreiras que impedem a conversão de leads que receberam amostra em clientes pagantes. 
+
+Resumo da conversa:
+Foi enviada uma mensagem para cada cliente, informando que percebemos que tinha adquirido as amostras mas não retornou para uma nova compra. 
+
+O Apolo é o mais iluminado da casa Camila, ele entendeu a revolução antes dos outros 😂
+
+Mas olha, o fato de cheirarem já é um ótimo sinal, o interesse tá lá! 
+
+Com gatos a aceitação é bem gradual mesmo. Tenta misturar aos poucos na comida favorita deles, pode ser úmida, e vai aumentando aos poucos. 
+
+Em pouco tempo o Apolo vai ter feito a cabeça de todos os 8. 
+
+E essa é a Semana do Consumidor aqui com o Dragão e tá rolando 30% OFF em todo o site! 
+O momento perfeito para garantir mais pro Apolo!!
+
+🔥 comidadedragao.com.br 
+
+Qualquer dúvida é só chamar! 	
+Priscila | Time Comida de Dragão
+",Priscila,,2026-03-17 14:16:13.39502+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+b593db51-cb54-477d-ba91-f0987e36c644,502f2eb8-8fe5-4b61-81c3-a5f127c6c7b6,2026-03-18 19:54:13.121731+00,whatsapp,gato não comeu - amostras,"Cliente respondeu um envio automático de mensagem informando que o gato dela não gostou e que deu a amostra para o cachorro de uma amiga e que ele gostou. 
+
+Agradecia  a gentileza por ter compartilhado com a amiga e enviei um artigo do blog que fala sobre a adaptação alimentar  dos gatos. 
+
+Conversa: 
+
+Oi, queridos, eu lastimo, já informei que meus gatos não comeram, dei para a cadelinha de uma vizinha, ela gostou, dei os dados de vocês, possível que ela encomende.
+
+Oi Marlise!
+Sou a Priscila do time Comida de Dragão! 
+
+Obrigada por indicar a gente pra sua vizinha, fico feliz que a cadelinha tenha aprovado! 
+
+E se quiser tentar de novo com seus gatos no futuro, a gente tem algumas dicas para facilitar a aceitação, com os gatos o processo é mais demorado mesmo. 
+
+Caso tenha interesse, temos um artigo no blog com dicas para facilitar a aceitação: https://www.comidadedragao.com.br/blogs/news/como-introduzir-proteina-de-insetos-na-rotina-do-seu-gato-sem-erro-e-sem-rejeicao
+
+Estamos aqui sempre 💚
+
+Qualquer dúvida é só chamar! 	
+Priscila | Time Comida de Dragão
+
+",Priscila,,2026-03-18 19:54:13.121731+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+d805c6cb-c95e-40ea-8ecc-f66173654fcd,15372f8e-2ac2-425d-8c33-f02824767d45,2026-03-18 20:40:10.163992+00,whatsapp,Cachorro não comeu ,"cliente respondeu a campanha com cupom de desconto informando que os cachorros dela não comeram e esta com os produtos encalhados. 
+
+Respondi com dicas para a adaptação alimentar e artigo do blog com o tema. 
+
+conversa: 
+
+""Tenho 3 cachorros, nenhum gosta, tá tudo empacado aqui.
+
+Que pena Lilliane, entendo! 
+
+Sou a Priscila do time Comida de Dragão e posso te ajudar com essa questão! 
+
+Me conta um pouco mais.. eles cheiraram e ignoraram, ou nem chegaram perto?
+
+A adaptação pode demorar um tempinho, recomendamos oferecer uma pequena quantidade de Comida de Dragão  misturada com uma ração úmida que já estão acostumados. E aos poucos viram fãs também!
+
+O esforço vale a pena pela saúde dos seus cãezinhos. 
+
+Deixo um artigo do blog com mais informações sobre,  para que possa dar uma olhada: https://www.comidadedragao.com.br/blogs/news/da-repulsa-a-curiosidade-tutores-estao-mudando-de-ideia-sobre-a-proteina-de-insetos
+
+Qualquer dúvida é só chamar! 	
+Priscila | Time Comida de Dragão",Priscila,,2026-03-18 20:40:10.163992+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+b3fff5c2-78eb-4d56-8018-1b9a41ff5118,6fcb0b6a-6e48-464b-9f56-339d9984abcf,2026-03-23 13:15:17.006749+00,whatsapp,Entrega,"Cliente entrou em contato para avisar que pode deixar a entrega com a vizinha. 
+
+Informei que já tinha sido postado e que não tinha como adicionar informação. Enviei o código de rastreio e que caso não tenha ninguém em casa o pacote fica em uma base do Correios para ser retirado. 
+
+""Olá bom dia, que belezinha 😃 👏👏👏👏 caso não tenha ninguém em casa , pois todos trabalham fora, podem deixa com a vizinha da frente. Obrigada 😃"" 
+
+""Oi Elaine! 
+Sou a Priscila da equipe Comida de Dragão. Sinto muito, mas como já foi postado pelos correios, não é possível adicionar mais informações. 
+Caso ninguém esteja em casa, o mais comum é que seja deixado um aviso de tentativa de entrega e a encomenda fique disponível para retirada na agência dos Correios mais próxima por até 7 dias corridos.
+
+Recomendamos acompanhar pelo rastreio dos Correios. 
+código: WWTLF4UM
+
+Qualquer dúvida, estamos aqui!""",Priscila,,2026-03-23 13:15:17.006749+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+87fdf3bf-c8d9-4967-b975-c5246274c04b,502f2eb8-8fe5-4b61-81c3-a5f127c6c7b6,2026-03-25 14:00:46.106245+00,whatsapp,Parar de receber mensagem automática ,"Cliente pediu para parar de receber mensagens automáticas . 
+
+Oi, favor retirar meu número do mailing. 
+
+**A cliente já tinha avisado que o gato não aceitou e que acabou dando para a vizinha.
+
+",Priscila,,2026-03-25 14:00:46.106245+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+867cbbe8-b616-4d6e-a0ed-b503e272916f,f9bd1845-f36a-43de-b6ec-f8c2cc2a57db,2026-03-25 14:11:39.859736+00,whatsapp,parar de receber mensagem automática ,cliente pediu para parar de receber mensagens automáticas. ,Priscila,,2026-03-25 14:11:39.859736+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+2c23a330-7b50-4b0a-9714-0f000655ef2d,9822655a-f403-45f4-9a0d-02e135b6deeb,2026-03-25 16:37:53.433399+00,whatsapp,Alterar e-mail ,"Cliente solicitou a alteração do e-mail cadastrado. 
+
+ mudar para zivatoquinho@gmail.com
+O atual é adriana.oliveira08@uol.com.br
+
+O e-mail foi alterado  e informei a cliente que a alteração foi feita. ",Priscila,,2026-03-25 16:37:53.433399+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+9486e198-5602-46ff-9764-0f49c8971b18,2ad339cc-0c51-46e7-8fe7-5bed488f64e7,2026-04-09 15:07:16.156578+00,outro,acompanhamento do pedido,"cliente entrou em contato por mais informações sobre o pedido #3753. que no site não estava atualizando e o pedido que foi feito no dia 25 de fevereiro ainda não chegou. 
+
+Verifiquei o código de rastreio com a Transportadora Loggi e está como pacote interrompido, nunca foi retirado da transportadora e o envio cancelado.  
+
+A transportadora cancelou o pedido e o cliente não foi notificado. 
+
+Solicitei um novo envio das amostras. 
+
+",Priscila,,2026-04-09 15:07:16.156578+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+696cfcbc-c145-41ea-a468-3b4da0673bc4,5951a31c-fe00-481a-b343-1bbd61235e19,2026-04-13 13:42:21.553131+00,whatsapp,Gato não comeu ,"Cliente recebeu uma mensagem automática sobre o kit gatos e respondeu que o gato dela não gostou. 
+
+Expliquei que alguns gatos tem um período de adaptação  e dicas para fazer a introdução. Junto com o artigo do blog sobre adaptação dos gatos. 
+Perguntando também como ela ofereceu para gerar mais interação. ",Priscila,,2026-04-13 13:42:21.553131+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+3949a782-645a-4350-997f-59bbfdb62c77,ef40b799-e524-4cdb-9dca-3f6bab9bfbe7,2026-04-13 14:02:55.941634+00,whatsapp,gato não comeu ,"Cliente respondeu uma mensagem de cupom informando que o gato dela nao aceitou. 
+Dei dicas e perguntei como foi oferecido. ela disse que ofereceu com comida úmida, inclusive a farinha e o gato não aceitou. 
+
+expliquei a importância nutricional e enviei o artigo do blog sobre adaptação alimentar do gatos! ",Priscila,,2026-04-13 14:02:55.941634+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+a67c2338-393e-4919-90fa-68b6dbc97fd3,ce90a56a-8b11-41b4-b6bd-833f4e161472,2026-04-13 17:48:12.378757+00,whatsapp,Entrega,"Cliente queria saber mais informações sobre o pedido feito no dia 11.04,  
+Pacote ainda não foi enviado, o pedido foi feito em um sábado e o envio da transportadora Loggi conta por dias úteis. 
+
+Expliquei para a cliente que o prazo da entrega são 4 dias úteis e que ela vai receber um e-mail com o código de rastreio assim que for enviado! 
+",Priscila,,2026-04-13 17:48:12.378757+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+4d81b197-3386-4ae1-bf73-81c18fa138ef,0f7d00c9-3286-4a1a-a5b8-bae95a1b6b16,2026-04-16 13:51:36.052082+00,whatsapp,Gato não comeu ,"Cliente entrou em contato para falar que a gata dela não aceitou o Comida Original. 
+Expliquei sobre o período de adaptação  dos gatos e enviei o artigo do blog dicas de adaptação e mais informações nutricionais para gatos ",Priscila ,,2026-04-16 13:51:36.052082+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+59f4f907-1f3f-44a6-b193-786900d16582,2e53f2a5-406b-492d-a6c8-3d44676c728a,2026-04-16 13:59:43.794654+00,whatsapp,Gato não comeu,"Cliente respondeu uma mensagem automática informando que a gata dela não comeu a comida original. 
+Expliquei que gatos precisam de um tempo de adaptação e enviei o artigo do blog com dicas de adaptação e valores nutricionais.  ",Priscila,,2026-04-16 13:59:43.794654+00,42a35af1-f695-4dab-b120-2c14183b2b6f
+99346252-f693-478f-97cc-10b41bdee237,9ffddab4-8648-489e-9a24-16840814c2f1,2026-04-20 14:36:32.83058+00,whatsapp,cachorro não comeu,"cliente respondeu uma mensagem automática informando que o cachorro dela não aceitou Comida de Dragão Original, mas que esta comendo o suplemento com a ração. 
+
+- informei os benefícios do suplemento, já é importante estar comendo e dei dicas de como adaptar o cachorro com as larvas. ",Priscila ,,2026-04-20 14:36:32.83058+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+26b68243-a1c3-4793-b224-46b58e76a7d0,cec55d83-d456-42a6-b6f9-ef375c53a365,2026-04-20 19:43:08.756573+00,whatsapp,e-mail de confirmação não chegou ,"Cliente informou que não recebeu o e-mail de confirmação após o pagamento. 
+Verifiquei no shopify e o e-mail estava errado. 
+Editei o e-mail para o correto e fiz um teste de envio novamente. Ela recebeu e o e-mial ja esta atualizado. ",Priscila ,,2026-04-20 19:43:08.756573+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+d88bb701-ee6f-49e4-9c9a-a4c07fb1f958,cc73ff44-c39f-442a-be46-662a64099360,2026-04-22 13:53:09.158083+00,whatsapp,parar com mensagens no whatsapp ,Cliente respondeu uma mensagem automática informando que não quer mais receber mensagens ,Priscila ,,2026-04-22 13:53:09.158083+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+0715404a-f17c-4f01-8bb5-a1a476ce32f4,4f1c81f3-45e5-41fa-8dfb-f44f18fad1f5,2026-04-22 14:06:13.789772+00,whatsapp,A cachorra não gostou,"Cliente respondeu mensagem automatica informando que a cachorra dela não gostou e ela ja deu as amostras. 
+Expliquei que alguns animais tem uma questão com adaptação e com dicas caso tenha vontade de testar novamente. ",Priscila ,,2026-04-22 14:06:13.789772+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+becf7f28-cb1d-4df2-80ef-3fc98c4534e8,17a9d904-99aa-4d90-8a3b-52ee237d0c1e,2026-04-22 14:14:42.066876+00,whatsapp,não quer receber mensagens automaticas ,"cliente respondeu uma mensagem automatica informando que não quer receber mensagens . 
+Retirei cliente da lista. 
+",Priscila ,,2026-04-22 14:14:42.066876+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+3d7cb817-36ea-4250-a1cf-f16c035788c6,b0fe9493-1621-469c-ac00-6b5a25ce0961,2026-04-22 14:25:22.274471+00,whatsapp,Frete mais caro que o produto ,cliente recebeu uma mensagem automática direcionada para carrinho abandonado e falou que não comprou porque o frete está mais caro que o produto. ,Priscila,,2026-04-22 14:25:22.274471+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+66483775-3cc9-4ace-a9a6-ce79b0038dfc,d61e36b1-bc75-4c13-9610-c27545d84d74,2026-04-22 17:49:41.232026+00,whatsapp,cachorra não comeu ,"Cliente recebeu uma mensagem automática e respondeu que a cachorra dela não gostou e que deu as amostras. 
+Perguntei o que tinha acontecido que a adaptação pode levar um tempo e a cliente respondeu : Palatabilidade 
+Aceitação 
+Odor. 
+
+Expliquei que para alguns animais existe um período de adaptação, mas que se ja doou as amostras outro cachorrinho vai ter a oportunidade de conhecer a Comida de Dragão. ",Priscila ,,2026-04-22 17:49:41.232026+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+9466d1b3-8741-423a-bcb8-0a451d68036a,b365983a-b9df-401b-90b0-f9a3a0a585d5,2026-04-28 18:33:18.547475+00,whatsapp,Retirar da lista de envio automático ,"Cliente entrou em contato para avisar que não quer mais receber mensagens automáticas. 
+O cachorro morreu.
+Contato foi removido do Reportana. ",Priscila ,,2026-04-28 18:33:18.547475+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+1b87dad9-da5e-43ea-9e6b-765cf6cd3338,b3da937b-4fd9-4b3c-91b8-04856ca5b6ab,2026-04-29 15:23:38.569922+00,outro,pedido retornou ,"O interfone não estava funcionando e  não conseguiu ser notificada que a entrega chegou. 
+Solicitei o envio novamente. ",Priscila ,,2026-04-29 15:23:38.569922+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+04f3fc5c-ad9b-431b-8043-656521be6a32,f4d53436-a62b-4cac-9bba-4e268e54b5dd,2026-05-04 13:29:47.182633+00,outro,acompanhar entrega ,"Cliente entrou em contato para saber mais informações da entrega, as atualizações não estavam aparecendo no site. 
+Passei o código de rastreio  e indiquei o caminho para rastrear no site. O pacote ainda estava no centro de distribuição, teve um feriado e acredito que por isso o envio atrasou. ",Priscila ,,2026-05-04 13:29:47.182633+00,8eb36add-ce4b-4349-a3fe-8950a535fa87
+3d41f0ce-8789-41c4-9fa5-b40b8c3f1710,52f1a96b-699f-48a5-bc93-f47671e1bbba,2026-05-04 14:41:20.357622+00,whatsapp,gato não comeu ,"Cliente respondeu uma mensagem automática informando que o gato dela não gostou da Comida de Dragão Original. 
+Que ela deu as amostras para uma vizinha que tem cachorro e os cachorros adoraram. 
+Passei uma dicas de adaptação caso ela queira provar novamente. ",Priscila. ,,2026-05-04 14:41:20.357622+00,8eb36add-ce4b-4349-a3fe-8950a535fa87

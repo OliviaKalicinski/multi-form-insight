@@ -1,0 +1,160 @@
+id,customer_id,natureza_pedido,status_operacional,valor_total_informado,forma_pagamento,responsavel,observacoes,lote,peso_total,medidas,codigo_rastreio,numero_nf,is_fiscal_exempt,reconciliado,divergencia,pedido_origem_tipo,pedido_origem_id,created_by,created_at,updated_at,destinatario_nome,destinatario_documento,destinatario_email,destinatario_telefone,destinatario_endereco,destinatario_bairro,destinatario_cidade,destinatario_cep,tipo_nf,nf_pendente,nf_file_path,boleto_file_path,documentos_atualizados_em,reconciliacao_status,apelido
+3a3f530e-8bee-4055-9737-de5996a5285a,a30fe3db-c6ee-42cd-bf0b-a3cfb657b5af,B2B,cancelado,0.01,outro,OLIVIA ,TESTE DE USO.,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-03 15:56:02.474127+00,2026-03-04 14:25:22.860461+00,,,,,,,,,,f,3a3f530e-8bee-4055-9737-de5996a5285a/nf.pdf,,2026-03-04 14:20:57.654+00,erro,
+bb703dd4-663e-442f-afe1-a32b864caaf0,5140710c-190d-4be8-9a0b-0beb041b743a,B2C,cancelado,38.9,,,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-04 14:25:51.91886+00,2026-03-05 00:40:42.006081+00,,,,,,,,,venda,t,bb703dd4-663e-442f-afe1-a32b864caaf0/nf.pdf,,2026-03-04 14:27:43.952+00,erro,
+dde10c34-fbb8-4c7c-a8eb-43199f65553f,0b16ceb3-6245-43fc-ac7c-9fba5d57df39,B2B2C,enviado,384.94,pix,Breno ,Desconto via Pix ,,2.5,30x30x30,AN660850258BR,000717,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-04 16:07:12.371566+00,2026-03-12 23:50:40.797802+00,Box Natural Pet,49178378000179,contato@naturalpet.com.br,11 983324032,Rua Sinanduva 377 apt 31,Vila Marieta,São Paulo,03621010,venda,f,dde10c34-fbb8-4c7c-a8eb-43199f65553f/nf.pdf,,2026-03-05 11:42:34.096+00,erro,
+9471996e-8ca5-480e-9377-07601c92b23d,a30fe3db-c6ee-42cd-bf0b-a3cfb657b5af,B2C,cancelado,10,outro,Breno,Teste,555,55,40x30x20,qejdjlkmfmdkfmsd,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-04 17:19:11.565161+00,2026-03-05 00:40:44.166414+00,,,,,,,,,bonificacao,t,,,2026-03-04 17:19:11.565161+00,,
+b2bedcde-5b5f-4090-b4ae-40b575239247,,Seeding,enviado,5,,Priscila ,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-05 16:05:54.086012+00,2026-03-16 11:25:47.164617+00,Amanda Jailsa Damasceno ,,,,Estrada Manoel Lages número 750 Bloco 29/43 Condomínio Green Land ,Jd Caiapia. Cotia,São Paulo,06705050,,t,,,2026-03-05 16:05:54.086012+00,,
+7a980a33-1998-4930-b12a-0c05011136aa,,Seeding,enviado,5,,Priscila,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-05 16:13:28.187623+00,2026-03-16 11:25:44.181862+00,Mariana Loschi Salomão,,,,"Rua da Groenlândia, 401, ap 1202-bl2",Sion ,Belo Horizonte/MG,30320060,bonificacao,t,,,2026-03-05 16:13:28.187623+00,,
+c3a21f36-56c9-4f0a-9512-c63a2a45ae0e,,Seeding,enviado,5,,Priscila,"Participou do lançamento do Sup Gatos. 
+Pedido retornou. 
+Enviar também amostra de suplemento para gatos 
+",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-05 17:26:07.869432+00,2026-03-16 11:25:41.041725+00,Stephanie Schneider Pereira,,mv.stephanieschneider@gmail.com, (54) 99209-8770, Rua tronca 2028 - Clínica veterinária eccellenza,Exposição ,Caxias do Sul,95010100,,t,,,2026-03-05 17:26:07.869432+00,,
+f65d12df-28e1-46e6-8e31-df792e409d5d,,Seeding,enviado,5,,Priscila,"Pedido retornou. 
+Papelaria padrão",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-05 17:39:58.528053+00,2026-03-16 11:25:38.220746+00,Laissa Santiago,,laissantiagoc@gmail.com,, Eliana paiva auricchio n 50 ,Vista linda,São José dos Campos,12220048,,t,,,2026-03-05 17:39:58.528053+00,,
+31c5c430-2033-4b95-8469-d43708c3cec8,,Seeding,enviado,5,,Priscila,"Participou do lançamento do Sup Gatos
+Pedido Retornou.
+Reenviar também amostras do Suplemento para gato 
+Papelaria padrão  ",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-05 17:46:04.194578+00,2026-03-16 11:25:33.734288+00,WALTER FIGUEIRA,,walterfigueira1@gmail.com,(11) 94756-4008,PRAÇA DOM JUSTINO JOSE SANTANA n50  casa,TATUAPE,São Paulo,03316155,,t,,,2026-03-05 17:46:04.194578+00,,
+ef141fe4-64a4-4aa3-863d-d0dfdf40d7b4,,Seeding,enviado,5,,Priscila,"Participou do lançamento do Sup Gatos  
+Pedido retornou 
+Enviar também amostra do suplemento para gatos",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-05 17:51:55.476278+00,2026-03-16 11:25:31.442752+00,Jucimara Roepcke Zanella,,felinosdaju@gmail.com,(47) 99203-6600, Rua Pomeranos 1900 ,Pomeranos,Timbó,89090728,,t,,,2026-03-05 17:51:55.476278+00,,
+5feb4806-4ae1-4713-a5c1-9cc4c43ffa61,,Seeding,enviado,4.93,,Priscila,Estudante Med Vet,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-05 17:55:45.169099+00,2026-03-16 11:25:28.819631+00,Danilo Carri Wordell,,,,R. Érico Veríssimo 1216,Alto Alegre,RJ,85805-050,,t,,,2026-03-05 17:55:45.169099+00,,
+160dc265-8090-4009-83ca-7402774e50d0,,Seeding,enviado,5,,Priscila ,"Envio especial para canil: 
+Enviar: -1 Kg Suplemento integral
+            -1 Kg biscoito ",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-05 18:03:41.038162+00,2026-03-16 11:25:25.641767+00,Edson / Canil Oliver,07143866776,anna.edson.72@gmail.com,13 982106338,Av Tiradentes número 9957 Casa,Itaguaí Mongaguá ,SP,11733610,,t,,,2026-03-05 18:03:41.038162+00,,
+6b28ef14-de10-4ea5-b36b-099c1aa3a4cb,,B2C,enviado,5,,Priscila,Pedido #3498  de amostrar retornou. ,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-05 18:07:50.439435+00,2026-03-16 11:25:20.729486+00,Tatiene Figueiredo,,tatienefigueiredo@gmail.com,21986740005,"Rua Aroazes, n 145, Bl 2 apto 905",Barra Olímpica,RJ,22775-060,,t,,,2026-03-05 18:07:50.439435+00,,
+d5049ace-e325-4683-b5a3-42fd27b9fcd1,,B2B2C,enviado,405,boleto,Breno,Boleto 20/45 dias,,3.546,30x30x30,,000721,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-06 14:20:27.418725+00,2026-04-10 19:55:53.089552+00,AgroPet Mineiro,078417470001-11,fiscal@agropetmineiro.com.br,19 988388858,Rua Anhanguera n55 box 4 e 8,Centro,Americana,13466060,venda,f,d5049ace-e325-4683-b5a3-42fd27b9fcd1/nf.pdf,,2026-03-09 18:09:30.705+00,,
+728eda53-f94c-425e-873c-32b2ad5d77c4,,Seeding,enviado,5,,Priscila,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-06 14:20:59.246295+00,2026-03-16 11:25:14.913771+00,Pedro Blaya Luz,024.995.740-03,,24 9957-4003,"Rua Getúlio Lopes de Araújo, 353. Bloco C, ap 403",Ponta Negra,Natal - RN,59091-100,bonificacao,t,,,2026-03-06 14:20:59.246295+00,,
+c2be90e4-5cf9-4934-8699-e1e6bf4fb90e,591058e6-ce74-45a6-94b1-63449f5f972b,Seeding,enviado,1,,Priscila ,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-06 14:25:47.437879+00,2026-03-20 18:50:32.974412+00,Gabriel Lima Pires Ribeiro,16460981701,,,"Avenida Estanilo Franciso Xavier, 185",Javary,"Miguel Pereira, RJ",26900000,bonificacao,t,,,2026-03-06 14:25:47.437879+00,,
+d3cf0871-506b-401a-ba3e-294c42ec13ab,,B2C,enviado,5,,Priscila,"Envio retornou, reenviar para a cliente. 
+Participou do lançamento do Sup Gatos  
+Papelaria padrão. 
+
+",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-09 14:15:44.323671+00,2026-03-16 11:25:04.556765+00, Melissa da Fraga carreiro,,spapetadm@outlook.com,(21) 98826-8161,Rua Pedro bloch quadra a lote 17 - loja,Campo Grande,RJ,23075499,,t,,,2026-03-09 14:15:44.323671+00,,
+7947ba86-1684-4401-a6cc-c45c891f12b2,a5a2c2eb-36bd-4f3a-8abe-e228481d79a9,B2B2C,enviado,419.8,boleto,Breno,Boleto 30D,,2.506,30X30X30,,000722,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-09 18:55:16.151248+00,2026-04-10 19:55:49.472296+00,Jilliane dos Santos ,59734810000114,zoroekaya@gmail.com,67 99844-2934,Rua Rio Formoso 915,São Jorge da lagoa,Campo Grande,79095-040,,f,7947ba86-1684-4401-a6cc-c45c891f12b2/nf.pdf,,2026-03-10 16:43:40.426+00,,
+a742ab39-f9d2-46ff-8e88-dc4522797005,,B2B,enviado,862,outro,Breno,"Dados para Faturamento
+Nome: FIOTEC - FUNDACAO PARA O DESENVOLVIMENTO CIENTIFICO E TECNOLOGICO EM SAUDE
+CNPJ: 02.385.669/0001-74 - IE:  77.469.770 - IM: 02.240.228
+Endereço:
+Av. Brasil 4036 -Manguinhos
+Rio de Janeiro/RJ - CEP 21040-361
+
+Valor:
+Total: R$ 792,00
+FRETE: R$ 70,00
+VALOR TOTAL: R$ 862,00
+Cond.pgto.: Faturado 30 dias
+
+ENVIAR NOTA FISCAL PARA OS E-MAILS:
+nfe@fiotec.fiocruz.br
+acompanhamentodecompras@fiotec.fiocruz.br
+RCC: 10125026",,19.2,50x40x20,,000723,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-10 14:29:06.704572+00,2026-03-18 20:38:56.400777+00,WMP RJ,,nfe@fiotec.fiocruz.br,," Fiocruz Maré - Avenida Brasil, 4036 ",,Rio de Janeiro,21040361,,f,a742ab39-f9d2-46ff-8e88-dc4522797005/nf.pdf,,2026-03-11 19:02:05.125+00,,
+04449bc7-bb76-4548-9e3d-5d105ab238c2,,B2B2C,enviado,419.4,pix,Breno,Pix 5% de desconto,,,,,000724,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-11 17:38:53.917856+00,2026-03-18 20:38:06.85798+00,Murilo Guerra,632035440001-70,,1199895-2832,"Rua Mazzini, N 87 apt 33",Aclimação,SP,01528000,,f,04449bc7-bb76-4548-9e3d-5d105ab238c2/nf.pdf,,2026-03-11 19:22:59.776+00,,
+62fc5cfe-fc3b-49ab-bcec-62d8693ac112,,B2C,enviado,6.75,,Priscila,"Pedido #3723 retornou para remetente. 
+Reenviar pacote. ",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-17 13:16:06.254542+00,2026-03-26 15:19:34.160183+00,Bianca Maranhão,,,,"Estrada do Lameirao pequeno, ⁠770, Casa 14B,",Campo grande,RJ,23017-325,,t,,,2026-03-17 13:16:06.254542+00,,
+e064564b-17fb-4996-8a02-e9dc32230417,,B2C,enviado,8.89,,Priscila,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-19 12:48:18.382003+00,2026-03-26 15:19:31.922292+00,Tarimy Nassif,,,,"Alameda Sarutaiá, n ⁠353, 32, ⁠",⁠Jardim Paulista,São Paulo,01403-010,,t,,,2026-03-19 12:48:18.382003+00,,
+79091c2e-22de-4861-a4a3-469ff0a7d001,,B2C,enviado,8.89,,Priscila,"* Importante 1 amostra para gatos. 
+
+-Médico Veterinário
+
+A loggi não entregou o pacote e no rastreio está como entregue na portaria. ",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-19 14:42:06.439061+00,2026-03-26 15:19:29.065638+00,HERVAL CITTADINO,,,,"Rua dos Estudantes, ⁠n 357 , 1010,", ⁠Liberdade,SP,01505-001 ,,t,,,2026-03-19 14:42:06.439061+00,,
+d9a57528-a2d9-4fcf-8bbb-8a1c5b0a0323,,Seeding,enviado,0.92,,Priscila ,"Envio especial. Urgência. 
+
+* Enviar por Sedex*
+
+* Enviar o mordida se couber na caixa. 
+Dono de empresa pet nos eua e está no Brasil nesse momento.",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-20 16:34:35.423291+00,2026-03-26 15:19:26.142905+00,Dagoberto Tenaglia Junior,,,,Rua Marambaia 627,Casa Verde,São Paulo ,02513-000,bonificacao,t,,,2026-03-20 16:34:35.423291+00,,
+42451b0b-fca6-4eaf-b303-b93b531aac44,e12c936d-3a18-4096-a499-790de9193dd1,B2B,enviado,8320,boleto,BRENO,"Frete: R$ 804,48 
+PAGO PELA LETS FLY
+ATENÇAO QUE O PRODUTO É LARVA DESIDRATADA E NÃO FARINHA DESIDRATADA ",,,,,000728,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-23 11:24:10.07297+00,2026-03-29 21:59:06.850652+00,,,,,,,,,venda,f,,,2026-03-23 11:24:10.07297+00,,
+b44939c3-073d-484f-8cc4-4d9956312149,,Seeding,enviado,2,,Priscila,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-23 13:58:43.490063+00,2026-03-30 11:55:22.399848+00,Jansen Henrique ,,,,"Rua Machado Sidney, nº 160, apto 1105",São José dos Campos,SP,12245-650,bonificacao,t,,,2026-03-23 13:58:43.490063+00,,
+04523a98-c31e-43a7-a57a-cfa6d22c1c57,,B2C,enviado,2,,Priscila,"
+
+** kit amostras para cachorros.
+
+Pedido da cliente foi enviado em 5/11/25 e não foi entregue até hoje. Transportadora Loggi. ",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-23 18:16:27.890919+00,2026-03-30 11:55:19.738207+00,SIMONE DE SIQUEIRA,,simonexsiqueira@gmail.com,,"angelo matielo, ⁠270 Ou 229",Jardim Meridien,Águas de Lindóia SP,13940-534,,t,,,2026-03-23 18:16:27.890919+00,,
+fd024b9b-17a6-429b-b149-0f1cb63b8dac,,B2B,enviado,800,boleto,Breno,Frete por conta da Lets Fly,,,,,000731,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-24 14:01:50.192407+00,2026-04-10 19:55:44.651275+00,WOLBITO DO BRASIL,,,,"Rua Professor Algacyr Munhoz Mader, 3775",Cidade Industrial,Curitiba,81350010,venda,f,,,2026-03-24 14:01:50.192407+00,,
+aeb5c401-58cf-4860-9fc3-710c40a4c27b,,Seeding,pedidos,2.1,,Priscila,"**incluir também : 
+
+-  Camisa CD 
+- Caneca (Patacurta)
+- Cartela adesivos (CD + Patacurta)
+",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-24 18:28:25.208864+00,2026-03-24 18:28:25.208864+00,Juliana Hermsdorff ,,,,Rua Marquês De Paraná n:360   comp: ap704 bloco 4, Centro,Niteroi,24030211,bonificacao,t,,,2026-03-24 18:28:25.208864+00,,
+9f32afb8-5adc-4cc7-a3d8-b691a28d8b04,,Seeding,pedidos,2,,Priscila ,"** incluir no envio: 
+
+Camisa CD 
+Caneca (Patacurta)
+Cartela adesivos (CD + Patacurta)
+",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-24 18:32:13.402796+00,2026-04-23 12:00:38.946721+00,Marcela Silveira,,,,Rua Luiz Torres De Barcelos n: 86 (portão laranja),Pedro Brito Neto, Leopoldina,36707070,bonificacao,t,,,2026-03-24 18:32:13.402796+00,,
+08e55246-75cd-4875-bc3e-e9677d5c9de0,,B2B2C,enviado,2123,boleto,Breno,"BOLETO 30/60/90
+Datas: 30/04 - 30/05 - 30/06",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-25 17:49:08.566641+00,2026-03-30 11:55:07.508619+00,Lucia Rolim,,atelieluciarolim@gmail.com,,"AVENIDA SETE DE SETEMBRO, 1448,EDF. SÂNDALO, 1001",centro,SALVADOR,40020465,venda,t,08e55246-75cd-4875-bc3e-e9677d5c9de0/nf.pdf,08e55246-75cd-4875-bc3e-e9677d5c9de0/boleto.pdf,2026-03-26 17:19:02.46+00,,
+cc1aec56-b572-4319-975b-06658a871d48,,B2C,enviado,2,,,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-25 17:52:27.769448+00,2026-03-30 11:55:16.563038+00,Marcela Silveira,,,,Rua Luiz Torres De Barcelos n: 88 86 Compl: Portão laranja,Pedro Brito Neto,Leopoldina,36707070,,t,,,2026-03-25 17:52:27.769448+00,,
+9aa0acdf-1b59-4dce-917e-ac5200efc826,,Seeding,enviado,2,,Priscila,"** Envio especial ** Dono de uma rede de pets. 
+Se não couber na caixa de seeding enviar em outra caixa. 
+",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-26 13:58:36.88389+00,2026-03-30 11:55:13.724887+00, Victor Leite ,,,,"Av. Dr. Heitor Penteado, 123 ",Jardim Nossa Sra. Auxiliadora,Campinas,13075185,bonificacao,t,,,2026-03-26 13:58:36.88389+00,,
+5ce25372-3328-47ea-8412-a6432e9cda05,,Seeding,enviado,2,,Priscila,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-26 18:21:58.843458+00,2026-04-08 13:13:35.421808+00,Bruno Matias,,,,Rua Santo Amaro 107 ap308,Gloria ,RJ,22211-230,,t,,,2026-03-26 18:21:58.843458+00,,
+3fe91579-f8ee-4080-bbea-16bc810da7db,,Seeding,cancelado,2,,Priscila,"** Envio Urgente e especial Tiktoker. Importante Caprichar. 
+** 3 Caixas com os 3 itens em cada 
+** Adicionar panfletos ou mais itens disponíveis de papelaria. ",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-27 20:56:28.397642+00,2026-03-27 21:26:43.504253+00,Alexandre Capella,,,,Rua ibiquara 80 - casa,São Paulo,SP,05055-020,bonificacao,t,,,2026-03-27 20:56:28.397642+00,,
+eb52215f-495b-40fd-b8f7-a899f00b0506,79303727-fc58-4f92-9b2f-ca15478069bd,Seeding,cancelado,11,,,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-30 13:11:59.113837+00,2026-03-30 17:20:25.335086+00,,,,,,,,,bonificacao,t,,,2026-03-30 13:11:59.113837+00,,
+c8d68bb1-624a-4b12-a283-6875903e6467,,B2C,cancelado,49.02,,Priscila ,"N do pedido: #3970
+A transportadora Loggi registrou como entregue, mas não deixou nada no local. 
+** Pode deixar com vizinha da frente Dorvalina. ",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-03-30 18:44:37.867471+00,2026-04-01 13:26:16.705596+00,Elaine Regina Genaro,,,,"Rua marcelino zequim, ⁠77 A","Rua marcelino zequim, ⁠77 A",Maringa ,87060-029,,t,,,2026-03-30 18:44:37.867471+00,,
+27164eee-3608-4f82-9c22-510398aa0d1d,,B2C,enviado,2,,Priscila,"Cliente pediu para trocar um Comida de Dragão Original fechado por um Mordida  Spirulina.  Cachorra não gostou. 
+
+*Cachorra provou amostra
+
+Expliquei do tempo de adaptação e ofereci o Mordida sem a troca, para continuar a adaptação. 
+",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-01 19:44:43.430079+00,2026-04-08 13:13:33.069969+00,Elisangela Teles Santos,,,,Rua João Miguel Fernandes Coelho n: 9 ,Jardim Paris,São Paulo,05761-420,,t,,,2026-04-01 19:44:43.430079+00,,
+e6d67b27-2e17-4d30-98f0-ec8f77fbcf67,,B2C,enviado,2,,,"**Kit amostra gato. 
+*Loggi deu como pedido entregue mas cliente falou que não chegou",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-02 17:40:19.237072+00,2026-04-09 14:31:08.425674+00,Leonardo Stafski,,,,"Condominio Recanto dos Passaros(s/n). Rua Uirapuru, n: 885",⁠Recanto dos Passaros,Engenheiro Coelho- SP,13448-256,,t,,,2026-04-02 17:40:19.237072+00,,
+a4257d9f-2cf8-4f1a-971d-d70a7a48dc27,,B2B2C,enviado,1239.47,pix,Breno Barros,,,8.8,42L x 52C x 43A,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-08 13:33:40.272568+00,2026-04-09 14:31:05.548062+00,Thuany da Silva,50451836000180,Thuanychaparro21@icloud.com,67 998882055,spipe calarge 688,tv morena , Campo Grande ,79.050-261,venda,f,a4257d9f-2cf8-4f1a-971d-d70a7a48dc27/nf.pdf,,2026-04-08 18:18:24.354+00,,
+28cef53e-6cae-438f-b41a-be51e2972474,,Seeding,enviado,2,,Priscila,* ajuda a gente em tráfego pago. ,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-08 20:38:51.482048+00,2026-04-22 20:27:26.798564+00,Mamédio de Freitas Oliveira Rezende,,,,"Rua Rio de Janeiro, 178",Bairro Santa Maria,Uberaba - MG,38050150,bonificacao,t,,,2026-04-08 20:38:51.482048+00,,
+a7278c6e-0806-4250-9948-de642f210a0b,,B2B,fechado,880,transferencia,,"Atenção Frete:
+Valor Frete: R$ 90,00 
+Total: R$ 970,00
+
+Envio da Nota Fiscal:
+
+nfe@fiotec.fiocruz.br
+
+Envio de Cobranças de Pagamento:
+
+Cobranças de pagamento deverão ser encaminhadas para:
+
+cobrancas@fiotec.fiocruz.br",,21,40x27x41,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-09 14:19:02.511892+00,2026-04-27 13:05:54.911997+00,FIOTEC - FUNDACAO PARA O DESENVOLVIMENTO CIENTIFICO E TECNOLOGICO EM SAUDE,02.385.669/0001-74,nfe@fiotec.fiocruz.br,," Av Brasil, 4036",,RIO DE JANEIRO,21040361,venda,t,,,2026-04-09 14:19:02.511892+00,,
+8cf0f569-8164-4160-be0e-4d493381a5d1,e12c936d-3a18-4096-a499-790de9193dd1,B2B,enviado,7904,transferencia,Breno,Frete por nossa conta,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-09 14:30:33.573647+00,2026-04-13 18:03:55.979335+00,Buzz,,,,,,,,venda,t,,,2026-04-09 14:30:33.573647+00,,
+c1a10bfe-0157-467e-bcb1-7e5b7ef5d01c,,B2C,enviado,2,,,**Kit amostra para cães,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-09 15:12:22.730861+00,2026-04-14 17:25:06.604528+00,Joao Claudino,,,,"Avenida Universitária n.1257, 2101c",⁠Vila Santa Isabel,Anápolis GO,75083-350,,t,,,2026-04-09 15:12:22.730861+00,,
+1b00ccfa-0b55-4bc7-9f12-32c331606102,,B2B2C,enviado,384.75,pix,Breno,5% de desconto no pix,,2.566,30X30X30,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-14 13:02:09.608123+00,2026-04-22 20:27:23.874916+00,Carolina Maia,30.743.804/0001-41,carol.grrrl@hotmail.com,(12) 99174-1935,"Rua Ary Barroso, 551,  casa 32",Vila Santos,Caçapava,12280020,venda,f,1b00ccfa-0b55-4bc7-9f12-32c331606102/nf.pdf,,2026-04-14 17:56:50.116+00,,
+57abc090-1cb1-4b6c-9b2c-a5f013b608af,,Seeding,aguardando_expedicao,2,,Priscila ,"Canil parceiro- 1Kg de Suplemento Concentrado 
+1kg de larvas",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-16 13:15:24.028907+00,2026-05-04 13:05:00.542998+00,Edson / Canil Oliver ,07143866776,,,Av Tiradentes número 9957,Itaguaí,Mongaguá SP,11733610,bonificacao,t,,,2026-04-16 13:15:24.028907+00,,
+e039dd1f-efc3-458f-8822-ca1f3dea8ab0,,Seeding,fechado,2,,Priscila ,"**Importante verificar prazo de validade do Grub e mandar um agrado. 
+
+*Cliente em potencial fez pedido do Grub e foi perto da data de vencimento. 
+Fez uma reclamação no reclame aqui. 
+
+",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-16 13:26:35.801404+00,2026-04-22 20:27:32.194188+00,Fernando Henrique Amizes Felipe,,,,"Rua Maestro Cardim, ⁠1059, apto 14",Liberdade,Sao Paulo SP,01323-001,bonificacao,t,,,2026-04-16 13:26:35.801404+00,,
+707f39d9-61dd-4b44-9b47-8afaf0690bb4,,B2C,fechado,1.98,,Priscila ,**Kit amostra para cães,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-16 13:44:33.944702+00,2026-04-22 20:27:29.556209+00,Silvana Gastaldo,,,,"Rua Castro Alves,, ⁠607",⁠Independencia,Porto Alegre RS,90430-131 ,,t,,,2026-04-16 13:44:33.944702+00,,
+a2b472ca-46de-403f-8b70-a938a9983799,,B2B,enviado,784,pix,Breno,"Guilherme vai buscar na operação 
+ATENÇÃO QUE É LARVA DESIDRADATA E NÃO FARINHA DESIDRATADA",,,,,748,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-22 14:14:19.373518+00,2026-04-29 19:07:56.268815+00,GUILHERME SILVA SILVANY DE ARAUJO,24.898.054/0001-84,,(21) 99533-9305,Rua Mirene Abigail Santa Rosa  - Serra grande - Niterói RJ N 13,,Niterói,24340-245,venda,f,,,2026-04-22 14:14:19.373518+00,,
+d017d09d-67a8-4cc3-9fcb-48f7bfb5095b,,B2B2C,enviado,1344,,,,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-23 14:46:12.508471+00,2026-04-29 18:33:52.103234+00,Petz,18.328.118/0038-09,,11 3434-6800,"AV HELIO OSSAMU DAIKUARA, 1445",,EMBU DAS ARTES ,06806045,,t,,,2026-04-23 14:46:12.508471+00,,
+59d7615b-0b5f-4e3d-bbd0-0826fe572065,,B2B,enviado,1,,,,,10.945,45C x 37L x 24A,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-24 12:16:00.969319+00,2026-04-29 18:33:48.730095+00,Herold Ribeiro Bull, 05.470.581/0001-49,,,"Avenida Horst Frederico João Heer, 1420, Sala 01",Europark Comercial,,13348758,,t,,,2026-04-24 12:16:00.969319+00,,
+18d3a0bd-eb75-4c97-bf29-53fc1f192761,,B2C,pedidos,45,pix,Amanda,"São apenas amostras. Ela vai pagar apenas o Frete R$ 45,00
+FAZER APENAS QUANDO TIVERMOS AMOSTRAS DE SUPLEMENTO
+50 Amostras Original
+10 Amostras Mordida legumes
+10 Amostras Mordida Spirulina
+10 Amostras Suplemento Caes integral
+10 Amostras Suplemento gato 
+
+Pedir pagamento em Pix: somos@letsfly.com.br",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-27 15:02:28.26637+00,2026-04-28 00:04:14.313717+00,Lucia Rolim,34662178000110,,71 99414-4660,"AVENIDA SETE DE SETEMBRO, 1448,EDF. SÂNDALO, 1001",Centro,"Salvador, Bahia",40020465,,t,,,2026-04-27 15:02:28.26637+00,,
+b9f8b5d1-cbee-4ec4-984c-636168e66375,,B2C,enviado,69.93,,Priscila,,,,,,,f,f,,,,8eb36add-ce4b-4349-a3fe-8950a535fa87,2026-04-28 13:29:12.624684+00,2026-04-29 18:33:02.013165+00,Renata Toribio Nunes,,,,"Rua Aldo Menotti Sirangelo, ⁠n 40,  1304", ⁠Jardim do Salso,Porto Alegre RS,91410-060,,t,,,2026-04-28 13:29:12.624684+00,,
+444c6bfa-3b33-4ee3-a31c-fac9334e4bca,,B2C,pedidos,6.75,,Priscila,Kit amostra para cães ,,,,,,f,f,,,,8eb36add-ce4b-4349-a3fe-8950a535fa87,2026-04-29 15:21:53.02807+00,2026-04-29 15:21:53.02807+00,Isabella Vieira,,,,"Rua Maranhão, ⁠n 199, apt. 301",Meier ,Rio de Janeiro ,20720-293,,t,,,2026-04-29 15:21:53.02807+00,,
+69bca353-dcb2-4290-b1a8-cbab32c1c883,c359f370-9e15-40bb-af78-874bbbd3a69e,B2B,cancelado,1792,pix,Amanda,"Serão 7 SACOS DE ROCK LARVA DE 8KG
+ATENÇÃO QUE É LARVA DESIDRADATA E NÃO FARINHA DESIDRATADA
+Guilherme vai buscar na operação 01/05/2026",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-29 18:30:32.687164+00,2026-04-29 19:17:05.218789+00,,,,,,,,,venda,t,,,2026-04-29 18:30:32.687164+00,,
+b24e9dd2-c30d-4a23-8f00-10e24243cc16,,B2B,enviado,1792,pix,Amanda,"Serão 7 SACOS DE ROCK LARVA DE 8KG
+ATENÇÃO QUE É LARVA DESIDRADATA E NÃO FARINHA DESIDRATADA
+Guilherme vai buscar na operação 01/05/2026",,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-04-29 19:15:08.11205+00,2026-05-04 12:31:32.41312+00,GUILHERME SILVA SILVANY DE ARAUJO,24.898.054/0001-84,,(21) 99533-9305,"Rua Mirene Abigail Santa Rosa, 13 - Quadra 100, Lote 13",Serra Grande,Niterói,24340-245,venda,t,,,2026-04-29 19:15:08.11205+00,, 
+c92e5b7c-fe81-4ba2-885c-68f827916351,,B2C,pedidos,13.28,,Priscila,Kit amostras para cães,,,,,,f,f,,,,8eb36add-ce4b-4349-a3fe-8950a535fa87,2026-04-30 18:45:24.49493+00,2026-05-03 16:00:49.95877+00,Solange Saiki,15701667812,,+55 18 99796-9804,"Rua Rosalina Campos Vieira, 201",Terras de Imoplan,Presidente Prudente  - SP,19044-120,,t,,,2026-04-30 18:45:24.49493+00,,
+bb8c8fb6-325e-4791-a94b-b0715fc0f319,,Seeding,pedidos,39.97,,Amanda,Envio para Miami a pedido do Bruno,,,,,,f,f,,,,42a35af1-f695-4dab-b120-2c14183b2b6f,2026-05-04 14:42:15.713361+00,2026-05-04 14:42:35.567898+00,Envio EUA,,,,2184 ne 167st North Miami Beach FL 33162,,Miami,33162000,bonificacao,t,,,2026-05-04 14:42:15.713361+00,,
