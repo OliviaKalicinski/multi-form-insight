@@ -252,7 +252,9 @@ function textParts(raw: string): string[] {
     .toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .split(/[._\-\s]+/)
-    .filter((p) => p.length >= 3); // ignora partículas curtas
+    // R40 (auditoria #6.5): subido de 3→4 pra reduzir falso positivo
+    // (tipos "dra", "raf", "ana", "vet", "pet" puxavam cupom errado).
+    .filter((p) => p.length >= 4);
 }
 
 /**
@@ -294,20 +296,29 @@ function suggestCoupon(influencer: Influencer, availableCoupons: string[]): stri
   // Junta todas as partes de todas as fontes num único array para comparação
   const allParts = sources.flatMap(textParts);
 
-  // Passagem 1 — exato / prefixo direto
+  // R40 (auditoria #6.5): Passagem 1 endurecida.
+  // Antes: `c.startsWith(part)` aceitava prefix de 3 chars → "dra" puxava
+  // DRAEVE, "raf" puxava RAFAPETSITTER. Resultado: 168 perfis com
+  // SIMBAEPULGA porque parts curtas combinavam fácil.
+  // Agora: match exato OU `startsWith` exige min(part, coupon) >= 5 chars.
   for (const part of allParts) {
     for (const coupon of availableCoupons) {
       const c = coupon.toLowerCase();
-      if (c === part || part.startsWith(c) || c.startsWith(part)) return coupon;
+      if (c === part) return coupon;
+      const minLen = Math.min(c.length, part.length);
+      if (minLen >= 5 && (part.startsWith(c) || c.startsWith(part))) return coupon;
     }
   }
 
   // Passagem 2 — raiz do coupon (sem dígitos finais) contra as partes
+  // R40: idem — exige min 5 chars na sobreposição de prefix.
   for (const part of allParts) {
     for (const coupon of availableCoupons) {
       const root = couponRoot(coupon);
-      if (root.length < 3) continue;
-      if (part === root || part.startsWith(root) || root.startsWith(part)) return coupon;
+      if (root.length < 5) continue;
+      if (part === root) return coupon;
+      const minLen = Math.min(root.length, part.length);
+      if (minLen >= 5 && (part.startsWith(root) || root.startsWith(part))) return coupon;
     }
   }
 
@@ -817,8 +828,25 @@ export default function CadastroInfluenciadores() {
 
   const selectedLinkedCoupon = selected?.coupon ?? null;
   const selectedStats = selected ? getStats(selected.email) : null;
+
+  // R40 (auditoria #6.5): set de TODOS os cupons já vinculados a outras
+  // influenciadoras. Antes, `selectedSuggestion` excluía só o cupom da
+  // influenciadora ATUAL — cupons já em uso por outras continuavam no
+  // espaço de busca, e o algoritmo sugeria o mesmo várias vezes.
+  // Resultado bug 6.5: 168 perfis com SIMBAEPULGA. Agora todo cupom
+  // que já está em uso é excluído da sugestão (exceto o da própria,
+  // se já tiver — pra não atrapalhar fluxo de "manter o vínculo atual").
+  const linkedCouponsSet = useMemo(
+    () => new Set(influencersData.map((i) => i.coupon).filter(Boolean) as string[]),
+    [influencersData],
+  );
   const selectedSuggestion = selected
-    ? suggestCoupon(selected, availableCoupons.filter((c) => c !== selectedLinkedCoupon))
+    ? suggestCoupon(
+        selected,
+        availableCoupons.filter(
+          (c) => c === selectedLinkedCoupon || !linkedCouponsSet.has(c),
+        ),
+      )
     : null;
 
   const matchedSuggestions = suggestions.filter((s) => !!s.coupon);
