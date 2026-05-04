@@ -25,7 +25,7 @@ import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { EmptyState } from "@/components/EmptyState";
 import { getB2COrders } from "@/utils/revenue";
 import { computeBehaviorMetrics } from "@/utils/computeBehaviorMetrics";
-import { isSampleProduct } from "@/utils/samplesAnalyzer";
+import { isSampleProduct, isOnlySampleOrder } from "@/utils/samplesAnalyzer";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, Legend, Cell,
@@ -480,8 +480,34 @@ function JourneyTab({ analysis }: { analysis: JourneyAnalysis }) {
 export default function ComportamentoCliente() {
   const { salesData, dateRange, comparisonDateRange, comparisonMode } = useDashboard();
 
+  // R42: toggle "Excluir clientes só-amostra" (default ON — comportamento mais
+  // honesto: cliente que só pegou amostra de R$1 não distorce métricas).
+  const [excludeSampleOnly, setExcludeSampleOnly] = useState(true);
+
+  // R42: Set de CPFs cuja vida inteira de pedidos é 100% amostra. Usa
+  // isOnlySampleOrder como detector (price-based + keyword + tipo_movimento).
+  // Mesma lógica do filtro em /clientes (Clientes.tsx).
+  const sampleOnlyCpfSet = useMemo(() => {
+    if (!excludeSampleOnly) return undefined;
+    const byCpf = new Map<string, { total: number; samples: number }>();
+    for (const o of salesData ?? []) {
+      const cpfRaw = (o as any).cpfCnpj ?? "";
+      const cpf = String(cpfRaw).replace(/\D/g, "");
+      if (!cpf) continue;
+      const cur = byCpf.get(cpf) ?? { total: 0, samples: 0 };
+      cur.total++;
+      if (isOnlySampleOrder(o)) cur.samples++;
+      byCpf.set(cpf, cur);
+    }
+    const out = new Set<string>();
+    byCpf.forEach((v, cpf) => {
+      if (v.total > 0 && v.total === v.samples) out.add(cpf);
+    });
+    return out;
+  }, [salesData, excludeSampleOnly]);
+
   // useCustomerData → apenas para aba Churn (lifecycle, sempre histórico completo)
-  const { churnMetrics, churnRiskCustomers, isLoading: customerLoading } = useCustomerData();
+  const { churnMetrics, churnRiskCustomers, isLoading: customerLoading } = useCustomerData(sampleOnlyCpfSet);
   const { sectorBenchmarks } = useAppSettings();
 
   const b2cSalesData = useMemo(() => getB2COrders(salesData), [salesData]);
@@ -588,14 +614,35 @@ export default function ComportamentoCliente() {
   return (
     <div className="container mx-auto px-6 py-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Users className="w-8 h-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold">👥 Comportamento do Cliente</h1>
-          <p className="text-muted-foreground">
-            Jornada de entrada, recompra, churn, volume e segmentação
-          </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Users className="w-8 h-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">👥 Comportamento do Cliente</h1>
+            <p className="text-muted-foreground">
+              Jornada de entrada, recompra, churn, volume e segmentação
+            </p>
+          </div>
         </div>
+
+        {/* R42: toggle "Excluir clientes só-amostra" — afeta Comportamento,
+             Segmentos e Risco de Churn (todas as métricas via useCustomerData). */}
+        <label className="flex items-center gap-2 text-sm bg-card border rounded-md px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
+          <input
+            type="checkbox"
+            checked={excludeSampleOnly}
+            onChange={(e) => setExcludeSampleOnly(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <span>
+            Excluir clientes só-amostra
+            {sampleOnlyCpfSet && (
+              <span className="text-muted-foreground ml-1.5 text-xs">
+                ({sampleOnlyCpfSet.size} CPFs)
+              </span>
+            )}
+          </span>
+        </label>
       </div>
 
       <Tabs defaultValue="jornada">

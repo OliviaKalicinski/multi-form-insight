@@ -40,7 +40,12 @@ export interface SummaryMetrics {
 const isValidIdentity = (cpf: string | null): cpf is string =>
   !!cpf && !cpf.startsWith('nf-') && cpf.trim().length > 3;
 
-export function useCustomerData() {
+/**
+ * R42: aceita um Set de CPFs a EXCLUIR (clientes só-amostra).
+ * Quando passado, todas as métricas (churn, segmentos, summary, risco)
+ * recalculam ignorando esses clientes.
+ */
+export function useCustomerData(excludedCpfs?: Set<string>) {
   const { data: rawCustomers, isLoading, error } = useQuery({
     queryKey: ['customer-data'],
     queryFn: async () => {
@@ -72,8 +77,16 @@ export function useCustomerData() {
 
   const customers = useMemo(() => {
     if (!rawCustomers) return [];
-    return rawCustomers.filter(r => isValidIdentity(r.cpf_cnpj));
-  }, [rawCustomers]);
+    let filtered = rawCustomers.filter(r => isValidIdentity(r.cpf_cnpj));
+    // R42: excluir clientes só-amostra se o caller passou o Set.
+    if (excludedCpfs && excludedCpfs.size > 0) {
+      filtered = filtered.filter((r) => {
+        const norm = (r.cpf_cnpj ?? "").replace(/\D/g, "");
+        return !excludedCpfs.has(norm) && !excludedCpfs.has(r.cpf_cnpj ?? "");
+      });
+    }
+    return filtered;
+  }, [rawCustomers, excludedCpfs]);
 
   const segments: CustomerSegment[] = useMemo(() => {
     if (customers.length === 0) return [];
@@ -121,17 +134,22 @@ export function useCustomerData() {
       return { totalClientes: 0, clientesAtivos: 0, clientesEmRisco: 0, clientesInativos: 0, clientesChurn: 0, taxaChurn: 0, taxaRetencao: 0 };
     }
 
-    let ativos = 0, emRisco = 0, inativos = 0, churned = 0;
+    let ativos = 0, emRisco = 0, inativos = 0, churned = 0, neverPurchased = 0;
     customers.forEach(c => {
       switch (c.churn_status) {
         case 'active': ativos++; break;
         case 'at_risk': emRisco++; break;
         case 'inactive': inativos++; break;
         case 'churned': churned++; break;
-        default: ativos++; // fallback
+        case 'never_purchased': neverPurchased++; break;
+        // R42: removido fallback que jogava tudo desconhecido em 'ativos'
+        // (mascarava bug). Caso categoria nova venha, fica fora das somas.
       }
     });
 
+    // R42: total considerado pra taxa de churn = SOMENTE quem já comprou.
+    // Lead Shopify nunca-comprado não distorce numerador nem denominador.
+    const totalCompradores = ativos + emRisco + inativos + churned;
     const total = customers.length;
     return {
       totalClientes: total,
@@ -139,8 +157,8 @@ export function useCustomerData() {
       clientesEmRisco: emRisco,
       clientesInativos: inativos,
       clientesChurn: churned,
-      taxaChurn: total > 0 ? (churned / total) * 100 : 0,
-      taxaRetencao: total > 0 ? ((total - churned) / total) * 100 : 0,
+      taxaChurn: totalCompradores > 0 ? (churned / totalCompradores) * 100 : 0,
+      taxaRetencao: totalCompradores > 0 ? ((totalCompradores - churned) / totalCompradores) * 100 : 0,
     };
   }, [customers]);
 
