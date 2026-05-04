@@ -239,6 +239,17 @@ const Ads = () => {
     return calculateAdsMetrics(currentMonthAdsData);
   }, [currentMonthAdsData]);
 
+  // R38: ROAS Vendas SEMPRE usa só ads de objective=VENDAS, independente
+  // da aba ativa. Antes lia de `activeAdsData` que muda conforme a view
+  // selecionada (Vendas/Outros/Auto) — fazia o card "ROAS Vendas" calcular
+  // sobre dados errados quando o usuário não estava na aba Vendas.
+  // Bruno 04/05: "deve considerar apenas a receita oriunda do ads de
+  // vendas / investimento em ads vendas".
+  const vendasOnlyMetrics = useMemo(() => {
+    const vendasAds = filterAdsByObjective(currentMonthAdsData, "VENDAS");
+    return calculateAdsMetrics(vendasAds);
+  }, [currentMonthAdsData]);
+
   const totalInvestment = allObjectivesMetrics.investimentoTotal;
 
   // ===== Semantic aliases =====
@@ -246,15 +257,18 @@ const Ads = () => {
   const revenueBenchmarkMultiplier = 3;
   const grossMediaResult = metrics.valorConversaoTotal - totalInvestment;
 
-  // R08/R11: dois ROAS com leituras distintas.
-  // - roasSales: receita Vendas ÷ investimento Vendas. Decisão operacional
-  //   sobre verba de campanha de conversão.
+  // R08/R11/R38: dois ROAS com leituras distintas.
+  // - roasSales: receita Vendas ÷ investimento Vendas. SEMPRE filtrado
+  //   por objective=VENDAS (não usa `metrics` que reflete a aba ativa).
   // - roasTotal: receita Vendas ÷ investimento TOTAL (Vendas + Outros).
   //   Eficiência global do Meta Ads — revela o "custo" de Awareness/Traffic
   //   que não gera purchase atribuído direto mas é investimento intencional.
-  const roasSales = objectiveInvestment > 0 ? metrics.valorConversaoTotal / objectiveInvestment : 0;
+  const roasSales =
+    vendasOnlyMetrics.investimentoTotal > 0
+      ? vendasOnlyMetrics.valorConversaoTotal / vendasOnlyMetrics.investimentoTotal
+      : 0;
   const roasTotal =
-    totalInvestment > 0 ? allObjectivesMetrics.valorConversaoTotal / totalInvestment : 0;
+    totalInvestment > 0 ? vendasOnlyMetrics.valorConversaoTotal / totalInvestment : 0;
 
   // Alias para código legado que usa correctedRoas em trends/progress/status.
   const correctedRoas = roasSales;
@@ -582,8 +596,10 @@ const Ads = () => {
                                 {formatRoas(roasSales)}
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                {formatCurrency(metrics.valorConversaoTotal)} receita ·{" "}
-                                {formatCurrency(objectiveInvestment)} investido
+                                {/* R38: usa vendasOnlyMetrics (sempre filtrado por VENDAS),
+                                     não `metrics`/`objectiveInvestment` que dependem da aba ativa. */}
+                                {formatCurrency(vendasOnlyMetrics.valorConversaoTotal)} receita ·{" "}
+                                {formatCurrency(vendasOnlyMetrics.investimentoTotal)} investido
                               </p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">
                                 Só campanhas Vendas · performance operacional
@@ -641,11 +657,13 @@ const Ads = () => {
                                     {formatRoas(roasTotal)}
                                   </p>
                                   <p className="text-xs text-muted-foreground mt-1">
-                                    {formatCurrency(allObjectivesMetrics.valorConversaoTotal)} receita ·{" "}
-                                    {formatCurrency(totalInvestment)} investido
+                                    {/* R38: numerador é receita só de VENDAS (Outros não converte
+                                         purchase atribuído), denominador é o investimento TOTAL. */}
+                                    {formatCurrency(vendasOnlyMetrics.valorConversaoTotal)} receita Vendas ·{" "}
+                                    {formatCurrency(totalInvestment)} investido total
                                   </p>
                                   <p className="text-[10px] text-muted-foreground mt-0.5">
-                                    Todo investimento · eficiência global
+                                    Receita Vendas ÷ investimento total · eficiência global
                                   </p>
                                 </div>
 
