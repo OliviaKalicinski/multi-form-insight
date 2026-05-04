@@ -82,12 +82,17 @@ export default function Atendimentos() {
     return sortDirection === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
+  // R37-quick: nome exibido vem do customer cadastrado (se houver) ou
+  // do contato_nome avulso (atendimento sem cliente).
+  const displayName = (l: ContactLog) =>
+    (l.customer_id ? customerMap.get(l.customer_id) : null) ?? l.contato_nome ?? "";
+
   const filtered = useMemo(() => {
     let list = [...logs];
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((l) => {
-        const name = customerMap.get(l.customer_id) ?? "";
+        const name = displayName(l);
         return (
           name.toLowerCase().includes(q) ||
           l.resumo.toLowerCase().includes(q) ||
@@ -107,9 +112,9 @@ export default function Atendimentos() {
         return dir * (new Date(a.data_contato).getTime() - new Date(b.data_contato).getTime());
       }
       if (sortColumn === "cliente") {
-        const na = (customerMap.get(a.customer_id) ?? "").toLowerCase();
-        const nb = (customerMap.get(b.customer_id) ?? "").toLowerCase();
-        return dir * na.localeCompare(nb);
+        const na = displayName(a).toLowerCase();
+        const nb = displayName(b).toLowerCase();
+        return dir * na.localeCompare(nb, "pt-BR");
       }
       if (sortColumn === "tipo") return dir * (a.tipo ?? "").localeCompare(b.tipo ?? "");
       if (sortColumn === "motivo") return dir * (a.motivo ?? "").localeCompare(b.motivo ?? "");
@@ -126,7 +131,7 @@ export default function Atendimentos() {
     const headers = ["Data", "Cliente", "Tipo", "Motivo", "Resumo", "Responsável", "Resultado"];
     const rows = filtered.map((l) => [
       l.data_contato ? format(new Date(l.data_contato), "dd/MM/yyyy") : "",
-      q(customerMap.get(l.customer_id) ?? ""),
+      q(displayName(l)),
       q(tipoLabels[l.tipo ?? ""] ?? l.tipo ?? ""),
       q(l.motivo ?? ""),
       q(l.resumo ?? ""),
@@ -262,7 +267,14 @@ export default function Atendimentos() {
                     <TableCell className="text-sm">
                       {l.data_contato ? format(new Date(l.data_contato), "dd/MM/yyyy", { locale: ptBR }) : "—"}
                     </TableCell>
-                    <TableCell className="text-sm font-medium">{customerMap.get(l.customer_id) ?? "—"}</TableCell>
+                    <TableCell className="text-sm font-medium">
+                      {displayName(l) || "—"}
+                      {!l.customer_id && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                          sem cadastro
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {l.tipo && (
                         <Badge variant="secondary" className="text-[10px]">
@@ -284,9 +296,12 @@ export default function Atendimentos() {
                           size="icon"
                           className="h-7 w-7"
                           onClick={() => {
+                            // R37-quick: atendimento avulso (sem customer_id) não navega.
+                            if (!l.customer_id) return;
                             const cpf = customerCpfMap.get(l.customer_id);
                             if (cpf) navigate(`/clientes/${encodeURIComponent(cpf)}`);
                           }}
+                          disabled={!l.customer_id}
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                         </Button>

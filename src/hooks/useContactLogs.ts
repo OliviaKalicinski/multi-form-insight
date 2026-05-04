@@ -3,7 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface ContactLog {
   id: string;
-  customer_id: string;
+  // R37-quick: customer_id agora pode ser null pra atendimento avulso
+  // (pessoa entrou em contato antes de virar cliente).
+  customer_id: string | null;
+  contato_nome: string | null;
+  contato_whatsapp: string | null;
+  contato_email: string | null;
   data_contato: string;
   tipo: string | null;
   motivo: string | null;
@@ -14,7 +19,10 @@ export interface ContactLog {
 }
 
 export interface NewContactLog {
-  customer_id: string;
+  customer_id?: string | null;
+  contato_nome?: string;
+  contato_whatsapp?: string;
+  contato_email?: string;
   tipo: string;
   motivo?: string;
   resumo: string;

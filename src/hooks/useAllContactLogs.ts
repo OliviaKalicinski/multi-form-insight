@@ -37,7 +37,11 @@ export function useAllContactLogs() {
 
   const addLog = useMutation({
     mutationFn: async (log: {
-      customer_id: string;
+      customer_id?: string | null;
+      // R37-quick: campos pra atendimento avulso (sem cliente cadastrado)
+      contato_nome?: string;
+      contato_whatsapp?: string;
+      contato_email?: string;
       tipo: string;
       motivo?: string;
       resumo: string;

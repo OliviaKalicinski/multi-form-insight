@@ -20,7 +20,17 @@ interface Customer {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (log: { customer_id: string; tipo: string; motivo?: string; resumo: string; responsavel?: string; resultado?: string }) => void;
+  onSubmit: (log: {
+    customer_id?: string | null;
+    contato_nome?: string;
+    contato_whatsapp?: string;
+    contato_email?: string;
+    tipo: string;
+    motivo?: string;
+    resumo: string;
+    responsavel?: string;
+    resultado?: string;
+  }) => void;
   customers: Customer[];
   isLoading?: boolean;
 }
@@ -35,6 +45,11 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
   const [responsavel, setResponsavel] = useState("");
   const [resultado, setResultado] = useState("");
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  // R37-quick: modo "atendimento avulso" (pessoa que ainda não é cliente)
+  const [avulso, setAvulso] = useState(false);
+  const [avulsoNome, setAvulsoNome] = useState("");
+  const [avulsoWhatsapp, setAvulsoWhatsapp] = useState("");
+  const [avulsoEmail, setAvulsoEmail] = useState("");
 
   // R31-B: ordena por número de pedidos (desc) — quando há homônimos
   // (lead Shopify sem pedidos vs cliente NF com pedidos), o que tem
@@ -63,16 +78,37 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
     return selectedCustomerName;
   }, [selectedCustomerId, customers, selectedCustomerName]);
 
+  // R37-quick: identidade pode vir de cliente cadastrado OU contato avulso.
+  const canSubmit = resumo.trim().length > 0 && (
+    selectedCustomerId
+      ? true
+      : avulso && avulsoNome.trim().length > 0
+  );
+
   const handleSubmit = () => {
-    if (!selectedCustomerId || !resumo.trim()) return;
-    onSubmit({
-      customer_id: selectedCustomerId,
-      tipo,
-      motivo: motivo || undefined,
-      resumo,
-      responsavel: responsavel || undefined,
-      resultado: resultado || undefined,
-    });
+    if (!canSubmit) return;
+    if (avulso && !selectedCustomerId) {
+      onSubmit({
+        customer_id: null,
+        contato_nome: avulsoNome.trim(),
+        contato_whatsapp: avulsoWhatsapp.trim() || undefined,
+        contato_email: avulsoEmail.trim() || undefined,
+        tipo,
+        motivo: motivo || undefined,
+        resumo,
+        responsavel: responsavel || undefined,
+        resultado: resultado || undefined,
+      });
+    } else {
+      onSubmit({
+        customer_id: selectedCustomerId,
+        tipo,
+        motivo: motivo || undefined,
+        resumo,
+        responsavel: responsavel || undefined,
+        resultado: resultado || undefined,
+      });
+    }
     resetForm();
     onOpenChange(false);
   };
@@ -84,6 +120,10 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
     setMotivo("");
     setResumo("");
     setResultado("");
+    setAvulso(false);
+    setAvulsoNome("");
+    setAvulsoWhatsapp("");
+    setAvulsoEmail("");
   };
 
   return (
@@ -93,6 +133,46 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
           <DialogTitle>Novo Atendimento</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {/* R37-quick: modo avulso (atendimento sem cliente cadastrado) */}
+          <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-muted/30">
+            <Label htmlFor="avulso-toggle" className="text-xs text-muted-foreground cursor-pointer flex-1">
+              Atendimento sem vínculo com cliente <span className="text-[10px]">(dúvida pré-venda, contato não cadastrado)</span>
+            </Label>
+            <input
+              id="avulso-toggle"
+              type="checkbox"
+              checked={avulso}
+              onChange={(e) => {
+                setAvulso(e.target.checked);
+                if (e.target.checked) {
+                  // Limpa seleção de cliente ao ativar modo avulso
+                  setSelectedCustomerId("");
+                  setSelectedCustomerName("");
+                  setCustomerSearch("");
+                }
+              }}
+              className="h-4 w-4"
+            />
+          </div>
+
+          {avulso ? (
+            <div className="space-y-3 rounded-md border p-3 bg-amber-50/30 border-amber-200">
+              <div>
+                <Label>Nome *</Label>
+                <Input value={avulsoNome} onChange={(e) => setAvulsoNome(e.target.value)} placeholder="Nome de quem entrou em contato" autoFocus />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>WhatsApp</Label>
+                  <Input value={avulsoWhatsapp} onChange={(e) => setAvulsoWhatsapp(e.target.value)} placeholder="11999990000" />
+                </div>
+                <div>
+                  <Label>E-mail</Label>
+                  <Input value={avulsoEmail} onChange={(e) => setAvulsoEmail(e.target.value)} placeholder="contato@..." />
+                </div>
+              </div>
+            </div>
+          ) : (
           <div>
             <Label>Cliente *</Label>
             {selectedCustomerId ? (
@@ -154,6 +234,7 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
               </div>
             )}
           </div>
+          )}
           <div>
             <Label>Tipo</Label>
             <Select value={tipo} onValueChange={setTipo}>
@@ -183,7 +264,7 @@ export function ContactLogFormWithCustomerSelect({ open, onOpenChange, onSubmit,
             <Label>Resultado</Label>
             <Input value={resultado} onChange={e => setResultado(e.target.value)} placeholder="Ex: Cliente satisfeito" />
           </div>
-          <Button onClick={handleSubmit} disabled={!selectedCustomerId || !resumo.trim() || isLoading} className="w-full">
+          <Button onClick={handleSubmit} disabled={!canSubmit || isLoading} className="w-full">
             Registrar Atendimento
           </Button>
         </div>
