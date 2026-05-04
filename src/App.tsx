@@ -24,6 +24,7 @@ import Clientes from "./pages/Clientes";
 import ClientePerfil from "./pages/ClientePerfil";
 import ImportarClientesShopify from "./pages/ImportarClientesShopify";
 import ClientesDuplicatas from "./pages/ClientesDuplicatas";
+import Financeiro from "./pages/Financeiro";
 import Reclamacoes from "./pages/Reclamacoes";
 import Atendimentos from "./pages/Atendimentos";
 import ReclamacaoNova from "./pages/ReclamacaoNova";
@@ -236,6 +237,18 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <ClientesDuplicatas />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* R37: Modelo Financeiro — owner-only (gate dentro da própria página) */}
+          <Route
+            path="/financeiro"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Financeiro />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }

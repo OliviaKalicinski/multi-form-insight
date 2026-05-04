@@ -48,11 +48,13 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useIsOwner } from "@/hooks/useIsOwner";
 
 interface NavItem {
   title: string;
   url: string;
   icon: React.ComponentType<{ className?: string }>;
+  ownerOnly?: boolean;
 }
 
 interface NavSection {
@@ -71,6 +73,8 @@ const navSections: NavSection[] = [
       // R35: "Visão Executiva" (/dashboard) removida do menu — KPIs estratégicos
       // (CAC, LTV, LTV/CAC, 4 ROAS, evolução temporal) consolidados dentro de
       // "Fotografia Operacional → Mundo Online (B2C)". Rota mantida pra debug.
+      // R37: "Modelo Financeiro" — só aparece se user é owner (filtro abaixo).
+      { title: "Modelo Financeiro", url: "/financeiro", icon: TrendingUp, ownerOnly: true },
       { title: "Kanban", url: "/kanban-operacional", icon: ClipboardList },
       { title: "Conciliação NF", url: "/kanban-conciliacao", icon: ClipboardList },
       { title: "Operações", url: "/operacoes", icon: Truck },
@@ -129,8 +133,15 @@ export function AppSidebar() {
 
   const { user, signOut } = useAuth();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { isOwner } = useIsOwner();
 
   const isActive = (url: string) => location.pathname === url;
+
+  // R37: filtra items marcados como ownerOnly se o user atual não é owner.
+  const visibleSections = navSections.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => !item.ownerOnly || isOwner),
+  })).filter((section) => section.items.length > 0);
 
   // Check if any item in section is active
   const isSectionActive = (section: NavSection) => section.items.some((item) => isActive(item.url));
@@ -149,7 +160,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <Collapsible key={section.title} defaultOpen={isSectionActive(section)} className="group/collapsible">
             <SidebarGroup>
               <CollapsibleTrigger asChild>
