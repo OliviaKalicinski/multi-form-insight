@@ -69,13 +69,13 @@ DROP POLICY IF EXISTS "Owner can write financial_monthly" ON public.financial_mo
 CREATE POLICY "Owner can read financial_monthly"
   ON public.financial_monthly FOR SELECT
   TO authenticated
-  USING (auth.email() = 'multedob@gmail.com');
+  USING (auth.email() = 'bruno.multedo@letsfly.com.br');
 
 CREATE POLICY "Owner can write financial_monthly"
   ON public.financial_monthly FOR ALL
   TO authenticated
-  USING (auth.email() = 'multedob@gmail.com')
-  WITH CHECK (auth.email() = 'multedob@gmail.com');
+  USING (auth.email() = 'bruno.multedo@letsfly.com.br')
+  WITH CHECK (auth.email() = 'bruno.multedo@letsfly.com.br');
 
 -- updated_at trigger
 CREATE OR REPLACE FUNCTION public.touch_financial_monthly_updated_at()

@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
  * incluir o email no array OWNER_EMAILS — e atualizar a expressão das
  * policies RLS em `public.financial_monthly` correspondentemente.
  */
-const OWNER_EMAILS = ["multedob@gmail.com"];
+const OWNER_EMAILS = ["bruno.multedo@letsfly.com.br"];
 
 export function useIsOwner(): { isOwner: boolean; loading: boolean; email: string | null } {
   const [state, setState] = useState<{ isOwner: boolean; loading: boolean; email: string | null }>({
