@@ -23,7 +23,14 @@ import { ChurnFunnelChart } from "@/components/dashboard/ChurnFunnelChart";
 import { ChurnRiskTable } from "@/components/dashboard/ChurnRiskTable";
 import { KPITooltip } from "@/components/dashboard/KPITooltip";
 import { EmptyState } from "@/components/EmptyState";
-import { getB2COrders } from "@/utils/revenue";
+import {
+  getB2COrders,
+  getB2B2COrders,
+  getB2BOrders,
+  SEGMENT_LABELS,
+  SEGMENT_COLORS,
+  SEGMENT_ORDER,
+} from "@/utils/revenue";
 import { computeBehaviorMetrics } from "@/utils/computeBehaviorMetrics";
 import { isSampleProduct, isOnlySampleOrder } from "@/utils/samplesAnalyzer";
 import {
@@ -484,6 +491,26 @@ export default function ComportamentoCliente() {
   // honesto: cliente que só pegou amostra de R$1 não distorce métricas).
   const [excludeSampleOnly, setExcludeSampleOnly] = useState(true);
 
+  // R43: multi-select de segmentos (B2C/B2B2C/B2B). Default = todos selecionados
+  // (visão consolidada). Filtro vale pra TODAS as abas: Jornada, Comportamento,
+  // Segmentos, Risco de Churn — coerência entre o que aparece em cada aba.
+  type Seg = (typeof SEGMENT_ORDER)[number];
+  const [selectedSegments, setSelectedSegments] = useState<Set<Seg>>(
+    () => new Set(SEGMENT_ORDER),
+  );
+  const toggleSegment = (s: Seg) => {
+    setSelectedSegments((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) {
+        if (next.size === 1) return prev; // mínimo 1 segmento
+        next.delete(s);
+      } else {
+        next.add(s);
+      }
+      return next;
+    });
+  };
+
   // R42: Set de CPFs cuja vida inteira de pedidos é 100% amostra. Usa
   // isOnlySampleOrder como detector (price-based + keyword + tipo_movimento).
   // Mesma lógica do filtro em /clientes (Clientes.tsx).
@@ -506,17 +533,56 @@ export default function ComportamentoCliente() {
     return out;
   }, [salesData, excludeSampleOnly]);
 
-  // useCustomerData → apenas para aba Churn (lifecycle, sempre histórico completo)
-  const { churnMetrics, churnRiskCustomers, isLoading: customerLoading } = useCustomerData(sampleOnlyCpfSet);
+  // R43: bucket de segmento por CPF. Cliente é classificado pelo segmentoCliente
+  // do PRIMEIRO pedido (ou "b2c" como fallback se vier null). Assim CPFs com
+  // segmento não-selecionado ficam fora das métricas via excludedCpfs.
+  const cpfSegmentMap = useMemo(() => {
+    const map = new Map<string, Seg>();
+    for (const o of salesData ?? []) {
+      const cpf = String((o as any).cpfCnpj ?? "").replace(/\D/g, "");
+      if (!cpf || map.has(cpf)) continue;
+      const segRaw = String((o as any).segmentoCliente ?? "").toLowerCase().trim();
+      const bucket: Seg = segRaw === "b2b" ? "b2b" : segRaw === "b2b2c" ? "b2b2c" : "b2c";
+      map.set(cpf, bucket);
+    }
+    return map;
+  }, [salesData]);
+
+  // R43: CPFs cujo segmento NÃO está selecionado — entram no exclude para useCustomerData.
+  const excludedSegmentCpfSet = useMemo(() => {
+    const out = new Set<string>();
+    if (selectedSegments.size === SEGMENT_ORDER.length) return out; // todos = nada a excluir
+    cpfSegmentMap.forEach((seg, cpf) => {
+      if (!selectedSegments.has(seg)) out.add(cpf);
+    });
+    return out;
+  }, [cpfSegmentMap, selectedSegments]);
+
+  // R43: combina exclude de só-amostra + segmento não-selecionado pro hook de churn.
+  const combinedExcludedCpfs = useMemo(() => {
+    const out = new Set<string>();
+    if (sampleOnlyCpfSet) sampleOnlyCpfSet.forEach((c) => out.add(c));
+    excludedSegmentCpfSet.forEach((c) => out.add(c));
+    return out.size > 0 ? out : undefined;
+  }, [sampleOnlyCpfSet, excludedSegmentCpfSet]);
+
+  // useCustomerData → aba Churn (lifecycle, histórico completo). Respeita
+  // tanto o toggle só-amostra quanto o multi-select de segmentos (R43).
+  const { churnMetrics, churnRiskCustomers, isLoading: customerLoading } = useCustomerData(combinedExcludedCpfs);
   const { sectorBenchmarks } = useAppSettings();
 
-  // R42-fix: filtra TODOS os pedidos B2C dos CPFs só-amostra quando o toggle
-  // está ON. Isso propaga pro filteredOrders, journeyAnalysis, behaviorMetrics,
-  // volumeAnalysis, peaksData — toda métrica derivada respeita o filtro.
-  // Mantém CPFs com produto puro OU produto+amostra (Bruno: "quero ver o
-  // comportamento isolado do grupo que compraram produtos ou produtos+amostras").
-  const b2cSalesData = useMemo(() => {
-    let orders = getB2COrders(salesData);
+  // R42-fix → R43: filtra pedidos pelos segmentos selecionados (union) e
+  // exclui CPFs só-amostra quando o toggle está ON. Propaga pra filteredOrders,
+  // journeyAnalysis, behaviorMetrics, volumeAnalysis, peaksData — toda métrica
+  // derivada respeita ambos os filtros.
+  const segmentSalesData = useMemo(() => {
+    if (!salesData) return [];
+    const buckets: Record<Seg, ReturnType<typeof getB2COrders>> = {
+      b2c: selectedSegments.has("b2c") ? getB2COrders(salesData) : [],
+      b2b2c: selectedSegments.has("b2b2c") ? getB2B2COrders(salesData) : [],
+      b2b: selectedSegments.has("b2b") ? getB2BOrders(salesData) : [],
+    };
+    let orders = [...buckets.b2c, ...buckets.b2b2c, ...buckets.b2b];
     if (sampleOnlyCpfSet && sampleOnlyCpfSet.size > 0) {
       orders = orders.filter((o) => {
         const cpf = String((o as any).cpfCnpj ?? "").replace(/\D/g, "");
@@ -524,25 +590,25 @@ export default function ComportamentoCliente() {
       });
     }
     return orders;
-  }, [salesData, sampleOnlyCpfSet]);
+  }, [salesData, selectedSegments, sampleOnlyCpfSet]);
 
   const [volumeView, setVolumeView] = useState<"daily" | "weekly" | "monthly" | "quarterly">("daily");
 
   const filteredOrders = useMemo(() => {
-    if (b2cSalesData.length === 0) return [];
-    return dateRange ? filterOrdersByDateRange(b2cSalesData, dateRange.start, dateRange.end) : b2cSalesData;
-  }, [b2cSalesData, dateRange]);
+    if (segmentSalesData.length === 0) return [];
+    return dateRange ? filterOrdersByDateRange(segmentSalesData, dateRange.start, dateRange.end) : segmentSalesData;
+  }, [segmentSalesData, dateRange]);
 
   // ── Journey Analysis (new) ──────────────────────────────────────────────────
   // Uses ALL b2c orders for full customer history; dateRange filters first-purchase date
   const journeyAnalysis = useMemo(
     () =>
       computeJourneyAnalysis(
-        b2cSalesData,
+        segmentSalesData,
         dateRange?.start ?? null,
         dateRange?.end ?? null,
       ),
-    [b2cSalesData, dateRange],
+    [segmentSalesData, dateRange],
   );
 
   // ── Behaviour metrics (period-filtered) ────────────────────────────────────
@@ -560,12 +626,12 @@ export default function ComportamentoCliente() {
   }, [filteredOrders]);
 
   const volumeTrend = useMemo(() => {
-    if (!dateRange || !comparisonDateRange || b2cSalesData.length === 0) return undefined;
-    const curr = filterOrdersByDateRange(b2cSalesData, dateRange.start, dateRange.end);
-    const prev = filterOrdersByDateRange(b2cSalesData, comparisonDateRange.start, comparisonDateRange.end);
+    if (!dateRange || !comparisonDateRange || segmentSalesData.length === 0) return undefined;
+    const curr = filterOrdersByDateRange(segmentSalesData, dateRange.start, dateRange.end);
+    const prev = filterOrdersByDateRange(segmentSalesData, comparisonDateRange.start, comparisonDateRange.end);
     if (prev.length === 0) return undefined;
     return ((curr.length - prev.length) / prev.length) * 100;
-  }, [b2cSalesData, dateRange, comparisonDateRange]);
+  }, [segmentSalesData, dateRange, comparisonDateRange]);
 
   const volumeAnalysis = useMemo(() => {
     if (!volumeAnalysisData?.daily?.length)
@@ -582,14 +648,14 @@ export default function ComportamentoCliente() {
   );
 
   const comparisonMetrics = useMemo(() => {
-    if (!comparisonMode || !comparisonDateRange || b2cSalesData.length === 0) return null;
+    if (!comparisonMode || !comparisonDateRange || segmentSalesData.length === 0) return null;
     const COLORS = ["#8b5cf6", "#3b82f6"];
     const periods = [
       { range: dateRange, label: "Período A", color: COLORS[0] },
       { range: comparisonDateRange, label: "Período B", color: COLORS[1] },
     ].filter((p) => p.range);
     const volumePorMes = periods.map(({ range, label, color }) => {
-      const orders = filterOrdersByDateRange(b2cSalesData, range!.start, range!.end);
+      const orders = filterOrdersByDateRange(segmentSalesData, range!.start, range!.end);
       return { month: label.toLowerCase().replace(" ", "-"), monthLabel: label, value: orders.length, color };
     });
     if (volumePorMes.length > 1) {
@@ -600,9 +666,9 @@ export default function ComportamentoCliente() {
       });
     }
     return { volumePorMes };
-  }, [comparisonMode, comparisonDateRange, dateRange, b2cSalesData]);
+  }, [comparisonMode, comparisonDateRange, dateRange, segmentSalesData]);
 
-  if (b2cSalesData.length === 0 && !customerLoading) {
+  if (segmentSalesData.length === 0 && !customerLoading) {
     return (
       <div className="container mx-auto px-6 py-8">
         <Card>
@@ -639,24 +705,55 @@ export default function ComportamentoCliente() {
           </div>
         </div>
 
-        {/* R42: toggle "Excluir clientes só-amostra" — afeta Comportamento,
-             Segmentos e Risco de Churn (todas as métricas via useCustomerData). */}
-        <label className="flex items-center gap-2 text-sm bg-card border rounded-md px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
-          <input
-            type="checkbox"
-            checked={excludeSampleOnly}
-            onChange={(e) => setExcludeSampleOnly(e.target.checked)}
-            className="h-4 w-4"
-          />
-          <span>
-            Excluir clientes só-amostra
-            {sampleOnlyCpfSet && (
-              <span className="text-muted-foreground ml-1.5 text-xs">
-                ({sampleOnlyCpfSet.size} CPFs)
-              </span>
-            )}
-          </span>
-        </label>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* R43: multi-select de segmentos. Default = todos (consolidado).
+               Vale pra TODAS as abas: Jornada, Comportamento, Segmentos, Churn. */}
+          <div className="flex items-center gap-1 bg-card border rounded-md p-1">
+            {SEGMENT_ORDER.map((seg) => {
+              const active = selectedSegments.has(seg);
+              return (
+                <button
+                  key={seg}
+                  onClick={() => toggleSegment(seg)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                    active
+                      ? "text-white"
+                      : "text-muted-foreground hover:bg-muted/50",
+                  )}
+                  style={active ? { backgroundColor: SEGMENT_COLORS[seg] } : undefined}
+                  title={active ? `Clique pra ocultar ${SEGMENT_LABELS[seg]}` : `Clique pra incluir ${SEGMENT_LABELS[seg]}`}
+                >
+                  {SEGMENT_LABELS[seg]}
+                </button>
+              );
+            })}
+            <span className="text-[11px] text-muted-foreground px-2 select-none">
+              {selectedSegments.size === SEGMENT_ORDER.length
+                ? "Consolidado"
+                : `${selectedSegments.size}/${SEGMENT_ORDER.length}`}
+            </span>
+          </div>
+
+          {/* R42: toggle "Excluir clientes só-amostra" — afeta Comportamento,
+               Segmentos e Risco de Churn (todas as métricas via useCustomerData). */}
+          <label className="flex items-center gap-2 text-sm bg-card border rounded-md px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={excludeSampleOnly}
+              onChange={(e) => setExcludeSampleOnly(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span>
+              Excluir clientes só-amostra
+              {sampleOnlyCpfSet && (
+                <span className="text-muted-foreground ml-1.5 text-xs">
+                  ({sampleOnlyCpfSet.size} CPFs)
+                </span>
+              )}
+            </span>
+          </label>
+        </div>
       </div>
 
       <Tabs defaultValue="jornada">
