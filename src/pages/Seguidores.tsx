@@ -13,7 +13,12 @@ import {
   Percent,
   BarChart3,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
+import { ptBR } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { InstagramFunnel } from "@/components/dashboard/InstagramFunnel";
 import { DayOfWeekChart } from "@/components/dashboard/DayOfWeekChart";
 import { HistoricalBenchmarkTable } from "@/components/dashboard/HistoricalBenchmarkTable";
@@ -73,9 +78,57 @@ const Seguidores = () => {
     comparisonDateRange,
     comparisonMode,
     lastDataDate,
+    refreshFromDatabase,
   } = useDashboard();
 
+  const { toast } = useToast();
   const [chartViewMode, setChartViewMode] = useState<"daily" | "weekly" | "monthly">("daily");
+  // R47: estado do sync manual
+  const [syncing, setSyncing] = useState(false);
+
+  // R47: data mais recente nos dados (proxy de "última atualização").
+  // Bug Bruno 04/05: 'os números estão com certeza desatualizados'.
+  // Causa raiz: sync-instagram-organic não tinha cron — só rodava manual.
+  // Fix combinado: cron de 6h (migration nova) + UI mostrando defasagem.
+  const dataAteDate = useMemo(() => {
+    if (!followersData?.length) return null;
+    const dates = followersData
+      .map((d: any) => d.Data)
+      .filter(Boolean)
+      .sort();
+    const latest = dates[dates.length - 1];
+    return latest ? new Date(latest) : null;
+  }, [followersData]);
+
+  const isStale = useMemo(() => {
+    if (!dataAteDate) return false;
+    const hoursSince = (Date.now() - dataAteDate.getTime()) / (1000 * 60 * 60);
+    return hoursSince > 48; // > 2 dias = stale
+  }, [dataAteDate]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-instagram-organic", { body: {} });
+      if (error) throw error;
+      await refreshFromDatabase();
+      toast({
+        title: "Sincronizado!",
+        description: data?.message ?? "Dados de seguidores atualizados.",
+      });
+    } catch (e: any) {
+      toast({ title: "Erro no sync", description: e.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // R47: refetch quando o usuário volta pra aba (catch sync feito em background pelo cron)
+  useEffect(() => {
+    const onFocus = () => { void refreshFromDatabase(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshFromDatabase]);
 
   // Default para mês atual APENAS se não há filtro selecionado pelo usuário
   useEffect(() => {
@@ -325,13 +378,40 @@ const Seguidores = () => {
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground">📸 Instagram</h1>
-            <Badge variant="secondary" className="text-xs">
-              Orgânico
-            </Badge>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-foreground">📸 Instagram</h1>
+                <Badge variant="secondary" className="text-xs">
+                  Orgânico
+                </Badge>
+              </div>
+              <p className="text-muted-foreground mt-1">Métricas de atenção, alcance e engajamento orgânico</p>
+            </div>
+
+            {/* R47: indicador de freshness + sync manual.
+                Cron sync-instagram-organic-6h (migration 20260504210000) faz a sync
+                automática a cada 6h. Esse botão dispara o sync sob demanda. */}
+            <div className="flex items-center gap-3">
+              {dataAteDate && (
+                <div className={`text-sm ${isStale ? "text-orange-600 font-medium" : "text-muted-foreground"}`}>
+                  Dados até <strong>{format(dataAteDate, "dd 'de' MMM", { locale: ptBR })}</strong>
+                  {isStale && <span className="ml-1.5">⚠ desatualizado</span>}
+                </div>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSync}
+                disabled={syncing}
+                className="gap-1.5"
+                title="Sincroniza agora com a API do Instagram (geralmente roda automaticamente a cada 6h)"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Sincronizando..." : "Atualizar agora"}
+              </Button>
+            </div>
           </div>
-          <p className="text-muted-foreground">Métricas de atenção, alcance e engajamento orgânico</p>
         </div>
 
         {/* Show welcome message if no data */}
