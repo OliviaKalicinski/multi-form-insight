@@ -127,14 +127,16 @@ export const standardizeProductName = (name: string, price: number): string => {
   // ── Lets Fly Insumos (ordem: específico → genérico) ──
   // "Desengordurada" = nome oficial. Aceita também a grafia legada "desidratada"
   // (ex.: NFs antigas) e consolida no mesmo SKU.
-  // R56-fix: regex anterior exigia 'desengordurada' DEPOIS de 'bsf'.
-  // Falhava em descricoes tipo "Farinha Desengordurada de BSF" e
-  // classificava erroneamente como Integral. Agora aceita em qualquer ordem.
-  if (/farinha/i.test(desc) && /(deseng|desidrat)/i.test(desc)) {
-    return 'Farinha BSF Desengordurada (kg)';
-  }
-  if (/farinha/i.test(desc) && /(bsf|mosca)/i.test(desc)) {
+  // R56-fix-2: troca de defaults. Bruno confirmou que "Farinha Deseng. eh
+  // o produto mais vendido, nao Integral". Antes, descricoes generic
+  // "Farinha BSF" caiam como Integral (49% do donut estava errado).
+  // Agora: SO eh Integral se a descricao tem palavra "integral" explicita.
+  // Generic / sem qualifier / com 'deseng' ou 'desidrat' = Desengordurada.
+  if (/farinha/i.test(desc) && /\bintegral\b/i.test(desc)) {
     return 'Farinha BSF Integral (kg)';
+  }
+  if (/farinha/i.test(desc) && /(bsf|mosca|deseng|desidrat)/i.test(desc)) {
+    return 'Farinha BSF Desengordurada (kg)';
   }
   if (/larva.*desid/i.test(desc)) {
     return 'Larva Desidratada de BSF (kg)';

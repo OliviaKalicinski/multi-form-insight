@@ -124,7 +124,11 @@ function buildProductRevenueMap(orders: ProcessedOrder[]) {
   exploded.forEach((o) =>
     o.produtos.forEach((p) => {
       if (!isSampleProduct(p) && !isMaterialProduct(p)) {
-        const k = p.descricaoAjustada || p.descricao;
+        // R56-fix-2: agrega pelo nome ABREVIADO. Antes, descricoes diferentes
+        // ("Larva Desidratada de BSF Lote 1", "Larva Desidratada (kg)", etc)
+        // viravam fatias separadas no donut. Agora consolida sob "Larva Desidratada".
+        const raw = p.descricaoAjustada || p.descricao;
+        const k = abbreviateProductName(raw);
         if (!map[k]) map[k] = { revenue: 0, qty: 0 };
         map[k].revenue += p.preco;
         map[k].qty += p.quantidade;
@@ -133,10 +137,21 @@ function buildProductRevenueMap(orders: ProcessedOrder[]) {
   );
   return map;
 }
+// R56-fix-2: lista de clientes que NAO devem aparecer em Top Clientes.
+// Lets Fly Sustentavel = empresa-mae registrando vendas internas.
+// Bruno Multedo = dono pessoal, nao cliente comercial.
+// Ajuste essa lista conforme necessidade futura (ex: outros pessoais).
+const TOP_CLIENTES_EXCLUIR = [
+  /lets\s*fly/i,
+  /bruno\s*multedo/i,
+];
+
 function buildTopClientes(orders: ProcessedOrder[], n = 5) {
   const map: Record<string, { pedidos: number; receita: number }> = {};
   orders.filter(isRevenueOrder).forEach((o) => {
-    const k = o.nomeCliente || o.cpfCnpj || "Desconhecido";
+    const nome = o.nomeCliente || o.cpfCnpj || "Desconhecido";
+    if (TOP_CLIENTES_EXCLUIR.some((rx) => rx.test(nome))) return;
+    const k = nome;
     if (!map[k]) map[k] = { pedidos: 0, receita: 0 };
     map[k].pedidos++;
     map[k].receita += getOfficialRevenue(o);
