@@ -279,33 +279,56 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const today = new Date().toISOString().split("T")[0];
 
-    // 4. Upsert followers_data — total_seguidores so para today (snapshot do perfil)
-    const followersRows = dates.map((date) => ({
-      data: date,
-      total_seguidores: date === today && followersCount !== null ? followersCount : null,
-      novos_seguidores: byDate[date]?.["follows"] ?? 0,
-      unfollows: byDate[date]?.["unfollows"] ?? 0,
-      source: "api",
-    }));
-
-    // R48: garante row pra today mesmo se today nao estiver no range pedido.
-    // Importante porque Meta tem delay de 24h e until normalmente e 'ontem'.
-    if (!dates.includes(today) && followersCount !== null) {
-      followersRows.push({
-        data: today,
-        total_seguidores: followersCount,
-        novos_seguidores: 0,
-        unfollows: 0,
+    // 4. Upsert followers_data — R52: SO grava rows que efetivamente vieram com
+    // dado da Meta. Preserva valor anterior quando Meta retorna erro silencioso
+    // (rate limit, scope, etc) pra evitar sobrescrever historico bom com zero.
+    const followersRows = dates
+      .filter((date) => {
+        const hasFollows = byDate[date]?.["follows"] !== undefined;
+        const hasUnfollows = byDate[date]?.["unfollows"] !== undefined;
+        return hasFollows || hasUnfollows;
+      })
+      .map((date) => ({
+        data: date,
+        total_seguidores: date === today && followersCount !== null ? followersCount : null,
+        novos_seguidores: byDate[date]["follows"] ?? 0,
+        unfollows: byDate[date]["unfollows"] ?? 0,
         source: "api",
-      });
+      }));
+
+    if (followersRows.length > 0) {
+      const { error: followersError } = await supabase
+        .from("followers_data")
+        .upsert(followersRows, { onConflict: "data", ignoreDuplicates: false });
+      if (followersError) throw new Error(`followers_data: ${followersError.message}`);
     }
 
-    const { error: followersError } = await supabase
-      .from("followers_data")
-      .upsert(followersRows, { onConflict: "data", ignoreDuplicates: false });
-    if (followersError) throw new Error(`followers_data: ${followersError.message}`);
+    // R52: snapshot de today vai separado via UPDATE-OR-INSERT pra nao
+    // sobrescrever novos_seguidores/unfollows existentes com null.
+    if (followersCount !== null) {
+      const { data: existing } = await supabase
+        .from("followers_data")
+        .select("data")
+        .eq("data", today)
+        .maybeSingle();
+      if (existing) {
+        await supabase
+          .from("followers_data")
+          .update({ total_seguidores: followersCount })
+          .eq("data", today);
+      } else {
+        await supabase.from("followers_data").insert({
+          data: today,
+          total_seguidores: followersCount,
+          novos_seguidores: 0,
+          unfollows: 0,
+          source: "api",
+        });
+      }
+    }
 
-    // 5. Upsert marketing_data
+    // 5. Upsert marketing_data — R52: so inclui rows com valor REAL retornado
+    // pela Meta. typeof === 'number' ja garante isso (skip null silencioso).
     const marketingRows: any[] = [];
     for (const m of METRICS) {
       if (!m.dbKey) continue;
