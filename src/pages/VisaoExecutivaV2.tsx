@@ -206,27 +206,28 @@ const DonutChart = ({
           </PieChart>
         </ResponsiveContainer>
       </div>
-      {/* R56: legenda compacta — nome curto + valor logo ao lado.
-           Antes: name truncate(130px) + valor à direita criava espaço grande
-           e desconectava o número do produto. */}
+      {/* R56-fix-3: legenda centralizada com nome + valor JUNTOS.
+           Antes: nome flex-1 + valor à direita criava espaço grande entre eles.
+           Agora: cor + nome · valor (pct%) numa linha unica, item centralizado. */}
       <div className="w-full space-y-1">
         {dataAbbr.map((d, i) => {
           const pct = total > 0 ? ((d.value / total) * 100).toFixed(0) : "0";
           return (
             <div
               key={d.fullName}
-              className="flex items-center gap-2 text-xs"
+              className="flex items-center justify-center gap-2 text-xs"
               title={d.fullName}
             >
               <div
                 className="w-2.5 h-2.5 rounded-sm shrink-0"
                 style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
               />
-              <span className="text-muted-foreground flex-1 min-w-0 truncate">
-                {d.name}
-              </span>
-              <span className="font-medium tabular-nums shrink-0">
-                {fmt(d.value)} ({pct}%)
+              <span className="truncate">
+                <span className="text-foreground">{d.name}</span>
+                <span className="text-muted-foreground"> · </span>
+                <span className="font-medium tabular-nums">
+                  {fmt(d.value)} ({pct}%)
+                </span>
               </span>
             </div>
           );
@@ -556,7 +557,11 @@ const VisaoExecutivaV2 = () => {
         entry[prod] = Math.round(
           mo
             .flatMap((o) => o.produtos)
-            .filter((p) => (p.descricaoAjustada || p.descricao) === prod && !isSampleProduct(p))
+            .filter(
+              (p) =>
+                abbreviateProductName(p.descricaoAjustada || p.descricao) === prod &&
+                !isSampleProduct(p),
+            )
             .reduce((s, p) => s + p.preco, 0),
         );
       });
@@ -667,6 +672,9 @@ const VisaoExecutivaV2 = () => {
       .sort((a, b) => b[1].revenue - a[1].revenue)
       .slice(0, 5)
       .map(([name]) => name);
+    // R56-fix-3: top5 e productsSold agora usam nome ABREVIADO (do
+    // buildProductRevenueMap). Filter precisa comparar nome abreviado tambem,
+    // senao filter vira [] sempre e graficos ficam zerados.
     const faturamentoPorProduto = months12.map((m) => {
       const mo = allSeg.filter((o) => format(o.dataVenda, "yyyy-MM") === m);
       const entry: Record<string, number | string> = { mes: fmtMonth(m) };
@@ -674,7 +682,11 @@ const VisaoExecutivaV2 = () => {
         entry[prod] = Math.round(
           mo
             .flatMap((o) => o.produtos)
-            .filter((p) => (p.descricaoAjustada || p.descricao) === prod && !isSampleProduct(p))
+            .filter(
+              (p) =>
+                abbreviateProductName(p.descricaoAjustada || p.descricao) === prod &&
+                !isSampleProduct(p),
+            )
             .reduce((s, p) => s + p.preco, 0),
         );
       });
@@ -686,7 +698,11 @@ const VisaoExecutivaV2 = () => {
       top5.forEach((prod) => {
         entry[prod] = mo
           .flatMap((o) => o.produtos)
-          .filter((p) => (p.descricaoAjustada || p.descricao) === prod && !isSampleProduct(p))
+          .filter(
+            (p) =>
+              abbreviateProductName(p.descricaoAjustada || p.descricao) === prod &&
+              !isSampleProduct(p),
+          )
           .reduce((s, p) => s + p.quantidade, 0);
       });
       return entry;

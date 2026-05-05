@@ -127,15 +127,18 @@ export const standardizeProductName = (name: string, price: number): string => {
   // ── Lets Fly Insumos (ordem: específico → genérico) ──
   // "Desengordurada" = nome oficial. Aceita também a grafia legada "desidratada"
   // (ex.: NFs antigas) e consolida no mesmo SKU.
-  // R56-fix-2: troca de defaults. Bruno confirmou que "Farinha Deseng. eh
-  // o produto mais vendido, nao Integral". Antes, descricoes generic
-  // "Farinha BSF" caiam como Integral (49% do donut estava errado).
-  // Agora: SO eh Integral se a descricao tem palavra "integral" explicita.
-  // Generic / sem qualifier / com 'deseng' ou 'desidrat' = Desengordurada.
-  if (/farinha/i.test(desc) && /\bintegral\b/i.test(desc)) {
+  // R56-fix-3: regex Farinha mais estrito. Antes "Farinha Integral" texto
+  // simples caía como Integral, mas Bruno confirmou que sao Desengordurada
+  // com nome bagunçado na NF. Agora SÓ classifica como Integral se desc
+  // tem 'farinha' + 'integral' + 'bsf' (3 palavras juntas, qualquer ordem).
+  // Senao, todo 'farinha' default vira Desengordurada (produto mais vendido).
+  const hasFarinha = /farinha/i.test(desc);
+  const hasIntegral = /\bintegral\b/i.test(desc);
+  const hasBsf = /\bbsf\b|mosca/i.test(desc);
+  if (hasFarinha && hasIntegral && hasBsf) {
     return 'Farinha BSF Integral (kg)';
   }
-  if (/farinha/i.test(desc) && /(bsf|mosca|deseng|desidrat)/i.test(desc)) {
+  if (hasFarinha) {
     return 'Farinha BSF Desengordurada (kg)';
   }
   if (/larva.*desid/i.test(desc)) {
@@ -254,7 +257,17 @@ export const getKitType = (productName: string): string | null => {
 // ─────────────────────────────────────────────────────────────────────────────
 export function abbreviateProductName(name: string): string {
   if (!name) return name;
-  const n = name.toLowerCase();
+  // R56-fix-3: strip sufixos de lote ("- LOTE: ROCK082025", "- Lote 02035")
+  // antes de classificar. Antes, "C.D. ORIGINAL- LOTE: ROCK082025" virava
+  // fatia separada de "C.D. Original".
+  const cleaned = name.replace(/\s*-\s*lote.*$/i, '').trim();
+  const n = cleaned.toLowerCase();
+
+  // R56-fix-3: aceita versoes ja abreviadas no banco (NF, sistema interno)
+  if (/^c\.d\.\s*original\b/i.test(cleaned)) return 'C.D. Original';
+  if (/^m\.d\.\s*legumes\b/i.test(cleaned)) return 'M.D. Legumes';
+  if (/^m\.d\.\s*spirulina\b/i.test(cleaned)) return 'M.D. Spirulina';
+  if (/^m\.d\.\s*mix\b/i.test(cleaned)) return 'Kit M.D. Mix';
 
   // Comida de Dragão Original
   if (n.includes('comida de dragão') && !n.includes('kit')) {
