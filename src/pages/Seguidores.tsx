@@ -408,11 +408,14 @@ const Seguidores = () => {
   // Funnel
   const funnelSteps = useMemo(() => buildInstagramFunnel(currentMonthMarketingData), [currentMonthMarketingData]);
 
-  // Historical benchmarks (only for single-month view)
+  // R55: Historical benchmarks SEMPRE disponivel (qualquer periodo).
+  // Antes so renderizava em single-month view. Agora aceita tambem
+  // multi-month — passa currentMonthMarketingData (filtrado pelo dateRange)
+  // e a fn calcula a media diaria desse range vs media diaria 3m/6m.
   const historicalBenchmarks = useMemo(() => {
-    if (!hasMarketingData || isMultiMonthView) return [];
-    return calculateHistoricalBenchmarks(marketingData, referenceMonth);
-  }, [marketingData, hasMarketingData, isMultiMonthView, referenceMonth]);
+    if (!hasMarketingData) return [];
+    return calculateHistoricalBenchmarks(marketingData, referenceMonth, currentMonthMarketingData);
+  }, [marketingData, hasMarketingData, referenceMonth, currentMonthMarketingData]);
 
   // Prepare chart data for FollowersTrendChart
   const followersChartData = useMemo(() => {
@@ -659,29 +662,8 @@ const Seguidores = () => {
                   size="compact"
                   tooltipKey="novos_seguidores"
                 />
-                <StatusMetricCard
-                  title="Crescimento"
-                  value={formatFollowersGrowth(currentFollowersMetrics.crescimentoAbsoluto)}
-                  icon={
-                    currentFollowersMetrics.crescimentoAbsoluto >= 0 ? (
-                      <TrendingUp className="h-3 w-3" />
-                    ) : (
-                      <TrendingDown className="h-3 w-3" />
-                    )
-                  }
-                  status={currentFollowersMetrics.crescimentoAbsoluto >= 0 ? "success" : "danger"}
-                  interpretation={
-                    previousMonthFollowersData.length > 0
-                      ? currentFollowersMetrics.novosSeguidoresMes > 0 &&
-                        currentFollowersMetrics.crescimentoPercentual === 0 &&
-                        currentFollowersMetrics.crescimentoAbsoluto > 0
-                        ? "Primeiro período"
-                        : `${currentFollowersMetrics.crescimentoPercentual >= 0 ? "+" : ""}${currentFollowersMetrics.crescimentoPercentual.toFixed(1)}% vs anterior`
-                      : undefined
-                  }
-                  size="compact"
-                  tooltipKey="crescimento_seguidores"
-                />
+                {/* R55: card "Crescimento" removido. Quando comparison mode
+                     desligado, mostrava sempre "+0" sem sentido. */}
                 {hasMarketingData && currentMarketingMetrics && (
                   <>
                     {/* Dimensão: Atenção */}

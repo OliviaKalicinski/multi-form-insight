@@ -108,17 +108,22 @@ export interface FunnelStep {
 export function buildInstagramFunnel(data: import("@/types/marketing").MarketingData[]): FunnelStep[] {
   if (!data.length) return [];
 
-  const impressoes = data.reduce((s, d) => s + safeInt(d.Visualizações), 0);
+  // R55: refatoração do funil. Antes incluía 'Interações' como etapa, mas
+  // interação é métrica HORIZONTAL (curtidas/comentários no feed sem
+  // necessariamente passar pelo perfil) — não é etapa de jornada vertical.
+  // Daí aparecia "242% chegam aqui" que era absurdo no funil.
+  // Agora: jornada de atenção→ação correta:
+  //   Visualizações (vezes que apareceu) → Alcance único (pessoas únicas)
+  //   → Visitas ao Perfil (foram olhar) → Cliques no Link (foram pro site).
+  const visualizacoes = data.reduce((s, d) => s + safeInt(d.Visualizações), 0);
   const alcance = data.reduce((s, d) => s + safeInt(d.Alcance), 0);
   const visitas = data.reduce((s, d) => s + safeInt(d.Visitas), 0);
-  const interacoes = data.reduce((s, d) => s + safeInt(d.Interações), 0);
   const cliques = data.reduce((s, d) => s + safeInt(d["Clicks no Link"]), 0);
 
   const steps = [
-    { label: "Impressões", value: impressoes },
+    { label: "Visualizações", value: visualizacoes },
     { label: "Alcance único", value: alcance },
     { label: "Visitas ao Perfil", value: visitas },
-    { label: "Interações", value: interacoes },
     { label: "Cliques no Link", value: cliques },
   ];
 
@@ -126,7 +131,6 @@ export function buildInstagramFunnel(data: import("@/types/marketing").Marketing
     "hsl(var(--chart-4))",
     "hsl(var(--chart-1))",
     "hsl(var(--chart-2))",
-    "hsl(var(--chart-3))",
     "hsl(var(--chart-5))",
   ];
 
@@ -163,7 +167,8 @@ export interface HistoricalBenchmark {
 
 export function calculateHistoricalBenchmarks(
   allData: import("@/types/marketing").MarketingData[],
-  currentMonth: string, // "YYYY-MM"
+  currentMonth: string, // "YYYY-MM" — usado como ANCHOR pro cálculo de 3m/6m
+  currentRangeData?: import("@/types/marketing").MarketingData[], // R55: dados do periodo selecionado (opcional, se omitido usa o mes inteiro do anchor)
 ): HistoricalBenchmark[] {
   if (!allData.length) return [];
 
@@ -199,7 +204,9 @@ export function calculateHistoricalBenchmarks(
     return avgs.length > 0 ? avgs.reduce((s, v) => s + v, 0) / avgs.length : 0;
   };
 
-  const currentData = getMonthData(currentMonth);
+  // R55: se currentRangeData veio (filtro do dashboard), usa ele.
+  // Fallback: dados do mes anchor (comportamento antigo).
+  const currentData = currentRangeData && currentRangeData.length > 0 ? currentRangeData : getMonthData(currentMonth);
   const daysInCurrentPeriod = currentData.length;
 
   const metrics: { label: string; key: keyof import("@/types/marketing").MarketingData }[] = [
