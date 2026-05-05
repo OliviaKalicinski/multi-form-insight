@@ -173,6 +173,11 @@ interface MetricConfig {
 
 const METRICS: MetricConfig[] = [
   { name: "reach", daily: false, dbKey: "alcance" },
+  // R50: 'views' substitui 'impressions' (deprecado em v20). Nao confundir
+  // com reach: views = total de visualizacoes (1 pessoa pode ver N vezes);
+  // reach = pessoas unicas. CSVs do Meta Business Suite confirmam que
+  // views eh tipicamente 2-3× reach.
+  { name: "views", daily: true, metricType: "total_value", dbKey: "visualizacoes" },
   { name: "total_interactions", daily: true, metricType: "total_value", dbKey: "interacoes" },
   { name: "accounts_engaged", daily: true, metricType: "total_value", dbKey: "engajamentos" },
   { name: "saves", daily: true, metricType: "total_value", dbKey: "saves" },
@@ -311,13 +316,9 @@ serve(async (req) => {
         }
       }
     }
-    // Visualizacoes: alias de reach (impressions foi deprecado em v20)
-    for (const date of dates) {
-      const v = byDate[date]?.["reach"];
-      if (typeof v === "number") {
-        marketingRows.push({ data: date, metrica: "visualizacoes", valor: v, source: "api" });
-      }
-    }
+    // R50: removido alias reach→visualizacoes. Agora 'visualizacoes' eh
+    // populado pela metrica 'views' (Meta v20+) que eh distinta de 'reach'.
+    // Tipicamente views = 2-3× reach (1 pessoa pode ver N vezes).
 
     if (marketingRows.length > 0) {
       const { error: mktError } = await supabase
@@ -334,7 +335,7 @@ serve(async (req) => {
         followers_rows: followersRows.length,
         marketing_rows: marketingRows.length,
         daily_calls: dailyCalls,
-        message: `Sync R49 completo — ${days} dias, ${dailyCalls} chamadas Meta API (paralelizado por dia).`,
+        message: `Sync R50 completo — ${days} dias, ${dailyCalls} chamadas Meta API.`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
