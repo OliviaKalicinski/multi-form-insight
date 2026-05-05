@@ -413,17 +413,26 @@ const Seguidores = () => {
                 <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
                 {syncing ? "Sincronizando..." : "Atualizar agora"}
               </Button>
-              {/* R48: backfill de 30 dias pra reconstruir histórico apos fix do parser de total_value.
-                  Demora ~30s (≈210 chamadas Meta API com sleep 80ms). */}
+              {/* R49: backfill ate 60 dias (paralelizado, cabe no limite de 150s do Edge). */}
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => handleSync(30)}
                 disabled={syncing}
                 className="gap-1.5 text-xs text-muted-foreground"
-                title="Recarrega últimos 30 dias do Meta. Use após bug fix pra reconstruir histórico (~30s)."
+                title="Recarrega últimos 30 dias do Meta (~10s)."
               >
                 Backfill 30d
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleSync(60)}
+                disabled={syncing}
+                className="gap-1.5 text-xs text-muted-foreground"
+                title="Recarrega últimos 60 dias do Meta. Limite máximo por chamada (~25s)."
+              >
+                60d
               </Button>
             </div>
           </div>

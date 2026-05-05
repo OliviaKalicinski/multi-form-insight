@@ -26,8 +26,10 @@ export const FollowersHeroCard = ({
   meta,
   baselineSeguidores = 0,
 }: FollowersHeroCardProps) => {
-  // Total real = baseline + acumulado dos dados importados
-  const totalReal = baselineSeguidores > 0 ? baselineSeguidores : totalAcumulado;
+  // R49: prioriza dado real (snapshot Meta API ou upload) sobre baseline manual.
+  // Antes: baseline=100 sobrescrevia totalAcumulado=9909, mostrando "100".
+  // Agora: baseline só entra como fallback quando não há dado real (totalAcumulado=0).
+  const totalReal = totalAcumulado > 0 ? totalAcumulado : baselineSeguidores;
   const progressoMeta = meta ? Math.min((novosNoMes / meta) * 100, 100) : 0;
   const metaAtingida = meta ? novosNoMes >= meta : false;
   

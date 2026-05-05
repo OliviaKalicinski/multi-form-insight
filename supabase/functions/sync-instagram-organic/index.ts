@@ -31,8 +31,12 @@ const corsHeaders = {
 const IG_ACCOUNT_ID = "17841470017662704";
 const META_API = "https://graph.facebook.com/v20.0";
 
-// Sleep entre chamadas pra respeitar rate limit Meta (~200/h por user).
-const SLEEP_MS = 80;
+// R49: paralelismo via Promise.all de N métricas por dia + sleep entre dias.
+// Antes (R48): loop sequencial dia × métrica = 30d × 7 × 80ms = 17s só de sleep.
+// Agora (R49): 30d × (1 batch paralelo de 7 + 100ms sleep) ≈ 5s.
+// Cabe no limite de 150s do Supabase Edge mesmo pra 60d.
+const SLEEP_BETWEEN_DAYS_MS = 100;
+const MAX_DAYS_PER_CALL = 60; // R49 (A): limite duro. 12 meses estourava 150s.
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -205,7 +209,9 @@ serve(async (req) => {
         until = body.date_stop;
         days = enumerateDates(since, until).length;
       } else {
-        days = typeof body?.days === "number" ? Math.min(body.days, 90) : 7;
+        // R49 (A): teto de 60 dias por chamada pra não estourar 150s do Edge.
+        // Backfill maior precisa ser feito em múltiplas invocações.
+        days = typeof body?.days === "number" ? Math.min(body.days, MAX_DAYS_PER_CALL) : 7;
         const r = dateRangeFromDays(days);
         since = r.since;
         until = r.until;
@@ -225,36 +231,39 @@ serve(async (req) => {
 
     // 1. Metricas range (reach) — 1 chamada
     const rangeMetrics = METRICS.filter((m) => !m.daily);
-    for (const m of rangeMetrics) {
-      const series = await fetchRangeMetric(m.name, since, until, META_TOKEN);
+    const rangeResults = await Promise.all(
+      rangeMetrics.map((m) => fetchRangeMetric(m.name, since, until, META_TOKEN)),
+    );
+    rangeResults.forEach((series, i) => {
+      const m = rangeMetrics[i];
       for (const { date, value } of series) {
         if (!byDate[date]) byDate[date] = {};
         byDate[date][m.name] = typeof value === "number" ? value : 0;
       }
-      await sleep(SLEEP_MS);
-    }
+    });
 
-    // 2. Metricas daily — loop dia × metrica
+    // 2. Metricas daily — R49: paralelizado por DIA (Promise.all das N métricas
+    // simultaneamente). Sleep entre dias pra respeitar rate limit (~200/h).
     const dailyMetrics = METRICS.filter((m) => m.daily);
     let dailyCalls = 0;
     for (const date of dates) {
-      for (const m of dailyMetrics) {
-        const value = await fetchDailyMetric(m.name, date, META_TOKEN, m.metricType);
+      const values = await Promise.all(
+        dailyMetrics.map((m) => fetchDailyMetric(m.name, date, META_TOKEN, m.metricType)),
+      );
+      values.forEach((value, i) => {
+        const m = dailyMetrics[i];
         dailyCalls++;
-        if (value === null) {
-          await sleep(SLEEP_MS);
-          continue;
-        }
+        if (value === null) return;
         if (m.name === "follows_and_unfollows" && typeof value === "object") {
           byDate[date]["follows"] = (value as any).FOLLOW ?? (value as any).follow ?? 0;
           byDate[date]["unfollows"] = (value as any).UNFOLLOW ?? (value as any).unfollow ?? 0;
         } else if (typeof value === "number") {
           byDate[date][m.name] = value;
         }
-        await sleep(SLEEP_MS);
-      }
+      });
+      await sleep(SLEEP_BETWEEN_DAYS_MS);
     }
-    console.log(`[R48] daily calls: ${dailyCalls}, datas com algum dado: ${
+    console.log(`[R49] daily calls: ${dailyCalls}, datas com algum dado: ${
       Object.values(byDate).filter((v) => Object.keys(v).length > 0).length
     }`);
 
@@ -325,7 +334,7 @@ serve(async (req) => {
         followers_rows: followersRows.length,
         marketing_rows: marketingRows.length,
         daily_calls: dailyCalls,
-        message: `Sync R48 completo — ${days} dias, ${dailyCalls} chamadas Meta API.`,
+        message: `Sync R49 completo — ${days} dias, ${dailyCalls} chamadas Meta API (paralelizado por dia).`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
