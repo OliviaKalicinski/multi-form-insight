@@ -2447,6 +2447,7 @@ export type Database = {
       }
       recalculate_all_customers: { Args: never; Returns: number }
       recalculate_customer: { Args: { p_cpf_cnpj: string }; Returns: undefined }
+      recompute_total_seguidores_retroativo: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "admin" | "viewer"
