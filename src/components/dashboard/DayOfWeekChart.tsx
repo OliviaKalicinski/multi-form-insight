@@ -25,18 +25,17 @@ export function DayOfWeekChart({ stats, bestDay }: Props) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
+        {/* R55-fix: stack vertical pra titulo nao quebrar em colunas estreitas.
+             Antes: flex justify-between empurrava o titulo a quebrar 4 linhas. */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-1.5 whitespace-nowrap">
               <span>📅</span>
-              Melhor Dia para Postar
+              Melhor Dia
             </CardTitle>
-            <CardDescription>
-              Média por dia da semana ·{" "}
-              <Badge variant="secondary" className="text-xs">
-                🏆 {bestDay.day} ({bestDay.posts} posts)
-              </Badge>
-            </CardDescription>
+            <Badge variant="secondary" className="text-xs">
+              🏆 {bestDay.day} ({bestDay.posts} posts)
+            </Badge>
           </div>
           <div className="flex gap-1">
             {(Object.keys(METRIC_LABELS) as Metric[]).map(m => (
