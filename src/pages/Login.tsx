@@ -97,7 +97,7 @@ export default function Login() {
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 text-4xl">🐉</div>
           <CardTitle className="text-2xl">Lets Fly</CardTitle>
-          <CardDescription>Dashboard de Marketing</CardDescription>
+          <CardDescription>Dashboard da Lets Fly</CardDescription>
         </CardHeader>
         
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "signup")}>

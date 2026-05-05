@@ -34,7 +34,7 @@ const DashboardLayoutInner = ({ children }: { children: React.ReactNode }) => {
         <SidebarInset>
           <header className="flex h-12 items-center border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
             <SidebarTrigger className="-ml-1" />
-            <div className="ml-4 font-semibold text-sm">📊 Dashboard de Marketing</div>
+            <div className="ml-4 font-semibold text-sm">📊 Dashboard da Lets Fly</div>
             <div className="flex-1" />
             <div className="text-xs text-muted-foreground flex items-center gap-1.5">
               <span
