@@ -127,10 +127,13 @@ export const standardizeProductName = (name: string, price: number): string => {
   // ── Lets Fly Insumos (ordem: específico → genérico) ──
   // "Desengordurada" = nome oficial. Aceita também a grafia legada "desidratada"
   // (ex.: NFs antigas) e consolida no mesmo SKU.
-  if (/farinha.*bsf.*(desengordurada|desidratada)/i.test(desc)) {
+  // R56-fix: regex anterior exigia 'desengordurada' DEPOIS de 'bsf'.
+  // Falhava em descricoes tipo "Farinha Desengordurada de BSF" e
+  // classificava erroneamente como Integral. Agora aceita em qualquer ordem.
+  if (/farinha/i.test(desc) && /(deseng|desidrat)/i.test(desc)) {
     return 'Farinha BSF Desengordurada (kg)';
   }
-  if (/farinha.*bsf/i.test(desc)) {
+  if (/farinha/i.test(desc) && /(bsf|mosca)/i.test(desc)) {
     return 'Farinha BSF Integral (kg)';
   }
   if (/larva.*desid/i.test(desc)) {
@@ -241,3 +244,61 @@ export const getKitType = (productName: string): string | null => {
 
   return null;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R56: abbreviateProductName — versão CURTA pra legendas de gráficos.
+// Usa pattern matching em vez de exact match porque os nomes vêm com sufixos
+// variados ("(90g) - Lote X", "(kg)", etc).
+// ─────────────────────────────────────────────────────────────────────────────
+export function abbreviateProductName(name: string): string {
+  if (!name) return name;
+  const n = name.toLowerCase();
+
+  // Comida de Dragão Original
+  if (n.includes('comida de dragão') && !n.includes('kit')) {
+    return 'C.D. Original';
+  }
+  if (n.includes('kit comida de dragão')) {
+    return 'Kit Gatos';
+  }
+
+  // Mordida de Dragão
+  if (n.includes('mordida de dragão')) {
+    if (n.includes('legumes')) return 'M.D. Legumes';
+    if (n.includes('spirulina')) return 'M.D. Spirulina';
+    if (n.includes('kit') && n.includes('mix')) return 'Kit M.D. Mix';
+    return 'M.D.';
+  }
+
+  // Suplementos
+  if (n.includes('suplemento')) {
+    if (n.includes('integral')) return 'Sup. Integral';
+    if (n.includes('concentrado')) return 'Sup. Concentrado';
+    if (n.includes('gato') || n.includes('felino') || n.includes('taurina')) {
+      return 'Sup. Felino';
+    }
+    return 'Suplemento';
+  }
+
+  // Insumos B2B
+  if (n.includes('farinha bsf')) {
+    if (n.includes('desengordurada') || n.includes('deseng')) return 'Farinha Deseng.';
+    if (n.includes('integral')) return 'Farinha Integral';
+    return 'Farinha BSF';
+  }
+  if (n.includes('larva')) {
+    if (n.includes('desidratada')) return 'Larva Desidratada';
+    if (n.includes('natura')) return 'Larva in Natura';
+    return 'Larva BSF';
+  }
+  if (n.includes('óleo') || n.includes('oleo')) {
+    return 'Óleo BSF';
+  }
+
+  // Grub (já curto)
+  if (n.includes('grub')) return 'Grub';
+
+  // Fallback: corta no primeiro " - " ou " (" e remove sufixos comuns
+  const cut = name.split(/ - | \(/)[0].trim();
+  return cut.length > 0 ? cut : name;
+}

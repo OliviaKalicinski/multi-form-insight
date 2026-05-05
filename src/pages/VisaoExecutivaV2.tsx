@@ -12,6 +12,7 @@ import { getOfficialRevenue, isRevenueOrder, getB2COrders, getB2BOrders, getB2B2
 import { isSampleProduct, isOnlySampleOrder, hasRegularProduct, isMaterialProduct } from "@/utils/samplesAnalyzer";
 import { breakdownOrders } from "@/utils/orderBreakdown";
 import { classifyProductsByAnimal } from "@/utils/petProfile";
+import { abbreviateProductName } from "@/utils/productNormalizer";
 import { BuyerPetProfile, PET_PROFILE_LABELS } from "@/data/operationalProducts";
 import { supabase } from "@/integrations/supabase/client";
 import { PartnerGrowthChart } from "@/components/influenciadores/PartnerGrowthChart";
@@ -67,7 +68,7 @@ const B2C_COLOR = "#2563eb",
   B2B2C_COLOR = "#9333ea",
   FRETE_COLOR = "#16a34a";
 
-type PresetKey = "1d" | "7d" | "30d" | "current_month" | "last_month";
+type PresetKey = "1d" | "7d" | "30d" | "current_month" | "last_month" | "12m";
 interface LocalPeriod {
   type: PresetKey | "custom";
   start: Date;
@@ -79,6 +80,7 @@ const PRESETS: { key: PresetKey; label: string }[] = [
   { key: "30d", label: "30 dias" },
   { key: "current_month", label: "Mês atual" },
   { key: "last_month", label: "Mês anterior" },
+  { key: "12m", label: "12 meses" },
 ];
 function buildPreset(key: PresetKey, anchor: Date): LocalPeriod {
   switch (key) {
@@ -99,6 +101,11 @@ function buildPreset(key: PresetKey, anchor: Date): LocalPeriod {
     case "last_month": {
       const p = subMonths(anchor, 1);
       return { type: key, start: startOfMonth(p), end: endOfMonth(p) };
+    }
+    case "12m": {
+      // R56: ultimos 12 meses (incluindo o mes corrente parcial)
+      const s = subMonths(anchor, 11);
+      return { type: key, start: startOfMonth(s), end: endOfDay(anchor) };
     }
   }
 }
@@ -152,6 +159,12 @@ const DonutChart = ({
   if (!data.length) return <p className="text-sm text-muted-foreground">Sem dados</p>;
   const total = data.reduce((s, d) => s + d.value, 0);
   const fmt = formatValue ?? ((v: number) => v.toLocaleString("pt-BR"));
+  // R56: usa nome abreviado nas legendas (cabe melhor); tooltip mostra nome completo.
+  const dataAbbr = data.map((d) => ({
+    ...d,
+    fullName: d.name,
+    name: abbreviateProductName(d.name),
+  }));
   return (
     <div className="flex flex-col items-center gap-2">
       {label && <p className="text-xs font-medium text-muted-foreground">{label}</p>}
@@ -159,7 +172,7 @@ const DonutChart = ({
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={data}
+              data={dataAbbr}
               cx="50%"
               cy="50%"
               innerRadius={38}
@@ -168,27 +181,36 @@ const DonutChart = ({
               paddingAngle={2}
               stroke="none"
             >
-              {data.map((_, i) => (
+              {dataAbbr.map((_, i) => (
                 <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(v: number) => fmt(v)} />
+            <Tooltip
+              formatter={(v: number, _key, p: any) => [fmt(v), p.payload?.fullName ?? ""]}
+            />
           </PieChart>
         </ResponsiveContainer>
       </div>
+      {/* R56: legenda compacta — nome curto + valor logo ao lado.
+           Antes: name truncate(130px) + valor à direita criava espaço grande
+           e desconectava o número do produto. */}
       <div className="w-full space-y-1">
-        {data.map((d, i) => {
+        {dataAbbr.map((d, i) => {
           const pct = total > 0 ? ((d.value / total) * 100).toFixed(0) : "0";
           return (
-            <div key={d.name} className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="w-2.5 h-2.5 rounded-sm shrink-0"
-                  style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
-                />
-                <span className="text-muted-foreground truncate max-w-[130px]">{d.name}</span>
-              </div>
-              <span className="font-medium tabular-nums">
+            <div
+              key={d.fullName}
+              className="flex items-center gap-2 text-xs"
+              title={d.fullName}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-sm shrink-0"
+                style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
+              />
+              <span className="text-muted-foreground flex-1 min-w-0 truncate">
+                {d.name}
+              </span>
+              <span className="font-medium tabular-nums shrink-0">
                 {fmt(d.value)} ({pct}%)
               </span>
             </div>
@@ -227,22 +249,73 @@ const KPICard = ({
     </CardContent>
   </Card>
 );
-const TopClientesTable = ({ clientes }: { clientes: { nome: string; pedidos: number; receita: number }[] }) => {
+// R56: TopClientesTable agora aceita critério de ordenação selecionável.
+type TopClienteSort = "receita" | "pedidos" | "ticket";
+const TopClientesTable = ({
+  clientes,
+}: {
+  clientes: { nome: string; pedidos: number; receita: number }[];
+}) => {
+  const [sortBy, setSortBy] = useState<TopClienteSort>("receita");
+
   if (!clientes.length) return <p className="text-sm text-muted-foreground">Sem dados no período</p>;
+
+  const sorted = [...clientes].sort((a, b) => {
+    if (sortBy === "receita") return b.receita - a.receita;
+    if (sortBy === "pedidos") return b.pedidos - a.pedidos;
+    // ticket
+    const tA = a.pedidos > 0 ? a.receita / a.pedidos : 0;
+    const tB = b.pedidos > 0 ? b.receita / b.pedidos : 0;
+    return tB - tA;
+  });
+
+  const SORT_LABELS: Record<TopClienteSort, string> = {
+    receita: "Receita",
+    pedidos: "Pedidos",
+    ticket: "Ticket",
+  };
+
   return (
-    <div className="space-y-1">
-      {clientes.map((c, i) => (
-        <div key={c.nome} className="flex items-center justify-between text-xs py-1.5 border-b last:border-0">
-          <div className="flex items-center gap-2">
-            <span className="w-4 text-muted-foreground font-medium shrink-0">{i + 1}.</span>
-            <span className="truncate max-w-[150px]">{c.nome}</span>
-          </div>
-          <div className="flex gap-3 shrink-0">
-            <span className="text-muted-foreground">{c.pedidos}p</span>
-            <span className="font-semibold tabular-nums">{formatCurrency(c.receita)}</span>
-          </div>
-        </div>
-      ))}
+    <div className="space-y-2">
+      {/* Botões de ordenação */}
+      <div className="flex gap-1">
+        {(Object.keys(SORT_LABELS) as TopClienteSort[]).map((k) => (
+          <button
+            key={k}
+            onClick={() => setSortBy(k)}
+            className={`text-xs px-2 py-1 rounded-md transition-colors ${
+              sortBy === k
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {SORT_LABELS[k]}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-1">
+        {sorted.map((c, i) => {
+          const ticket = c.pedidos > 0 ? c.receita / c.pedidos : 0;
+          return (
+            <div
+              key={c.nome}
+              className="flex items-center justify-between text-xs py-1.5 border-b last:border-0"
+              title={c.nome}
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-4 text-muted-foreground font-medium shrink-0">{i + 1}.</span>
+                <span className="truncate max-w-[150px]">{c.nome}</span>
+              </div>
+              <div className="flex gap-3 shrink-0">
+                <span className="text-muted-foreground">{c.pedidos}p</span>
+                <span className="font-semibold tabular-nums">
+                  {sortBy === "ticket" ? formatCurrency(ticket) : formatCurrency(c.receita)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
