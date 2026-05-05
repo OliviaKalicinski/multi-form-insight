@@ -106,15 +106,18 @@ const Seguidores = () => {
     return hoursSince > 48; // > 2 dias = stale
   }, [dataAteDate]);
 
-  const handleSync = async () => {
+  // R48: handleSync aceita "days" pra delta (7d) ou backfill (30d/90d).
+  const handleSync = async (days: number = 7) => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-instagram-organic", { body: {} });
+      const { data, error } = await supabase.functions.invoke("sync-instagram-organic", {
+        body: { days },
+      });
       if (error) throw error;
       await refreshFromDatabase();
       toast({
-        title: "Sincronizado!",
-        description: data?.message ?? "Dados de seguidores atualizados.",
+        title: days === 7 ? "Sincronizado!" : `Backfill de ${days} dias concluído!`,
+        description: data?.message ?? "Dados atualizados.",
       });
     } catch (e: any) {
       toast({ title: "Erro no sync", description: e.message, variant: "destructive" });
@@ -402,13 +405,25 @@ const Seguidores = () => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleSync}
+                onClick={() => handleSync(7)}
                 disabled={syncing}
                 className="gap-1.5"
-                title="Sincroniza agora com a API do Instagram (geralmente roda automaticamente a cada 6h)"
+                title="Sincroniza últimos 7 dias com a API do Instagram (cron roda automaticamente a cada 6h)"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
                 {syncing ? "Sincronizando..." : "Atualizar agora"}
+              </Button>
+              {/* R48: backfill de 30 dias pra reconstruir histórico apos fix do parser de total_value.
+                  Demora ~30s (≈210 chamadas Meta API com sleep 80ms). */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleSync(30)}
+                disabled={syncing}
+                className="gap-1.5 text-xs text-muted-foreground"
+                title="Recarrega últimos 30 dias do Meta. Use após bug fix pra reconstruir histórico (~30s)."
+              >
+                Backfill 30d
               </Button>
             </div>
           </div>
