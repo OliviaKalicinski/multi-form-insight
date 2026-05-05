@@ -106,7 +106,7 @@ const Seguidores = () => {
     return hoursSince > 48; // > 2 dias = stale
   }, [dataAteDate]);
 
-  // R48: handleSync aceita "days" pra delta (7d) ou backfill (30d/90d).
+  // R48: handleSync aceita "days" pra delta (7d) ou backfill (30d/60d).
   const handleSync = async (days: number = 7) => {
     setSyncing(true);
     try {
@@ -121,6 +121,54 @@ const Seguidores = () => {
       });
     } catch (e: any) {
       toast({ title: "Erro no sync", description: e.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // R51: backfill de 12 meses em 6 chunks de 60 dias + recalculo retroativo
+  // de total_seguidores. Cada chunk envia date_start/date_stop especifico
+  // (bypass do MAX_DAYS_PER_CALL=60 que so se aplica ao body.days default).
+  const handleHistoricBackfill = async () => {
+    setSyncing(true);
+    try {
+      const CHUNKS = 6; // 6 × 60d = 360d ≈ 12 meses
+      const CHUNK_DAYS = 60;
+
+      for (let i = 0; i < CHUNKS; i++) {
+        const dateStop = new Date();
+        dateStop.setDate(dateStop.getDate() - 1 - i * CHUNK_DAYS);
+        const dateStart = new Date(dateStop);
+        dateStart.setDate(dateStart.getDate() - (CHUNK_DAYS - 1));
+
+        const body = {
+          date_start: dateStart.toISOString().split("T")[0],
+          date_stop: dateStop.toISOString().split("T")[0],
+        };
+
+        toast({
+          title: `Backfill ${i + 1}/${CHUNKS}`,
+          description: `Buscando ${body.date_start} → ${body.date_stop}...`,
+        });
+
+        const { error } = await supabase.functions.invoke("sync-instagram-organic", { body });
+        if (error) throw new Error(`Chunk ${i + 1}: ${error.message}`);
+      }
+
+      // Recalcula total_seguidores retroativo
+      toast({ title: "Reconstruindo histórico...", description: "Calculando totais por dia..." });
+      const { data: rpcData, error: rpcError } = await (supabase as any).rpc(
+        "recompute_total_seguidores_retroativo",
+      );
+      if (rpcError) throw new Error(`Recompute: ${rpcError.message}`);
+
+      await refreshFromDatabase();
+      toast({
+        title: "Backfill 12 meses concluído!",
+        description: `${rpcData ?? 0} dias reconstruídos. Histórico mensal disponível.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Erro no backfill", description: e.message, variant: "destructive" });
     } finally {
       setSyncing(false);
     }
@@ -433,6 +481,17 @@ const Seguidores = () => {
                 title="Recarrega últimos 60 dias do Meta. Limite máximo por chamada (~25s)."
               >
                 60d
+              </Button>
+              {/* R51: backfill 12 meses (6 chunks × 60d) + recompute retroativo de total_seguidores. */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleHistoricBackfill}
+                disabled={syncing}
+                className="gap-1.5 text-xs text-muted-foreground"
+                title="Reconstrói histórico de 12 meses. ~2.5min. Use uma vez pra popular evolução mensal."
+              >
+                12m histórico
               </Button>
             </div>
           </div>
