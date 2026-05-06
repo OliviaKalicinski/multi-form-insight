@@ -1373,6 +1373,18 @@ export default function KanbanInfluenciadores() {
   const isProspectionFormat = (headers: string[]) =>
     headers.some((h) => /^creator$/i.test(h.trim()) || /^username$/i.test(h.trim()));
 
+  /** R59-fix: detecta CSV simples 2 colunas (nome, @instagram) sem header.
+   *  Usado por Bruno em listas de prospeccao rapida exportadas de Sheets/Notion.
+   *  Heuristica: 2 colunas, coluna 2 com nome 'instagram' OU parecendo um handle. */
+  const isSimpleProspection = (headers: string[]) => {
+    if (headers.length !== 2) return false;
+    const col2 = (headers[1] || "").trim();
+    if (/^instagram$/i.test(col2)) return true;
+    // Handle Instagram: 3-30 chars, letras/numeros/underscore/ponto
+    if (/^[a-zA-Z0-9._]{3,30}$/.test(col2)) return true;
+    return false;
+  };
+
   /** Detecta plataforma: "Instagram Link" → instagram, "TikTok Link" → tiktok */
   const detectPlatform = (headers: string[]): "instagram" | "tiktok" => {
     if (headers.some((h) => /tiktok\s*link/i.test(h.trim()))) return "tiktok";
@@ -1411,6 +1423,28 @@ export default function KanbanInfluenciadores() {
     if (!/^\d+$/.test(digits)) return null;
     const n = parseInt(digits, 10);
     return isFinite(n) ? n : null;
+  };
+
+  /** R59-fix: mapeia row do formato simples (Nome, @instagram) */
+  const mapSimpleRow = (row: Record<string, string>): Record<string, unknown> => {
+    const nome = fixMojibake((row["_simpleNome"] || "").trim());
+    const handle = (row["_simpleHandle"] || "").trim().replace(/^@/, "");
+    const igNorm = normalizeInstagram(handle);
+    return {
+      _nome: nome,
+      _igRaw: handle,
+      _igNorm: igNorm || "",
+      _platform: "instagram",
+      payload: {
+        name: nome,
+        instagram: igNorm,
+        tiktok: null,
+        email: null,
+        whatsapp: null,
+        kanban_seguidores: null,
+        updated_at: new Date().toISOString(),
+      },
+    };
   };
 
   /** Mapeia uma row CSV de prospecção para o payload interno */
@@ -1507,11 +1541,24 @@ export default function KanbanInfluenciadores() {
         // Detectar formato pelo cabeçalho (keys da primeira row)
         const headers = Object.keys(jsonData[0]);
         const isProspection = isProspectionFormat(headers);
-        const platform = isProspection ? detectPlatform(headers) : "instagram";
+        const isSimple = !isProspection && isSimpleProspection(headers);
+        const platform: "instagram" | "tiktok" = isProspection ? detectPlatform(headers) : "instagram";
+
+        // R59-fix: simple format → re-lê como array (linhas viraram header errado)
+        // Cada item: [nome, handle]
+        let simpleRows: Array<[string, string]> = [];
+        if (isSimple) {
+          const arr = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: "", raw: false });
+          simpleRows = arr.map((row) => [String(row[0] ?? ""), String(row[1] ?? "")]);
+        }
 
         // Formato interno: pula 2 rows (label + exemplo). CSV prospecção: dados começam na row 1.
-        const dataRows = isProspection ? jsonData : jsonData.slice(2);
-        const rowOffset = isProspection ? 2 : 4; // para mensagens de erro (linha no arquivo original)
+        const dataRows = isSimple
+          ? simpleRows.map(([nome, handle]) => ({ _simpleNome: nome, _simpleHandle: handle }))
+          : isProspection
+            ? jsonData
+            : jsonData.slice(2);
+        const rowOffset = isSimple ? 1 : isProspection ? 2 : 4;
 
         const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
@@ -1527,7 +1574,11 @@ export default function KanbanInfluenciadores() {
           const fileRow = idx + rowOffset;
 
           // Mapear conforme formato detectado
-          const mapped = isProspection ? mapProspectionRow(row, platform) : mapInternalRow(row);
+          const mapped = isSimple
+            ? mapSimpleRow(row)
+            : isProspection
+              ? mapProspectionRow(row, platform)
+              : mapInternalRow(row);
           const nome = mapped._nome as string;
           const igRaw = mapped._igRaw as string;
           const dedupKey = mapped._igNorm as string;
