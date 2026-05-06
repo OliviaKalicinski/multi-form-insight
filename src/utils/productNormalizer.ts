@@ -264,9 +264,10 @@ export function abbreviateProductName(name: string): string {
   const n = cleaned.toLowerCase();
 
   // R56-fix-3: aceita versoes ja abreviadas no banco (NF, sistema interno)
+  // R56-fix-10: aceita typo 'spirulia' (sem 'n') alem de 'spirulina'.
   if (/^c\.d\.\s*original\b/i.test(cleaned)) return 'C.D. Original';
   if (/^m\.d\.\s*legumes\b/i.test(cleaned)) return 'M.D. Legumes';
-  if (/^m\.d\.\s*spirulina\b/i.test(cleaned)) return 'M.D. Spirulina';
+  if (/^m\.d\.\s*spirul/i.test(cleaned)) return 'M.D. Spirulina';
   if (/^m\.d\.\s*mix\b/i.test(cleaned)) return 'Kit M.D. Mix';
 
   // Comida de Dragão Original
@@ -278,9 +279,10 @@ export function abbreviateProductName(name: string): string {
   }
 
   // Mordida de Dragão
+  // R56-fix-10: 'spirul' pega 'spirulina' e 'spirulia' (typo na NF)
   if (n.includes('mordida de dragão')) {
     if (n.includes('legumes')) return 'M.D. Legumes';
-    if (n.includes('spirulina')) return 'M.D. Spirulina';
+    if (n.includes('spirul')) return 'M.D. Spirulina';
     if (n.includes('kit') && n.includes('mix')) return 'Kit M.D. Mix';
     return 'M.D.';
   }
