@@ -663,16 +663,30 @@ const VisaoExecutivaV2 = () => {
     const totalPedidos = receitaOrders.length;
     const ticketMedio = totalPedidos > 0 ? receitaTotal / totalPedidos : 0;
     const productRevenueMap = buildProductRevenueMap(orders);
-    const productsSold = Object.entries(productRevenueMap)
-      .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
-      .sort((a, b) => b.revenue - a.revenue);
+
+    // R56-fix-9: B2B só vende insumos (Larva, Farinha, Óleo, Frass).
+    // Se aparecer 'Mordida de Dragão', 'Comida de Dragão' etc no top5
+    // do B2B, é classificação errada de pedido. Filtra.
+    const isInsumoB2B = (name: string) =>
+      /^(Larva|Farinha|Óleo|Oleo|Frass|Grub)/i.test(name);
+    const filterProductsForSeg = <T extends { name: string }>(items: T[]) =>
+      seg === "b2b" ? items.filter((p) => isInsumoB2B(p.name)) : items;
+
+    const productsSold = filterProductsForSeg(
+      Object.entries(productRevenueMap)
+        .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
+        .sort((a, b) => b.revenue - a.revenue),
+    );
     const topClientes = buildTopClientes(orders);
     const months12 = getLast12Months(allSeg.length > 0 ? allSeg : salesData);
     const allProdMap = buildProductRevenueMap(allSeg);
-    const top5 = Object.entries(allProdMap)
-      .sort((a, b) => b[1].revenue - a[1].revenue)
+    const allProdEntries = filterProductsForSeg(
+      Object.entries(allProdMap).map(([name, d]) => ({ name, ...d })),
+    );
+    const top5 = allProdEntries
+      .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5)
-      .map(([name]) => name);
+      .map((p) => p.name);
     // R56-fix-3: top5 e productsSold agora usam nome ABREVIADO (do
     // buildProductRevenueMap). Filter precisa comparar nome abreviado tambem,
     // senao filter vira [] sempre e graficos ficam zerados.
