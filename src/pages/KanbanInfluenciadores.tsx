@@ -1786,8 +1786,9 @@ export default function KanbanInfluenciadores() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 min-w-0 overflow-x-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* Header — R59: titulo em cima, controles em linha logo abaixo
+           pra ficarem visiveis a esquerda sem precisar rolar pra direita. */}
+      <div className="space-y-3">
         <div>
           <h1 className="text-2xl font-bold">Kanban de Influenciadores</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Pipeline de prospecção e relacionamento</p>
@@ -1850,7 +1851,7 @@ export default function KanbanInfluenciadores() {
             <Plus className="h-4 w-4 mr-1" /> Novo Influenciador
           </Button>
         </div>
-      </div>
+      </div>{/* /Header */}
 
       {/* R33: gráfico de evolução de creators removido daqui (decisão Bruno
            02/05 — Kanban é 100% operacional). Vive agora só em
