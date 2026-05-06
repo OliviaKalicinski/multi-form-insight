@@ -313,6 +313,15 @@ export function abbreviateProductName(name: string): string {
   // Grub (já curto)
   if (n.includes('grub')) return 'Grub';
 
+  // R56-fix-6: fallback amplo pra qualquer 'BSF' isolado nao classificado.
+  // Bruno: "Larva BSF de set/25 = Larva Desidratada". Provavelmente NF tem
+  // descricao tipo "BSF (kg)" ou "Inseto BSF" sem palavra 'larva'.
+  // Default seguro: BSF sozinho == Larva Desidratada (produto mais vendido).
+  if (/\bbsf\b/i.test(cleaned)) {
+    if (n.includes('natura')) return 'Larva in Natura';
+    return 'Larva Desidratada';
+  }
+
   // Fallback: corta no primeiro " - " ou " (" e remove sufixos comuns
   const cut = name.split(/ - | \(/)[0].trim();
   return cut.length > 0 ? cut : name;
