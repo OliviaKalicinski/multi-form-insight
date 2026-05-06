@@ -124,10 +124,11 @@ function buildProductRevenueMap(orders: ProcessedOrder[]) {
   exploded.forEach((o) =>
     o.produtos.forEach((p) => {
       if (!isSampleProduct(p) && !isMaterialProduct(p)) {
-        // R56-fix-2: agrega pelo nome ABREVIADO. Antes, descricoes diferentes
-        // ("Larva Desidratada de BSF Lote 1", "Larva Desidratada (kg)", etc)
-        // viravam fatias separadas no donut. Agora consolida sob "Larva Desidratada".
-        const raw = p.descricaoAjustada || p.descricao;
+        // R56-fix-7: prioriza descricao RAW (NF). descricaoAjustada esta
+        // cacheada com classificacoes erradas (pre-R56-fix-3 default Integral).
+        // Ex: NF tem 'Farinha Desengordurada de BSF' mas ajustada
+        // gravada como 'Farinha BSF Integral (kg)'. Usar raw resolve.
+        const raw = p.descricao || p.descricaoAjustada || '';
         const k = abbreviateProductName(raw);
         if (!map[k]) map[k] = { revenue: 0, qty: 0 };
         map[k].revenue += p.preco;
@@ -559,7 +560,7 @@ const VisaoExecutivaV2 = () => {
             .flatMap((o) => o.produtos)
             .filter(
               (p) =>
-                abbreviateProductName(p.descricaoAjustada || p.descricao) === prod &&
+                abbreviateProductName(p.descricao || p.descricaoAjustada || "") === prod &&
                 !isSampleProduct(p),
             )
             .reduce((s, p) => s + p.preco, 0),
@@ -684,7 +685,7 @@ const VisaoExecutivaV2 = () => {
             .flatMap((o) => o.produtos)
             .filter(
               (p) =>
-                abbreviateProductName(p.descricaoAjustada || p.descricao) === prod &&
+                abbreviateProductName(p.descricao || p.descricaoAjustada || "") === prod &&
                 !isSampleProduct(p),
             )
             .reduce((s, p) => s + p.preco, 0),
@@ -700,7 +701,7 @@ const VisaoExecutivaV2 = () => {
           .flatMap((o) => o.produtos)
           .filter(
             (p) =>
-              abbreviateProductName(p.descricaoAjustada || p.descricao) === prod &&
+              abbreviateProductName(p.descricao || p.descricaoAjustada || "") === prod &&
               !isSampleProduct(p),
           )
           .reduce((s, p) => s + p.quantidade, 0);

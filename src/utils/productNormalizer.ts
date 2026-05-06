@@ -296,15 +296,19 @@ export function abbreviateProductName(name: string): string {
   }
 
   // Insumos B2B
-  if (n.includes('farinha bsf')) {
+  // R56-fix-7: regex farinha relaxada. Antes 'farinha bsf' sequencial. Agora
+  // qualquer 'farinha' pega — descricao raw 'Farinha Desengordurada de BSF'
+  // (palavras separadas) classificava errado. Default = Desengordurada.
+  if (n.includes('farinha')) {
     if (n.includes('desengordurada') || n.includes('deseng')) return 'Farinha Deseng.';
     if (n.includes('integral')) return 'Farinha Integral';
-    return 'Farinha BSF';
+    return 'Farinha Deseng.';
   }
   if (n.includes('larva')) {
-    if (n.includes('desidratada')) return 'Larva Desidratada';
+    // R56-fix-4: 'Larva BSF' (sem qualifier) eh o mesmo produto que
+    // 'Larva Desidratada' (Bruno confirmou). Consolidar como Desidratada.
     if (n.includes('natura')) return 'Larva in Natura';
-    return 'Larva BSF';
+    return 'Larva Desidratada';
   }
   if (n.includes('óleo') || n.includes('oleo')) {
     return 'Óleo BSF';
