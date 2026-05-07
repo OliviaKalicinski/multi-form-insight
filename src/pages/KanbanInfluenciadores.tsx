@@ -1411,6 +1411,17 @@ export default function KanbanInfluenciadores() {
     return false;
   };
 
+  /** R59-fix-5: detecta CSV/XLSX com headers em PT (Nome + Instagram + extras).
+   *  Aceita planilhas exportadas do Sheets com colunas:
+   *    Nome, Instagram, Nicho, Seguidores, Status, Responsável, Email, WhatsApp...
+   *  Em qualquer ordem. Basta ter Nome E Instagram. */
+  const isPtProspection = (headers: string[]) => {
+    const hs = headers.map((h) => h.trim().toLowerCase());
+    const hasNome = hs.some((h) => /^(nome|creator|name)$/i.test(h));
+    const hasInsta = hs.some((h) => /^instagram$/i.test(h) || /instagram\s*link/i.test(h));
+    return hasNome && hasInsta;
+  };
+
   /** Detecta plataforma: "Instagram Link" → instagram, "TikTok Link" → tiktok */
   const detectPlatform = (headers: string[]): "instagram" | "tiktok" => {
     if (headers.some((h) => /tiktok\s*link/i.test(h.trim()))) return "tiktok";
@@ -1538,6 +1549,50 @@ export default function KanbanInfluenciadores() {
   };
 
   /** Mapeia uma row do formato interno (XLSX da planilha interna) */
+  /** R59-fix-5: mapeia row de planilha PT (Nome, Instagram, Nicho, Seguidores,
+   *  Status, Responsável, Email, WhatsApp). Tolera variações de capitalização
+   *  e aliases (Nicho/Categoria, Status/Etapa, Responsável/Owner). */
+  const mapPtRow = (row: Record<string, string>): Record<string, unknown> => {
+    // Lookup case-insensitive: monta mapa lower → real key uma vez.
+    const lowerMap: Record<string, string> = {};
+    for (const k of Object.keys(row)) lowerMap[k.toLowerCase().trim()] = k;
+    const get = (...keys: string[]): string => {
+      for (const k of keys) {
+        const realKey = lowerMap[k.toLowerCase()];
+        if (realKey && row[realKey]) {
+          const v = String(row[realKey]).trim();
+          if (v) return v;
+        }
+      }
+      return "";
+    };
+
+    const nomeRaw = cleanText(get("Nome", "Creator", "Name"));
+    const nome = fixMojibake(nomeRaw);
+    const igHandle = cleanHandle(get("Instagram", "Instagram Link", "Username"));
+    const tiktokHandle = cleanHandle(get("TikTok", "TikTok Link"));
+    const igNorm = normalizeInstagram(igHandle);
+    const seguidores = parseFollowerCount(get("Seguidores", "Followers", "Followers Count"));
+    const nicho = fixMojibake(cleanText(get("Nicho", "Categoria", "Category", "Niche")));
+
+    return {
+      _nome: nome,
+      _igRaw: igHandle,
+      _igNorm: igNorm || "",
+      _platform: "instagram",
+      payload: {
+        name: nome,
+        instagram: igNorm,
+        tiktok: tiktokHandle || null,
+        whatsapp: cleanText(get("WhatsApp", "Whatsapp", "Telefone", "Contato")) || null,
+        email: cleanText(get("Email", "E-mail")) || null,
+        kanban_seguidores: seguidores,
+        kanban_nicho: nicho || null,
+        updated_at: new Date().toISOString(),
+      },
+    };
+  };
+
   const mapInternalRow = (row: Record<string, string>): Record<string, unknown> => {
     // R34: fixMojibake aplicado em todos os campos texto (nome, endereço,
     // razão social) pra corrigir mojibake do CSV antes de mandar pro DB.
@@ -1596,6 +1651,9 @@ export default function KanbanInfluenciadores() {
         const headers = Object.keys(jsonData[0]);
         const isProspection = isProspectionFormat(headers);
         const isSimple = !isProspection && isSimpleProspection(headers);
+        // R59-fix-5: detecta formato PT (Nome+Instagram+extras). Tem prioridade
+        // sobre o fallback "interno" pra evitar slice(2) em planilhas PT.
+        const isPt = !isProspection && !isSimple && isPtProspection(headers);
         const platform: "instagram" | "tiktok" = isProspection ? detectPlatform(headers) : "instagram";
 
         // R59-fix: simple format → re-lê como array (linhas viraram header errado)
@@ -1606,13 +1664,13 @@ export default function KanbanInfluenciadores() {
           simpleRows = arr.map((row) => [String(row[0] ?? ""), String(row[1] ?? "")]);
         }
 
-        // Formato interno: pula 2 rows (label + exemplo). CSV prospecção: dados começam na row 1.
+        // Formato interno: pula 2 rows (label + exemplo). CSV prospecção/PT: dados começam na row 1.
         const dataRows = isSimple
           ? simpleRows.map(([nome, handle]) => ({ _simpleNome: nome, _simpleHandle: handle }))
-          : isProspection
+          : isProspection || isPt
             ? jsonData
             : jsonData.slice(2);
-        const rowOffset = isSimple ? 1 : isProspection ? 2 : 4;
+        const rowOffset = isSimple ? 1 : isProspection || isPt ? 2 : 4;
 
         const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
@@ -1630,9 +1688,11 @@ export default function KanbanInfluenciadores() {
           // Mapear conforme formato detectado
           const mapped = isSimple
             ? mapSimpleRow(row)
-            : isProspection
-              ? mapProspectionRow(row, platform)
-              : mapInternalRow(row);
+            : isPt
+              ? mapPtRow(row)
+              : isProspection
+                ? mapProspectionRow(row, platform)
+                : mapInternalRow(row);
           const nome = mapped._nome as string;
           const igRaw = mapped._igRaw as string;
           const dedupKey = mapped._igNorm as string;
@@ -1652,8 +1712,10 @@ export default function KanbanInfluenciadores() {
           }
 
           // Status from spreadsheet (column "kanban_status"). If empty/invalid → "prospeccao".
-          const sheetStatus =
-            parseStatusFromSheet(row["kanban_status"] || row["status"] || "");
+          // R59-fix-5: lookup case-insensitive pra pegar "Status" / "Etapa" tb.
+          const statusVal =
+            row["kanban_status"] || row["status"] || row["Status"] || row["Etapa"] || row["etapa"] || "";
+          const sheetStatus = parseStatusFromSheet(statusVal);
           const defaultStatus: InfluencerStatus = sheetStatus ?? "prospeccao";
 
           // Dedup: checar por instagram OU tiktok dependendo da plataforma
