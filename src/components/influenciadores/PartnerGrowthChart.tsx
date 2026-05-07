@@ -88,6 +88,29 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
     staleTime: 5 * 60 * 1000,
   });
 
+  // R60: novos no funil (qualquer entrada no Kanban) por created_at
+  // no trimestre. Captura cadastros via CSV import + criacao manual.
+  const { data: createdRows = [] } = useQuery({
+    queryKey: [
+      "partner_growth_chart_created",
+      quarterRange.start.toISOString(),
+      quarterRange.end.toISOString(),
+    ],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("influencer_registry")
+        .select("id, created_at")
+        .gte("created_at", quarterRange.start.toISOString())
+        .lte("created_at", quarterRange.end.toISOString());
+      if (error) {
+        console.warn("[partner_growth_chart] created_at query falhou:", error.message);
+        return [] as { id: string; created_at: string }[];
+      }
+      return (data ?? []) as { id: string; created_at: string }[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   const weeklyChartData = useMemo(() => {
     const { start: quarterStart, end: quarterEnd } = quarterRange;
 
@@ -115,6 +138,7 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
       weekStart: Date;
       isPast: boolean;
       parceiro: number;
+      novos: number; // R60: novos no funil (qualquer entrada no Kanban)
     };
     const weeks: Slot[] = [];
     for (let w = 0; w < numWeeks; w++) {
@@ -127,6 +151,7 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
         weekStart: ws,
         isPast: ws.getTime() < currentMonday.getTime(),
         parceiro: 0,
+        novos: 0,
       });
     }
 
@@ -157,10 +182,26 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
       }
     }
 
+    // R60: contabiliza novos no funil (created_at) — pra TODAS as semanas,
+    // inclusive passadas (dado real, nao sintetico).
+    for (const row of createdRows) {
+      const created = new Date(row.created_at);
+      if (isNaN(created.getTime())) continue;
+      if (created < quarterStart || created > quarterEnd) continue;
+      for (const slot of weeks) {
+        const slotEnd = new Date(slot.weekStart);
+        slotEnd.setDate(slot.weekStart.getDate() + 7);
+        if (created >= slot.weekStart && created < slotEnd) {
+          slot.novos += 1;
+          break;
+        }
+      }
+    }
+
     return weeks
-      .map(({ label, parceiro, isPast }) => ({ label, parceiro, isPast }))
+      .map(({ label, parceiro, novos, isPast }) => ({ label, parceiro, novos, isPast }))
       .reverse();
-  }, [statusHistory, quarterRange, rawInfluencers]);
+  }, [statusHistory, createdRows, quarterRange, rawInfluencers]);
 
   if (weeklyChartData.length === 0) return null;
 
@@ -174,11 +215,11 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
         </Badge>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Semanas passadas mostram a <strong>média histórica</strong> (base atual distribuída uniformemente). A partir da semana atual, cada barra é o <strong>número real</strong> de novos parceiros naquela semana, capturado pelo histórico de transições.
+        <strong>Azul</strong>: novos influenciadores cadastrados no Kanban (qualquer status). <strong>Verde</strong>: parceiros formais — transições para status &quot;parceiro&quot; (semana atual em diante). <strong>Cinza</strong>: média histórica de parceiros distribuída pelas semanas passadas.
       </p>
       <ResponsiveContainer
         width="100%"
-        height={Math.max(220, weeklyChartData.length * 28 + 60)}
+        height={Math.max(220, weeklyChartData.length * 32 + 60)}
       >
         <BarChart
           data={weeklyChartData}
@@ -205,12 +246,16 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
           />
           <Tooltip
             contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
-            formatter={(value: number, _name: string, item: any) => [
-              value,
-              item?.payload?.isPast ? "Média histórica (sintético)" : "Novos parceiros (real)",
-            ]}
+            formatter={(value: number, name: string) => {
+              if (name === "novos") return [value, "Novos no funil"];
+              if (name === "parceiro") return [value, "Parceiros formais"];
+              return [value, name];
+            }}
             labelFormatter={(label) => `Semana de ${label}`}
           />
+          {/* R60: barra azul de novos no funil — sempre mostra dado real */}
+          <Bar dataKey="novos" name="novos" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+          {/* Barra de parceiros — cinza pra semanas passadas (sintético), verde pra atual em diante (real) */}
           <Bar dataKey="parceiro" name="parceiro" radius={[0, 4, 4, 0]}>
             {weeklyChartData.map((entry, index) => (
               <Cell
@@ -221,14 +266,18 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1">
+      <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1 flex-wrap">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-sm bg-gray-300" />
-          Média histórica
+          <span className="inline-block w-3 h-3 rounded-sm bg-blue-500" />
+          Novos no funil (cadastros)
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded-sm bg-emerald-500" />
-          Novos parceiros (real)
+          Parceiros formais (real)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm bg-gray-300" />
+          Média histórica
         </span>
       </div>
     </div>
