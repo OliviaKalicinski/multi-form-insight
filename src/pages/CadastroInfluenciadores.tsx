@@ -612,6 +612,11 @@ export default function CadastroInfluenciadores() {
   // valor atual no DB (status intermediário ou 'arquivado' via NULL).
   const importMutation = useMutation({
     mutationFn: async (influencers: Influencer[]) => {
+      if (influencers.length === 0) {
+        throw new Error(
+          "Nenhuma linha valida na planilha. Verifique se as colunas 'Nome' e 'Instagram' estao preenchidas.",
+        );
+      }
       const rows = influencers.map((inf) => {
         const { coupon, ...rowWithoutCoupon } = influencerToDBRow(inf);
         return rowWithoutCoupon;
@@ -640,9 +645,27 @@ export default function CadastroInfluenciadores() {
         onConflict: "email",
       });
       if (error) throw error;
+
+      // R59-fix-6: retorna contagem pro toast
+      return {
+        total: rows.length,
+        created: rows.length - existingEmails.size,
+        updated: existingEmails.size,
+      };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["influencer-registry"] });
+      toast({
+        title: "Importacao concluida",
+        description: `${result.total} linha(s) processada(s) — ${result.created} nova(s), ${result.updated} atualizada(s).`,
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Erro na importacao",
+        description: err?.message || "Falha desconhecida ao importar CSV.",
+        variant: "destructive",
+      });
     },
   });
 
