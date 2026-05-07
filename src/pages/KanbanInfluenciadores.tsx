@@ -1425,10 +1425,35 @@ export default function KanbanInfluenciadores() {
     return isFinite(n) ? n : null;
   };
 
+  /** R59-fix-2: helpers preventivos pra erros comuns de planilha. */
+  // Limpa newlines/tabs internos (B.O.N.O\n virava nome vazio depois do parse).
+  const cleanText = (s: string | undefined | null): string => {
+    if (!s) return "";
+    return String(s)
+      .replace(/[\r\n\t]+/g, " ")  // newlines/tabs viram espaço
+      .replace(/\s+/g, " ")        // múltiplos espaços → 1
+      .replace(/^﻿/, "")      // BOM UTF-8 no início
+      .trim();
+  };
+  // Normaliza handles do Instagram aceitando URL completa e variações.
+  const cleanHandle = (s: string | undefined | null): string => {
+    if (!s) return "";
+    let h = cleanText(s);
+    // URL completa: https://instagram.com/user, instagram.com/user, www.instagram.com/user
+    const urlMatch = h.match(/(?:instagram\.com|tiktok\.com)\/@?([a-zA-Z0-9._]+)/i);
+    if (urlMatch) h = urlMatch[1];
+    h = h.replace(/^@/, "").replace(/\/+$/, ""); // tira @ e barras finais
+    h = h.replace(/\s+/g, "");                    // sem espaços em handle
+    return h;
+  };
+
   /** R59-fix: mapeia row do formato simples (Nome, @instagram) */
   const mapSimpleRow = (row: Record<string, string>): Record<string, unknown> => {
-    const nome = fixMojibake((row["_simpleNome"] || "").trim());
-    const handle = (row["_simpleHandle"] || "").trim().replace(/^@/, "");
+    const nomeRaw = cleanText(row["_simpleNome"]);
+    const handle = cleanHandle(row["_simpleHandle"]);
+    // R59-fix-2: se nome veio vazio (CSV bagunçado, célula com newline interna)
+    // mas handle existe, deriva nome do handle. Bruno edita depois se quiser.
+    const nome = fixMojibake(nomeRaw) || (handle ? `@${handle}` : "");
     const igNorm = normalizeInstagram(handle);
     return {
       _nome: nome,
@@ -1450,13 +1475,16 @@ export default function KanbanInfluenciadores() {
   /** Mapeia uma row CSV de prospecção para o payload interno */
   const mapProspectionRow = (row: Record<string, string>, platform: "instagram" | "tiktok"): Record<string, unknown> => {
     // R34: fixMojibake corrige UTF-8 lido como Latin-1 ("EcolÃ³gico" → "Ecológico")
-    const nome = fixMojibake((row["Creator"] || "").trim());
-    const username = (row["Username"] || "").trim().replace(/^@/, "");
-    const linkCol = platform === "tiktok" ? (row["TikTok Link"] || "").trim() : (row["Instagram Link"] || "").trim();
-    const handle = username || linkCol.replace(/^@/, "");
-    const email = (row["Email address"] || row["Email"] || "").trim();
+    // R59-fix-2: cleanText/cleanHandle aplicados pra preventir newlines internos,
+    // BOM UTF-8, URLs completas no campo de handle, etc.
+    const nomeRaw = cleanText(row["Creator"]);
+    const nome = fixMojibake(nomeRaw);
+    const username = cleanHandle(row["Username"]);
+    const linkCol = platform === "tiktok" ? cleanHandle(row["TikTok Link"]) : cleanHandle(row["Instagram Link"]);
+    const handle = username || linkCol;
+    const email = cleanText(row["Email address"] || row["Email"]);
     const seguidores = parseFollowerCount(row["Followers"] || "");
-    const contato = (row["Contato"] || "").trim();
+    const contato = cleanText(row["Contato"]);
 
     // Para upsert, precisamos de um identificador único — usar o handle da plataforma
     // Instagram: normalizar como antes. TikTok: usar handle direto.
