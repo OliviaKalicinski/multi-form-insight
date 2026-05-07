@@ -17,8 +17,10 @@ import {
 import {
   Upload, Search, X, Instagram, Phone, Mail, MapPin, Building2,
   TrendingUp, Link2, Users, User, LinkIcon, Zap, CheckCircle2, AlertCircle,
-  ChevronDown, ChevronUp, Pencil,
+  ChevronDown, ChevronUp, Pencil, UserPlus,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -474,6 +476,53 @@ export default function CadastroInfluenciadores() {
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<Influencer | null>(null);
 
+  // R61: novo cadastro manual (alternativa ao CSV)
+  const [novoCadastroOpen, setNovoCadastroOpen] = useState(false);
+  const [novoForm, setNovoForm] = useState({
+    name: "",
+    instagram: "",
+    whatsapp: "",
+    email: "",
+    cidade: "",
+    estado: "",
+    coupon: "",
+    cpf: "",
+  });
+  const { toast } = useToast();
+  const insertInfluencerMutation = useMutation({
+    mutationFn: async (form: typeof novoForm) => {
+      const handle = form.instagram.trim().replace(/^@/, "").replace(/\s+/g, "");
+      if (!form.name.trim()) throw new Error("Nome é obrigatório");
+      if (!handle) throw new Error("Instagram é obrigatório");
+      const payload: Record<string, unknown> = {
+        name: form.name.trim(),
+        instagram: handle,
+        kanban_status: "prospeccao",
+        na_base: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      if (form.whatsapp.trim()) payload.whatsapp = form.whatsapp.trim();
+      if (form.email.trim()) payload.email = form.email.trim();
+      if (form.cidade.trim()) payload.address_cidade = form.cidade.trim();
+      if (form.estado.trim()) payload.address_estado = form.estado.trim().toUpperCase();
+      if (form.coupon.trim()) payload.coupon = form.coupon.trim();
+      if (form.cpf.trim()) payload.cpf = form.cpf.trim().replace(/\D/g, "");
+      const { error } = await (supabase as any).from("influencer_registry").insert(payload);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["influencer-registry"] });
+      queryClient.invalidateQueries({ queryKey: ["kanban_influenciadores"] });
+      toast({ title: "Influenciadora cadastrada!", description: "Adicionada ao Kanban em status Prospecção." });
+      setNovoCadastroOpen(false);
+      setNovoForm({ name: "", instagram: "", whatsapp: "", email: "", cidade: "", estado: "", coupon: "", cpf: "" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erro ao cadastrar", description: err.message, variant: "destructive" });
+    },
+  });
+
   // Auto-link dialog state
   const [autoLinkOpen, setAutoLinkOpen] = useState(false);
 
@@ -885,6 +934,10 @@ export default function CadastroInfluenciadores() {
             <Upload className="h-4 w-4 mr-1" /> Importar CSV
           </Button>
           <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+          {/* R61: cadastro manual direto na pagina */}
+          <Button size="sm" onClick={() => setNovoCadastroOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-1" /> Nova Influenciadora
+          </Button>
         </div>
       </div>
 
@@ -1073,6 +1126,102 @@ export default function CadastroInfluenciadores() {
           </Card>
         </>
       )}
+
+      {/* R61: ── Novo Cadastro Manual ─────────────────────────────────────────── */}
+      <Dialog open={novoCadastroOpen} onOpenChange={setNovoCadastroOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova Influenciadora</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Cadastro rápido. Vai entrar no Kanban em status &quot;Prospecção&quot;.
+            </p>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs">Nome *</Label>
+              <Input
+                value={novoForm.name}
+                onChange={(e) => setNovoForm({ ...novoForm, name: e.target.value })}
+                placeholder="Ex: Ana Silva"
+                autoFocus
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Instagram *</Label>
+              <Input
+                value={novoForm.instagram}
+                onChange={(e) => setNovoForm({ ...novoForm, instagram: e.target.value })}
+                placeholder="@usuario ou usuario"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">WhatsApp</Label>
+                <Input
+                  value={novoForm.whatsapp}
+                  onChange={(e) => setNovoForm({ ...novoForm, whatsapp: e.target.value })}
+                  placeholder="(21) 99999-0000"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Email</Label>
+                <Input
+                  type="email"
+                  value={novoForm.email}
+                  onChange={(e) => setNovoForm({ ...novoForm, email: e.target.value })}
+                  placeholder="ana@exemplo.com"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <Label className="text-xs">Cidade</Label>
+                <Input
+                  value={novoForm.cidade}
+                  onChange={(e) => setNovoForm({ ...novoForm, cidade: e.target.value })}
+                  placeholder="Rio de Janeiro"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">UF</Label>
+                <Input
+                  value={novoForm.estado}
+                  onChange={(e) => setNovoForm({ ...novoForm, estado: e.target.value.slice(0, 2) })}
+                  placeholder="RJ"
+                  maxLength={2}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Coupon</Label>
+                <Input
+                  value={novoForm.coupon}
+                  onChange={(e) => setNovoForm({ ...novoForm, coupon: e.target.value })}
+                  placeholder="ANA10"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">CPF</Label>
+                <Input
+                  value={novoForm.cpf}
+                  onChange={(e) => setNovoForm({ ...novoForm, cpf: e.target.value })}
+                  placeholder="000.000.000-00"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNovoCadastroOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => insertInfluencerMutation.mutate(novoForm)}
+              disabled={insertInfluencerMutation.isPending || !novoForm.name.trim() || !novoForm.instagram.trim()}
+            >
+              {insertInfluencerMutation.isPending ? "Cadastrando..." : "Cadastrar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── CPF Import Dialog ────────────────────────────────────────────────── */}
       <Dialog open={cpfImportOpen} onOpenChange={setCpfImportOpen}>
