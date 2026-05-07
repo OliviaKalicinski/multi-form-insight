@@ -635,22 +635,36 @@ export default function CadastroInfluenciadores() {
         );
       }
 
-      const enriched = rows.map((row) =>
-        existingEmails.has(row.email)
-          ? row // existente: preserva kanban_status atual do DB
-          : { ...row, kanban_status: "prospeccao" }, // novo: força default
-      );
+      // R59-fix-7: split em INSERT (novos) + UPDATE (existentes) porque a coluna
+      // 'email' nao tem UNIQUE constraint no banco — upsert(onConflict:'email')
+      // quebra com 'no unique or exclusion constraint matching'.
+      const newRows = rows
+        .filter((r) => !existingEmails.has(r.email))
+        .map((r) => ({ ...r, kanban_status: "prospeccao" }));
+      const updateRows = rows.filter((r) => existingEmails.has(r.email));
 
-      const { error } = await (supabase.from("influencer_registry") as any).upsert(enriched, {
-        onConflict: "email",
-      });
-      if (error) throw error;
+      let createdCount = 0;
+      let updatedCount = 0;
 
-      // R59-fix-6: retorna contagem pro toast
+      if (newRows.length > 0) {
+        const { error: insertErr } = await (supabase.from("influencer_registry") as any).insert(newRows);
+        if (insertErr) throw insertErr;
+        createdCount = newRows.length;
+      }
+
+      // UPDATE individual por email — preserva kanban_status existente.
+      for (const row of updateRows) {
+        const { error: updateErr } = await (supabase.from("influencer_registry") as any)
+          .update(row)
+          .eq("email", row.email);
+        if (updateErr) throw updateErr;
+        updatedCount += 1;
+      }
+
       return {
         total: rows.length,
-        created: rows.length - existingEmails.size,
-        updated: existingEmails.size,
+        created: createdCount,
+        updated: updatedCount,
       };
     },
     onSuccess: (result) => {
