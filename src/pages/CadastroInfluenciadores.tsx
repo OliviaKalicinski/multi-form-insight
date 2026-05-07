@@ -128,30 +128,70 @@ interface CpfMatch {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+/** R59-fix-4: lookup case-insensitive de coluna pra aceitar headers em PT
+ *  (Nome, Instagram, ...) ou formato Aspire (name_full_text, ...) */
+function getCol(row: Record<string, string>, ...keys: string[]): string {
+  // Tenta keys exatas primeiro
+  for (const k of keys) {
+    const v = row[k];
+    if (v && String(v).trim()) return String(v).trim();
+  }
+  // Fallback: case-insensitive
+  const lowerMap: Record<string, string> = {};
+  for (const k of Object.keys(row)) lowerMap[k.toLowerCase()] = k;
+  for (const k of keys) {
+    const realKey = lowerMap[k.toLowerCase()];
+    if (realKey && row[realKey] && String(row[realKey]).trim()) return String(row[realKey]).trim();
+  }
+  return "";
+}
+
+function cleanHandle(s: string): string {
+  if (!s) return "";
+  let h = String(s).trim();
+  const urlMatch = h.match(/(?:instagram\.com|tiktok\.com)\/@?([a-zA-Z0-9._]+)/i);
+  if (urlMatch) h = urlMatch[1];
+  return h.replace(/^@/, "").replace(/\/+$/, "").replace(/\s+/g, "");
+}
+
 function parseInfluencerCSV(raw: string): Influencer[] {
-  const result = Papa.parse<InfluencerRaw>(raw, { header: true, skipEmptyLines: true });
+  const result = Papa.parse<Record<string, string>>(raw, { header: true, skipEmptyLines: true });
   return result.data
-    .filter((r) => r.email || r.name_full_text)
-    .map((r) => ({
-      email: r.email?.trim() || r.name_full_text?.trim(),
-      name: r.name_full_text?.trim() || "",
-      instagram: r.contact_instagram_text?.trim() || "",
-      tiktok: r.contact_tiktok_text?.trim() || "",
-      whatsapp: r.contact_whatsapp_text?.trim() || "",
-      cnpj: r.paym_pj_cnpj_text?.trim() || "",
-      cpf: r.paym_pf_cpf_text?.trim() || "",
-      razao_social: r.paym_pj_razao_social_text?.trim() || "",
-      address: {
-        logradouro: r.address_logradouro_text?.trim() || "",
-        numero: r.address_numero_text?.trim() || "",
-        complemento: r.address_complemento_text?.trim() || "",
-        bairro: r.address_bairro_text?.trim() || "",
-        cidade: r.address_cidade_text?.trim() || "",
-        estado: r.address_estado_text?.trim() || "",
-        cep: r.address_cep_text?.trim() || "",
-      },
-      coupon: null,
-    }));
+    .filter((r) => {
+      // R59-fix-4: aceita formato Aspire (name_full_text/email) OU formato PT
+      // (Nome/Instagram). Se qualquer um deles tiver dado, mantem.
+      const nome = getCol(r, "name_full_text", "Nome", "Creator", "Name");
+      const instagram = getCol(r, "contact_instagram_text", "Instagram");
+      const email = getCol(r, "email", "Email", "E-mail");
+      return !!(nome || email || instagram);
+    })
+    .map((r) => {
+      const name = getCol(r, "name_full_text", "Nome", "Creator", "Name");
+      const instagram = cleanHandle(getCol(r, "contact_instagram_text", "Instagram", "Instagram Link"));
+      const tiktok = cleanHandle(getCol(r, "contact_tiktok_text", "TikTok", "TikTok Link"));
+      const whatsapp = getCol(r, "contact_whatsapp_text", "WhatsApp", "Whatsapp", "Telefone", "Contato");
+      const email = getCol(r, "email", "Email", "E-mail") || name;
+      return {
+        email,
+        name,
+        instagram,
+        tiktok,
+        whatsapp,
+        cnpj: getCol(r, "paym_pj_cnpj_text", "CNPJ"),
+        cpf: getCol(r, "paym_pf_cpf_text", "CPF"),
+        razao_social: getCol(r, "paym_pj_razao_social_text", "Razão Social", "Razao Social"),
+        address: {
+          logradouro: getCol(r, "address_logradouro_text", "Logradouro", "Endereço", "Endereco"),
+          numero: getCol(r, "address_numero_text", "Número", "Numero"),
+          complemento: getCol(r, "address_complemento_text", "Complemento"),
+          bairro: getCol(r, "address_bairro_text", "Bairro"),
+          cidade: getCol(r, "address_cidade_text", "Cidade"),
+          estado: getCol(r, "address_estado_text", "Estado", "UF"),
+          cep: getCol(r, "address_cep_text", "CEP"),
+        },
+        coupon: null,
+      };
+    });
 }
 
 function influencerDBRowToInfluencer(row: InfluencerDBRow): Influencer {
