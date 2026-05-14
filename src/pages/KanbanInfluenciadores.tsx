@@ -1246,6 +1246,20 @@ export default function KanbanInfluenciadores() {
         }
       }
     },
+    // R64: optimistic update — quando muda status pelo Select no card aberto
+    // (bug 874b44aa), o card pulava de coluna so depois do refetch (e antes
+    // do R62, nem isso). Agora move IMEDIATO igual ao drag-and-drop.
+    onMutate: async (payload) => {
+      if (payload.isNew || !payload.id) return;
+      const newStatus = payload.data.kanban_status as InfluencerStatus | undefined;
+      if (!newStatus) return;
+      await queryClient.cancelQueries({ queryKey: ["kanban_influenciadores"] });
+      const prev = queryClient.getQueryData<Influencer[]>(["kanban_influenciadores"]);
+      queryClient.setQueryData<Influencer[]>(["kanban_influenciadores"], (old = []) =>
+        old.map((i) => (i.id === payload.id ? { ...i, status: newStatus } : i)),
+      );
+      return { prev };
+    },
     // R62: refetch explícito força banco-fonte-da-verdade depois de cada mutation.
     // Também invalida queries do gráfico (PartnerGrowthChart) que tinham staleTime
     // de 5min e ficavam com numero antigo apos criar/mover.
@@ -1255,7 +1269,9 @@ export default function KanbanInfluenciadores() {
       queryClient.invalidateQueries({ queryKey: ["partner_growth_chart_history"] });
       queryClient.invalidateQueries({ queryKey: ["partner_growth_chart_created"] });
     },
-    onError: (err: Error) => {
+    onError: (err: Error, _vars, ctx: any) => {
+      // R64: rollback optimistic em caso de erro
+      if (ctx?.prev) queryClient.setQueryData(["kanban_influenciadores"], ctx.prev);
       // Mostra na UI ao invés de silenciar. Beatriz reportou (28/04) que
       // edição de nome "não persistia" — sem onError, qualquer falha era
       // invisível e a UI mostrava cache antigo.
