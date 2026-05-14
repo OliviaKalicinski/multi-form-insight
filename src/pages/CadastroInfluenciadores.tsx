@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Papa from "papaparse";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -498,6 +498,15 @@ function CouponInput({
 export default function CadastroInfluenciadores() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
+  // R63: debouncedSearch aplica filtro 250ms depois da ultima tecla.
+  // Sem isso, com 1000+ influencers cada keystroke disparava filter+sort
+  // pesado e podia bloquear o refresh do token JWT do Supabase → redirect
+  // pra /login (sintoma reportado: 'site desloga ao buscar').
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
   const [selected, setSelected] = useState<Influencer | null>(null);
   const [editingCoupon, setEditingCoupon] = useState<string>("none");
   const queryClient = useQueryClient();
@@ -910,23 +919,27 @@ export default function CadastroInfluenciadores() {
   // ── Derived ─────────────────────────────────────────────────────────────────
   const displayed = useMemo(() => {
     let list = influencersData;
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (i) =>
-          i.name.toLowerCase().includes(q) ||
-          i.instagram.toLowerCase().includes(q) ||
-          i.email.toLowerCase().includes(q) ||
-          i.address.cidade.toLowerCase().includes(q)
-      );
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      // R63: null-safety em todos os campos. Antes, se algum influencer tinha
+      // cidade/name/instagram/email = null, o .toLowerCase() quebrava com
+      // TypeError mid-render → crash silencioso → ProtectedRoute remontava
+      // e podia interpretar como sessao invalida → redirect pra /login.
+      list = list.filter((i) => {
+        const name = (i.name || "").toLowerCase();
+        const ig = (i.instagram || "").toLowerCase();
+        const em = (i.email || "").toLowerCase();
+        const cidade = (i.address?.cidade || "").toLowerCase();
+        return name.includes(q) || ig.includes(q) || em.includes(q) || cidade.includes(q);
+      });
     }
 
     list = [...list].sort((a, b) => {
       let av = "";
       let bv = "";
-      if (sortField === "name") { av = a.name; bv = b.name; }
-      else if (sortField === "instagram") { av = a.instagram; bv = b.instagram; }
-      else if (sortField === "cidade") { av = a.address.cidade; bv = b.address.cidade; }
+      if (sortField === "name") { av = a.name || ""; bv = b.name || ""; }
+      else if (sortField === "instagram") { av = a.instagram || ""; bv = b.instagram || ""; }
+      else if (sortField === "cidade") { av = a.address?.cidade || ""; bv = b.address?.cidade || ""; }
       else if (sortField === "coupon") {
         av = a.coupon ?? "";
         bv = b.coupon ?? "";
@@ -941,7 +954,8 @@ export default function CadastroInfluenciadores() {
     return list;
     // R39 (auditoria #4): perfStats faltava — sort por GMV usava valores
     // antigos/zerados quando salesData chegava depois do cadastro.
-  }, [influencersData, search, sortField, sortAsc, perfStats]);
+    // R63: trocado search por debouncedSearch (250ms) + null-safety completa.
+  }, [influencersData, debouncedSearch, sortField, sortAsc, perfStats]);
 
   const linkedCount = influencersData.filter((i) => !!i.coupon).length;
 
