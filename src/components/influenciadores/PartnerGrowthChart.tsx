@@ -61,7 +61,10 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
       }
       return (data ?? []).map((r: any) => ({ id: r.id, status: r.kanban_status })) as InfluencerBasic[];
     },
-    staleTime: 5 * 60 * 1000,
+    // R62: staleTime baixo (30s) pra alinhar com o Kanban. Mutations do
+    // Kanban (drag/criar) invalidam essas queries explicitamente pra que
+    // o gráfico reflita a base no mesmo momento que os contadores.
+    staleTime: 30 * 1000,
   });
 
   // Histórico de transições para "parceiro" no trimestre atual.
@@ -85,7 +88,10 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
       }
       return (data ?? []) as { new_status: string; changed_at: string; source: string }[];
     },
-    staleTime: 5 * 60 * 1000,
+    // R62: staleTime baixo (30s) pra alinhar com o Kanban. Mutations do
+    // Kanban (drag/criar) invalidam essas queries explicitamente pra que
+    // o gráfico reflita a base no mesmo momento que os contadores.
+    staleTime: 30 * 1000,
   });
 
   // R60: novos no funil (qualquer entrada no Kanban) por created_at
@@ -108,7 +114,10 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
       }
       return (data ?? []) as { id: string; created_at: string }[];
     },
-    staleTime: 5 * 60 * 1000,
+    // R62: staleTime baixo (30s) pra alinhar com o Kanban. Mutations do
+    // Kanban (drag/criar) invalidam essas queries explicitamente pra que
+    // o gráfico reflita a base no mesmo momento que os contadores.
+    staleTime: 30 * 1000,
   });
 
   const weeklyChartData = useMemo(() => {

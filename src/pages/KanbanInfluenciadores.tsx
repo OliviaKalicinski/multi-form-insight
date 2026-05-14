@@ -1090,6 +1090,12 @@ export default function KanbanInfluenciadores() {
       if (error) throw error;
       return (data ?? []).map(rowToInfluencer);
     },
+    // R62: staleTime 0 + refetchOnWindowFocus garantem que toda invalidacao
+    // dispare refetch real. Sem isso, contadores podiam ficar congelados
+    // depois de drag-drop por race condition optimistic + invalidate.
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   // ── Histórico de transições REAIS para "parceiro" (trimestre atual) ───────
@@ -1240,7 +1246,15 @@ export default function KanbanInfluenciadores() {
         }
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kanban_influenciadores"] }),
+    // R62: refetch explícito força banco-fonte-da-verdade depois de cada mutation.
+    // Também invalida queries do gráfico (PartnerGrowthChart) que tinham staleTime
+    // de 5min e ficavam com numero antigo apos criar/mover.
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["kanban_influenciadores"], type: "active" });
+      queryClient.invalidateQueries({ queryKey: ["partner_growth_chart_parceiros"] });
+      queryClient.invalidateQueries({ queryKey: ["partner_growth_chart_history"] });
+      queryClient.invalidateQueries({ queryKey: ["partner_growth_chart_created"] });
+    },
     onError: (err: Error) => {
       // Mostra na UI ao invés de silenciar. Beatriz reportou (28/04) que
       // edição de nome "não persistia" — sem onError, qualquer falha era
@@ -1258,7 +1272,14 @@ export default function KanbanInfluenciadores() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kanban_influenciadores"] }),
+    // R62: refetch explícito + invalidate do gráfico. Sem o refetch garantido,
+    // drags em sequência causavam race entre optimistic e invalidate.
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["kanban_influenciadores"], type: "active" });
+      queryClient.invalidateQueries({ queryKey: ["partner_growth_chart_parceiros"] });
+      queryClient.invalidateQueries({ queryKey: ["partner_growth_chart_history"] });
+      queryClient.invalidateQueries({ queryKey: ["partner_growth_chart_created"] });
+    },
     // Optimistic update
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey: ["kanban_influenciadores"] });
@@ -1282,7 +1303,10 @@ export default function KanbanInfluenciadores() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kanban_influenciadores"] }),
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["kanban_influenciadores"], type: "active" });
+      queryClient.invalidateQueries({ queryKey: ["partner_growth_chart_parceiros"] });
+    },
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
