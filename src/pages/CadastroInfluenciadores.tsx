@@ -585,9 +585,21 @@ export default function CadastroInfluenciadores() {
   const { data: influencersData = [], isLoading: influencersLoading } = useQuery({
     queryKey: ["influencer-registry"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("influencer_registry") as any).select("*");
-      if (error) throw error;
-      return (data || []).map(influencerDBRowToInfluencer);
+      // R68: paginacao manual — Supabase tem db-max-rows default 1000.
+      // Sem isso, o /cadastro mostrava apenas 1000 influenciadoras mesmo
+      // tendo mais no banco (visto antes na UI: "1000 influenciadoras").
+      const all: any[] = [];
+      const BATCH = 1000;
+      for (let off = 0; off < 100000; off += BATCH) {
+        const { data, error } = await (supabase.from("influencer_registry") as any)
+          .select("*")
+          .range(off, off + BATCH - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < BATCH) break;
+      }
+      return all.map(influencerDBRowToInfluencer);
     },
   });
 

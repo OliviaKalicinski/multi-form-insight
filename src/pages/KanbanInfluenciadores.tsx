@@ -1088,13 +1088,25 @@ export default function KanbanInfluenciadores() {
   const { data: rawInfluencers = [], isLoading } = useQuery({
     queryKey: ["kanban_influenciadores"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("influencer_registry")
-        .select("*")
-        .not("kanban_status", "is", null)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map(rowToInfluencer);
+      // R68: paginacao manual em batches de 1000 — Supabase tem db-max-rows
+      // default 1000. Sem isso, o Kanban exibia apenas os 1000 mais recentes
+      // e contadores ficavam errados (ex: 'Parceiro 23' enquanto banco tinha
+      // 195). Sintoma reportado por Bruno em 14/05.
+      const all: any[] = [];
+      const BATCH = 1000;
+      for (let off = 0; off < 100000; off += BATCH) {
+        const { data, error } = await supabase
+          .from("influencer_registry")
+          .select("*")
+          .not("kanban_status", "is", null)
+          .order("created_at", { ascending: false })
+          .range(off, off + BATCH - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < BATCH) break;
+      }
+      return all.map(rowToInfluencer);
     },
     // R62: staleTime 0 + refetchOnWindowFocus garantem que toda invalidacao
     // dispare refetch real. Sem isso, contadores podiam ficar congelados
