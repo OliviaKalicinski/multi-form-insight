@@ -1729,9 +1729,13 @@ export default function KanbanInfluenciadores() {
         // Load existing para upsert check — por instagram, tiktok E email.
         // R66: incluir email no select pra dedup quando a planilha so tem email
         // ou tem instagram que ja foi atualizado/renomeado.
+        // R66b: range(0, 9999) pra burlar o LIMIT default de 1000 do Supabase
+        // (Bruno: base tinha 1423 influencers — emails das ultimas 423 linhas
+        // ficavam fora do indice e geravam "duplicate key" no INSERT).
         const { data: existing } = await supabase
           .from("influencer_registry")
-          .select("id, instagram, tiktok, email, kanban_status");
+          .select("id, instagram, tiktok, email, kanban_status")
+          .range(0, 9999);
         const igMap = new Map((existing ?? []).filter(r => r.instagram).map((r) => [normalizeInstagram(r.instagram!), r]));
         const ttMap = new Map((existing ?? []).filter(r => r.tiktok).map((r) => [r.tiktok!.replace(/^@/, "").toLowerCase(), r]));
         const emailMap = new Map(
