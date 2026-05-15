@@ -1817,6 +1817,16 @@ export default function KanbanInfluenciadores() {
             } else if (!existing.kanban_status) {
               updatePayload.kanban_status = "prospeccao";
             }
+            // R66d: se o email do payload colide com OUTRO registro do banco
+            // (UNIQUE constraint), preserva o email atual do existing pra
+            // evitar 409 Conflict. O instagram match ja garantiu a identidade.
+            const payloadEmail = String((updatePayload.email as string) || "").toLowerCase().trim();
+            if (payloadEmail) {
+              const conflictRow = emailMap.get(payloadEmail);
+              if (conflictRow && conflictRow.id !== existing.id) {
+                delete updatePayload.email; // mantem email atual do existing
+              }
+            }
             const { error } = await supabase
               .from("influencer_registry")
               .update(updatePayload as any)
@@ -1824,14 +1834,31 @@ export default function KanbanInfluenciadores() {
             if (error) result.errors.push(`Linha ${fileRow}: Erro ao atualizar — ${error.message}`);
             else result.updated++;
           } else {
-            const { error } = await supabase.from("influencer_registry").insert([{
+            // R66d: usa upsert(onConflict:'email') em vez de insert puro
+            // quando ha email — se ja existir registro com esse email
+            // (mas instagram nao bateu por divergencia), faz UPDATE em vez
+            // de falhar com unique constraint.
+            const insertPayload = {
               ...dbPayload,
               kanban_status: defaultStatus,
               na_base: false,
               created_at: new Date().toISOString(),
-            }] as any);
-            if (error) result.errors.push(`Linha ${fileRow}: Erro ao criar — ${error.message}`);
-            else result.created++;
+            };
+            const insertEmail = String((insertPayload.email as string) || "").toLowerCase().trim();
+            if (insertEmail) {
+              const { error } = await (supabase.from("influencer_registry") as any)
+                .upsert(insertPayload, { onConflict: "email", ignoreDuplicates: false });
+              if (error) result.errors.push(`Linha ${fileRow}: Erro ao salvar — ${error.message}`);
+              else {
+                // Se ja existia (matched no emailMap), conta como updated
+                if (emailMap.has(insertEmail)) result.updated++;
+                else result.created++;
+              }
+            } else {
+              const { error } = await supabase.from("influencer_registry").insert([insertPayload] as any);
+              if (error) result.errors.push(`Linha ${fileRow}: Erro ao criar — ${error.message}`);
+              else result.created++;
+            }
           }
         }
 
