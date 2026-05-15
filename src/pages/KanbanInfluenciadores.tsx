@@ -1727,22 +1727,33 @@ export default function KanbanInfluenciadores() {
         const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
         // Load existing para upsert check — por instagram, tiktok E email.
-        // R66: incluir email no select pra dedup quando a planilha so tem email
-        // ou tem instagram que ja foi atualizado/renomeado.
-        // R66b: range(0, 9999) pra burlar o LIMIT default de 1000 do Supabase
-        // (Bruno: base tinha 1423 influencers — emails das ultimas 423 linhas
-        // ficavam fora do indice e geravam "duplicate key" no INSERT).
-        const { data: existing } = await supabase
-          .from("influencer_registry")
-          .select("id, instagram, tiktok, email, kanban_status")
-          .range(0, 9999);
-        const igMap = new Map((existing ?? []).filter(r => r.instagram).map((r) => [normalizeInstagram(r.instagram!), r]));
-        const ttMap = new Map((existing ?? []).filter(r => r.tiktok).map((r) => [r.tiktok!.replace(/^@/, "").toLowerCase(), r]));
+        // R66c: paginacao manual em batches de 1000. O .range() do R66b nao
+        // resolveu porque o Supabase tem 'db-max-rows' global (default 1000)
+        // que sobrepoe o range — mesmo pedindo 10k, ele corta em 1k. Aqui
+        // a gente itera ate esgotar, garantindo pegar 100% dos registros.
+        const existing: Array<{ id: string; instagram: string | null; tiktok: string | null; email: string | null; kanban_status: string | null }> = [];
+        const BATCH = 1000;
+        for (let off = 0; off < 100000; off += BATCH) {
+          const { data, error } = await supabase
+            .from("influencer_registry")
+            .select("id, instagram, tiktok, email, kanban_status")
+            .range(off, off + BATCH - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          existing.push(...(data as any));
+          if (data.length < BATCH) break;
+        }
+        const igMap = new Map(existing.filter(r => r.instagram).map((r) => [normalizeInstagram(r.instagram!), r]));
+        const ttMap = new Map(existing.filter(r => r.tiktok).map((r) => [r.tiktok!.replace(/^@/, "").toLowerCase(), r]));
         const emailMap = new Map(
-          (existing ?? [])
-            .filter((r: any) => r.email)
-            .map((r: any) => [String(r.email).toLowerCase().trim(), r]),
+          existing
+            .filter((r) => r.email)
+            .map((r) => [String(r.email).toLowerCase().trim(), r]),
         );
+        // R66c: log de diagnostico — Bruno: se 'existing.length' for proximo
+        // de 1000 mesmo com base maior, o batch nao esta esgotando.
+        // eslint-disable-next-line no-console
+        console.log(`[import] carregou ${existing.length} influencers, ${emailMap.size} com email, ${igMap.size} com instagram`);
 
         for (let idx = 0; idx < dataRows.length; idx++) {
           const row = dataRows[idx];
