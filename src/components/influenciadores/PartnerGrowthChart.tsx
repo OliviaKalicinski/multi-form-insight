@@ -75,11 +75,15 @@ export function PartnerGrowthChart(_props: PartnerGrowthChartProps = {}) {
       quarterRange.end.toISOString(),
     ],
     queryFn: async () => {
+      // R69: aceita source='trigger' (novas transicoes pos-migration) E
+      // source='backfill' (entries criadas pela migration kanban_status_history
+      // pra parceiros pre-existentes). Sem isso, o grafico ficava vazio
+      // mesmo apos 176 parceiros novos terem entrado via 'Forcar: Parceiro'.
       const { data, error } = await supabase
         .from("kanban_status_history" as any)
         .select("new_status, changed_at, source")
         .eq("new_status", "parceiro")
-        .eq("source", "trigger")
+        .in("source", ["trigger", "backfill"])
         .gte("changed_at", quarterRange.start.toISOString())
         .lte("changed_at", quarterRange.end.toISOString());
       if (error) {
