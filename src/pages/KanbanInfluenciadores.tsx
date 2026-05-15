@@ -1070,6 +1070,12 @@ export default function KanbanInfluenciadores() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importResultOpen, setImportResultOpen] = useState(false);
+  // R66: dialog pra importar planilha pra coluna específica (parceiros, etc).
+  // Quando setado, sobrescreve o status de TODAS as linhas da planilha
+  // pra essa coluna — ignora coluna 'Status' da planilha. Default 'auto'
+  // mantém comportamento antigo (detecta pela planilha).
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importTargetColumn, setImportTargetColumn] = useState<InfluencerStatus | "auto">("auto");
   const [search, setSearch] = useState("");
   const [filterResponsavel, setFilterResponsavel] = useState<string>("");
   // R32: filtro adicional por Nicho (já existia opção de Responsável + busca).
@@ -1646,6 +1652,11 @@ export default function KanbanInfluenciadores() {
     if (!file) return;
     e.target.value = "";
 
+    // R66: captura o target column no momento do upload — depois fecha o dialog.
+    const forcedStatus: InfluencerStatus | null =
+      importTargetColumn !== "auto" ? importTargetColumn : null;
+    setImportDialogOpen(false);
+
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -1656,7 +1667,32 @@ export default function KanbanInfluenciadores() {
           : workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
 
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "", raw: false });
+        // R66: detecta planilhas com linha descritiva no topo (ex: "Influenciadores
+        // cadastrados na plataforma mas NÃO presentes no Kanban — 177"). Faz um
+        // sweep nas primeiras 5 linhas procurando a row que tem 'Nome' / 'Instagram'
+        // / 'Email' / 'Creator' e a usa como header real, descartando o lixo acima.
+        const rawJson = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: "", raw: false });
+        let headerRowIdx = 0;
+        for (let i = 0; i < Math.min(5, rawJson.length); i++) {
+          const row = (rawJson[i] || []).map((c) => String(c || "").toLowerCase().trim());
+          const hasHeader = row.some((c) =>
+            /^(nome|name|creator|instagram|email|e-mail|name_full_text)$/i.test(c),
+          );
+          if (hasHeader) { headerRowIdx = i; break; }
+        }
+        const realHeaders = (rawJson[headerRowIdx] || []).map((c) => String(c || "").trim());
+        let jsonData: Record<string, string>[] = rawJson.slice(headerRowIdx + 1).map((row) => {
+          const obj: Record<string, string> = {};
+          for (let j = 0; j < realHeaders.length; j++) {
+            if (realHeaders[j]) obj[realHeaders[j]] = String(row[j] ?? "");
+          }
+          return obj;
+        });
+        // Filtra linhas vazias
+        jsonData = jsonData.filter((r) =>
+          Object.values(r).some((v) => String(v || "").trim().length > 0),
+        );
+
         if (jsonData.length === 0) {
           setImportResult({ created: 0, updated: 0, skipped: 0, errors: ["Arquivo vazio ou sem dados."] });
           setImportResultOpen(true);
@@ -1690,12 +1726,19 @@ export default function KanbanInfluenciadores() {
 
         const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
 
-        // Load existing para upsert check — por instagram E por tiktok
+        // Load existing para upsert check — por instagram, tiktok E email.
+        // R66: incluir email no select pra dedup quando a planilha so tem email
+        // ou tem instagram que ja foi atualizado/renomeado.
         const { data: existing } = await supabase
           .from("influencer_registry")
-          .select("id, instagram, tiktok, kanban_status");
+          .select("id, instagram, tiktok, email, kanban_status");
         const igMap = new Map((existing ?? []).filter(r => r.instagram).map((r) => [normalizeInstagram(r.instagram!), r]));
         const ttMap = new Map((existing ?? []).filter(r => r.tiktok).map((r) => [r.tiktok!.replace(/^@/, "").toLowerCase(), r]));
+        const emailMap = new Map(
+          (existing ?? [])
+            .filter((r: any) => r.email)
+            .map((r: any) => [String(r.email).toLowerCase().trim(), r]),
+        );
 
         for (let idx = 0; idx < dataRows.length; idx++) {
           const row = dataRows[idx];
@@ -1714,34 +1757,47 @@ export default function KanbanInfluenciadores() {
           const dedupKey = mapped._igNorm as string;
           const dbPayload = mapped.payload as Record<string, unknown>;
 
-          if (!nome && !igRaw) { result.skipped++; continue; }
+          // R66: aceita linha que tenha pelo menos nome OU instagram OU email
+          // (planilhas de parceiros frequentemente so tem nome + email).
+          const rowEmail = String((dbPayload.email as string) || "").toLowerCase().trim();
+          if (!nome && !igRaw && !rowEmail) { result.skipped++; continue; }
 
           if (!nome) {
-            result.errors.push(`Linha ${fileRow}: Nome obrigatório vazio (${platform === "tiktok" ? "TikTok" : "Instagram"}: ${igRaw || "—"})`);
+            result.errors.push(`Linha ${fileRow}: Nome obrigatório vazio.`);
             result.skipped++;
             continue;
           }
-          if (!dedupKey) {
-            result.errors.push(`Linha ${fileRow}: ${platform === "tiktok" ? "TikTok" : "Instagram"} obrigatório vazio (Nome: ${nome})`);
+          // R66: se forcedStatus existe, dedupKey pode ser vazio — match por email.
+          if (!dedupKey && !rowEmail) {
+            result.errors.push(`Linha ${fileRow}: Instagram OU Email obrigatório (Nome: ${nome})`);
             result.skipped++;
             continue;
           }
 
-          // Status from spreadsheet (column "kanban_status"). If empty/invalid → "prospeccao".
-          // R59-fix-5: lookup case-insensitive pra pegar "Status" / "Etapa" tb.
+          // Status — R66: se forcedStatus setado, sobrescreve qualquer status
+          // da planilha. Senão, comportamento antigo (le da coluna Status).
           const statusVal =
             row["kanban_status"] || row["status"] || row["Status"] || row["Etapa"] || row["etapa"] || "";
           const sheetStatus = parseStatusFromSheet(statusVal);
-          const defaultStatus: InfluencerStatus = sheetStatus ?? "prospeccao";
+          const defaultStatus: InfluencerStatus =
+            forcedStatus ?? sheetStatus ?? "prospeccao";
 
-          // Dedup: checar por instagram OU tiktok dependendo da plataforma
-          const existingByIg = igMap.get(dedupKey);
-          const existingByTt = ttMap.get(dedupKey.toLowerCase());
-          const existing = (platform === "tiktok" ? (existingByTt || existingByIg) : (existingByIg || existingByTt));
+          // Dedup: instagram primeiro, depois tiktok, depois email (R66).
+          const existingByIg = dedupKey ? igMap.get(dedupKey) : undefined;
+          const existingByTt = dedupKey ? ttMap.get(dedupKey.toLowerCase()) : undefined;
+          const existingByEmail = rowEmail ? emailMap.get(rowEmail) : undefined;
+          const existing =
+            platform === "tiktok"
+              ? (existingByTt || existingByIg || existingByEmail)
+              : (existingByIg || existingByTt || existingByEmail);
 
           if (existing) {
             const updatePayload: Record<string, unknown> = { ...dbPayload };
-            if (sheetStatus) {
+            // R66: forcedStatus sempre sobrescreve. Caso contrario, fallback
+            // pra sheetStatus, e por ultimo preserva o status existente.
+            if (forcedStatus) {
+              updatePayload.kanban_status = forcedStatus;
+            } else if (sheetStatus) {
               updatePayload.kanban_status = sheetStatus;
             } else if (!existing.kanban_status) {
               updatePayload.kanban_status = "prospeccao";
@@ -1973,7 +2029,14 @@ export default function KanbanInfluenciadores() {
             </Select>
           )}
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setImportTargetColumn("auto");
+              setImportDialogOpen(true);
+            }}
+            className="gap-1.5"
+          >
             <Upload className="h-4 w-4" /> Importar
           </Button>
           <Button variant="outline" onClick={handleExportXLSX} className="gap-1.5" disabled={rawInfluencers.length === 0}>
@@ -2042,6 +2105,48 @@ export default function KanbanInfluenciadores() {
         isPending={upsertMutation.isPending}
       />
       <ImportResultDialog open={importResultOpen} onClose={() => setImportResultOpen(false)} result={importResult} />
+
+      {/* R66: dialog de importacao com escolha de coluna alvo. */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Importar planilha</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Coluna de destino</Label>
+              <Select
+                value={importTargetColumn}
+                onValueChange={(v) => setImportTargetColumn(v as InfluencerStatus | "auto")}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Detectar pela planilha (padrão)</SelectItem>
+                  {COLUMNS.map((c) => (
+                    <SelectItem key={c.key} value={c.key}>Forçar: {c.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {importTargetColumn === "auto"
+                  ? "Lê a coluna 'Status' da planilha. Linhas sem status entram em Prospecção."
+                  : `Todas as linhas vão pra esta coluna, sobrescrevendo status existentes. Útil pra subir listas de parceiros ou contatos já qualificados.`}
+              </p>
+            </div>
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+              <p><strong>Formatos aceitos:</strong> .xlsx, .xls, .csv</p>
+              <p><strong>Colunas reconhecidas:</strong> Nome, Instagram, TikTok, WhatsApp, Email, Cidade/Estado, Nicho, Seguidores</p>
+              <p>Linhas duplicadas (match por Instagram, TikTok ou Email) são atualizadas — nunca duplicadas.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-1" /> Selecionar arquivo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
