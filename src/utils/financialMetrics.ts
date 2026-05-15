@@ -630,7 +630,11 @@ export const calculateFinancialMetrics = (orders: ProcessedOrder[], selectedMont
   // Calcular produto médio REAL (média de produtos individuais, excluindo amostras)
   const brokenDownOrders = breakdownOrders(realOrders);
 
-  // Contar linhas de SKU por pedido (não soma de unidades físicas), excluindo amostras e materiais
+  // R65: soma QUANTIDADES (itens reais) após breakdown, nao linhas/SKUs.
+  // Antes: 'pSum + 1' contava cada linha como 1 mesmo quando a linha tinha
+  // qty>1 (ex: kit 3x90g virava 1 linha qty=3 mas contava 1 item, nao 3).
+  // Bug reportado por Bruno: 'Itens/Pedido = 1.6' nao refletia kits de 3.
+  // Agora: cada item real conta — kit de 3 = 3 itens, 2 unidades = 2 itens.
   const totalIndividualItems = brokenDownOrders.reduce((sum, order) => {
     return (
       sum +
@@ -638,7 +642,8 @@ export const calculateFinancialMetrics = (orders: ProcessedOrder[], selectedMont
         if (produto.descricaoAjustada === "Kit de Amostras" || isMaterialProduct(produto)) {
           return pSum;
         }
-        return pSum + 1; // conta linha, não quantidade
+        const qty = Number(produto.quantidade) || 0;
+        return pSum + qty;
       }, 0)
     );
   }, 0);
