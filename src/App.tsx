@@ -41,6 +41,7 @@ import PerformanceInfluenciadores from "./pages/PerformanceInfluenciadores";
 import CadastroInfluenciadores from "./pages/CadastroInfluenciadores";
 import CalendarioMarketing from "./pages/CalendarioMarketing";
 import OrcamentosAprovacao from "./pages/OrcamentosAprovacao";
+import Relatorios from "./pages/Relatorios";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -427,6 +428,18 @@ const App = () => (
               <ProtectedRoute>
                 <AuthenticatedLayout>
                   <OrcamentosAprovacao />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* R76: Repositorio central de relatorios */}
+          <Route
+            path="/relatorios"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <Relatorios />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             }
