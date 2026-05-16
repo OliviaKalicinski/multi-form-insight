@@ -456,6 +456,48 @@ export type Database = {
           },
         ]
       }
+      company_reports: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string | null
+          id: string
+          title: string
+          uploaded_by: string | null
+          uploaded_by_email: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number
+          file_type?: string | null
+          id?: string
+          title: string
+          uploaded_by?: string | null
+          uploaded_by_email?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: string | null
+          id?: string
+          title?: string
+          uploaded_by?: string | null
+          uploaded_by_email?: string | null
+        }
+        Relationships: []
+      }
       coupon_cleanup_audit_20260504: {
         Row: {
           coupon: string | null
