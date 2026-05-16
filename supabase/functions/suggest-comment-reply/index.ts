@@ -217,7 +217,13 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 400,
+        // R74: max_tokens 400→600 — algumas respostas estavam sendo cortadas
+        // antes do CTA. Brevidade vem do prompt, nao do limite tecnico.
+        max_tokens: 600,
+        // R74: temperature explicito 0.7 (default Anthropic eh ~1.0).
+        // Reduz erratidade, mantem criatividade. Bruno reportou (05/05)
+        // que tom de voz nao tava 100% consistente.
+        temperature: 0.7,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userMessage }],
       }),
