@@ -234,19 +234,34 @@ export default function ComentariosInstagram() {
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error ?? "Erro ao enviar resposta");
 
+      const responseTimestamp = new Date().toISOString();
       await (supabase as any)
         .from("instagram_comments")
         .update({
           respondido: true,
           resposta_texto: replyText,
-          resposta_timestamp: new Date().toISOString(),
+          resposta_timestamp: responseTimestamp,
         })
         .eq("id", comment.id);
 
       toast({ title: "Resposta enviada!" });
       setReplyingTo(null);
       setReplyText("");
-      await fetchComments();
+      // R71: update local em vez de fetchComments() — evita 'recarregamento'
+      // da pagina inteira (reclamacao Olivia 05/05). KPIs e contadores
+      // derivados sao recalculados via useMemo automaticamente.
+      setAllComments((prev) =>
+        prev.map((c) =>
+          c.id === comment.id
+            ? {
+                ...c,
+                respondido: true,
+                resposta_texto: replyText,
+                resposta_timestamp: responseTimestamp,
+              }
+            : c,
+        ),
+      );
     } catch (e: any) {
       toast({ title: "Erro ao responder", description: e.message, variant: "destructive" });
     }
