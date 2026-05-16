@@ -25,6 +25,9 @@ Deno.serve(async (req) => {
     const META_TOKEN = Deno.env.get("META_ACCESS_TOKEN");
     if (!META_TOKEN) throw new Error("META_ACCESS_TOKEN não configurado");
 
+    // R72: log do input pra debug (sem o token)
+    console.log("[reply] input", { comment_id, message_preview: message.slice(0, 50) });
+
     // Envia resposta via Meta API
     const url = `${META_API}/${comment_id}/replies`;
     const res = await fetch(url, {
@@ -34,7 +37,19 @@ Deno.serve(async (req) => {
     });
 
     const data = await res.json();
-    if (data.error) throw new Error(`Meta API: ${data.error.message} (code ${data.error.code})`);
+    // R72: log da resposta crua da Meta pra debug do bug 1eec8fad
+    console.log("[reply] meta_status", res.status, "meta_body", JSON.stringify(data));
+
+    // R72: validacao tripla — Meta retornou erro OU status nao-2xx OU sem id de resposta
+    if (data?.error) {
+      throw new Error(`Meta API: ${data.error.message} (code ${data.error.code})`);
+    }
+    if (!res.ok) {
+      throw new Error(`Meta API HTTP ${res.status}: ${JSON.stringify(data)}`);
+    }
+    if (!data?.id) {
+      throw new Error(`Meta API nao retornou reply_id. Resposta: ${JSON.stringify(data)}`);
+    }
 
     return new Response(JSON.stringify({ ok: true, reply_id: data.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
