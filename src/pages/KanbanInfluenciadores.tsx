@@ -1238,12 +1238,13 @@ export default function KanbanInfluenciadores() {
     }) => {
       const { id, instagram, data, isNew } = payload;
       if (isNew) {
-        // R59-fix-3: trocado de upsert(onConflict:"instagram") pra insert puro.
-        // A coluna 'instagram' nao tem UNIQUE constraint no banco — onConflict
-        // dava erro 'no unique or exclusion constraint matching'.
-        // Dedup ja eh feito acima em handleAdd via rawInfluencers.some()
-        // antes de decidir isNew, entao insert puro eh seguro.
-        const { error } = await (supabase.from("influencer_registry") as any).insert([data]);
+        // R70: voltou a usar upsert(onConflict:'instagram') agora que a
+        // migration R70_unique_constraint_instagram criou UNIQUE INDEX
+        // em instagram (parcial — ignora NULL/vazio). Se houver race
+        // condition (alguem criou o mesmo instagram entre o dedup local
+        // e o insert), o banco trata via ON CONFLICT em vez de quebrar.
+        const { error } = await (supabase.from("influencer_registry") as any)
+          .upsert(data, { onConflict: "instagram", ignoreDuplicates: false });
         if (error) throw error;
       } else {
         // Match por id (preferido) ou cai pra instagram como fallback de
