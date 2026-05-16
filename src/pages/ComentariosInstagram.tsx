@@ -188,7 +188,10 @@ export default function ComentariosInstagram() {
   };
 
   const handleSync = () => doSync("delta");
+  // R73: handleSyncAll mantido por compatibilidade mas botao removido da UI.
+  // Pode ser chamado via console.log em emergencia: handleSyncAll();
   const handleSyncAll = () => doSync("full");
+  void handleSyncAll; // suppress unused warning
 
   // R44: pede sugestão ao Claude (sonnet-4-6) e prefilla a textarea.
   const handleSuggest = async (comment: Comment) => {
@@ -326,10 +329,8 @@ export default function ComentariosInstagram() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleSyncAll} disabled={syncing} variant="outline" size="sm" className="gap-1.5 text-xs">
-            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-            Sync completo
-          </Button>
+          {/* R73: removido "Sync completo" (Bruno 16/05) — 'delta' cobre 99%
+              dos casos. handleSyncAll mantido em codigo pra emergencias. */}
           <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "Sincronizando..." : "Sincronizar"}
